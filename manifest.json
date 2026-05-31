@@ -1,0 +1,9 @@
+{
+  "name": "translate",
+  "id": 193088440301145,
+  "main": "dist/main.js",
+  "ui": "dist/index.html",
+  "editor_type": [
+    "canvas"
+  ]
+}
