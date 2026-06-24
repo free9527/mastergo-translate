@@ -15,17 +15,50 @@
 
     <!-- 主操作区 -->
     <div class="toolbar">
+      <!-- 翻译范围 -->
+      <div class="field-label">翻译范围</div>
       <div class="toolbar-row">
-        <button class="btn btn-primary" @click="scanAll" :disabled="scanning">
-          <span class="btn-icon">⌘</span>{{ scanning ? '扫描中...' : '全页扫描' }}
+        <button class="btn btn-primary flex-1" @click="scanAll" :disabled="scanning">
+          {{ scanning ? '扫描中...' : '当前页扫描' }}
         </button>
-        <button class="btn btn-secondary" @click="scanSelection" :disabled="scanning">
-          选中扫描
+        <button class="btn btn-secondary flex-1" @click="scanSelection" :disabled="scanning">
+          选中内容扫描
         </button>
-        <select v-model="targetLang" class="lang-select">
-          <option v-for="l in LANGUAGES" :key="l.code" :value="l.code">{{ l.name }}</option>
-        </select>
       </div>
+      <!-- 语言选择 -->
+      <div class="lang-row">
+        <div class="lang-col">
+          <div class="field-label">源语言</div>
+          <select v-model="sourceLang" class="lang-select">
+            <option value="auto">自动检测</option>
+            <option v-for="l in LANGUAGES" :key="l.code" :value="l.code">{{ l.name }}</option>
+          </select>
+        </div>
+        <div class="lang-arrow">
+          <svg width="16" height="16" viewBox="0 0 16 16"><path d="M3 8h10M11 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="lang-col">
+          <div class="field-label">目标语言</div>
+          <select v-model="targetLang" class="lang-select">
+            <option v-for="l in LANGUAGES" :key="l.code" :value="l.code">{{ l.name }}</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 统计 -->
+      <div class="stats-row" v-if="items.length > 0">
+        <div class="stat-item">
+          <span class="stat-value">{{ items.length }}</span>
+          <span class="stat-label">文本数</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-item">
+          <span class="stat-value">{{ charCount }}</span>
+          <span class="stat-label">字符数</span>
+        </div>
+      </div>
+
+      <!-- 操作按钮 -->
       <div class="toolbar-row">
         <button class="btn btn-accent flex-1" @click="startTranslate" :disabled="translating || proofreading || items.length === 0">
           {{ translating ? `翻译中 ${Math.floor(translateProgressPercent)}%...` : '翻译' }}
@@ -33,13 +66,11 @@
         <button class="btn btn-primary flex-1" @click="applyTranslations" :disabled="applying || translating || proofreading || !hasTranslation">
           {{ applying ? `应用 ${Math.floor(applyingProgressPercent)}%...` : '应用' }}
         </button>
-        <button class="btn btn-ghost flex-1" @click="undoAll" :disabled="undoing || translating || proofreading || applying">
-          撤销
+        <button v-if="translating || proofreading" class="btn btn-warning flex-1" @click="cancelOperation">
+          取消
         </button>
-      </div>
-      <div class="toolbar-row" v-if="translating || proofreading">
-        <button class="btn btn-warning flex-1" @click="cancelOperation">
-          取消{{ translating ? '翻译' : '校对' }}
+        <button v-else class="btn btn-ghost flex-1" @click="undoAll" :disabled="undoing || applying">
+          撤销
         </button>
       </div>
       <div class="toolbar-row" v-if="failedNodeIds.length > 0">
@@ -82,8 +113,8 @@
       <div class="section-body" v-if="showTexts">
         <div class="empty-state" v-if="items.length === 0">
           <div class="empty-icon">⇧</div>
-          <p>点击"全页扫描"采集文本</p>
-          <p class="empty-sub">或先选中图层后点击"选中扫描"</p>
+          <p>点击"当前页扫描"采集文本</p>
+          <p class="empty-sub">或先选中图层后点击"选中内容扫描"</p>
         </div>
         <div class="text-item" :class="{ corrected: item.corrected, 'csv-changed': csvChangedIds.has(item.nodeIds[0]), 'trans-error': translateErrors.has(item.nodeIds[0]) }" v-for="(item, idx) in items" :key="item.nodeIds[0] || idx">
           <div class="item-row">
@@ -350,16 +381,18 @@ import { UIMessage, PluginMessage, TextItem, LLMConfig, GlossaryEntry, Translati
 import { sendMsgToPlugin } from '@messages/ui-sender'
 import { parseCSVRow, csvEncodeCell } from '@lib/parse-csv'
 import { formatCJKSpace } from '@lib/format-text'
-import { postProcessTranslation } from '@lib/post-process'
-import { translateBatch, proofreadBatch, fetchWithRetry } from '@lib/llm-api'
+import { postProcessTranslation, restoreTrademarkSymbols, enforceGlossaryTerms } from '@lib/post-process'
+import { translateBatch, proofreadBatch, fetchWithRetry, isProofreadScriptMismatch } from '@lib/llm-api'
 import { DEFAULT_GLOSSARY_CSV } from '@lib/default-glossary'
-import { TRANSLATE_BATCH_SIZE, PROOFREAD_BATCH_SIZE, TOAST_DURATION_MS, CORRECTION_THRESHOLD, makeFontKey, parseFontKey } from '@lib/constants'
+import { TRANSLATE_BATCH_SIZE, PROOFREAD_BATCH_SIZE, TOAST_DURATION_MS, CORRECTION_THRESHOLD, makeFontKey, parseFontKey, normalizeText } from '@lib/constants'
+import { convertStorageUnit } from '@lib/unit-convert'
 
 // ============================================================
 // 响应式状态
 // ============================================================
 const items = ref<TextItem[]>([])
 const targetLang = ref('en')
+const sourceLang = ref('auto')
 const glossary = ref<GlossaryEntry[]>([])
 const translationCache = ref<Record<string, string>>({})
 const llmConfig = ref<LLMConfig>({ apiKey: '', apiUrl: '', model: 'gpt-4o', industryContext: '', enableProofread: false, proofreadApiKey: '', proofreadApiUrl: '', proofreadModel: '' })
@@ -530,6 +563,14 @@ const activeGlossaryLangs = computed(() => {
 
 const hasTranslation = computed(() => items.value.some(it => it.translatedText))
 
+const charCount = computed(() => {
+  let count = 0
+  for (const item of items.value) {
+    count += item.sourceText.length
+  }
+  return count
+})
+
 const statusClass = computed(() => {
   if (translating.value || proofreading.value) return 'busy'
   if (hasTranslation.value) return 'done'
@@ -610,6 +651,31 @@ function scanSelection() {
 }
 
 // ============================================================
+// ============================================================
+// 相同源文本强制一致
+// ============================================================
+function enforceSameSourceConsistency() {
+  const seen = new Map<string, string>()
+  let unified = 0
+  for (const item of items.value) {
+    if (!item.translatedText) continue
+    const key = normalizeText(item.sourceText)
+    if (!key) continue
+    if (seen.has(key)) {
+      const first = seen.get(key)!
+      if (item.translatedText !== first) {
+        item.translatedText = first
+        unified++
+      }
+    } else {
+      seen.set(key, item.translatedText)
+    }
+  }
+  if (unified > 0) {
+    console.log('[translate] 一致化: ' + unified + ' 条相同源文本的译文被统一')
+  }
+}
+
 // 取消操作
 // ============================================================
 function cancelOperation() {
@@ -652,13 +718,20 @@ async function startTranslate() {
     return
   }
 
-  // 纯数字、单字符文本直接沿用原文，不请求 API
+  // 纯数字、单字符、纯存储规格文本直接沿用/本地转换，不请求 API
   let autoSkipped = 0
   for (const item of toTranslate) {
     const trimmed = item.sourceText.trim()
     if (/^\d+(\.\d+)?$/.test(trimmed) || (trimmed.length === 1 && !/[一-鿿぀-ヿ가-힯]/.test(trimmed))) {
       item.translatedText = trimmed
       autoSkipped++
+    } else {
+      // 检测纯存储规格（如 128GB、256MB/s），本地做单位转换
+      const unitConverted = convertStorageUnit(trimmed, targetLang.value)
+      if (unitConverted !== trimmed) {
+        item.translatedText = unitConverted
+        autoSkipped++
+      }
     }
   }
 
@@ -689,7 +762,9 @@ async function startTranslate() {
   }
 
   const cache = translationCache.value
-  const cacheKey = (text: string) => text + '\x00' + targetLang.value
+  // 术语库hash：术语库更新后缓存自动失效
+  const glossaryHash = glossary.value.map(g => g.source + '|' + (g.translations[targetLang.value] || '')).join(',').slice(0, 200).split('').reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0).toString(36)
+  const cacheKey = (text: string) => normalizeText(text) + '\x00' + targetLang.value + '\x00' + glossaryHash
   let cacheHits = 0
 
   let failedBatches = 0
@@ -717,7 +792,7 @@ async function startTranslate() {
       let translated: string[] = []
       if (uncachedIndices.length > 0) {
         const uncachedTexts = uncachedIndices.map(idx => texts[idx])
-        const apiResult = await translateBatch(uncachedTexts, targetLang.value, glossaryMap, llmConfig.value)
+        const apiResult = await translateBatch(uncachedTexts, targetLang.value, glossaryMap, llmConfig.value, sourceLang.value === 'auto' ? undefined : sourceLang.value, items.value.map(it => it.sourceText))
         // 合并缓存+API结果
         translated = texts.map((_, idx) => {
           if (cachedResult[idx] !== null) return cachedResult[idx]!
@@ -785,6 +860,9 @@ async function startTranslate() {
       showToast('校对异常: ' + (e instanceof Error ? e.message : String(e)), 'error')
     }
   }
+
+  // 同源一致化：无论是否开启校对都执行，确保相同源文本译文一致
+  enforceSameSourceConsistency()
   } catch (e) {
     translating.value = false
     console.error('[translate] fatal error', e)
@@ -806,13 +884,14 @@ async function startProofread() {
     return
   }
 
-  try {
-    const glossaryMap = new Map<string, string>()
-    for (const g of glossary.value) {
-      const t = g.translations[targetLang.value]
-      if (t) glossaryMap.set(g.source, t)
-    }
+  // 提前构建 glossaryMap，供校对后 enforceGlossaryTerms 兜底使用
+  const glossaryMap = new Map<string, string>()
+  for (const g of glossary.value) {
+    const t = g.translations[targetLang.value]
+    if (t) glossaryMap.set(g.source, t)
+  }
 
+  try {
     let correctedCount = 0
     let cursor = 0
     let failedBatches = 0
@@ -830,9 +909,14 @@ async function startProofread() {
         for (let j = 0; j < batch.length; j++) {
           const proofed = batchResults[j]
           if (proofed.text && proofed.text !== 'OK' && proofed.text !== batch[j].translatedText) {
+            // 脚本不匹配检测：校对结果语言与目标语言完全不符时拒绝（如目标ES却输出中文"主機"）
+            if (isProofreadScriptMismatch(proofed.text, targetLang.value)) {
+              console.warn('[translate] proofread script mismatch, rejected:', proofed.text)
+              cursor++
+              continue
+            }
             let fixed = postProcessTranslation(proofed.text, targetLang.value)
             fixed = formatCJKSpace(fixed, targetLang.value)
-            // 后处理后若与原译文一致则跳过（API 可能仅修正了空格/标点等被后处理吞掉的差异）
             if (fixed === batch[j].translatedText) { cursor++; continue }
             batch[j].proofreadText = batch[j].translatedText
             batch[j].translatedText = fixed
@@ -853,11 +937,28 @@ async function startProofread() {
 
     proofreading.value = false
     resizeAllTextareas()
+
+    // 校对后兜底：术语库强制校准 → 语言后处理 → CJK格式 → 商标符号还原
+    // 注意：首字母大写翻译管道已处理，校对后不重复执行
+    const allSourceTexts = items.value.map(it => it.sourceText)
+    let allTranslatedTexts = items.value.map(it => it.translatedText)
+    allTranslatedTexts = enforceGlossaryTerms(allSourceTexts, allTranslatedTexts, glossaryMap)
+    allTranslatedTexts = allTranslatedTexts.map(t => postProcessTranslation(t, targetLang.value))
+    allTranslatedTexts = allTranslatedTexts.map(t => formatCJKSpace(t, targetLang.value))
+    allTranslatedTexts = restoreTrademarkSymbols(allSourceTexts, allTranslatedTexts)
+    for (let i = 0; i < items.value.length; i++) {
+      if (allTranslatedTexts[i] !== items.value[i].translatedText) {
+        items.value[i].translatedText = allTranslatedTexts[i]
+      }
+    }
+
+    enforceSameSourceConsistency()
     if (cancelFlag.value) {
       showToast(`校对已取消，已修正 ${correctedCount} 处`, 'warning')
       return
     }
-    if (correctedCount === 0 && failedBatches === total / PROOFREAD_BATCH_SIZE && failedBatches > 0) {
+    const totalBatches = Math.ceil(total / PROOFREAD_BATCH_SIZE)
+    if (correctedCount === 0 && failedBatches >= totalBatches && failedBatches > 0) {
       showToast('校对全部失败: ' + proofLastError.slice(0, 80), 'error')
     } else {
       const failMsg = failedBatches > 0 ? `，${failedBatches} 批次校对失败` : ''
@@ -971,6 +1072,9 @@ function triggerGlossaryUpload() {
   glossaryInput.value?.click()
 }
 
+// 已知的有效语言代码（与 LANGUAGES 常量保持一致）
+const VALID_LANG_CODES = new Set(LANGUAGES.map(l => l.code))
+
 function handleGlossaryUpload(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file) return
@@ -979,9 +1083,17 @@ function handleGlossaryUpload(e: Event) {
     const text = (reader.result as string).replace(/^﻿/, '').trim()
     const rows = text.split('\n')
     const headerCells = parseCSVRow(rows[0])
+    // 识别语言列：跳过非语言代码的列（如 category, category_name, 中文品类 等）
+    const colMap: number[] = []  // 源列索引 -> 目标列索引（-1 表示跳过）
     const langCols: string[] = []
     for (let i = 1; i < headerCells.length; i++) {
-      langCols.push(headerCells[i].trim())
+      const colName = headerCells[i].trim()
+      if (VALID_LANG_CODES.has(colName)) {
+        colMap.push(langCols.length)
+        langCols.push(colName)
+      } else {
+        colMap.push(-1)  // 跳过非语言列
+      }
     }
 
     const entries: GlossaryEntry[] = []
@@ -990,34 +1102,17 @@ function handleGlossaryUpload(e: Event) {
       const source = (cells[0] || '').trim()
       if (!source) continue
       const translations: Record<string, string> = {}
-      for (let j = 0; j < langCols.length; j++) {
+      for (let j = 0; j < colMap.length; j++) {
+        if (colMap[j] < 0) continue  // 跳过非语言列
         const val = (cells[j + 1] || '').trim()
-        if (val) translations[langCols[j]] = val
+        if (val) translations[langCols[colMap[j]]] = val
       }
       entries.push({ source, translations })
     }
-    // 合并而非替换：已有条目更新翻译，新条目追加
-    const existingMap = new Map(glossary.value.map(g => [g.source, g]))
-    let added = 0
-    let updated = 0
-    for (const entry of entries) {
-      const existing = existingMap.get(entry.source)
-      if (existing) {
-        let changed = false
-        for (const [lang, val] of Object.entries(entry.translations)) {
-          if (val && existing.translations[lang] !== val) {
-            existing.translations[lang] = val
-            changed = true
-          }
-        }
-        if (changed) updated++
-      } else {
-        glossary.value.push(entry)
-        added++
-      }
-    }
+    // 直接替换：上传的术语库完全覆盖现有术语库
+    glossary.value = entries
     saveGlossary()
-    showToast(`已导入：新增 ${added} 条，更新 ${updated} 条`, 'success')
+    showToast(`已导入 ${entries.length} 条术语（替换原有术语库）`, 'success')
   }
   reader.readAsText(file)
   glossaryInput.value!.value = ''
@@ -1085,6 +1180,15 @@ const PRESETS: Record<string, string> = {
 }
 
 const selectedPreset = ref('')
+
+function detectPreset(): string {
+  const ctx = (llmConfig.value.industryContext || '').trim()
+  if (!ctx) return ''
+  for (const [key, value] of Object.entries(PRESETS)) {
+    if (ctx === value) return key
+  }
+  return ''
+}
 
 function applyPreset() {
   if (selectedPreset.value && PRESETS[selectedPreset.value]) {
@@ -1248,6 +1352,7 @@ onMounted(() => {
         if (data) {
           llmConfig.value = { industryContext: '', enableProofread: false, proofreadApiKey: '', proofreadApiUrl: '', proofreadModel: '', ...(data as LLMConfig) }
         }
+        selectedPreset.value = detectPreset()
         settingsReady = true
         break
 
@@ -1409,7 +1514,7 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .app.dark {
@@ -1453,14 +1558,47 @@ body {
 .toolbar {
   background: #fff;
   border-radius: var(--radius-lg);
-  padding: 12px;
+  padding: 16px;
   box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 .app.dark .toolbar { background: var(--gray-100); }
 .toolbar-row { display: flex; gap: 6px; align-items: center; }
+
+/* ---- 语言选择行 ---- */
+.lang-row {
+  display: flex; align-items: flex-end; gap: 6px;
+  padding: 2px 0;
+}
+.lang-col { flex: 1; min-width: 0; }
+.lang-arrow {
+  display: flex; align-items: center; justify-content: center;
+  padding-bottom: 6px; color: var(--gray-200); flex-shrink: 0;
+}
+.app.dark .lang-arrow { color: var(--gray-400); }
+
+/* ---- 统计行 ---- */
+.stats-row {
+  display: flex; align-items: center; justify-content: center;
+  gap: 14px; padding: 2px 0;
+}
+.stat-item {
+  display: flex; align-items: baseline; gap: 4px;
+}
+.stat-value {
+  font-size: 15px; font-weight: 600; color: var(--gray-800);
+  letter-spacing: -0.02em;
+}
+.stat-label {
+  font-size: 11px; color: var(--gray-400);
+}
+.stat-divider {
+  width: 1px; height: 20px; background: var(--gray-100);
+}
+.app.dark .stat-value { color: var(--gray-900); }
+.app.dark .stat-divider { background: var(--gray-200); }
 
 /* ---- 按钮 ---- */
 .btn {
@@ -1522,7 +1660,7 @@ body {
 .app.dark .section { background: var(--gray-100); }
 .section-header {
   display: flex; align-items: center; gap: 8px;
-  padding: 10px 14px; cursor: pointer; user-select: none;
+  padding: 12px 14px; cursor: pointer; user-select: none;
   font-size: 13px; font-weight: 600;
   transition: background var(--transition);
 }
@@ -1537,7 +1675,7 @@ body {
   transition: transform var(--transition);
 }
 .chevron.open { transform: rotate(90deg); }
-.section-body { padding: 0 14px 12px 14px; }
+.section-body { padding: 0 14px 14px 14px; }
 
 /* ---- 空状态 ---- */
 .empty-state { text-align: center; padding: 28px 0; color: var(--gray-400); }
@@ -1808,7 +1946,7 @@ body {
 .field-xs { flex: 0.8; min-width: 50px; padding: 5px 8px; font-size: 12px; }
 
 /* ---- 内联操作 ---- */
-.inline-actions { display: flex; gap: 6px; padding: 4px 0; flex-wrap: wrap; }
+.inline-actions { display: flex; gap: 6px; padding: 2px 0; flex-wrap: wrap; }
 .btn-row { display: flex; gap: 8px; margin-top: 4px; }
 
 /* ---- 测试结果 ---- */
@@ -1893,6 +2031,6 @@ textarea.field { resize: vertical; }
 ::-webkit-scrollbar-thumb { background: var(--gray-200); border-radius: 2px; }
 .app.dark ::-webkit-scrollbar-thumb { background: var(--gray-400); }
 
-.footer { text-align: center; padding: 12px 0 4px; font-size: 11px; color: var(--gray-200); letter-spacing: 0.5px; }
+.footer { text-align: center; padding: 16px 0 4px; font-size: 11px; color: var(--gray-200); letter-spacing: 0.3px; }
 .app.dark .footer { color: var(--gray-400); }
 </style>

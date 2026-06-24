@@ -111,38 +111,3 @@ export function filterRelevantGlossary(
   return { filteredMap: filtered, glossaryHint }
 }
 
-/**
- * 从 CSV 术语库 (GlossaryEntry[]) 构建目标语言映射
- * 同时做智能过滤
- */
-export function buildGlossaryMapForTranslation(
-  entries: Array<{ source: string; translations: Record<string, string> }>,
-  targetLang: string,
-  sourceTexts?: string[],
-): { map: Map<string, string>; hint: string } {
-  const map = new Map<string, string>()
-  for (const entry of entries) {
-    const translation = entry.translations[targetLang]
-    if (translation && translation.trim()) {
-      map.set(entry.source, translation.trim())
-    }
-  }
-
-  if (!sourceTexts || sourceTexts.length === 0 || map.size === 0) {
-    // 无源文本或术语为空时返回全量
-    const all = Array.from(map.entries()).map(([k, v]) => `"${k}" → "${v}"`)
-    return {
-      map,
-      hint: map.size > 0 ? `\n术语库（最高优先级，必须严格使用）：\n${all.join('\n')}` : '',
-    }
-  }
-
-  // 智能过滤
-  const glossaryObj: GlossaryMap = {}
-  for (const [k, v] of map.entries()) {
-    glossaryObj[k] = v
-  }
-  const { filteredMap, glossaryHint } = filterRelevantGlossary(glossaryObj, sourceTexts)
-
-  return { map: new Map(Object.entries(filteredMap)), hint: glossaryHint }
-}

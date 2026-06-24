@@ -1,4 +1,5 @@
 import { TextItem } from '@messages/types'
+import { normalizeText } from '@lib/constants'
 
 export interface TraversableNode {
   type?: string
@@ -31,11 +32,7 @@ export function collectTextNodes(container: TraversableNode): TextNode[] {
   const containerType = container.type || 'unknown'
   console.log('[translate] collectTextNodes called, container.type =', containerType)
 
-  const availableMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(container))
-    .filter(function (k) { return typeof (container as Record<string, unknown>)[k] === 'function' && k.includes('find') })
-  console.log('[translate] available find methods:', availableMethods)
-
-  // 策略1: findAllWithCriteria
+  // 策略1: findAllWithCriteria（MasterGo API，按图层面板顺序返回节点）
   if (typeof container.findAllWithCriteria === 'function') {
     try {
       const result = container.findAllWithCriteria({ types: ['TEXT'] })
@@ -64,7 +61,7 @@ export function collectTextNodes(container: TraversableNode): TextNode[] {
     console.log('[translate] findAll is not a function')
   }
 
-  // 策略3: 手动递归遍历
+  // 策略3: 手动递归遍历（children 数组顺序 = 图层面板顺序）
   const results: TextNode[] = []
   function walk(node: TraversableNode) {
     if (!node) return
@@ -88,9 +85,8 @@ export function collectTextNodes(container: TraversableNode): TextNode[] {
 export function mergeDuplicates(nodes: TextNode[]): TextItem[] {
   const map = new Map<string, TextNode[]>()
   for (const node of nodes) {
-    const normalized = node.characters.replace(/\n/g, ' ').trim()
-    if (!normalized) continue
-    const key = normalized
+    const key = normalizeText(node.characters)
+    if (!key) continue
     const group = map.get(key)
     if (group) {
       group.push(node)

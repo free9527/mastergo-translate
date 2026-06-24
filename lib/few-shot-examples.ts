@@ -458,6 +458,12 @@ export function getFewShotExamples(
   const src = sourceLang.startsWith('zh') ? 'zh' : 'en'
   const tgt = targetLang === 'zh-CN' ? 'zh' : targetLang
 
+  // Qwen 3.7 对中文（母语）质量可靠，去掉 few-shot 省 token
+  // 其他语言（ja/ko/de/fr/es等）全部保留
+  if (tgt === 'zh' || tgt === 'zh-TW') {
+    return ''
+  }
+
   // 先找精确匹配
   let key = `${src}_${tgt}_${contentType}`
   let examples = FEWSHOT_STORE[key]
@@ -497,16 +503,4 @@ export function getFewShotExamples(
     `示例 ${i + 1}:\n原文: ${ex.source}\n译文: ${ex.target}`
   )
   return `\n【高质量翻译参考示例】\n${lines.join('\n\n')}\n`
-}
-
-/**
- * 获取用于校对 prompt 的 few-shot 示例
- */
-export function getProofreadFewShot(
-  targetLang: string,
-): string {
-  if (targetLang === 'zh-TW') {
-    return `\n【校对示例】\n原文: 硬盘读取速度可达7400MB/s\n原译文: 硬碟讀取速度可達7400MB/s\n修正: 硬碟讀取速度可達7400MB/s\n原因: 已正确转换，无需修正`
-  }
-  return ''
 }

@@ -1,6 +1,6 @@
 import { PluginMessage, UIMessage, TextItem, LLMConfig, GlossaryEntry, TranslationCorrection } from '@messages/types'
 import { sendMsgToUI } from '@messages/main-sender'
-import { STORAGE_KEY_GLOSSARY, STORAGE_KEY_SETTINGS, STORAGE_KEY_ORIGINALS, STORAGE_KEY_TRANSLATION_CACHE, STORAGE_KEY_CORRECTIONS, CORRECTION_THRESHOLD, UI_WIDTH, UI_HEIGHT, MAX_CACHE_SIZE, makeFontKey } from '@lib/constants'
+import { STORAGE_KEY_GLOSSARY, STORAGE_KEY_GLOSSARY_VERSION, STORAGE_KEY_SETTINGS, STORAGE_KEY_ORIGINALS, STORAGE_KEY_TRANSLATION_CACHE, STORAGE_KEY_CORRECTIONS, CORRECTION_THRESHOLD, UI_WIDTH, UI_HEIGHT, MAX_CACHE_SIZE, GLOSSARY_VERSION, makeFontKey } from '@lib/constants'
 import { collectTextNodes, mergeDuplicates, TraversableNode } from '@lib/text-collector'
 import { exportCSV, importCSV } from '@lib/csv-handler'
 import { DEFAULT_GLOSSARY_CSV } from '@lib/default-glossary'
@@ -46,7 +46,6 @@ function scanAllTextNodes(): void {
 
   const items = mergeDuplicates(textNodes)
   pruneStaleOriginals(items)
-  // 保留遍历顺序（层级从上到下=设计阅读顺序），不按长度排序，以保持上下文关联
   console.log('[translate] final merged items:', items.length)
   sendMsgToUI(PluginMessage.SCAN_RESULT, items)
 }
@@ -77,7 +76,6 @@ function scanSelectedTextNodes(): void {
 
   const items = mergeDuplicates(allTextNodes)
   pruneStaleOriginals(items)
-  items.sort(function (a, b) { return b.sourceText.length - a.sourceText.length })
   sendMsgToUI(PluginMessage.SCAN_RESULT, items)
 }
 
@@ -157,6 +155,11 @@ async function applyTranslations(items: TextItem[]): Promise<void> {
 
   for (let i = 0; i < itemsWithTranslation.length; i++) {
     const item = itemsWithTranslation[i]
+    // 译文与源文相同，跳过无意义替换
+    if (item.translatedText === item.sourceText) {
+      done++
+      continue
+    }
     try {
       for (const nodeId of item.nodeIds) {
         const node = mg.getNodeById<TextNode>(nodeId)
@@ -317,37 +320,51 @@ function parseDefaultGlossary(): GlossaryEntry[] {
 }
 
 async function loadGlossary(): Promise<GlossaryEntry[]> {
+  // 版本检测：内置术语库更新后自动覆盖旧版
+  const storedVersion = await mg.clientStorage.getAsync(STORAGE_KEY_GLOSSARY_VERSION)
+  if (storedVersion == null || storedVersion < GLOSSARY_VERSION) {
+    // 版本过旧或不存在，强制使用内置默认术语库
+    const defaults = parseDefaultGlossary()
+    if (defaults.length > 0) {
+      await mg.clientStorage.setAsync(STORAGE_KEY_GLOSSARY, defaults)
+      await mg.clientStorage.setAsync(STORAGE_KEY_GLOSSARY_VERSION, GLOSSARY_VERSION)
+    }
+    return defaults
+  }
+
   const fromLocal = await mg.clientStorage.getAsync(STORAGE_KEY_GLOSSARY)
   if (fromLocal && fromLocal.length > 0) return fromLocal
 
   for (const page of mg.document.children) {
     try {
-      const json = (page as BaseNode).getPluginData(STORAGE_KEY_GLOSSARY)
+      const json = (page as BaseNode).getSharedPluginData('translate', STORAGE_KEY_GLOSSARY)
       if (json) {
         const entries = JSON.parse(json)
         await mg.clientStorage.setAsync(STORAGE_KEY_GLOSSARY, entries)
         return entries
       }
-    } catch (_) { /* 页面不支持 PluginData 则跳过 */ }
+    } catch (_) { /* 页面不支持 SharedPluginData 则跳过 */ }
   }
 
   // 首次使用：加载内置默认术语库
   const defaults = parseDefaultGlossary()
   if (defaults.length > 0) {
     await mg.clientStorage.setAsync(STORAGE_KEY_GLOSSARY, defaults)
+    await mg.clientStorage.setAsync(STORAGE_KEY_GLOSSARY_VERSION, GLOSSARY_VERSION)
   }
   return defaults
 }
 
 async function saveGlossary(entries: GlossaryEntry[]): Promise<void> {
   await mg.clientStorage.setAsync(STORAGE_KEY_GLOSSARY, entries)
+  await mg.clientStorage.setAsync(STORAGE_KEY_GLOSSARY_VERSION, GLOSSARY_VERSION)
   // 术语库变更后清除翻译缓存，确保重新翻译使用新术语
   await mg.clientStorage.setAsync(STORAGE_KEY_TRANSLATION_CACHE, {})
   const json = JSON.stringify(entries)
   for (const page of mg.document.children) {
     try {
-      (page as BaseNode).setPluginData(STORAGE_KEY_GLOSSARY, json)
-    } catch (_) { /* 页面不支持 PluginData 则跳过 */ }
+      (page as BaseNode).setSharedPluginData('translate', STORAGE_KEY_GLOSSARY, json)
+    } catch (_) { /* 页面不支持 SharedPluginData 则跳过 */ }
   }
   sendMsgToUI(PluginMessage.GLOSSARY_SAVED)
 }
@@ -373,16 +390,16 @@ async function loadSettings(): Promise<LLMConfig | null> {
   const fromLocal = await mg.clientStorage.getAsync(STORAGE_KEY_SETTINGS)
   if (fromLocal) return fromLocal
 
-  // 尝试从文档页面 PluginData 中读取（跨客户端同步）
+  // 尝试从文档 SharedPluginData 中读取（跨客户端同步）
   for (const page of mg.document.children) {
     try {
-      const json = (page as BaseNode).getPluginData(STORAGE_KEY_SETTINGS)
+      const json = (page as BaseNode).getSharedPluginData('translate', STORAGE_KEY_SETTINGS)
       if (json) {
         const config = JSON.parse(json)
         await mg.clientStorage.setAsync(STORAGE_KEY_SETTINGS, config)
         return config
       }
-    } catch (_) { /* 页面不支持 PluginData 则跳过 */ }
+    } catch (_) { /* 页面不支持 SharedPluginData 则跳过 */ }
   }
   return null
 }
@@ -394,8 +411,8 @@ async function saveSettings(config: LLMConfig): Promise<void> {
   const json = JSON.stringify(config)
   for (const page of mg.document.children) {
     try {
-      (page as BaseNode).setPluginData(STORAGE_KEY_SETTINGS, json)
-    } catch (_) { /* 页面不支持 PluginData 则跳过 */ }
+      (page as BaseNode).setSharedPluginData('translate', STORAGE_KEY_SETTINGS, json)
+    } catch (_) { /* 页面不支持 SharedPluginData 则跳过 */ }
   }
   sendMsgToUI(PluginMessage.SETTINGS_SAVED)
 }

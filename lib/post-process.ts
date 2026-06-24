@@ -5,6 +5,113 @@
  */
 
 // ============================================================
+// 商标符号还原
+// 将原文中的 ® ™ © 符号还原到译文中
+// 策略：找到符号前紧邻的单词，在译文中定位该单词并补回符号
+// ============================================================
+export function restoreTrademarkSymbols(sourceTexts: string[], translatedTexts: string[]): string[] {
+  return translatedTexts.map((translated, i) => {
+    const source = sourceTexts[i] || ''
+    if (!source) return translated
+
+    // 提取原文中所有商标符号及其前导词
+    // 使用 [^\s®™©]+ 排除符号字符，避免贪婪匹配吞噬相邻符号（如 "Lexar®™" 中 ® 被 \S+ 吃掉）
+    const symbolPattern = /([^\s®™©]+)\s*([®™©]+)/g
+    const symbols: Array<{ word: string; symbol: string }> = []
+    let match: RegExpExecArray | null
+    while ((match = symbolPattern.exec(source)) !== null) {
+      // 去掉该词上已有的商标符号（避免重复匹配）
+      const cleanWord = match[1].replace(/[®™©]/g, '')
+      if (cleanWord) {
+        // 支持连续多个符号（如 Lexar®™），逐个记录
+        for (const symbolChar of match[2]) {
+          symbols.push({ word: cleanWord, symbol: symbolChar })
+        }
+      }
+    }
+
+    if (symbols.length === 0) return translated
+
+    let result = translated
+
+    for (const { word, symbol } of symbols) {
+      // 检查译文是否已有该符号
+      if (result.includes(symbol)) continue
+
+      // 在译文中查找该词（不区分大小写）
+      const escapedWord = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const wordRegex = new RegExp(escapedWord, 'i')
+      const wordMatch = wordRegex.exec(result)
+
+      if (wordMatch) {
+        // 找到该词，在它后面插入符号
+        const insertPos = wordMatch.index + wordMatch[0].length
+        // 如果后面紧跟标点，符号放在标点后
+        const after = result.slice(insertPos)
+        const punctMatch = after.match(/^(\s*[.,;:!?)]?)/)
+        const punctLen = punctMatch ? punctMatch[0].length : 0
+        result = result.slice(0, insertPos + punctLen) + symbol + result.slice(insertPos + punctLen)
+      } else {
+        // 找不到该词，追加到译文末尾
+        result = result + symbol
+      }
+    }
+
+    return result
+  })
+}
+
+// ============================================================
+// 术语库强制校准
+// 翻译完成后，将术语库中的固定译法强制替换到译文中
+// 优先精确匹配，其次子串匹配
+// ============================================================
+export function enforceGlossaryTerms(
+  sourceTexts: string[],
+  translatedTexts: string[],
+  glossaryMap: Map<string, string>,
+): string[] {
+  return translatedTexts.map((translated, i) => {
+    const source = sourceTexts[i] || ''
+    if (!source) return translated
+
+    const normalizedSource = source.replace(/[®™©]/g, '').trim()
+
+    // 1. 精确匹配：源文本本身就是术语库条目
+    if (glossaryMap.has(source)) {
+      const target = glossaryMap.get(source)!
+      if (target !== translated) return target
+    }
+    if (glossaryMap.has(normalizedSource)) {
+      const target = glossaryMap.get(normalizedSource)!
+      if (target !== translated) return target
+    }
+
+    // 2. 子串匹配：源文本包含术语库条目（产品名嵌入在长句中）
+    for (const [glossarySource, glossaryTarget] of glossaryMap.entries()) {
+      const normalizedGlossarySource = glossarySource.replace(/[®™©]/g, '').trim()
+      // 至少 8 个字符避免短词误匹配
+      if (normalizedGlossarySource.length < 8) continue
+      if (normalizedSource.includes(normalizedGlossarySource)) {
+        // 检查译文是否已包含正确的术语译法
+        if (!translated.includes(glossaryTarget)) {
+          // 尝试用规范化方式找到译文中的对应部分并替换
+          // 简单策略：如果源文本就是术语+少量后缀，直接替换
+          const before = normalizedSource.indexOf(normalizedGlossarySource)
+          const after = normalizedSource.length - before - normalizedGlossarySource.length
+          // 如果术语占据了源文本 85% 以上，直接用术语译法
+          if (normalizedGlossarySource.length / normalizedSource.length > 0.85) {
+            return glossaryTarget
+          }
+        }
+      }
+    }
+
+    return translated
+  })
+}
+
+// ============================================================
 // 主入口
 // ============================================================
 export function postProcessTranslation(text: string, lang: string): string {
@@ -46,6 +153,32 @@ export function postProcessTranslation(text: string, lang: string): string {
   }
 
   return result
+}
+
+// ============================================================
+// 首字母大写（拉丁/西里尔字母语言）
+// 安全策略：仅当首字符为小写字母且第二个字符也是小写字母时才转换
+// 避免误伤 "iPhone"、"eBay" 等专有名词
+// ============================================================
+export function capitalizeFirstLetter(text: string): string {
+  if (!text || text.length === 0) return text
+  const first = text[0]
+  const second = text.length > 1 ? text[1] : ''
+
+  // 拉丁小写字母 a-z
+  if (first >= 'a' && first <= 'z') {
+    // 仅当第二个字符也是小写字母时才大写（排除 iPhone、eBay 等）
+    if (second && (second < 'a' || second > 'z')) return text
+    return first.toUpperCase() + text.slice(1)
+  }
+
+  // 西里尔小写字母 а-я (Unicode: 0430-044F), ё (0451)
+  if ((first >= 'а' && first <= 'я') || first === 'ё') {
+    if (second && (second < 'а' || second > 'я') && second !== 'ё') return text
+    return first.toUpperCase() + text.slice(1)
+  }
+
+  return text
 }
 
 // ============================================================
