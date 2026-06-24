@@ -32,36 +32,7 @@ export function collectTextNodes(container: TraversableNode): TextNode[] {
   const containerType = container.type || 'unknown'
   console.log('[translate] collectTextNodes called, container.type =', containerType)
 
-  // 策略1: findAllWithCriteria（MasterGo API，按图层面板顺序返回节点）
-  if (typeof container.findAllWithCriteria === 'function') {
-    try {
-      const result = container.findAllWithCriteria({ types: ['TEXT'] })
-      console.log('[translate] findAllWithCriteria returned', result ? result.length : 0, 'nodes')
-      const visible = filterVisible(result as TextNode[])
-      if (visible.length > 0) return visible
-    } catch (e) {
-      console.error('[translate] findAllWithCriteria failed:', e)
-    }
-  } else {
-    console.log('[translate] findAllWithCriteria is not a function')
-  }
-
-  // 策略2: findAll 回调
-  if (typeof container.findAll === 'function') {
-    try {
-      const result = container.findAll(function (node: TraversableNode) {
-        return node.type === 'TEXT' && isEffectivelyVisible(node)
-      })
-      console.log('[translate] findAll returned', result ? result.length : 0, 'nodes')
-      if (result && result.length > 0) return result as TextNode[]
-    } catch (e) {
-      console.error('[translate] findAll failed:', e)
-    }
-  } else {
-    console.log('[translate] findAll is not a function')
-  }
-
-  // 策略3: 手动递归遍历（children 数组顺序 = 图层面板顺序）
+  // 策略1: 手动递归遍历（children 数组顺序 = 图层面板顺序，文档明确保证）
   const results: TextNode[] = []
   function walk(node: TraversableNode) {
     if (!node) return
@@ -77,7 +48,41 @@ export function collectTextNodes(container: TraversableNode): TextNode[] {
     }
   }
   walk(container)
-  console.log('[translate] manual walk found', results.length, 'TEXT nodes')
+  if (results.length > 0) {
+    console.log('[translate] manual walk found', results.length, 'TEXT nodes (layer order)')
+    return results
+  }
+
+  // 策略2: findAllWithCriteria（MasterGo API，返回顺序文档未明确说明，仅作兜底）
+  if (typeof container.findAllWithCriteria === 'function') {
+    try {
+      const result = container.findAllWithCriteria({ types: ['TEXT'] })
+      console.log('[translate] findAllWithCriteria returned', result ? result.length : 0, 'nodes')
+      const visible = filterVisible(result as TextNode[])
+      if (visible.length > 0) return visible
+    } catch (e) {
+      console.error('[translate] findAllWithCriteria failed:', e)
+    }
+  } else {
+    console.log('[translate] findAllWithCriteria is not a function')
+  }
+
+  // 策略3: findAll 回调（兜底）
+  if (typeof container.findAll === 'function') {
+    try {
+      const result = container.findAll(function (node: TraversableNode) {
+        return node.type === 'TEXT' && isEffectivelyVisible(node)
+      })
+      console.log('[translate] findAll returned', result ? result.length : 0, 'nodes')
+      if (result && result.length > 0) return result as TextNode[]
+    } catch (e) {
+      console.error('[translate] findAll failed:', e)
+    }
+  } else {
+    console.log('[translate] findAll is not a function')
+  }
+
+  console.log('[translate] all strategies returned 0 TEXT nodes')
   return results
 }
 
@@ -105,7 +110,7 @@ export function mergeDuplicates(nodes: TextNode[]): TextItem[] {
       nodeIds: group.map(function (n) { return n.id }),
       nodeNames: group.map(function (n) { return n.name }),
       pageName: mg.document.currentPage.name,
-      sourceText: text,
+      sourceText: first.characters,
       translatedText: '',
       proofreadText: '',
       proofreadReason: '',
