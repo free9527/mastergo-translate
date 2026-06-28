@@ -88,9 +88,18 @@ export function collectTextNodes(container: TraversableNode): TextNode[] {
 
 // 合并重复文本
 export function mergeDuplicates(nodes: TextNode[]): TextItem[] {
+  // 规范化键：保留 ®™© 符号（避免 "Lexar®" 和 "Lexar" 被错误合并丢失商标）
+  function mergeKey(text: string): string {
+    return text
+      .replace(/[\n\r]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .toLowerCase()
+      .trim()
+  }
+
   const map = new Map<string, TextNode[]>()
   for (const node of nodes) {
-    const key = normalizeText(node.characters)
+    const key = mergeKey(node.characters)
     if (!key) continue
     const group = map.get(key)
     if (group) {

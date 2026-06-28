@@ -7,8 +7,10 @@ export enum UIMessage {
   SCAN_SELECTION = 'SCAN_SELECTION',
   APPLY_TRANSLATIONS = 'APPLY_TRANSLATIONS',
   UNDO_ALL = 'UNDO_ALL',
-  SAVE_GLOSSARY = 'SAVE_GLOSSARY',
-  LOAD_GLOSSARY = 'LOAD_GLOSSARY',
+  SAVE_GLOSSARY_PRODUCTS = 'SAVE_GLOSSARY_PRODUCTS',
+  LOAD_GLOSSARY_PRODUCTS = 'LOAD_GLOSSARY_PRODUCTS',
+  SAVE_GLOSSARY_EXCLUSIVE = 'SAVE_GLOSSARY_EXCLUSIVE',
+  LOAD_GLOSSARY_EXCLUSIVE = 'LOAD_GLOSSARY_EXCLUSIVE',
   EXPORT_CSV = 'EXPORT_CSV',
   IMPORT_CSV = 'IMPORT_CSV',
   SAVE_SETTINGS = 'SAVE_SETTINGS',
@@ -34,8 +36,10 @@ export enum PluginMessage {
   APPLY_PROGRESS = 'APPLY_PROGRESS',
   APPLY_DONE = 'APPLY_DONE',
   UNDO_DONE = 'UNDO_DONE',
-  GLOSSARY_LOADED = 'GLOSSARY_LOADED',
-  GLOSSARY_SAVED = 'GLOSSARY_SAVED',
+  GLOSSARY_PRODUCTS_LOADED = 'GLOSSARY_PRODUCTS_LOADED',
+  GLOSSARY_PRODUCTS_SAVED = 'GLOSSARY_PRODUCTS_SAVED',
+  GLOSSARY_EXCLUSIVE_LOADED = 'GLOSSARY_EXCLUSIVE_LOADED',
+  GLOSSARY_EXCLUSIVE_SAVED = 'GLOSSARY_EXCLUSIVE_SAVED',
   CSV_EXPORT_READY = 'CSV_EXPORT_READY',
   CSV_IMPORT_DONE = 'CSV_IMPORT_DONE',
   SETTINGS_LOADED = 'SETTINGS_LOADED',
@@ -78,7 +82,10 @@ export interface LLMConfig {
   apiKey: string
   apiUrl: string
   model: string
-  industryContext: string
+  translationStyle: string
+  translationStyleCustom: string
+  scenePreset: string
+  manualProductLine?: string  // undefined=自动检测, 'none'=不注入, 其他值=强制指定产品线
   enableProofread: boolean
   proofreadApiKey: string
   proofreadApiUrl: string
@@ -96,6 +103,21 @@ export interface TranslationCorrection {
 export interface GlossaryEntry {
   source: string
   translations: Record<string, string>  // 语言代码 → 翻译
+  productLine?: string  // 产品线标签
+  termType?: string     // 术语类型: 技术术语|产品品类|产品系列|品牌术语|说明文案|功能特性|营销文案
+}
+
+/** 产品线标签说明（用于术语库模板） */
+export const PRODUCT_LINE_LABELS: Record<string, string> = {
+  gaming_dimm: '游戏内存（ARES/THOR DDR）',
+  gaming_ssd: '游戏SSD（PLAY/ARES SSD）',
+  gaming_card: '游戏存储卡（PLAY microSD/SD）',
+  professional_imaging: '专业影像（GOLD/DIAMOND/ARMOR CFexpress/SD）',
+  pc_productivity: 'PC生产力（NM/NQ/NS/EQ SSD/DRAM）',
+  consumer_cards: '消费级存储卡（BLUE/SILVER SD/microSD）',
+  portable_storage: '移动存储（PSSD/U盘/读卡器/Hub）',
+  innovation_lifestyle: '创新生活（pexar/数码相框）',
+  common: '通用（所有产品线共用）',
 }
 
 export interface LanguageOption {

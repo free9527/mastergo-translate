@@ -1,0 +1,3 @@
+- [MasterGo 开发者文档](mastergo-developer-docs.md) — 文档地址、关键API、所有功能修改必须基于此文档
+- [MasterGo Lexar 翻译插件](matergo-translate-plugin.md) — 项目架构、核心功能流程、消息通信、文件结构
+- [UI 设计规范](ui-apple-style.md) — Apple 简约风 CSS 变量、组件模式、暗色模式

@@ -55,8 +55,8 @@ export function importCSV(csvText: string): void {
   for (let i = headerIdx + 1; i < dataRows.length; i++) {
     const cells = parseCSVRow(dataRows[i])
     if (cells.length < 4) continue
-    const nodeIdsStr = (cells[1] || '').replace(/^"|"$/g, '')
-    const translatedText = (cells[3] || '').replace(/^"|"$/g, '')
+    const nodeIdsStr = (cells[1] || '').trim()
+    const translatedText = (cells[3] || '').trim()
     if (!nodeIdsStr || !translatedText) continue
     result.push({
       nodeIds: nodeIdsStr.split(' | ').map(function (s) { return s.trim() }),

@@ -73,11 +73,73 @@
           撤销
         </button>
       </div>
-      <div class="toolbar-row" v-if="failedNodeIds.length > 0">
-        <button class="btn btn-warning flex-1" @click="retryFailed" :disabled="applying || translating || proofreading">
-          重试失败 ({{ failedNodeIds.length }})
+      <div class="toolbar-row" v-if="translateErrors.size > 0">
+        <button class="btn btn-warning flex-1" @click="retryFailedTranslations" :disabled="applying || translating || proofreading">
+          重翻失败 ({{ translateErrors.size }})
         </button>
       </div>
+      <div class="toolbar-row" v-if="failedNodeIds.length > 0">
+        <button class="btn btn-secondary flex-1" @click="retryFailedApply" :disabled="applying || translating || proofreading">
+          重试应用 ({{ failedNodeIds.length }})
+        </button>
+      </div>
+    </div>
+
+    <!-- 翻译风格 & 场景 -->
+    <div class="style-bar">
+      <div class="style-row">
+        <div class="style-field">
+          <label class="field-label">翻译风格</label>
+          <select class="style-select" v-model="selectedPreset" @change="applyPreset" :disabled="isStyleLocked">
+            <option value="custom">自定义</option>
+            <option value="standard">通用标准版</option>
+            <option value="professional">{{ isStyleLocked ? '严谨专业版（场景锁定）' : '严谨专业版' }}</option>
+            <option value="marketing" v-if="!isStyleLocked">电商营销版</option>
+          </select>
+        </div>
+        <div class="style-field">
+          <label class="field-label">场景</label>
+          <select class="style-select" v-model="llmConfig.scenePreset" @change="onSceneChange">
+            <option value="ecommerce">电商详情页</option>
+            <option value="technical_params">技术参数表</option>
+            <option value="packaging">包装印刷</option>
+            <option value="ui">软件UI</option>
+          </select>
+        </div>
+        <div class="style-field">
+          <label class="field-label">产品线</label>
+          <select class="style-select" v-model="manualProductLine" @change="onProductLineChange">
+            <option v-for="opt in productLineOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+          </select>
+          <span v-if="effectiveProductLine && manualProductLine === ''" class="auto-badge">自动</span>
+          <span v-if="manualProductLine !== ''" class="manual-badge">手动</span>
+        </div>
+      </div>
+      <textarea
+        v-if="selectedPreset === 'custom'"
+        class="style-textarea"
+        v-model="llmConfig.translationStyleCustom"
+        rows="3"
+        placeholder="自定义翻译风格，如：语气轻松活泼，适合年轻用户..."
+      ></textarea>
+      <div v-if="selectedPreset === 'custom'" class="style-ref-toggle" @click="showRef = !showRef">
+        <svg class="chevron" :class="{ open: showRef }" width="12" height="12" viewBox="0 0 12 12"><path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span>参考格式（点击展开）</span>
+      </div>
+      <textarea
+        v-if="selectedPreset === 'custom' && showRef"
+        class="style-prompt"
+        :value="styleReference"
+        readonly
+        rows="8"
+      ></textarea>
+      <textarea
+        v-if="selectedPreset !== 'custom'"
+        class="style-prompt"
+        :value="currentStylePrompt"
+        readonly
+        rows="10"
+      ></textarea>
     </div>
 
     <!-- 翻译进度条 -->
@@ -261,29 +323,34 @@
       <div class="section-header" @click="showGlossary = !showGlossary">
         <svg class="chevron" :class="{ open: showGlossary }" width="12" height="12" viewBox="0 0 12 12"><path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
         <span>术语库</span>
-        <span class="section-count">{{ glossary.length }}</span>
+        <span class="section-count">{{ glossaryProducts.length + glossaryExclusive.length }}</span>
       </div>
       <div class="section-body" v-if="showGlossary">
-        <div class="inline-actions">
-          <button class="btn btn-sm btn-secondary" @click="downloadGlossaryTemplate">模板</button>
-          <button class="btn btn-sm btn-secondary" @click="triggerGlossaryUpload">上传</button>
-          <button class="btn btn-sm btn-ghost" @click="clearGlossary" v-if="glossary.length">清空</button>
-          <input ref="glossaryInput" type="file" accept=".csv" style="display:none" @change="handleGlossaryUpload" />
-        </div>
-        <div class="glossary-list" v-if="glossary.length">
-          <div class="glossary-card" v-for="(g, i) in glossary" :key="i">
-            <div class="gc-head">
-              <span class="gc-source">{{ g.source }}</span>
-              <button class="btn-del" @click="glossary.splice(i, 1); saveGlossary()">
-                <svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 3l6 6M9 3l-6 6" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
-              </button>
-            </div>
-            <div class="gc-tags">
-              <span class="gc-tag" v-for="l in activeGlossaryLangs" :key="l.code">
-                <b>{{ l.code }}</b>&nbsp;{{ g.translations[l.code] || '-' }}
-              </span>
-            </div>
+        <!-- 产品名术语库 -->
+        <div class="glossary-sub">
+          <div class="glossary-sub-head">
+            <span class="glossary-sub-title">产品名</span>
+            <span class="glossary-sub-count">{{ glossaryProducts.length }} 条</span>
           </div>
+          <div class="inline-actions">
+            <button class="btn btn-sm btn-secondary" @click="downloadGlossaryProducts">下载</button>
+            <button class="btn btn-sm btn-secondary" @click="triggerGlossaryProductsUpload">替换</button>
+            <input ref="glossaryProductsInput" type="file" accept=".csv" style="display:none" @change="handleGlossaryProductsUpload" />
+          </div>
+          <p class="glossary-hint">上传将完全替换现有产品名术语库，而非合并。</p>
+        </div>
+        <!-- 专属术语术语库 -->
+        <div class="glossary-sub">
+          <div class="glossary-sub-head">
+            <span class="glossary-sub-title">专属术语</span>
+            <span class="glossary-sub-count">{{ glossaryExclusive.length }} 条</span>
+          </div>
+          <div class="inline-actions">
+            <button class="btn btn-sm btn-secondary" @click="downloadGlossaryExclusive">下载</button>
+            <button class="btn btn-sm btn-secondary" @click="triggerGlossaryExclusiveUpload">替换</button>
+            <input ref="glossaryExclusiveInput" type="file" accept=".csv" style="display:none" @change="handleGlossaryExclusiveUpload" />
+          </div>
+          <p class="glossary-hint">上传将完全替换现有专属术语术语库，而非合并。</p>
         </div>
       </div>
     </div>
@@ -307,21 +374,7 @@
           <label class="field-label">模型</label>
           <input class="field" v-model="llmConfig.model" placeholder="gpt-4o" />
         </div>
-        <div class="field-group">
-          <label class="field-label">行业翻译提示</label>
-          <div class="preset-row">
-            <select class="field preset-select" v-model="selectedPreset" @change="applyPreset">
-              <option value="">自定义</option>
-              <option value="standard">通用标准版</option>
-              <option value="technical">严谨专业版</option>
-              <option value="marketing">电商营销版</option>
-              <option value="taiwan">台湾繁体版（3C/存储）</option>
-            </select>
-          </div>
-          <textarea class="field" v-model="llmConfig.industryContext" rows="4"
-            placeholder='例如：这是3C数码产品详情页，"刷新率"而非"更新率"'></textarea>
-        </div>
-        <div class="field-group">
+                <div class="field-group">
           <label class="toggle-label" @click="llmConfig.enableProofread = !llmConfig.enableProofread">
             <span class="toggle" :class="{ on: llmConfig.enableProofread }">
               <span class="toggle-knob"></span>
@@ -376,14 +429,14 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { UIMessage, PluginMessage, TextItem, LLMConfig, GlossaryEntry, TranslationCorrection, LANGUAGES, TestConnectionResult } from '@messages/types'
 import { sendMsgToPlugin } from '@messages/ui-sender'
 import { parseCSVRow, csvEncodeCell } from '@lib/parse-csv'
 import { formatCJKSpace } from '@lib/format-text'
-import { postProcessTranslation, restoreTrademarkSymbols, enforceGlossaryTerms } from '@lib/post-process'
-import { translateBatch, proofreadBatch, fetchWithRetry, isProofreadScriptMismatch } from '@lib/llm-api'
-import { DEFAULT_GLOSSARY_CSV } from '@lib/default-glossary'
+import { postProcessTranslation, restoreTrademarkSymbols, restoreStorageUnitFormatting, enforceGlossaryTerms } from '@lib/post-process'
+import { translateBatch, proofreadBatch, fetchWithRetry, isProofreadScriptMismatch, STYLE_PRESETS, SCENE_PRESETS, detectProductLine } from '@lib/llm-api'
+import { DEFAULT_GLOSSARY_PRODUCTS_CSV, DEFAULT_GLOSSARY_EXCLUSIVE_CSV } from '@lib/default-glossary'
 import { TRANSLATE_BATCH_SIZE, PROOFREAD_BATCH_SIZE, TOAST_DURATION_MS, CORRECTION_THRESHOLD, makeFontKey, parseFontKey, normalizeText } from '@lib/constants'
 import { convertStorageUnit } from '@lib/unit-convert'
 
@@ -393,11 +446,15 @@ import { convertStorageUnit } from '@lib/unit-convert'
 const items = ref<TextItem[]>([])
 const targetLang = ref('en')
 const sourceLang = ref('auto')
-const glossary = ref<GlossaryEntry[]>([])
+const glossaryProducts = ref<GlossaryEntry[]>([])
+const glossaryExclusive = ref<GlossaryEntry[]>([])
+const glossary = computed(() => [...glossaryProducts.value, ...glossaryExclusive.value])
 const translationCache = ref<Record<string, string>>({})
-const llmConfig = ref<LLMConfig>({ apiKey: '', apiUrl: '', model: 'gpt-4o', industryContext: '', enableProofread: false, proofreadApiKey: '', proofreadApiUrl: '', proofreadModel: '' })
+const llmConfig = ref<LLMConfig>({ apiKey: '', apiUrl: '', model: 'gpt-4o', translationStyle: 'standard', translationStyleCustom: '', scenePreset: 'ecommerce', enableProofread: false, proofreadApiKey: '', proofreadApiUrl: '', proofreadModel: '' })
 
 const scanning = ref(false)
+const pageName = ref('')
+const fileName = ref('')
 const translating = ref(false)
 const proofreading = ref(false)
 const applying = ref(false)
@@ -547,7 +604,6 @@ const toastType = ref('info')
 let toastTimer = 0
 
 const csvInput = ref<HTMLInputElement | null>(null)
-const glossaryInput = ref<HTMLInputElement | null>(null)
 
 const activeGlossaryLangs = computed(() => {
   const set = new Set<string>()
@@ -686,6 +742,91 @@ function cancelOperation() {
 // ============================================================
 // 翻译
 // ============================================================
+// 跨批次术语一致性辅助
+// ============================================================
+
+/** 扫描全页文本，找出在术语库中出现 2 次以上的高频术语 */
+function findHighFreqGlossaryTerms(
+  allTexts: string[],
+  glossaryMap: Map<string, string>,
+): string[] {
+  const wordCounts = new Map<string, number>()
+  for (const text of allTexts) {
+    const words = text.toLowerCase().split(/[\s,.;:!?()\[\]{}<>]+/)
+    for (const w of words) {
+      if (w.length < 3) continue
+      wordCounts.set(w, (wordCounts.get(w) || 0) + 1)
+    }
+  }
+  const result: string[] = []
+  for (const [word, count] of wordCounts) {
+    if (count >= 2 && glossaryMap.has(word)) {
+      result.push(word)
+    }
+  }
+  return result
+}
+
+/** 从多个候选译文中选出最佳译文 */
+function pickBestTranslation(translations: string[], glossaryTarget: string): string {
+  // 1. 与术语库完全匹配的优先
+  const exact = translations.find(t => t === glossaryTarget)
+  if (exact) return exact
+
+  // 2. 较长的译文通常信息更完整
+  const avgLen = translations.reduce((s, t) => s + t.length, 0) / translations.length
+  const reasonable = translations.filter(t => t.length >= avgLen * 0.5)
+  reasonable.sort((a, b) => b.length - a.length)
+
+  // 3. 排除空/单字译文
+  const valid = reasonable.filter(t => t.length > 1)
+  return valid.length > 0 ? valid[0] : translations[0]
+}
+
+/** 跨批次术语统一：同一术语在不同文本中出现多种译法时，统一为最佳译法 */
+function unifyTerminologyAcrossBatches(
+  items: TextItem[],
+  glossaryMap: Map<string, string>,
+): number {
+  // 收集每个术语源文本对应的所有译文变体
+  const termVariants = new Map<string, string[]>()
+  for (const item of items) {
+    if (!item.translatedText) continue
+    const normSource = normalizeText(item.sourceText)
+    for (const [glossSource, glossTarget] of glossaryMap) {
+      const normGloss = normalizeText(glossSource)
+      if (normSource.includes(normGloss) && normGloss.length >= 4) {
+        const existing = termVariants.get(glossSource)
+        if (existing) {
+          if (!existing.includes(item.translatedText)) {
+            existing.push(item.translatedText)
+          }
+        } else {
+          termVariants.set(glossSource, [item.translatedText])
+        }
+      }
+    }
+  }
+
+  // 对每个有多种译法的术语，选出最佳译文并统一
+  let changed = 0
+  for (const [term, variants] of termVariants) {
+    if (variants.length <= 1) continue
+    const best = pickBestTranslation(variants, glossaryMap.get(term) || '')
+    for (const item of items) {
+      if (item.translatedText && variants.includes(item.translatedText) && item.translatedText !== best) {
+        item.translatedText = best
+        changed++
+      }
+    }
+  }
+  if (changed > 0) {
+    console.log('[translate] 跨批次术语统一: ' + changed + ' 条译文被统一为最佳译法')
+  }
+  return changed
+}
+
+// ============================================================
 async function startTranslate() {
   if (!settingsReady || !glossaryReady) {
     showToast('插件正在初始化，请稍后再试...', 'warning')
@@ -704,10 +845,18 @@ async function startTranslate() {
 
   try {
     const glossaryMap = new Map<string, string>()
-  for (const g of glossary.value) {
-    const t = g.translations[targetLang.value]
-    if (t) glossaryMap.set(g.source, t)
-  }
+    const runtimeProductLines: Record<string, string> = {}
+    const runtimeTermTypes: Record<string, string> = {}
+    for (const g of glossary.value) {
+      const t = g.translations[targetLang.value]
+      if (t) glossaryMap.set(g.source, t)
+      if (g.productLine) runtimeProductLines[g.source] = g.productLine
+      if (g.termType) runtimeTermTypes[g.source] = g.termType
+    }
+
+  // 跨批次术语预扫描：找出全页高频术语，提前注入每个批次确保译文一致
+  const allSourceTexts = items.value.map(it => it.sourceText)
+  const crossBatchTerms = findHighFreqGlossaryTerms(allSourceTexts, glossaryMap)
 
   const toTranslate = items.value.filter(it => it.sourceText.trim())
   const total = toTranslate.length
@@ -766,62 +915,78 @@ async function startTranslate() {
   const glossaryHash = glossary.value.map(g => g.source + '|' + (g.translations[targetLang.value] || '')).join(',').slice(0, 200).split('').reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0).toString(36)
   const cacheKey = (text: string) => normalizeText(text) + '\x00' + targetLang.value + '\x00' + glossaryHash
   let cacheHits = 0
-
   let failedBatches = 0
-  let lastErrorMsg = ''
+  const lastErrors: string[] = []
+
   let cursor = autoSkipped
   translateProgress.value = { current: cursor, total }
-  for (let i = 0; i < apiTotal; i += TRANSLATE_BATCH_SIZE) {
+
+  // 并发批次处理：每次并发 CONCURRENCY 个批次，大幅提速
+  const CONCURRENCY = 3
+  for (let i = 0; i < apiTotal; i += TRANSLATE_BATCH_SIZE * CONCURRENCY) {
     if (cancelFlag.value) break
-    const batch = needApi.slice(i, i + TRANSLATE_BATCH_SIZE)
-    const texts = batch.map(it => it.sourceText)
 
-    try {
-      // 检查缓存：分离已缓存和未缓存的文本
-      const uncachedIndices: number[] = []
-      const cachedResult: (string | null)[] = texts.map((t, idx) => {
-        const hit = cache[cacheKey(t)]
-        if (hit !== undefined) {
-          cacheHits++
-          return hit
+    const concurrentBatchPromises: Promise<void>[] = []
+
+    for (let k = 0; k < CONCURRENCY; k++) {
+      const batchStart = i + k * TRANSLATE_BATCH_SIZE
+      if (batchStart >= apiTotal || cancelFlag.value) break
+      const batch = needApi.slice(batchStart, batchStart + TRANSLATE_BATCH_SIZE)
+
+      concurrentBatchPromises.push((async () => {
+        if (cancelFlag.value) return
+        const texts = batch.map(it => it.sourceText)
+
+        try {
+          // 检查缓存：分离已缓存和未缓存的文本
+          const uncachedIndices: number[] = []
+          const cachedResult: (string | null)[] = texts.map((t, idx) => {
+            const hit = cache[cacheKey(t)]
+            if (hit !== undefined) {
+              cacheHits++
+              return hit
+            }
+            uncachedIndices.push(idx)
+            return null
+          })
+
+          let translated: string[] = []
+          if (uncachedIndices.length > 0) {
+            const uncachedTexts = uncachedIndices.map(idx => texts[idx])
+            const apiResult = await translateBatch(uncachedTexts, targetLang.value, glossaryMap, llmConfig.value, sourceLang.value === 'auto' ? undefined : sourceLang.value, items.value.map(it => it.sourceText), runtimeProductLines, runtimeTermTypes, pageName.value || undefined, fileName.value || undefined, crossBatchTerms)
+            // 合并缓存+API结果
+            translated = texts.map((_, idx) => {
+              if (cachedResult[idx] !== null) return cachedResult[idx]!
+              const apiIdx = uncachedIndices.indexOf(idx)
+              return apiResult[apiIdx] || ''
+            })
+            // 更新缓存
+            for (let j = 0; j < uncachedIndices.length; j++) {
+              const srcIdx = uncachedIndices[j]
+              cache[cacheKey(texts[srcIdx])] = apiResult[j] || ''
+            }
+          } else {
+            translated = cachedResult as string[]
+          }
+
+          for (let j = 0; j < batch.length; j++) {
+            batch[j].translatedText = formatCJKSpace(translated[j] || '', targetLang.value)
+          }
+        } catch (e) {
+          failedBatches++
+          lastErrors.push(e instanceof Error ? e.message : String(e))
+          for (const item of batch) {
+            translateErrors.value.add(item.nodeIds[0])
+          }
+          console.error('[translate] batch failed', batchStart, lastErrors[lastErrors.length - 1])
         }
-        uncachedIndices.push(idx)
-        return null
-      })
-
-      let translated: string[] = []
-      if (uncachedIndices.length > 0) {
-        const uncachedTexts = uncachedIndices.map(idx => texts[idx])
-        const apiResult = await translateBatch(uncachedTexts, targetLang.value, glossaryMap, llmConfig.value, sourceLang.value === 'auto' ? undefined : sourceLang.value, items.value.map(it => it.sourceText))
-        // 合并缓存+API结果
-        translated = texts.map((_, idx) => {
-          if (cachedResult[idx] !== null) return cachedResult[idx]!
-          const apiIdx = uncachedIndices.indexOf(idx)
-          return apiResult[apiIdx] || ''
-        })
-        // 更新缓存
-        for (let j = 0; j < uncachedIndices.length; j++) {
-          const srcIdx = uncachedIndices[j]
-          cache[cacheKey(texts[srcIdx])] = apiResult[j] || ''
-        }
-      } else {
-        translated = cachedResult as string[]
-      }
-
-      for (let j = 0; j < batch.length; j++) {
-        batch[j].translatedText = formatCJKSpace(translated[j] || '', targetLang.value)
-        cursor++
-      }
-    } catch (e) {
-      failedBatches++
-      lastErrorMsg = e instanceof Error ? e.message : String(e)
-      for (const item of batch) {
-        translateErrors.value.add(item.nodeIds[0])
-      }
-      cursor += batch.length
-      console.error('[translate] batch failed', i, lastErrorMsg)
+      })())
     }
-    translateProgress.value = { current: cursor, total }
+
+    await Promise.allSettled(concurrentBatchPromises)
+    // 每轮并发结束后更新进度
+    const processedSoFar = toTranslate.filter(it => it.translatedText || translateErrors.value.has(it.nodeIds[0])).length
+    translateProgress.value = { current: processedSoFar, total }
   }
 
   translating.value = false
@@ -844,7 +1009,7 @@ async function startTranslate() {
   const failMsg = failedBatches > 0 ? `，${failedBatches} 个批次失败` : ''
   const skipMsg = autoSkipped > 0 ? `，${autoSkipped} 条沿用原文` : ''
   if (count === 0 && failedBatches > 0) {
-    const errDetail = lastErrorMsg ? ' — ' + lastErrorMsg.slice(0, 80) : ''
+    const errDetail = lastErrors.length > 0 ? ' — ' + lastErrors[lastErrors.length - 1].slice(0, 80) : ''
     showToast('翻译失败：所有批次请求失败' + errDetail, 'error')
   } else {
     showToast('翻译完成: ' + count + ' 条' + cacheMsg + skipMsg + failMsg, failedBatches > 0 ? 'warning' : 'success')
@@ -861,6 +1026,8 @@ async function startTranslate() {
     }
   }
 
+  // 跨批次术语统一：从同一术语的多个候选译文中选择最佳译法
+  unifyTerminologyAcrossBatches(items.value, glossaryMap)
   // 同源一致化：无论是否开启校对都执行，确保相同源文本译文一致
   enforceSameSourceConsistency()
   } catch (e) {
@@ -886,53 +1053,71 @@ async function startProofread() {
 
   // 提前构建 glossaryMap，供校对后 enforceGlossaryTerms 兜底使用
   const glossaryMap = new Map<string, string>()
+  const runtimeProductLines: Record<string, string> = {}
   for (const g of glossary.value) {
     const t = g.translations[targetLang.value]
     if (t) glossaryMap.set(g.source, t)
+    if (g.productLine) runtimeProductLines[g.source] = g.productLine
   }
 
   try {
     let correctedCount = 0
-    let cursor = 0
     let failedBatches = 0
     let proofLastError = ''
-    for (let i = 0; i < total; i += PROOFREAD_BATCH_SIZE) {
+
+    // 并发校对：大幅提速
+    const P_CONCURRENCY = 3
+    for (let i = 0; i < total; i += PROOFREAD_BATCH_SIZE * P_CONCURRENCY) {
       if (cancelFlag.value) break
-      const batch = toCheck.slice(i, i + PROOFREAD_BATCH_SIZE)
-      try {
-        const batchResults = await proofreadBatch(
-          batch.map(it => ({ sourceText: it.sourceText, translatedText: it.translatedText })),
-          targetLang.value,
-          glossaryMap,
-          llmConfig.value,
-        )
-        for (let j = 0; j < batch.length; j++) {
-          const proofed = batchResults[j]
-          if (proofed.text && proofed.text !== 'OK' && proofed.text !== batch[j].translatedText) {
-            // 脚本不匹配检测：校对结果语言与目标语言完全不符时拒绝（如目标ES却输出中文"主機"）
-            if (isProofreadScriptMismatch(proofed.text, targetLang.value)) {
-              console.warn('[translate] proofread script mismatch, rejected:', proofed.text)
-              cursor++
-              continue
+
+      const concurrentBatchPromises: Promise<void>[] = []
+
+      for (let k = 0; k < P_CONCURRENCY; k++) {
+        const batchStart = i + k * PROOFREAD_BATCH_SIZE
+        if (batchStart >= total || cancelFlag.value) break
+        const batch = toCheck.slice(batchStart, batchStart + PROOFREAD_BATCH_SIZE)
+
+        concurrentBatchPromises.push((async () => {
+          if (cancelFlag.value) return
+          try {
+            const batchResults = await proofreadBatch(
+              batch.map(it => ({ sourceText: it.sourceText, translatedText: it.translatedText })),
+              targetLang.value,
+              glossaryMap,
+              llmConfig.value,
+              runtimeProductLines,
+              undefined,
+              pageName.value || undefined,
+              fileName.value || undefined,
+            )
+            for (let j = 0; j < batch.length; j++) {
+              const proofed = batchResults[j]
+              if (proofed.text && proofed.text !== 'OK' && proofed.text !== batch[j].translatedText) {
+                if (isProofreadScriptMismatch(proofed.text, targetLang.value)) {
+                  console.warn('[translate] proofread script mismatch, rejected:', proofed.text)
+                  continue
+                }
+                let fixed = postProcessTranslation(proofed.text, targetLang.value)
+                fixed = formatCJKSpace(fixed, targetLang.value)
+                if (fixed === batch[j].translatedText) continue
+                batch[j].proofreadText = batch[j].translatedText
+                batch[j].translatedText = fixed
+                batch[j].proofreadReason = (proofed.reason || '').slice(0, 40)
+                batch[j].corrected = true
+                correctedCount++
+              }
             }
-            let fixed = postProcessTranslation(proofed.text, targetLang.value)
-            fixed = formatCJKSpace(fixed, targetLang.value)
-            if (fixed === batch[j].translatedText) { cursor++; continue }
-            batch[j].proofreadText = batch[j].translatedText
-            batch[j].translatedText = fixed
-            batch[j].proofreadReason = (proofed.reason || '').slice(0, 40)
-            batch[j].corrected = true
-            correctedCount++
+          } catch (e) {
+            failedBatches++
+            proofLastError = e instanceof Error ? e.message : String(e)
+            console.error('[translate] proofread batch failed', batchStart, proofLastError)
           }
-          cursor++
-        }
-      } catch (e) {
-        failedBatches++
-        proofLastError = e instanceof Error ? e.message : String(e)
-        cursor += batch.length
-        console.error('[translate] proofread batch failed', i, proofLastError)
+        })())
       }
-      proofreadProgress.value = { current: cursor, total }
+
+      await Promise.allSettled(concurrentBatchPromises)
+      const doneSoFar = toCheck.filter(it => it.corrected || (it.translatedText && !it.proofreadText)).length + toCheck.filter(it => !it.translatedText).length
+      proofreadProgress.value = { current: toCheck.filter(it => it.corrected || it.translatedText).length, total }
     }
 
     proofreading.value = false
@@ -945,6 +1130,7 @@ async function startProofread() {
     allTranslatedTexts = enforceGlossaryTerms(allSourceTexts, allTranslatedTexts, glossaryMap)
     allTranslatedTexts = allTranslatedTexts.map(t => postProcessTranslation(t, targetLang.value))
     allTranslatedTexts = allTranslatedTexts.map(t => formatCJKSpace(t, targetLang.value))
+    allTranslatedTexts = restoreStorageUnitFormatting(allSourceTexts, allTranslatedTexts)
     allTranslatedTexts = restoreTrademarkSymbols(allSourceTexts, allTranslatedTexts)
     for (let i = 0; i < items.value.length; i++) {
       if (allTranslatedTexts[i] !== items.value[i].translatedText) {
@@ -1009,7 +1195,7 @@ function undoAll() {
   // undoing state reset by UNDO_DONE message
 }
 
-function retryFailed() {
+function retryFailedApply() {
   if (failedNodeIds.value.length === 0) return
   const failedSet = new Set(failedNodeIds.value)
   const retryItems = items.value
@@ -1027,6 +1213,86 @@ function retryFailed() {
   applying.value = true
   failedNodeIds.value = []
   sendMsgToPlugin(UIMessage.APPLY_TRANSLATIONS, JSON.parse(JSON.stringify(retryItems)))
+}
+
+// 重试翻译失败的条目（不清除已成功的，只翻失败的）
+async function retryFailedTranslations() {
+  if (translateErrors.value.size === 0) return
+  if (translating.value || proofreading.value) {
+    showToast('翻译或校对进行中，请稍后再试', 'warning')
+    return
+  }
+  const errorSet = new Set(translateErrors.value)
+  const failedItems = items.value.filter(it => it.nodeIds.some(nid => errorSet.has(nid)))
+  if (failedItems.length === 0) return
+
+  // 清除之前的翻译结果和错误标记
+  for (const item of failedItems) {
+    item.translatedText = ''
+    for (const nid of item.nodeIds) {
+      translateErrors.value.delete(nid)
+    }
+  }
+
+  // 构建术语库并调用翻译
+  const glossaryMap = new Map<string, string>()
+  const runtimeProductLines: Record<string, string> = {}
+  const runtimeTermTypes: Record<string, string> = {}
+  for (const g of glossary.value) {
+    const t = g.translations[targetLang.value]
+    if (t) glossaryMap.set(g.source, t)
+    if (g.productLine) runtimeProductLines[g.source] = g.productLine
+    if (g.termType) runtimeTermTypes[g.source] = g.termType
+  }
+
+  const crossBatchTerms = findHighFreqGlossaryTerms(
+    items.value.map(it => it.sourceText), glossaryMap,
+  )
+
+  translating.value = true
+  cancelFlag.value = false
+  translateProgress.value = { current: 0, total: failedItems.length }
+
+  // 分批处理失败项
+  for (let i = 0; i < failedItems.length; i += TRANSLATE_BATCH_SIZE) {
+    if (cancelFlag.value) break
+    const batch = failedItems.slice(i, i + TRANSLATE_BATCH_SIZE)
+    const texts = batch.map(it => it.sourceText)
+
+    try {
+      const apiResult = await translateBatch(
+        texts, targetLang.value, glossaryMap, llmConfig.value,
+        sourceLang.value === 'auto' ? undefined : sourceLang.value,
+        items.value.map(it => it.sourceText),
+        runtimeProductLines, runtimeTermTypes,
+        pageName.value || undefined, fileName.value || undefined,
+        crossBatchTerms,
+      )
+      for (let j = 0; j < batch.length; j++) {
+        batch[j].translatedText = formatCJKSpace(apiResult[j] || '', targetLang.value)
+      }
+    } catch (e) {
+      for (const item of batch) {
+        translateErrors.value.add(item.nodeIds[0])
+      }
+      console.error('[translate] retry batch failed', e)
+    }
+    translateProgress.value = { current: Math.min(i + TRANSLATE_BATCH_SIZE, failedItems.length), total: failedItems.length }
+  }
+
+  translating.value = false
+  resizeAllTextareas()
+  enforceSameSourceConsistency()
+
+  const succeeded = failedItems.filter(it => it.translatedText && !translateErrors.value.has(it.nodeIds[0])).length
+  const stillFailed = translateErrors.value.size
+  if (succeeded > 0 && stillFailed === 0) {
+    showToast(`重翻成功 ${succeeded} 条`, 'success')
+  } else if (succeeded > 0) {
+    showToast(`重翻完成：${succeeded} 条成功，${stillFailed} 条仍失败`, 'warning')
+  } else {
+    showToast('重翻全部失败，请检查 API 配置', 'error')
+  }
 }
 
 // ============================================================
@@ -1064,137 +1330,228 @@ function triggerDownload(csv: string, filename: string) {
   URL.revokeObjectURL(url)
 }
 
-function downloadGlossaryTemplate() {
-  triggerDownload(DEFAULT_GLOSSARY_CSV, 'Lexar术语库模板.csv')
-}
-
-function triggerGlossaryUpload() {
-  glossaryInput.value?.click()
-}
-
 // 已知的有效语言代码（与 LANGUAGES 常量保持一致）
 const VALID_LANG_CODES = new Set(LANGUAGES.map(l => l.code))
 
-function handleGlossaryUpload(e: Event) {
+function parseGlossaryCSV(text: string): GlossaryEntry[] {
+  const rows = text.replace(/^﻿/, '').trim().split('\n')
+  const headerCells = parseCSVRow(rows[0])
+  // 检测「术语类型」「产品线」列
+  const termTypeIdx = headerCells.findIndex((h: string) => h.trim() === '术语类型')
+  const productLineIdx = headerCells.findIndex((h: string) => h.trim() === '产品线')
+  const skippedCols = new Set([termTypeIdx, productLineIdx].filter(i => i >= 0))
+  const langCols: string[] = []
+  const dataCols: number[] = []  // 实际在 CSV 行中的列索引
+  for (let i = 1; i < headerCells.length; i++) {
+    if (skippedCols.has(i)) continue
+    const colName = headerCells[i].trim()
+    if (VALID_LANG_CODES.has(colName)) {
+      dataCols.push(i)
+      langCols.push(colName)
+    }
+  }
+  const entries: GlossaryEntry[] = []
+  for (let i = 1; i < rows.length; i++) {
+    const cells = parseCSVRow(rows[i])
+    const source = (cells[0] || '').trim()
+    if (!source) continue
+    const translations: Record<string, string> = {}
+    for (let j = 0; j < langCols.length; j++) {
+      const val = (cells[dataCols[j]] || '').trim()
+      if (val) translations[langCols[j]] = val
+    }
+    const entry: GlossaryEntry = { source, translations }
+    if (termTypeIdx >= 0 && termTypeIdx < cells.length) {
+      const tt = cells[termTypeIdx].trim()
+      if (tt) entry.termType = tt
+    }
+    if (productLineIdx >= 0 && productLineIdx < cells.length) {
+      const pl = cells[productLineIdx].trim()
+      if (pl) entry.productLine = pl
+    }
+    entries.push(entry)
+  }
+  return entries
+}
+
+// ---- 产品名术语库 ----
+function downloadGlossaryProducts() {
+  triggerDownload(DEFAULT_GLOSSARY_PRODUCTS_CSV, 'Lexar术语库_产品名.csv')
+}
+
+const glossaryProductsInput = ref<HTMLInputElement | null>(null)
+function triggerGlossaryProductsUpload() {
+  glossaryProductsInput.value?.click()
+}
+
+function handleGlossaryProductsUpload(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file) return
   const reader = new FileReader()
   reader.onload = () => {
-    const text = (reader.result as string).replace(/^﻿/, '').trim()
-    const rows = text.split('\n')
-    const headerCells = parseCSVRow(rows[0])
-    // 识别语言列：跳过非语言代码的列（如 category, category_name, 中文品类 等）
-    const colMap: number[] = []  // 源列索引 -> 目标列索引（-1 表示跳过）
-    const langCols: string[] = []
-    for (let i = 1; i < headerCells.length; i++) {
-      const colName = headerCells[i].trim()
-      if (VALID_LANG_CODES.has(colName)) {
-        colMap.push(langCols.length)
-        langCols.push(colName)
-      } else {
-        colMap.push(-1)  // 跳过非语言列
-      }
-    }
-
-    const entries: GlossaryEntry[] = []
-    for (let i = 1; i < rows.length; i++) {
-      const cells = parseCSVRow(rows[i])
-      const source = (cells[0] || '').trim()
-      if (!source) continue
-      const translations: Record<string, string> = {}
-      for (let j = 0; j < colMap.length; j++) {
-        if (colMap[j] < 0) continue  // 跳过非语言列
-        const val = (cells[j + 1] || '').trim()
-        if (val) translations[langCols[colMap[j]]] = val
-      }
-      entries.push({ source, translations })
-    }
-    // 直接替换：上传的术语库完全覆盖现有术语库
-    glossary.value = entries
-    saveGlossary()
-    showToast(`已导入 ${entries.length} 条术语（替换原有术语库）`, 'success')
+    const entries = parseGlossaryCSV(reader.result as string)
+    glossaryProducts.value = entries
+    saveGlossaryProducts()
+    showToast(`已替换产品名术语库（${entries.length} 条）`, 'success')
   }
   reader.readAsText(file)
-  glossaryInput.value!.value = ''
+  glossaryProductsInput.value!.value = ''
 }
 
-function clearGlossary() {
-  glossary.value = []
-  saveGlossary()
+// ---- 专属术语术语库 ----
+function downloadGlossaryExclusive() {
+  triggerDownload(DEFAULT_GLOSSARY_EXCLUSIVE_CSV, 'Lexar术语库_专属.csv')
 }
 
-function saveGlossary() {
-  translationCache.value = {}  // 术语库变更后清除缓存
-  sendMsgToPlugin(UIMessage.SAVE_GLOSSARY, JSON.parse(JSON.stringify(glossary.value)))
+const glossaryExclusiveInput = ref<HTMLInputElement | null>(null)
+function triggerGlossaryExclusiveUpload() {
+  glossaryExclusiveInput.value?.click()
+}
+
+function handleGlossaryExclusiveUpload(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = () => {
+    const entries = parseGlossaryCSV(reader.result as string)
+    glossaryExclusive.value = entries
+    saveGlossaryExclusive()
+    showToast(`已替换专属术语术语库（${entries.length} 条）`, 'success')
+  }
+  reader.readAsText(file)
+  glossaryExclusiveInput.value!.value = ''
+}
+
+function saveGlossaryProducts() {
+  translationCache.value = {}
+  sendMsgToPlugin(UIMessage.SAVE_GLOSSARY_PRODUCTS, JSON.parse(JSON.stringify(glossaryProducts.value)))
+}
+function saveGlossaryExclusive() {
+  translationCache.value = {}
+  sendMsgToPlugin(UIMessage.SAVE_GLOSSARY_EXCLUSIVE, JSON.parse(JSON.stringify(glossaryExclusive.value)))
 }
 
 // ============================================================
-// 行业翻译提示预设
+// 翻译风格预设
 // ============================================================
-const PRESETS: Record<string, string> = {
-  standard: `你是Lexar（雷克沙）的专业翻译，专注SSD固态硬盘、HDD机械硬盘、内存条、U盘、存储卡、PSSD移动固态硬盘、NAS、硬盘盒等存储全品类商品详情页翻译。
-翻译严格遵守以下规则：
-1. 术语库中的固定译法为最高翻译标准，必须严格使用，不得自创替代；
-2. 专业术语绝对标准化，存储行业固定名词统一业内通用译法，不随意直译、不自创词汇；
-3. 保持电商详情页原有排版、分段、换行，不要打乱原文结构；
-4. 句式贴合海外电商平台表达习惯，通顺自然，不生硬机翻；
-5. 保留产品参数、规格、接口型号、容量参数（如1TB、PCIe 4.0、NVMe、SATA、USB3.2）原样不动；
-6. 营销文案保留原有卖点气场，不删减亮点、不夸大、不曲解原意；
-7. 禁止口语化、网络俚语，用词正式符合3C数码电商文案风格；
-8. 只输出翻译结果，不要额外解释、不要多余话术。`,
+const selectedPreset = ref('standard')
 
-  technical: `角色：Lexar（雷克沙）资深技术翻译+跨境电商文案专家
-服务品类：SSD固态硬盘、HDD机械硬盘、台式机/笔记本内存DDR4/DDR5、TF/SD存储卡、移动固态硬盘PSSD、U盘、NAS硬盘、硬盘阵列盒、存储扩展配件等全品类。
+// 场景锁定：非电商场景强制严谨专业版
+const isStyleLocked = computed(() => llmConfig.value.scenePreset !== 'ecommerce')
+const previousStyle = ref('marketing')
+const showRef = ref(false)
 
-翻译硬性规则：
-1. 术语库固定译法为强制标准，全文严格统一，不允许任何变体或自创；
-2. 所有技术参数、接口协议、颗粒类型、主控型号、读写速度、协议标准严格遵循国际存储行业官方标准术语，统一规范译法；
-3. 技术语句严谨客观，不美化、不夸张，忠于原文技术含义；
-4. 数字、单位、型号、版本、接口标识（NVMe/PCIe/SATA/USB/CFexpress等）完全保留不翻译、不改动；
-5. 保留原文表格、分段、项目符号、换行结构，格式完全对齐；
-6. 避免中式英语/中式外文，适配亚马逊、独立站、跨境平台官方商品文案风格；
-7. 专业词汇固定统一，全文前后译法保持一致；
-8. 仅输出精准译文，无多余解释、无补充说明、无格式冗余。`,
+// 自动检测的产品线
+const detectedProductLine = computed(() => {
+  if (items.value.length === 0) return null
+  return detectProductLine(items.value.map(it => it.sourceText), pageName.value || undefined, fileName.value || undefined)
+})
 
-  marketing: `你是Lexar（雷克沙）跨境3C数码存储类爆款详情页文案翻译专家，精通海外消费者阅读习惯。
-翻译要求：
-1. 术语库译法为标准底线，在此基础之上进行营销文案优化，不可偏离术语库原意；
-2. 覆盖SSD、内存、U盘、移动硬盘、存储卡、NAS等存储全品类；
-3. 专业术语标准不变，营销语句优化得更有吸引力，符合海外电商种草文案风格；
-4. 保留原有产品卖点、功能亮点、场景描述（办公、游戏、摄影、装机、存储备份）；
-5. 不改变原意，适当润色句式，流畅高级，不生硬机翻；
-6. 保留原文分段排版，参数型号容量原样保留；
-7. 不用口语化低俗表达，保持高端数码产品文案质感；
-8. 直接输出翻译结果，无需额外备注和解释。`,
+// 手动覆盖产品线（空字符串=不覆盖, 'none'=强制关闭）
+const manualProductLine = ref('')
+const effectiveProductLine = computed(() => {
+  if (manualProductLine.value === 'none') return null
+  if (manualProductLine.value) return manualProductLine.value
+  return detectedProductLine.value
+})
 
-  taiwan: `你是Lexar（雷克沙）的專業用語在地化轉換專家。你正在將大陸簡體中文（數位3C/存儲行業文案）轉換為台灣繁體中文。這不是簡單的簡轉繁，而是必須做完整的用語本地化（在地化）。
+// 产品线选项
+const productLineOptions = [
+  { value: '', label: '自动检测' },
+  { value: 'professional_imaging', label: '专业影像' },
+  { value: 'consumer_cards', label: '消费存储卡' },
+  { value: 'gaming_card', label: '游戏存储卡' },
+  { value: 'gaming_ssd', label: '电竞SSD' },
+  { value: 'gaming_dimm', label: '电竞内存' },
+  { value: 'pc_productivity', label: 'PC生产力' },
+  { value: 'portable_storage', label: '移动存储' },
+  { value: 'innovation_lifestyle', label: '创新生活' },
+  { value: 'none', label: '不注入' },
+]
 
-轉換重點：
-1. 詞彙本地化：所有大陸用語必須改為台灣慣用詞彙（如：硬盤→硬碟、U盤→隨身碟、內存→記憶體、顯卡→顯示卡、鼠標→滑鼠、充電寶→行動電源、筆記本→筆記型電腦、台式機→桌上型電腦、服務器→伺服器、芯片→晶片、傳感器→感測器、軟件→軟體、硬件→硬體、文件→檔案、數據→資料、網絡→網路、視頻→影片、音頻→音訊、默認→預設、點擊→點選、搜索→搜尋、支持→支援、優化→最佳化、智能→智慧、數字→數位、賬號→帳號、權限→權限、插件→外掛程式、菜單→選單、配置→設定、兼容→相容、加載→載入）
-2. 存儲行業術語標準：NVMe/PCIe/SATA/USB/Thunderbolt保留不翻譯、固件→韌體、閃存→快閃記憶體、主控→主控晶片、緩存→快取、帶寬→頻寬、協議→協定、接口→連接埠/介面
-3. 容量參數型號（1TB、PCIe 4.0、NVMe、USB 3.2、Type-C）保留原樣不動
-4. 保留原文排版分段，使用全形標點（，。！？：「」）
-5. 語氣符合台灣閱讀習慣，不使用大陸慣用書面語（如"從而"、"進而"、"通過"表示"透過"、"您"的泛化使用）
-6. 專有名詞和產品型號保留原文不翻譯
-7. 禁止僅做字符簡轉繁而不轉換詞彙，必須做到讓台灣讀者閱讀時感覺是本地撰寫的文案`,
-}
+const currentStylePrompt = computed(() => {
+  if (selectedPreset.value === 'custom') return ''
+  const effectiveStyle = isStyleLocked.value ? 'professional' : selectedPreset.value
+  let content = STYLE_PRESETS[effectiveStyle] || ''
 
-const selectedPreset = ref('')
+  // 拼接场景提示词
+  const sceneKey = llmConfig.value.scenePreset
+  if (sceneKey && SCENE_PRESETS[sceneKey]) {
+    content += '\n\n' + SCENE_PRESETS[sceneKey]
+  }
+
+  // 拼接产品线策略（如有）
+  if (effectiveProductLine.value) {
+    const lineKey = effectiveProductLine.value
+    const strategies: Record<string, string> = {
+      professional_imaging: '【产品线：专业影像】受众为职业摄影师/影视团队。"高速"→8K不掉帧、连拍不卡顿。',
+      consumer_cards: '【产品线：消费存储卡】受众为vlog/旅拍/家庭用户。"高速"→4K畅拍不中断。',
+      gaming_card: '【产品线：游戏存储卡】受众为掌机/主机玩家。"游戏性能"→海量扩容、游戏秒下载。',
+      gaming_ssd: '【产品线：电竞SSD】受众为3A玩家。"游戏性能"→3A秒加载、DirectStorage潜能释放。',
+      gaming_dimm: '【产品线：电竞内存】受众为电竞发烧友。"游戏性能"→提升1% Low帧、突破超频极限。',
+      pc_productivity: '【产品线：PC/AI生产力】受众为AI PC用户/创作者。"高速"→AI秒级响应、工程文件秒传。',
+      portable_storage: '【产品线：移动存储】受众为商务/学生/移动创作者。"高速"→移动办公、即拍即传。',
+      innovation_lifestyle: '【产品线：创新生活】受众为家庭用户。"分享"→跨越距离陪伴家人。',
+    }
+    if (strategies[lineKey]) {
+      content += '\n\n' + strategies[lineKey]
+    }
+  }
+
+  return content
+})
+
+// 自定义模式下的范文参考
+const styleReference = computed(() => {
+  const preset = STYLE_PRESETS['professional'] || ''
+  const sceneKey = llmConfig.value.scenePreset
+  const scene = sceneKey && SCENE_PRESETS[sceneKey] ? '\n\n' + SCENE_PRESETS[sceneKey] : ''
+  return preset + scene
+})
 
 function detectPreset(): string {
-  const ctx = (llmConfig.value.industryContext || '').trim()
-  if (!ctx) return ''
-  for (const [key, value] of Object.entries(PRESETS)) {
-    if (ctx === value) return key
-  }
-  return ''
+  const style = (llmConfig.value.translationStyle || '').trim()
+  if (!style) return 'standard'
+  if (style === 'custom') return 'custom'
+  if (style === 'standard' || style === 'professional' || style === 'marketing') return style
+  // 向后兼容：如果存储的是旧预设文本，检测匹配
+  if (style.includes('通用标准版') || style.includes('自然流畅')) return 'standard'
+  if (style.includes('严谨专业版') || style.includes('技术文档')) return 'professional'
+  if (style.includes('电商营销版') || style.includes('种草文案')) return 'marketing'
+  return 'custom'
 }
 
 function applyPreset() {
-  if (selectedPreset.value && PRESETS[selectedPreset.value]) {
-    llmConfig.value.industryContext = PRESETS[selectedPreset.value]
+  if (selectedPreset.value && selectedPreset.value !== 'custom') {
+    llmConfig.value.translationStyle = selectedPreset.value
+  } else {
+    llmConfig.value.translationStyle = 'custom'
   }
 }
+
+function onSceneChange() {
+  if (isStyleLocked.value) {
+    // 切换到非电商场景：保存当前风格，锁定为严谨专业版
+    previousStyle.value = selectedPreset.value
+    selectedPreset.value = 'professional'
+    llmConfig.value.translationStyle = 'professional'
+  } else {
+    // 切换回电商详情页：恢复之前的风格
+    if (previousStyle.value && previousStyle.value !== 'professional') {
+      selectedPreset.value = previousStyle.value
+      llmConfig.value.translationStyle = previousStyle.value
+    }
+  }
+}
+
+function onProductLineChange() {
+  llmConfig.value.manualProductLine = manualProductLine.value || undefined
+}
+
+// 初始化时同步产品线到 llmConfig
+watch(manualProductLine, (val) => {
+  llmConfig.value.manualProductLine = val || undefined
+}, { immediate: true })
 
 // ============================================================
 // 设置
@@ -1294,6 +1651,13 @@ async function testProofConnection() {
 // ============================================================
 let settingsReady = false
 let glossaryReady = false
+let glossaryProductsLoaded = false
+let glossaryExclusiveLoaded = false
+function checkGlossaryReady() {
+  if (glossaryProductsLoaded && glossaryExclusiveLoaded) {
+    glossaryReady = true
+  }
+}
 
 onMounted(() => {
   // 先注册监听器，再发请求，避免任何竞态
@@ -1304,12 +1668,23 @@ onMounted(() => {
     const { type, data } = msg
 
     switch (type) {
-      case PluginMessage.SCAN_RESULT:
+      case PluginMessage.SCAN_RESULT: {
         scanning.value = false
-        items.value = data as TextItem[]
+        // 兼容新旧格式：新格式 { items, pageName, fileName }，旧格式 TextItem[]
+        const scanData = data as { items: TextItem[]; pageName?: string; fileName?: string } | TextItem[]
+        if (Array.isArray(scanData)) {
+          items.value = scanData
+          pageName.value = ''
+          fileName.value = ''
+        } else {
+          items.value = scanData.items
+          pageName.value = scanData.pageName || ''
+          fileName.value = scanData.fileName || ''
+        }
         resizeAllTextareas()
-        showToast(`扫描到 ${(data as TextItem[]).length} 个文本节点`, 'success')
+        showToast(`扫描到 ${items.value.length} 个文本节点`, 'success')
         break
+      }
 
       case PluginMessage.TRANSLATION_CACHE_LOADED:
         translationCache.value = (data as Record<string, string>) || {}
@@ -1340,17 +1715,36 @@ onMounted(() => {
         showToast(`已恢复 ${(data as { count: number }).count} 条原文`, 'success')
         break
 
-      case PluginMessage.GLOSSARY_LOADED:
-        glossary.value = ((data as GlossaryEntry[]) || []).map(function (g: GlossaryEntry) {
+      case PluginMessage.GLOSSARY_PRODUCTS_LOADED:
+        glossaryProducts.value = ((data as GlossaryEntry[]) || []).map(function (g: GlossaryEntry) {
           if (g.translations) return g
           return { source: g.source, translations: (g as Record<string, unknown>).target ? { en: (g as Record<string, unknown>).target as string } : {} }
         })
-        glossaryReady = true
+        glossaryProductsLoaded = true
+        checkGlossaryReady()
+        break
+
+      case PluginMessage.GLOSSARY_EXCLUSIVE_LOADED:
+        glossaryExclusive.value = ((data as GlossaryEntry[]) || []).map(function (g: GlossaryEntry) {
+          if (g.translations) return g
+          return { source: g.source, translations: (g as Record<string, unknown>).target ? { en: (g as Record<string, unknown>).target as string } : {} }
+        })
+        glossaryExclusiveLoaded = true
+        checkGlossaryReady()
         break
 
       case PluginMessage.SETTINGS_LOADED:
         if (data) {
-          llmConfig.value = { industryContext: '', enableProofread: false, proofreadApiKey: '', proofreadApiUrl: '', proofreadModel: '', ...(data as LLMConfig) }
+          const raw = data as Record<string, unknown>
+          // 迁移旧字段 industryContext → translationStyleCustom
+          if (raw.translationStyle === undefined && raw.industryContext !== undefined) {
+            raw.translationStyle = 'custom'
+            raw.translationStyleCustom = raw.industryContext
+          }
+          if (raw.scenePreset === undefined) {
+            raw.scenePreset = 'ecommerce'
+          }
+          llmConfig.value = { translationStyle: 'standard', translationStyleCustom: '', scenePreset: 'ecommerce', enableProofread: false, proofreadApiKey: '', proofreadApiUrl: '', proofreadModel: '', ...(raw as LLMConfig) }
         }
         selectedPreset.value = detectPreset()
         settingsReady = true
@@ -1401,17 +1795,17 @@ onMounted(() => {
         const sug = data as { source: string; targetLang: string; correctedTranslation: string; count: number }
         showToast(`"${sug.source}" 已被手动修正 ${sug.count} 次，是否加入术语库？`, 'info')
         // 自动将修正加入术语库
-        const existing = glossary.value.find(g => g.source === sug.source)
+        const existing = glossaryExclusive.value.find(g => g.source === sug.source)
         if (existing) {
           existing.translations[sug.targetLang] = sug.correctedTranslation
         } else {
-          glossary.value.push({
+          glossaryExclusive.value.push({
             source: sug.source,
             translations: { [sug.targetLang]: sug.correctedTranslation },
           })
         }
-        saveGlossary()
-        showToast(`已自动将"${sug.source}"的修正加入术语库`, 'success')
+        saveGlossaryExclusive()
+        showToast(`已自动将"${sug.source}"的修正加入专属术语库`, 'success')
         break
       }
     }
@@ -1419,7 +1813,8 @@ onMounted(() => {
 
   // 监听器注册完毕后，发送初始化请求
   sendMsgToPlugin(UIMessage.LOAD_SETTINGS)
-  sendMsgToPlugin(UIMessage.LOAD_GLOSSARY)
+  sendMsgToPlugin(UIMessage.LOAD_GLOSSARY_PRODUCTS)
+  sendMsgToPlugin(UIMessage.LOAD_GLOSSARY_EXCLUSIVE)
   sendMsgToPlugin(UIMessage.LOAD_FONTS)
   sendMsgToPlugin(UIMessage.LOAD_TRANSLATION_CACHE)
 
@@ -1566,6 +1961,109 @@ body {
 }
 .app.dark .toolbar { background: var(--gray-100); }
 .toolbar-row { display: flex; gap: 6px; align-items: center; }
+
+/* ---- 翻译风格栏 ---- */
+.style-bar {
+  background: #fff;
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.app.dark .style-bar { background: var(--gray-100); }
+.style-row {
+  display: flex;
+  gap: 12px;
+}
+.style-field {
+  flex: 1;
+  min-width: 0;
+}
+.style-select {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--gray-100);
+  border-radius: var(--radius);
+  font-size: 13px;
+  background: #fff;
+  color: var(--gray-800);
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color var(--transition);
+  -webkit-appearance: none;
+  appearance: none;
+}
+.style-select:focus { outline: none; border-color: var(--blue); }
+.style-select:disabled { opacity: 0.6; cursor: not-allowed; background: var(--gray-50); }
+.auto-badge, .manual-badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 3px; margin-left: 6px; vertical-align: middle; }
+.auto-badge { color: var(--blue); background: rgba(66,133,244,0.10); }
+.manual-badge { color: var(--orange, #e67e22); background: rgba(230,126,34,0.10); }
+.app.dark .style-select {
+  background: var(--gray-200);
+  border-color: var(--gray-200);
+  color: var(--gray-900);
+}
+.style-textarea {
+  width: 100%;
+  font-size: 13px;
+  padding: 8px 10px;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: var(--gray-900);
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.5;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+.style-textarea:focus {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(0,122,255,0.12);
+}
+.style-textarea::placeholder { color: var(--gray-200); }
+.app.dark .style-textarea {
+  background: var(--gray-200);
+  border-color: var(--gray-400);
+  color: var(--gray-900);
+}
+.style-prompt {
+  width: 100%;
+  font-size: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--gray-100);
+  border-radius: var(--radius-sm);
+  background: var(--gray-50);
+  color: var(--gray-600);
+  resize: none;
+  font-family: -apple-system, 'SF Pro Text', 'Helvetica Neue', Helvetica, sans-serif;
+  line-height: 1.6;
+  max-height: 240px;
+  overflow-y: auto;
+  cursor: default;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.style-prompt:focus { outline: none; }
+.style-ref-toggle {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 0; cursor: pointer; user-select: none;
+  font-size: 11px; color: var(--gray-400);
+  transition: color var(--transition);
+}
+.style-ref-toggle:hover { color: var(--blue); }
+.style-ref-toggle .chevron {
+  color: var(--gray-400); flex-shrink: 0;
+  transition: transform var(--transition);
+}
+.style-ref-toggle .chevron.open { transform: rotate(90deg); }
+.app.dark .style-prompt {
+  background: var(--gray-200);
+  border-color: var(--gray-400);
+  color: var(--gray-400);
+}
 
 /* ---- 语言选择行 ---- */
 .lang-row {
@@ -1992,21 +2490,15 @@ textarea.field { resize: vertical; }
 .toggle.on .toggle-knob { transform: translateX(16px); }
 
 /* ---- 术语库 ---- */
-.glossary-list { display: flex; flex-direction: column; gap: 4px; max-height: 180px; overflow-y: auto; }
-.glossary-card { padding: 8px 10px; border: 1px solid var(--gray-100); border-radius: var(--radius-sm); transition: border-color var(--transition); }
-.glossary-card:hover { border-color: var(--gray-200); }
-.app.dark .glossary-card { border-color: var(--gray-200); }
-.gc-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
-.gc-source { font-size: 13px; font-weight: 500; color: var(--blue); }
-.gc-tags { display: flex; flex-wrap: wrap; gap: 3px; }
-.gc-tag { font-size: 11px; padding: 1px 6px; background: var(--gray-50); border-radius: 4px; color: var(--gray-600); }
-.gc-tag b { color: var(--gray-400); font-weight: 500; }
-.app.dark .gc-tag { background: var(--gray-200); }
-.btn-del {
-  background: none; border: none; color: var(--gray-400); cursor: pointer;
-  padding: 2px; border-radius: 4px; display: flex; transition: all var(--transition);
-}
-.btn-del:hover { color: var(--red); background: rgba(255,59,48,0.08); }
+.glossary-sub { padding: 8px 0; border-bottom: 1px solid var(--gray-100); }
+.glossary-sub:last-child { border-bottom: none; }
+.app.dark .glossary-sub { border-color: var(--gray-200); }
+.glossary-sub-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.glossary-sub-title { font-size: 13px; font-weight: 500; }
+.glossary-sub-count { font-size: 11px; color: var(--gray-500); }
+.app.dark .glossary-sub-count { color: var(--gray-400); }
+.glossary-hint { font-size: 11px; color: var(--gray-400); margin: 4px 0 0; line-height: 1.4; }
+.app.dark .glossary-hint { color: var(--gray-500); }
 
 /* ---- Toast ---- */
 .toast {

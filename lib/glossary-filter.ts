@@ -75,6 +75,13 @@ function termMatches(term: string, sourceTexts: string[]): boolean {
       const stemmedTerm = termWords.map(stemEnglish).join(' ')
       const stemmedText = textWords.map(stemEnglish).join(' ')
       if (stemmedText.includes(stemmedTerm)) return true
+      // 宽松前缀匹配：处理 write/writing → writ/write 这类变形
+      if (termWords.length === 1 && stemmedTerm.length > 2) {
+        for (const tw of textWords) {
+          const stw = stemEnglish(tw)
+          if (stw.length > 2 && (stemmedTerm.startsWith(stw) || stw.startsWith(stemmedTerm))) return true
+        }
+      }
     }
   }
   return false

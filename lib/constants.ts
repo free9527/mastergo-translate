@@ -3,8 +3,8 @@
 // ============================================================
 
 // 翻译批次大小
-export const TRANSLATE_BATCH_SIZE = 5
-export const PROOFREAD_BATCH_SIZE = 10
+export const TRANSLATE_BATCH_SIZE = 10
+export const PROOFREAD_BATCH_SIZE = 12
 
 // API 超时（毫秒）
 export const API_TIMEOUT_MS = 45000
@@ -17,14 +17,15 @@ export const API_RETRY_DELAY_MS = 1000
 export const MAX_CACHE_SIZE = 500
 
 // 术语库版本号（更新 default-glossary.ts 后手动 +1，旧版自动覆盖升级）
-export const GLOSSARY_VERSION = 1
+export const GLOSSARY_VERSION = 2  // 拆分术语库 + 产品线映射 + LLM优化版专属术语
 
 // UI 超时（仅用于 toast 消失等非关键逻辑）
 export const TOAST_DURATION_MS = 2500
 
 // 存储 Key
-export const STORAGE_KEY_GLOSSARY = 'translate_glossary'
 export const STORAGE_KEY_GLOSSARY_VERSION = 'translate_glossary_version'
+export const STORAGE_KEY_GLOSSARY_PRODUCTS = 'translate_glossary_products'
+export const STORAGE_KEY_GLOSSARY_EXCLUSIVE = 'translate_glossary_exclusive'
 export const STORAGE_KEY_SETTINGS = 'translate_settings'
 export const STORAGE_KEY_ORIGINALS = 'translate_originals'
 export const STORAGE_KEY_TRANSLATION_CACHE = 'translate_cache'

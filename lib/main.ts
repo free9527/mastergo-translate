@@ -1,9 +1,9 @@
 import { PluginMessage, UIMessage, TextItem, LLMConfig, GlossaryEntry, TranslationCorrection } from '@messages/types'
 import { sendMsgToUI } from '@messages/main-sender'
-import { STORAGE_KEY_GLOSSARY, STORAGE_KEY_GLOSSARY_VERSION, STORAGE_KEY_SETTINGS, STORAGE_KEY_ORIGINALS, STORAGE_KEY_TRANSLATION_CACHE, STORAGE_KEY_CORRECTIONS, CORRECTION_THRESHOLD, UI_WIDTH, UI_HEIGHT, MAX_CACHE_SIZE, GLOSSARY_VERSION, makeFontKey } from '@lib/constants'
+import { STORAGE_KEY_GLOSSARY_VERSION, STORAGE_KEY_GLOSSARY_PRODUCTS, STORAGE_KEY_GLOSSARY_EXCLUSIVE, STORAGE_KEY_SETTINGS, STORAGE_KEY_ORIGINALS, STORAGE_KEY_TRANSLATION_CACHE, STORAGE_KEY_CORRECTIONS, CORRECTION_THRESHOLD, UI_WIDTH, UI_HEIGHT, MAX_CACHE_SIZE, GLOSSARY_VERSION, makeFontKey } from '@lib/constants'
 import { collectTextNodes, mergeDuplicates, TraversableNode } from '@lib/text-collector'
 import { exportCSV, importCSV } from '@lib/csv-handler'
-import { DEFAULT_GLOSSARY_CSV } from '@lib/default-glossary'
+import { DEFAULT_GLOSSARY_PRODUCTS_CSV, DEFAULT_GLOSSARY_EXCLUSIVE_CSV } from '@lib/default-glossary'
 import { parseCSVRow } from '@lib/parse-csv'
 
 const originalTexts = new Map<string, string>()
@@ -39,7 +39,7 @@ function scanAllTextNodes(): void {
       console.error('[translate] page.children is undefined! page keys:', Object.keys(page))
     }
 
-    sendMsgToUI(PluginMessage.SCAN_RESULT, [])
+    sendMsgToUI(PluginMessage.SCAN_RESULT, { items: [], pageName: page.name, fileName: mg.document.name })
     sendMsgToUI(PluginMessage.STATUS, '当前页面未找到文本节点（已输出诊断日志，请按 F12 查看控制台）')
     return
   }
@@ -47,7 +47,7 @@ function scanAllTextNodes(): void {
   const items = mergeDuplicates(textNodes)
   pruneStaleOriginals(items)
   console.log('[translate] final merged items:', items.length)
-  sendMsgToUI(PluginMessage.SCAN_RESULT, items)
+  sendMsgToUI(PluginMessage.SCAN_RESULT, { items, pageName: page.name, fileName: mg.document.name })
 }
 
 // ============================================================
@@ -76,7 +76,8 @@ function scanSelectedTextNodes(): void {
 
   const items = mergeDuplicates(allTextNodes)
   pruneStaleOriginals(items)
-  sendMsgToUI(PluginMessage.SCAN_RESULT, items)
+  const page = mg.document.currentPage
+  sendMsgToUI(PluginMessage.SCAN_RESULT, { items, pageName: page.name, fileName: mg.document.name })
 }
 
 // ============================================================
@@ -295,12 +296,101 @@ async function loadOriginals(): Promise<void> {
   }
 }
 
-function parseDefaultGlossary(): GlossaryEntry[] {
-  const rows = DEFAULT_GLOSSARY_CSV.split('\n')
+// ============================================================
+// 产品名术语库（独立存储）
+// ============================================================
+function parseDefaultGlossaryProducts(): GlossaryEntry[] {
+  return parseCSVToGlossary(DEFAULT_GLOSSARY_PRODUCTS_CSV)
+}
+
+async function loadGlossaryProducts(): Promise<GlossaryEntry[]> {
+  // 版本检测：内置术语库更新后自动覆盖旧版
+  const storedVersion = await mg.clientStorage.getAsync(STORAGE_KEY_GLOSSARY_VERSION)
+  if (storedVersion == null || storedVersion < GLOSSARY_VERSION) {
+    const defaults = parseDefaultGlossaryProducts()
+    if (defaults.length > 0) {
+      await mg.clientStorage.setAsync(STORAGE_KEY_GLOSSARY_PRODUCTS, defaults)
+    }
+    return defaults
+  }
+
+  const fromLocal = await mg.clientStorage.getAsync(STORAGE_KEY_GLOSSARY_PRODUCTS)
+  if (fromLocal && fromLocal.length > 0) return fromLocal
+
+  const defaults = parseDefaultGlossaryProducts()
+  if (defaults.length > 0) {
+    await mg.clientStorage.setAsync(STORAGE_KEY_GLOSSARY_PRODUCTS, defaults)
+  }
+  return defaults
+}
+
+async function saveGlossaryProducts(entries: GlossaryEntry[]): Promise<void> {
+  await mg.clientStorage.setAsync(STORAGE_KEY_GLOSSARY_PRODUCTS, entries)
+  await mg.clientStorage.setAsync(STORAGE_KEY_TRANSLATION_CACHE, {})
+  const json = JSON.stringify(entries)
+  for (const page of mg.document.children) {
+    try {
+      (page as BaseNode).setSharedPluginData('translate', STORAGE_KEY_GLOSSARY_PRODUCTS, json)
+    } catch (_) { /* 页面不支持 SharedPluginData 则跳过 */ }
+  }
+  sendMsgToUI(PluginMessage.GLOSSARY_PRODUCTS_SAVED)
+}
+
+// ============================================================
+// 专属术语术语库（独立存储）
+// ============================================================
+function parseDefaultGlossaryExclusive(): GlossaryEntry[] {
+  return parseCSVToGlossary(DEFAULT_GLOSSARY_EXCLUSIVE_CSV)
+}
+
+async function loadGlossaryExclusive(): Promise<GlossaryEntry[]> {
+  // 版本检测：内置术语库更新后自动覆盖旧版
+  const storedVersion = await mg.clientStorage.getAsync(STORAGE_KEY_GLOSSARY_VERSION)
+  if (storedVersion == null || storedVersion < GLOSSARY_VERSION) {
+    const defaults = parseDefaultGlossaryExclusive()
+    if (defaults.length > 0) {
+      await mg.clientStorage.setAsync(STORAGE_KEY_GLOSSARY_EXCLUSIVE, defaults)
+    }
+    return defaults
+  }
+
+  const fromLocal = await mg.clientStorage.getAsync(STORAGE_KEY_GLOSSARY_EXCLUSIVE)
+  if (fromLocal && fromLocal.length > 0) return fromLocal
+
+  const defaults = parseDefaultGlossaryExclusive()
+  if (defaults.length > 0) {
+    await mg.clientStorage.setAsync(STORAGE_KEY_GLOSSARY_EXCLUSIVE, defaults)
+  }
+  return defaults
+}
+
+async function saveGlossaryExclusive(entries: GlossaryEntry[]): Promise<void> {
+  await mg.clientStorage.setAsync(STORAGE_KEY_GLOSSARY_EXCLUSIVE, entries)
+  await mg.clientStorage.setAsync(STORAGE_KEY_TRANSLATION_CACHE, {})
+  const json = JSON.stringify(entries)
+  for (const page of mg.document.children) {
+    try {
+      (page as BaseNode).setSharedPluginData('translate', STORAGE_KEY_GLOSSARY_EXCLUSIVE, json)
+    } catch (_) { /* 页面不支持 SharedPluginData 则跳过 */ }
+  }
+  sendMsgToUI(PluginMessage.GLOSSARY_EXCLUSIVE_SAVED)
+}
+
+// 通用 CSV 解析器
+function parseCSVToGlossary(csv: string): GlossaryEntry[] {
+  const rows = csv.split('\n')
   if (rows.length < 2) return []
   const headerCells = parseCSVRow(rows[0])
+  // 检测「术语类型」「产品线」列位置
+  const termTypeIdx = headerCells.findIndex((h: string) => h.trim() === '术语类型')
+  const productLineIdx = headerCells.findIndex((h: string) => h.trim() === '产品线')
+  const skippedCols = new Set([termTypeIdx, productLineIdx].filter(i => i >= 0))
+  // 语言列：记录实际列位置（跳过 source 和非语言列）
   const langCols: string[] = []
+  const colPositions: number[] = []  // 实际在 CSV 行中的列索引
   for (let i = 1; i < headerCells.length; i++) {
+    if (skippedCols.has(i)) continue
+    colPositions.push(i)
     langCols.push(headerCells[i].trim())
   }
   const entries: GlossaryEntry[] = []
@@ -310,63 +400,22 @@ function parseDefaultGlossary(): GlossaryEntry[] {
     const source = cells[0].trim()
     if (!source) continue
     const translations: Record<string, string> = {}
-    for (let j = 0; j < langCols.length; j++) {
-      const val = (cells[j + 1] || '').trim()
+    for (let j = 0; j < colPositions.length; j++) {
+      const val = (cells[colPositions[j]] || '').trim()
       if (val) translations[langCols[j]] = val
     }
-    entries.push({ source, translations })
+    const entry: GlossaryEntry = { source, translations }
+    if (termTypeIdx >= 0 && termTypeIdx < cells.length) {
+      const tt = cells[termTypeIdx].trim()
+      if (tt) entry.termType = tt
+    }
+    if (productLineIdx >= 0 && productLineIdx < cells.length) {
+      const pl = cells[productLineIdx].trim()
+      if (pl) entry.productLine = pl
+    }
+    entries.push(entry)
   }
   return entries
-}
-
-async function loadGlossary(): Promise<GlossaryEntry[]> {
-  // 版本检测：内置术语库更新后自动覆盖旧版
-  const storedVersion = await mg.clientStorage.getAsync(STORAGE_KEY_GLOSSARY_VERSION)
-  if (storedVersion == null || storedVersion < GLOSSARY_VERSION) {
-    // 版本过旧或不存在，强制使用内置默认术语库
-    const defaults = parseDefaultGlossary()
-    if (defaults.length > 0) {
-      await mg.clientStorage.setAsync(STORAGE_KEY_GLOSSARY, defaults)
-      await mg.clientStorage.setAsync(STORAGE_KEY_GLOSSARY_VERSION, GLOSSARY_VERSION)
-    }
-    return defaults
-  }
-
-  const fromLocal = await mg.clientStorage.getAsync(STORAGE_KEY_GLOSSARY)
-  if (fromLocal && fromLocal.length > 0) return fromLocal
-
-  for (const page of mg.document.children) {
-    try {
-      const json = (page as BaseNode).getSharedPluginData('translate', STORAGE_KEY_GLOSSARY)
-      if (json) {
-        const entries = JSON.parse(json)
-        await mg.clientStorage.setAsync(STORAGE_KEY_GLOSSARY, entries)
-        return entries
-      }
-    } catch (_) { /* 页面不支持 SharedPluginData 则跳过 */ }
-  }
-
-  // 首次使用：加载内置默认术语库
-  const defaults = parseDefaultGlossary()
-  if (defaults.length > 0) {
-    await mg.clientStorage.setAsync(STORAGE_KEY_GLOSSARY, defaults)
-    await mg.clientStorage.setAsync(STORAGE_KEY_GLOSSARY_VERSION, GLOSSARY_VERSION)
-  }
-  return defaults
-}
-
-async function saveGlossary(entries: GlossaryEntry[]): Promise<void> {
-  await mg.clientStorage.setAsync(STORAGE_KEY_GLOSSARY, entries)
-  await mg.clientStorage.setAsync(STORAGE_KEY_GLOSSARY_VERSION, GLOSSARY_VERSION)
-  // 术语库变更后清除翻译缓存，确保重新翻译使用新术语
-  await mg.clientStorage.setAsync(STORAGE_KEY_TRANSLATION_CACHE, {})
-  const json = JSON.stringify(entries)
-  for (const page of mg.document.children) {
-    try {
-      (page as BaseNode).setSharedPluginData('translate', STORAGE_KEY_GLOSSARY, json)
-    } catch (_) { /* 页面不支持 SharedPluginData 则跳过 */ }
-  }
-  sendMsgToUI(PluginMessage.GLOSSARY_SAVED)
 }
 
 async function loadTranslationCache(): Promise<Record<string, string>> {
@@ -485,11 +534,17 @@ mg.ui.onmessage = async function (msg: UIMessageEvent) {
     case UIMessage.UNDO_ALL:
       await undoAll()
       break
-    case UIMessage.LOAD_GLOSSARY:
-      sendMsgToUI(PluginMessage.GLOSSARY_LOADED, await loadGlossary())
+    case UIMessage.LOAD_GLOSSARY_PRODUCTS:
+      sendMsgToUI(PluginMessage.GLOSSARY_PRODUCTS_LOADED, await loadGlossaryProducts())
       break
-    case UIMessage.SAVE_GLOSSARY:
-      await saveGlossary(data as GlossaryEntry[])
+    case UIMessage.SAVE_GLOSSARY_PRODUCTS:
+      await saveGlossaryProducts(data as GlossaryEntry[])
+      break
+    case UIMessage.LOAD_GLOSSARY_EXCLUSIVE:
+      sendMsgToUI(PluginMessage.GLOSSARY_EXCLUSIVE_LOADED, await loadGlossaryExclusive())
+      break
+    case UIMessage.SAVE_GLOSSARY_EXCLUSIVE:
+      await saveGlossaryExclusive(data as GlossaryEntry[])
       break
     case UIMessage.LOAD_SETTINGS:
       sendMsgToUI(PluginMessage.SETTINGS_LOADED, await loadSettings())

@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:developers.mastergo.com)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Administrator\\\\Desktop\\\\商详小语种\" -Recurse)",
+      "Bash(Select-Object FullName, Length, Extension)",
+      "Bash(Format-Table -AutoSize -Wrap)",
+      "Bash(pip3 list *)",
+      "mcp__ide__executeCode",
+      "Bash(python3 *)",
+      "Bash(python *)",
+      "WebSearch",
+      "PowerShell(python -X utf8 \"c:\\\\Users\\\\Administrator\\\\Desktop\\\\materGO\\\\translate\\\\_build_glossary.py\" 2>&1)",
+      "PowerShell(python -X utf8 \"c:\\\\Users\\\\Administrator\\\\Desktop\\\\materGO\\\\translate\\\\_build_glossary_v2.py\" 2>&1)",
+      "PowerShell(python -X utf8 \"c:\\\\Users\\\\Administrator\\\\Desktop\\\\materGO\\\\translate\\\\_verify.py\")",
+      "PowerShell(python -X utf8 \"c:\\\\Users\\\\Administrator\\\\Desktop\\\\materGO\\\\translate\\\\_fix_glossary.py\")",
+      "PowerShell(python -X utf8 \"c:\\\\Users\\\\Administrator\\\\Desktop\\\\materGO\\\\translate\\\\_fix_glossary.py\" 2>&1; python -X utf8 -c \"import csv; rows=list\\(csv.DictReader\\(open\\(r'c:\\\\Users\\\\Administrator\\\\Desktop\\\\materGO\\\\translate\\\\lexar-glossary-categorized-v2.csv','r',encoding='utf-8-sig'\\)\\)\\); [print\\(r['source'],'|',r['category'],'| fr=',r.get\\('fr',''\\)[:30],'| vi=',r.get\\('vi',''\\)[:30],'| it=',r.get\\('it',''\\)[:30]\\) for r in rows if r['source'] in ['GOLD','DIAMOND','SILVER PLUS','SILVER PRO','BLUE PLUS','ARMOR GOLD','ARMOR SILVER PRO']]\")",
+      "PowerShell(python -X utf8 \"c:\\\\Users\\\\Administrator\\\\Desktop\\\\materGO\\\\translate\\\\_fix_glossary2.py\")",
+      "PowerShell(python -X utf8 -c \"import csv; r=list\\(csv.DictReader\\(open\\(r'c:\\\\Users\\\\Administrator\\\\Desktop\\\\materGO\\\\translate\\\\lexar-glossary-categorized-v2.csv','r',encoding='utf-8-sig'\\)\\)\\); from collections import Counter; cats=Counter\\(x['category'] for x in r\\); print\\('=== Final Glossary Summary ==='\\); print\\(f'Total terms: {len\\(r\\)}'\\); print\\(f'Categories: {len\\(cats\\)}'\\); print\\(\\); [print\\(f'  {c}: {n}'\\) for c,n in sorted\\(cats.items\\(\\)\\)]; print\\(\\); print\\('=== Language Coverage ==='\\); h=[k for k in r[0].keys\\(\\) if k not in\\('category','source'\\)]; [print\\(f'  {c}: {sum\\(1 for x in r if x.get\\(c,\\\\\"\\\\\"\\).strip\\(\\)\\)}/{len\\(r\\)}'\\) for c in h]\")",
+      "PowerShell(python -X utf8 \"c:\\\\Users\\\\Administrator\\\\Desktop\\\\materGO\\\\translate\\\\_summary.py\")",
+      "PowerShell(python -X utf8 \"c:\\\\Users\\\\Administrator\\\\Desktop\\\\materGO\\\\translate\\\\_scan_garbage.py\")",
+      "PowerShell(python -X utf8 \"c:\\\\Users\\\\Administrator\\\\Desktop\\\\materGO\\\\translate\\\\_check_history.py\" 2>&1)",
+      "PowerShell(python -X utf8 \"c:\\\\Users\\\\Administrator\\\\Desktop\\\\materGO\\\\translate\\\\_check_history.py\")",
+      "PowerShell(python -X utf8 -c \"import csv; f=open\\(r'c:\\\\Users\\\\Administrator\\\\Desktop\\\\materGO\\\\translate\\\\lexar-glossary-filled.csv','r',encoding='utf-8-sig'\\); r=csv.reader\\(f\\); print\\('Header:',next\\(r\\)\\); rows=list\\(r\\); print\\('Rows:',len\\(rows\\)\\); print\\('First:',rows[0][:3]\\); print\\('Last:',rows[-1][:3]\\)\")",
+      "PowerShell(python -X utf8 \"c:\\\\Users\\\\Administrator\\\\Desktop\\\\materGO\\\\translate\\\\_cleanup_and_merge.py\")",
+      "PowerShell(python -X utf8 \"c:\\\\Users\\\\Administrator\\\\Desktop\\\\materGO\\\\translate\\\\_merge_dupes.py\")",
+      "PowerShell(python -X utf8 \"c:\\\\Users\\\\Administrator\\\\Desktop\\\\materGO\\\\translate\\\\_mine_translations.py\")",
+      "Bash(copy *)",
+      "Bash(Get-ChildItem -Recurse -Depth 3)",
+      "Bash(Select-Object Mode, LastWriteTime, Length, Name)",
+      "Bash(Format-Table -AutoSize)",
+      "PowerShell(Remove-Item *)",
+      "Bash(echo \"exit: $?\")",
+      "PowerShell(git *)",
+      "PowerShell(gh auth *)"
+    ],
+    "defaultMode": "acceptEdits"
+  }
+}

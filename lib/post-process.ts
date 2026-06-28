@@ -35,8 +35,17 @@ export function restoreTrademarkSymbols(sourceTexts: string[], translatedTexts: 
     let result = translated
 
     for (const { word, symbol } of symbols) {
-      // 检查译文是否已有该符号
-      if (result.includes(symbol)) continue
+      // 检查译文是否已有该符号，如果已有则跳过插入
+      // 但需要先检查符号位置是否正确（前面不应有空格）
+      if (result.includes(symbol)) {
+        // 符号已存在，验证其位置：符号前不应有空格
+        const symbolIdx = result.indexOf(symbol)
+        if (symbolIdx > 0 && result[symbolIdx - 1] === ' ') {
+          // 符号前有空格，去掉空格使符号紧跟前一个词
+          result = result.slice(0, symbolIdx - 1) + result.slice(symbolIdx)
+        }
+        continue
+      }
 
       // 在译文中查找该词（不区分大小写）
       const escapedWord = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -57,9 +66,58 @@ export function restoreTrademarkSymbols(sourceTexts: string[], translatedTexts: 
       }
     }
 
+    // 商标符号间距规范化：去掉符号前的空格，符号后紧跟字母/数字时补空格
+    result = result.replace(/\s+([®™©])/g, '$1')
+    result = result.replace(/([®™©])([a-zA-Z0-9À-ɏЀ-ӿ])/g, '$1 $2')
+
     return result
   })
 }
+
+// ============================================================
+// 存储单位格式还原
+// 原文中数字和存储单位连写时（如 900MB/s），AI 经常误加空格变成 900 MB/s
+// 需要恢复原文的连写格式，保持技术规格一致
+// 覆盖: MB/s, GB/s, TB/s, KB/s, MB, GB, TB, KB, GByte, MByte 等
+// ============================================================
+export function restoreStorageUnitFormatting(sourceTexts: string[], translatedTexts: string[]): string[] {
+  // 常见存储单位模式 - 这些单位在技术规格中通常保持连写
+  // 匹配: 数字 + (可选空格) + 单位
+  const unitPatterns = [
+    /(\d+)\s+(MB|GB|TB|KB|GByte|MByte|TByte|KByte)(\/s)\b/gi,    // 900 MB/s → 900MB/s
+    /(\d+)\s+(MB|GB|TB|KB|GByte|MByte|TByte|KByte)\b(?!\/)/gi,  // 900 GB → 900GB (但仅当原文连写时)
+  ]
+
+  return translatedTexts.map((translated, i) => {
+    const source = sourceTexts[i] || ''
+    if (!source) return translated
+
+    let result = translated
+
+    // 仅当原文中数字和单位是连写时，才在译文中恢复连写
+    // 检查原文是否存在连写模式 (\d+[A-Z]{2})
+    const hasConnectedUnits = /\d+[A-Z]{2}/.test(source)
+
+    if (hasConnectedUnits) {
+      for (const pattern of unitPatterns) {
+        result = result.replace(pattern, '$1$2$3')
+      }
+    }
+
+    // 特殊处理星号后缀：900MB/s* → 保持 900MB/s* 不要变成 900 MB/s*
+    // 使用更激进的正则直接修复所有情况
+    result = result.replace(/(\d+)\s+([KMGT][B])(\/s\*)/g, '$1$2$3')
+    result = result.replace(/(\d+)\s+([KMGT][B]\/s)\*/g, '$1$2*')
+
+    return result
+  })
+}
+
+// ============================================================
+// 术语库强制校准
+// 翻译完成后，将术语库中的固定译法强制替换到译文中
+// 优先精确匹配，其次子串匹配
+// ============================================================
 
 // ============================================================
 // 术语库强制校准
@@ -71,13 +129,27 @@ export function enforceGlossaryTerms(
   translatedTexts: string[],
   glossaryMap: Map<string, string>,
 ): string[] {
+  // 构建去商标符号的归一化查找表（一次构建，避免 O(n*m) 循环）
+  // 解决术语库条目带 ®™© 而设计稿文本不带（或反之）导致的精确匹配失效
+  const normalizedGlossaryMap = new Map<string, string>()
+  for (const [key, value] of glossaryMap.entries()) {
+    const normalizedKey = key.replace(/[®™©]/g, '').trim()
+    if (!normalizedGlossaryMap.has(normalizedKey)) {
+      normalizedGlossaryMap.set(normalizedKey, value)
+    }
+  }
+
+  function stripTrademark(s: string): string {
+    return s.replace(/[®™©]/g, '').trim()
+  }
+
   return translatedTexts.map((translated, i) => {
     const source = sourceTexts[i] || ''
     if (!source) return translated
 
-    const normalizedSource = source.replace(/[®™©]/g, '').trim()
+    const normalizedSource = stripTrademark(source)
 
-    // 1. 精确匹配：源文本本身就是术语库条目
+    // 1. 精确匹配（三层：原文 → 去商标原文 → 术语库去商标 key）
     if (glossaryMap.has(source)) {
       const target = glossaryMap.get(source)!
       if (target !== translated) return target
@@ -86,10 +158,14 @@ export function enforceGlossaryTerms(
       const target = glossaryMap.get(normalizedSource)!
       if (target !== translated) return target
     }
+    if (normalizedGlossaryMap.has(normalizedSource)) {
+      const target = normalizedGlossaryMap.get(normalizedSource)!
+      if (target !== translated) return target
+    }
 
     // 2. 子串匹配：源文本包含术语库条目（产品名嵌入在长句中）
     for (const [glossarySource, glossaryTarget] of glossaryMap.entries()) {
-      const normalizedGlossarySource = glossarySource.replace(/[®™©]/g, '').trim()
+      const normalizedGlossarySource = stripTrademark(glossarySource)
       // 至少 8 个字符避免短词误匹配
       if (normalizedGlossarySource.length < 8) continue
       if (normalizedSource.includes(normalizedGlossarySource)) {
