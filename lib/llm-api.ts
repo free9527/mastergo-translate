@@ -1254,7 +1254,7 @@ Check each source→translation pair: 1. Accuracy — no omissions or mistransla
 
 ${CRITICAL_REMINDER_EN}
 
-Output JSON array, reason in 4 chars max: [{"i":1,"text":"corrected text","reason":"terminology"},{"i":2,"text":"OK","reason":""}] If no correction needed, text = "OK".`
+Output JSON array, reason must be in Chinese (max 4 Chinese characters): [{"i":1,"text":"corrected text","reason":"术语修正"},{"i":2,"text":"OK","reason":""}] If no correction needed, text = "OK".`
   } else {
     systemPrompt = `你是3C存储行业翻译校对专家，检查${targetName}译文质量。
 

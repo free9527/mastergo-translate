@@ -1121,11 +1121,9 @@ async function startProofread() {
       proofreadProgress.value = { current: toCheck.filter(it => it.corrected || it.translatedText).length, total }
     }
 
-    proofreading.value = false
-    resizeAllTextareas()
-
     // 校对后兜底：术语库强制校准 → 语言后处理 → CJK格式 → 商标符号还原
     // 注意：首字母大写翻译管道已处理，校对后不重复执行
+    // 注意：proofreading 必须保持 true 直到后处理完成，否则进度条提前消失
     const allSourceTexts = items.value.map(it => it.sourceText)
     let allTranslatedTexts = items.value.map(it => it.translatedText)
     allTranslatedTexts = enforceGlossaryTerms(allSourceTexts, allTranslatedTexts, glossaryMap)
@@ -1140,6 +1138,10 @@ async function startProofread() {
     }
 
     enforceSameSourceConsistency()
+
+    proofreading.value = false
+    resizeAllTextareas()
+
     if (cancelFlag.value) {
       showToast(`校对已取消，已修正 ${correctedCount} 处`, 'warning')
       return
@@ -1153,7 +1155,10 @@ async function startProofread() {
     }
   } catch (e) {
     proofreading.value = false
-    showToast('校对失败: ' + (e instanceof Error ? e.message : String(e)), 'error')
+    console.error('[translate] proofread error:', e)
+    showToast('校对失败: ' + (e instanceof Error ? e.message : String(e)).slice(0, 80), 'error')
+  } finally {
+    proofreading.value = false
   }
 }
 
