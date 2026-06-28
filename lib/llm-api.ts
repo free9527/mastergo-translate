@@ -1039,12 +1039,12 @@ ${contentTypeGuide}
 ${styleBlock}${sceneBlock}${productLineBlock}${pageContextBlock}
 
 ${getCategoryWordGuideIfNeeded(targetLang, contentType, productLine, isEnSource)}
-${langBlock}
 
 【規則】術語庫最高優先級，必須嚴格使用${glossaryHint}
 
 ${htmlTags.size > 0 ? '【HTML标签】保留原文中所有HTML标签位置不变。\n' : ''}【上下文】${CONTEXT_HINT}
 
+${langBlock}
 ${CRITICAL_REMINDER}
 
 ${SELF_CHECK}
@@ -1066,12 +1066,12 @@ ${contentTypeGuide}
 ${styleBlock}${sceneBlock}${productLineBlock}${pageContextBlock}
 
 ${getCategoryWordGuideIfNeeded(targetLang, contentType, productLine, isEnSource)}
-${langBlock}
 
 ${isEnSource ? '[Rule] Glossary terms are highest priority. You MUST use them exactly as specified:' : '【规则】术语库最高优先级，必须严格使用'}${glossaryHint}
 
 ${htmlTags.size > 0 ? (isEnSource ? '[HTML Tags] Preserve all HTML tags in their original positions.\n' : '【HTML标签】保留原文中所有HTML标签位置不变。\n') : ''}${isEnSource ? 'Context' : '【上下文】'}${isEnSource ? CONTEXT_HINT_EN : CONTEXT_HINT}
 
+${langBlock}
 ${isEnSource ? CRITICAL_REMINDER_EN : CRITICAL_REMINDER}
 
 ${isEnSource ? SELF_CHECK_EN : SELF_CHECK}
@@ -1233,12 +1233,12 @@ ${sceneBlock}
 ${productLineBlock}
 ${contentTypeGuide}
 ${categoryWordGuide}
-${langBlock}
 
 【上下文】${CONTEXT_HINT}
 
 對照原文與譯文逐條檢查：1.台灣用語正確性 2.術語庫譯法合規 3.語句自然流暢 4.場景適應性（字符長度、精簡度等） 5.全形標點。${glossaryHint}
 
+${langBlock}
 ${CRITICAL_REMINDER}
 
 輸出 JSON 陣列，reason 用4字以內簡述：[{"i":1,"text":"修正譯文","reason":"用語修正"},{"i":2,"text":"OK","reason":""}] 無需修正 text 填 "OK"。`
@@ -1251,12 +1251,12 @@ ${sceneBlock}
 ${productLineBlock}
 ${contentTypeGuide}
 ${categoryWordGuide}
-${langBlock}
 
 Context: ${CONTEXT_HINT_EN}
 
 Check each source→translation pair: 1. Accuracy — no omissions or mistranslations 2. Glossary compliance 3. Natural flow and proper punctuation 4. Scene fitness (character length, conciseness, etc.).${glossaryHint}
 
+${langBlock}
 ${CRITICAL_REMINDER_EN}
 
 Output JSON array, reason must be in Chinese (max 4 Chinese characters): [{"i":1,"text":"corrected text","reason":"术语修正"},{"i":2,"text":"OK","reason":""}] If no correction needed, text = "OK".`
@@ -1269,12 +1269,12 @@ ${sceneBlock}
 ${productLineBlock}
 ${contentTypeGuide}
 ${categoryWordGuide}
-${langBlock}
 
 【上下文】${CONTEXT_HINT}
 
 对照原文与译文逐条检查：1.准确无漏译错译 2.术语库译法合規 3.标点规范句式自然 4.场景适应性（字符长度、精简度等）。${glossaryHint}
 
+${langBlock}
 ${CRITICAL_REMINDER}
 
 输出 JSON 数组，reason 用4字以内简述：[{"i":1,"text":"修正译文","reason":"术语修正"},{"i":2,"text":"OK","reason":""}] 无需修正 text 填 "OK"。`
