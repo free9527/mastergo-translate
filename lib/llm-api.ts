@@ -1286,9 +1286,8 @@ ${categoryWordGuide}
 
 【上下文】${CONTEXT_HINT}
 
-對照原文與譯文逐條檢查：1.台灣用語正確性 2.術語庫譯法合規 3.語句自然流暢 4.場景適應性（字符長度、精簡度等） 5.全形標點。${glossaryHint}
-
-⚠️ 僅修正明確錯誤。譯文若已正確直接回「OK」，禁止改寫或潤色正確內容。
+對照原文與譯文逐條檢查：1.台灣用語正確性 2.術語庫譯法合規 3.語句自然流暢 4.場景適應性 5.全形標點。${glossaryHint}
+⚠️ 校對鐵則：譯文長度必須與原文匹配——原文短句→譯文短句，原文長句→譯文長句。禁止將短標語/短規格/短描述擴寫為長段落。若譯文已正確且長度匹配，直接回「OK」，不得改寫。
 
 ${langBlock}
 ${CRITICAL_REMINDER}
@@ -1306,9 +1305,8 @@ ${categoryWordGuide}
 
 Context: ${CONTEXT_HINT_EN}
 
-Check each source→translation pair: 1. Accuracy — no omissions or mistranslations 2. Glossary compliance 3. Natural flow and proper punctuation 4. Scene fitness (character length, conciseness, etc.).${glossaryHint}
-
-⚠️ CRITICAL: Only fix clear errors. If the translation is already correct, return "OK". Do NOT rewrite, rephrase, or polish correct translations.
+Check each source→translation pair: 1. Accuracy — no omissions or mistranslations 2. Glossary compliance 3. Natural flow 4. Scene fitness.${glossaryHint}
+⚠️ PROOFREADING RULE: Translation length MUST match source — short source → short translation. Do NOT expand short labels/specs into long paragraphs. If correct and length-matched, return "OK" — do NOT rewrite.
 
 ${langBlock}
 ${CRITICAL_REMINDER_EN}
@@ -1326,9 +1324,8 @@ ${categoryWordGuide}
 
 【上下文】${CONTEXT_HINT}
 
-对照原文与译文逐条检查：1.准确无漏译错译 2.术语库译法合規 3.标点规范句式自然 4.场景适应性（字符长度、精简度等）。${glossaryHint}
-
-⚠️ 仅修正明确错误。译文若已正确直接回"OK"，禁止改写或润色正确内容。
+对照原文与译文逐条检查：1.准确无漏译错译 2.术语库译法合規 3.标点规范句式自然 4.场景适应性。${glossaryHint}
+⚠️ 校对铁则：译文长度必须与原文匹配——短句→短句，长句→长句。禁止将短标签/短规格扩写为长段落。若译文已正确且长度匹配，回"OK"，不得改写。
 
 ${langBlock}
 ${CRITICAL_REMINDER}
