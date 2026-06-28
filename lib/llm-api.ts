@@ -628,8 +628,11 @@ Use formal Usted imperative: Aproveche, Combine, Descargue (NOT informal tú for
 
   'pt': `[European Portuguese rules]
 Use Portugal mainland formal Portuguese. Do NOT mix in Brazilian Portuguese vocabulary or grammar.
-Fixed terminology: cartão de memória, SSD portátil, leitor de cartões, velocidade de leitura, velocidade de escrita.
-Pronouns and clitics follow European Portuguese rules (post-position).
+Fixed terminology: cartão de memória, SSD portátil, leitor de cartões, velocidade de leitura (read speed), velocidade de gravação (write speed).
+⚠️ Adjective-noun agreement: adjectives must agree in GENDER and NUMBER with the noun they modify. "Cartão" is masculine singular → use masculine singular adjectives (impressionante, rápido, etc.). Never use plural adjectives with singular nouns ("é impressionantes" → WRONG, must be "é impressionante" or "impressionantemente" for adverbs).
+⚠️ Adverb vs Adjective: when modifying a verb or an entire clause, use the -mente adverb form (impressionantemente, rapidamente), NOT the adjective. English often uses flat adverbs — Portuguese does NOT.
+Pronouns and clitics follow European Portuguese rules (post-position: "carrega-se", not "se carrega").
+"Mais depressa" is acceptable for colloquial speed; "mais rapidamente" is preferred for technical/product copy.
 ⛔ RED LINE: U盘=Pen USB (NOT Pen Drive), 笔记本=Portátil (NOT Notebook), 硬盘盒=Caixa (NOT Case).`,
 
   'pt-BR': `[Brazilian Portuguese rules]
