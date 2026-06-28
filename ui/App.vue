@@ -104,6 +104,7 @@
             <option value="technical_params">技术参数表</option>
             <option value="packaging">包装印刷</option>
             <option value="ui">软件UI</option>
+            <option value="after_sales">售后/保修卡</option>
           </select>
         </div>
         <div class="style-field">
