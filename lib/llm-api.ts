@@ -1288,6 +1288,8 @@ ${categoryWordGuide}
 
 對照原文與譯文逐條檢查：1.台灣用語正確性 2.術語庫譯法合規 3.語句自然流暢 4.場景適應性（字符長度、精簡度等） 5.全形標點。${glossaryHint}
 
+⚠️ 僅修正明確錯誤。譯文若已正確直接回「OK」，禁止改寫或潤色正確內容。
+
 ${langBlock}
 ${CRITICAL_REMINDER}
 ${getTargetLangReinforcement(targetLang)}
@@ -1306,6 +1308,8 @@ Context: ${CONTEXT_HINT_EN}
 
 Check each source→translation pair: 1. Accuracy — no omissions or mistranslations 2. Glossary compliance 3. Natural flow and proper punctuation 4. Scene fitness (character length, conciseness, etc.).${glossaryHint}
 
+⚠️ CRITICAL: Only fix clear errors. If the translation is already correct, return "OK". Do NOT rewrite, rephrase, or polish correct translations.
+
 ${langBlock}
 ${CRITICAL_REMINDER_EN}
 ${getTargetLangReinforcement(targetLang)}
@@ -1323,6 +1327,8 @@ ${categoryWordGuide}
 【上下文】${CONTEXT_HINT}
 
 对照原文与译文逐条检查：1.准确无漏译错译 2.术语库译法合規 3.标点规范句式自然 4.场景适应性（字符长度、精简度等）。${glossaryHint}
+
+⚠️ 仅修正明确错误。译文若已正确直接回"OK"，禁止改写或润色正确内容。
 
 ${langBlock}
 ${CRITICAL_REMINDER}
