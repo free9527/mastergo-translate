@@ -631,6 +631,8 @@ Use Portugal mainland formal Portuguese. Do NOT mix in Brazilian Portuguese voca
 Fixed terminology: cartão de memória, SSD portátil, leitor de cartões, velocidade de leitura (read speed), velocidade de gravação (write speed).
 ⚠️ Adjective-noun agreement: adjectives must agree in GENDER and NUMBER with the noun they modify. "Cartão" is masculine singular → use masculine singular adjectives (impressionante, rápido, etc.). Never use plural adjectives with singular nouns ("é impressionantes" → WRONG, must be "é impressionante" or "impressionantemente" for adverbs).
 ⚠️ Adverb vs Adjective: when modifying a verb or an entire clause, use the -mente adverb form (impressionantemente, rapidamente), NOT the adjective. English often uses flat adverbs — Portuguese does NOT.
+⚠️ False friends / calques to avoid: "emparelhado" is ONLY for Bluetooth/wireless pairing — do NOT use for "used with" or "combined with". "When paired with" → "quando utilizado com" or "quando usado com".
+Keep sentences natural, not word-for-word translations. Portuguese prefers shorter, more direct phrasing than English.
 Pronouns and clitics follow European Portuguese rules (post-position: "carrega-se", not "se carrega").
 "Mais depressa" is acceptable for colloquial speed; "mais rapidamente" is preferred for technical/product copy.
 ⛔ RED LINE: U盘=Pen USB (NOT Pen Drive), 笔记本=Portátil (NOT Notebook), 硬盘盒=Caixa (NOT Case).`,
@@ -788,6 +790,54 @@ function getScenePrompt(config: LLMConfig, isEnSource?: boolean): string {
 function getLangSpecificPrompt(targetLang: string): string {
   const rules = LANG_SPECIFIC[targetLang]
   return rules ? `\n${rules}` : ''
+}
+
+// ============================================================
+// 目标语言 TAIL 加固（弱语言专属）
+// 根因：Qwen 弱语言子网在英文→目标语言切换时丢失指令约束。
+// 方案：在 TAIL 最后用目标语言本身注入硬规则，激活目标语言子网。
+// ============================================================
+function getTargetLangReinforcement(targetLang: string): string {
+  switch (targetLang) {
+    case 'pt':
+      return `\n[⚠️ REGRAS FINAIS EM PORTUGUÊS — LEIA ANTES DE GERAR]
+1. "Write speed" = velocidade de GRAVAÇÃO. "Read speed" = velocidade de LEITURA. São coisas DIFERENTES. NUNCA troque.
+2. Concordância de género e número: "o cartão é impressionante" (não "impressionantes"). Advérbios usam -mente: "impressionantemente rápido".
+3. Termos técnicos em INGLÊS: "host", "firmware", "driver", "chipset" NÃO se traduzem. "Dispositivo host" (NUNCA "anfitrião").
+4. "Emparelhado" é SÓ para Bluetooth/pareamento sem fios. "When paired with" = "quando utilizado com" ou "quando usado com".
+5. UHS-I e UHS-II são especificações técnicas DISTINTAS. Não as confunda nem as altere.
+6. NÃO invente nada que não esteja no texto original. NÃO adicione contexto sobre produtos futuros.
+7. Texto curto na origem = texto curto na tradução. NÃO expanda frases curtas em parágrafos.
+8. Escreva frases naturais em português, não traduções palavra-por-palavra do inglês. Seja direto e conciso.`
+    case 'pt-BR':
+      return `\n[⚠️ ANTES DE GERAR — REGRAS EM PORTUGUÊS (BR)]
+- Concordância: adjetivos concordam em GÉNERO e NÚMERO com o substantivo.
+- Termos técnicos NÃO se traduzem: "host", "firmware", "driver", "chipset" mantêm-se em inglês.
+- "Write speed" = "velocidade de gravação", "Read speed" = "velocidade de leitura". NUNCA confundir.
+- UHS-I e UHS-II são especificações distintas — não as altere.
+- Texto curto na origem = texto curto na tradução. NÃO expanda.
+- NÃO invente informação que não está no texto original.`
+    case 'vi':
+      return `\n[⚠️ TRƯỚC KHI DỊCH — QUY TẮC TIẾNG VIỆT]
+- Thuật ngữ kỹ thuật KHÔNG dịch: "host", "firmware", "driver", "chipset" giữ nguyên tiếng Anh.
+- "Write speed" = "tốc độ ghi", "Read speed" = "tốc độ đọc". KHÔNG nhầm lẫn.
+- Văn bản nguồn ngắn = bản dịch ngắn. KHÔNG mở rộng câu ngắn thành đoạn dài.
+- KHÔNG thêm thông tin không có trong văn bản gốc.`
+    case 'th':
+      return `\n[⚠️ ก่อนแปล — กฎภาษาไทย]
+- คำศัพท์เทคนิคห้ามแปล: "host", "firmware", "driver", "chipset" เก็บเป็นภาษาอังกฤษ
+- "Write speed" = "ความเร็วเขียน", "Read speed" = "ความเร็วอ่าน" ห้ามสลับ
+- ต้นฉบับสั้น = คำแปลสั้น ห้ามขยายความ
+- ห้ามเพิ่มข้อมูลที่ไม่มีในต้นฉบับ`
+    case 'ar':
+      return `\n[⚠️ قبل الترجمة — قواعد اللغة العربية]
+- المصطلحات التقنية لا تترجم: "host", "firmware", "driver", "chipset" تبقى بالإنجليزية
+- "Write speed" = "سرعة الكتابة", "Read speed" = "سرعة القراءة" — لا تخلط بينهما
+- النص القصير = ترجمة قصيرة. لا توسع
+- لا تضف معلومات غير موجودة في النص الأصلي`
+    default:
+      return ''
+  }
 }
 
 function getGlobalRulesForProofread(isEnSource?: boolean): string {
@@ -1048,7 +1098,7 @@ ${langBlock}
 ${CRITICAL_REMINDER}
 
 ${SELF_CHECK}
-
+${getTargetLangReinforcement(targetLang)}
 【輸出】全形標點。嚴格按編號對應，格式「編號. 結果」。${fewShot}`
   } else {
     // ============================================================
@@ -1075,7 +1125,7 @@ ${langBlock}
 ${isEnSource ? CRITICAL_REMINDER_EN : CRITICAL_REMINDER}
 
 ${isEnSource ? SELF_CHECK_EN : SELF_CHECK}
-
+${getTargetLangReinforcement(targetLang)}
 ${isEnSource ? '[Output] Strictly follow "N. translation" format. Preserve original line breaks and paragraph structure.' : '【输出】严格按 "编号. 译文" 格式，保持原文换行分段。'}${fewShot}`
   }
 
@@ -1240,7 +1290,7 @@ ${categoryWordGuide}
 
 ${langBlock}
 ${CRITICAL_REMINDER}
-
+${getTargetLangReinforcement(targetLang)}
 輸出 JSON 陣列，reason 用4字以內簡述：[{"i":1,"text":"修正譯文","reason":"用語修正"},{"i":2,"text":"OK","reason":""}] 無需修正 text 填 "OK"。`
   } else if (isEnSource) {
     systemPrompt = `You are a 3C storage industry translation proofreader. Review ${targetName} translations for quality.
@@ -1258,7 +1308,7 @@ Check each source→translation pair: 1. Accuracy — no omissions or mistransla
 
 ${langBlock}
 ${CRITICAL_REMINDER_EN}
-
+${getTargetLangReinforcement(targetLang)}
 Output JSON array, reason must be in Chinese (max 4 Chinese characters): [{"i":1,"text":"corrected text","reason":"术语修正"},{"i":2,"text":"OK","reason":""}] If no correction needed, text = "OK".`
   } else {
     systemPrompt = `你是3C存储行业翻译校对专家，检查${targetName}译文质量。
@@ -1276,7 +1326,7 @@ ${categoryWordGuide}
 
 ${langBlock}
 ${CRITICAL_REMINDER}
-
+${getTargetLangReinforcement(targetLang)}
 输出 JSON 数组，reason 用4字以内简述：[{"i":1,"text":"修正译文","reason":"术语修正"},{"i":2,"text":"OK","reason":""}] 无需修正 text 填 "OK"。`
   }
 
