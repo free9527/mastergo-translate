@@ -537,7 +537,7 @@ export const SCENE_PRESETS_EN: Record<string, string> = {
 const PRODUCT_LINE_STRATEGIES: Record<string, string> = {
   professional_imaging: `【产品线：专业影像】受众为职业摄影师/影视团队。"高速/性能"→8K RAW不掉帧、高速连拍不卡顿、极速导出。"可靠/耐用"→极端环境防护、数据绝对安全。钢甲系列额外强调物理抗损。`,
   consumer_cards: `【产品线：消费存储卡】受众为vlog创作者/旅拍爱好者/家庭用户。"高速/性能"→4K视频畅拍不中断、连拍不卡顿、记录生活每一帧。"可靠"→选对卡、少踩坑、数据不丢失。文案语气亲近可信赖，可适度使用痛点场景切入（"插卡提示错误？"类）。`,
-  gaming_card: `【产品线：游戏存储卡】受众为掌机/主机玩家。"游戏性能"→海量扩容、游戏秒下载、存档无缝读取、告别存储焦虑。文案简洁有活力。`,
+  gaming_card: `【产品线：游戏存储卡】受众为Switch/Steam Deck/ROG Ally等掌机玩家。"高速"→高读取速度(A2/V30/UHS-I)确保游戏加载快、关卡切换不等待、开放世界无缝读图。"大容量"→512GB/1TB海量存储，游戏库随身携带，告别删游戏腾空间的焦虑。"游戏性能"→沉浸式游戏体验不因存储卡速度拖后腿。文案简洁有活力，可适度使用游戏圈用语（"加载速度碾压""游戏库自由"）。`,
   gaming_ssd: `【产品线：电竞SSD】受众为3A大作玩家/PS5玩家。"游戏性能"→3A秒加载、消除材质延迟、DirectStorage潜能释放。`,
   gaming_dimm: `【产品线：电竞内存】受众为硬核电竞发烧友/超频玩家。"游戏性能"→提升1% Low帧、拒绝团战掉帧、突破超频极限。`,
   pc_productivity: `【产品线：PC/AI生产力】受众为AI PC用户/内容创作者/PC升级用户。"高速/性能"→AI模型秒级响应、巨型工程文件秒传、多任务游刃有余、旧电脑焕新。`,
@@ -548,7 +548,7 @@ const PRODUCT_LINE_STRATEGIES: Record<string, string> = {
 const PRODUCT_LINE_STRATEGIES_EN: Record<string, string> = {
   professional_imaging: `[Product Line: Professional Imaging] Audience: professional photographers and filmmakers. "High-speed / performance" → no dropped frames at 8K RAW, uninterrupted burst shooting, instant offload. "Reliability / durability" → extreme environment protection, absolute data safety. ARMOR series: additionally emphasize physical damage resistance.`,
   consumer_cards: `[Product Line: Consumer Cards] Audience: vloggers, travel photographers, families. "High-speed / performance" → smooth 4K recording without interruption, burst shooting without lag, capturing every frame of life. "Reliability" → choose the right card, avoid pitfalls, never lose data. Tone: approachable and trustworthy. May use relatable pain-point scenarios (e.g., "Card error?" moments).`,
-  gaming_card: `[Product Line: Gaming Card] Audience: handheld and console gamers. "Gaming performance" → massive storage expansion, instant game downloads, seamless save loading, end storage anxiety. Keep copy concise and energetic.`,
+  gaming_card: `[Product Line: Gaming Card] Audience: Switch, Steam Deck, ROG Ally, and other handheld gamers. "High-speed" → fast read speeds (A2, V30, UHS-I) deliver quick game loading, instant level transitions, seamless open-world streaming. "Large capacity" → 512GB/1TB lets gamers carry their entire library — no more deleting games to free up space. "Gaming performance" → immersive experience without storage bottlenecks holding you back. Keep copy concise and energetic. May use gaming-native language ("blazing load times", "carry your game library").`,
   gaming_ssd: `[Product Line: Gaming SSD] Audience: AAA gamers and PS5 players. "Gaming performance" → instant AAA loading, eliminate texture pop-in, unleash DirectStorage potential.`,
   gaming_dimm: `[Product Line: Gaming Memory] Audience: hardcore esports enthusiasts and overclockers. "Gaming performance" → boost 1% Low FPS, eliminate team-fight frame drops, push overclocking limits.`,
   pc_productivity: `[Product Line: PC / AI Productivity] Audience: AI PC users, content creators, PC upgraders. "High-speed / performance" → near-instant AI model response, massive project file transfers in seconds, effortless multitasking, breathe new life into older systems.`,
