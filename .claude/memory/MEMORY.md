@@ -1,7 +1,3 @@
 - [MasterGo 开发者文档](mastergo-developer-docs.md) — 文档地址、关键API、所有功能修改必须基于此文档
-- [MasterGo Lexar 翻译插件](matergo-translate-plugin.md) — 项目架构、核心功能流程、消息通信、文件结构
+- [MasterGo Lexar 翻译插件](matergo-translate-plugin.md) — 项目架构、核心功能流程、消息通信、文件结构（含字体映射/®修复/短标签守卫/翻译记忆）
 - [UI 设计规范](ui-apple-style.md) — Apple 简约风 CSS 变量、组件模式、暗色模式
-- [自动字体映射](auto-font-mapping.md) — 目标语言驱动，4品牌字体统一替换，字重继承
-- [Avenir ®符号修复](avenir-register-fix.md) — Avenir字体®过大，单独用 HarmonyOS Sans SC 覆盖
-- [短标签扩写硬守卫](short-label-guard.md) — 源文<15字符且译文>1.5x时降低术语阈值+硬截断
-- [翻译记忆模板匹配](translation-memory.md) — 同型号不同容量只翻译一次，减少30-50% API调用
