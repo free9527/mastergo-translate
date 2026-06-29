@@ -447,11 +447,13 @@ import { UIMessage, PluginMessage, TextItem, LLMConfig, GlossaryEntry, Translati
 import { sendMsgToPlugin } from '@messages/ui-sender'
 import { parseCSVRow, csvEncodeCell } from '@lib/parse-csv'
 import { formatCJKSpace } from '@lib/format-text'
-import { postProcessTranslation, restoreTrademarkSymbols, restoreStorageUnitFormatting, enforceGlossaryTerms } from '@lib/post-process'
+import { postProcessTranslation, restoreTrademarkSymbols, restoreStorageUnitFormatting, enforceGlossaryTerms, enforceShortLabelLength } from '@lib/post-process'
 import { translateBatch, proofreadBatch, fetchWithRetry, isProofreadScriptMismatch, STYLE_PRESETS, SCENE_PRESETS, detectProductLine } from '@lib/llm-api'
 import { DEFAULT_GLOSSARY_PRODUCTS_CSV, DEFAULT_GLOSSARY_EXCLUSIVE_CSV } from '@lib/default-glossary'
 import { TRANSLATE_BATCH_SIZE, PROOFREAD_BATCH_SIZE, TOAST_DURATION_MS, CORRECTION_THRESHOLD, makeFontKey, parseFontKey, normalizeText } from '@lib/constants'
 import { convertStorageUnit } from '@lib/unit-convert'
+import { getAutoFontMapping } from '@lib/font-mapper'
+import { compressBatch, expandBatch } from '@lib/translation-memory'
 
 // ============================================================
 // 响应式状态
@@ -1015,17 +1017,21 @@ async function startTranslate() {
           let translated: string[] = []
           if (uncachedIndices.length > 0) {
             const uncachedTexts = uncachedIndices.map(idx => texts[idx])
-            const apiResult = await translateBatch(uncachedTexts, targetLang.value, glossaryMap, llmConfig.value, sourceLang.value === 'auto' ? undefined : sourceLang.value, items.value.map(it => it.sourceText), runtimeProductLines, runtimeTermTypes, pageName.value || undefined, fileName.value || undefined, crossBatchTerms)
+            // 翻译记忆：同型号不同容量/速度的文本压缩为唯一模板，减少 API 调用
+            const { uniqueTexts, expandData } = compressBatch(uncachedTexts)
+            const uniqueResult = await translateBatch(uniqueTexts, targetLang.value, glossaryMap, llmConfig.value, sourceLang.value === 'auto' ? undefined : sourceLang.value, items.value.map(it => it.sourceText), runtimeProductLines, runtimeTermTypes, pageName.value || undefined, fileName.value || undefined, crossBatchTerms)
+            // 将模板译文展开回原始文本
+            const expandedResult = expandBatch(uniqueResult, expandData, uncachedTexts.length)
             // 合并缓存+API结果
             translated = texts.map((_, idx) => {
               if (cachedResult[idx] !== null) return cachedResult[idx]!
               const apiIdx = uncachedIndices.indexOf(idx)
-              return apiResult[apiIdx] || ''
+              return expandedResult[apiIdx] || ''
             })
             // 更新缓存
             for (let j = 0; j < uncachedIndices.length; j++) {
               const srcIdx = uncachedIndices[j]
-              cache[cacheKey(texts[srcIdx])] = apiResult[j] || ''
+              cache[cacheKey(texts[srcIdx])] = expandedResult[j] || ''
             }
           } else {
             translated = cachedResult as string[]
@@ -1092,6 +1098,8 @@ async function startTranslate() {
   unifyTerminologyAcrossBatches(items.value, glossaryMap)
   // 同源一致化：无论是否开启校对都执行，确保相同源文本译文一致
   enforceSameSourceConsistency()
+  // 自动字体映射（仅对未手动设置字体的条目生效）
+  autoMapFonts()
   } catch (e) {
     translating.value = false
     console.error('[translate] fatal error', e)
@@ -1189,6 +1197,7 @@ async function startProofread() {
     const allSourceTexts = items.value.map(it => it.sourceText)
     let allTranslatedTexts = items.value.map(it => it.translatedText)
     allTranslatedTexts = enforceGlossaryTerms(allSourceTexts, allTranslatedTexts, glossaryMap)
+    allTranslatedTexts = enforceShortLabelLength(allSourceTexts, allTranslatedTexts, glossaryMap)
     allTranslatedTexts = allTranslatedTexts.map(t => postProcessTranslation(t, targetLang.value))
     allTranslatedTexts = allTranslatedTexts.map(t => formatCJKSpace(t, targetLang.value))
     allTranslatedTexts = restoreStorageUnitFormatting(allSourceTexts, allTranslatedTexts)
@@ -1200,6 +1209,8 @@ async function startProofread() {
     }
 
     enforceSameSourceConsistency()
+    // 自动字体映射（校对可能改变了译文，也需重新映射）
+    autoMapFonts()
 
     proofreading.value = false
     resizeAllTextareas()
@@ -1254,6 +1265,27 @@ function syncFontMappings() {
     item.targetLineHeight = f.targetLineHeight
     item.targetLetterSpacing = f.targetLetterSpacing
     item.targetTextAlign = f.targetTextAlign || ''
+  }
+}
+
+// ============================================================
+// 自动字体映射：根据目标语言自动替换字体，字重/间距/行距全部继承原文
+// 仅当 targetFontFamily 为空时自动填充（用户手动覆盖优先）
+// ============================================================
+function autoMapFonts() {
+  for (const item of items.value) {
+    // 已有手动设置的跳过
+    if (item.targetFontFamily) continue
+
+    const mapping = getAutoFontMapping(item.fontFamily, targetLang.value)
+    if (!mapping) continue
+
+    item.targetFontFamily = mapping.targetFamily
+    // 继承源字体样式（字重），确保 Bold → Bold 等映射正确
+    item.targetFontStyle = item.fontStyle || 'Regular'
+    if (mapping.targetTextAlign) {
+      item.targetTextAlign = mapping.targetTextAlign
+    }
   }
 }
 
@@ -1328,16 +1360,19 @@ async function retryFailedTranslations() {
     const texts = batch.map(it => it.sourceText)
 
     try {
-      const apiResult = await translateBatch(
-        texts, targetLang.value, glossaryMap, llmConfig.value,
+      // 翻译记忆：同型号不同容量/速度的文本压缩为唯一模板
+      const { uniqueTexts, expandData } = compressBatch(texts)
+      const uniqueResult = await translateBatch(
+        uniqueTexts, targetLang.value, glossaryMap, llmConfig.value,
         sourceLang.value === 'auto' ? undefined : sourceLang.value,
         items.value.map(it => it.sourceText),
         runtimeProductLines, runtimeTermTypes,
         pageName.value || undefined, fileName.value || undefined,
         crossBatchTerms,
       )
+      const expandedResult = expandBatch(uniqueResult, expandData, texts.length)
       for (let j = 0; j < batch.length; j++) {
-        batch[j].translatedText = formatCJKSpace(apiResult[j] || '', targetLang.value)
+        batch[j].translatedText = formatCJKSpace(expandedResult[j] || '', targetLang.value)
       }
     } catch (e) {
       for (const item of batch) {
@@ -1351,6 +1386,7 @@ async function retryFailedTranslations() {
   translating.value = false
   resizeAllTextareas()
   enforceSameSourceConsistency()
+  autoMapFonts()
 
   const succeeded = failedItems.filter(it => it.translatedText && !translateErrors.value.has(it.nodeIds[0])).length
   const stillFailed = translateErrors.value.size

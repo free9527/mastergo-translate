@@ -188,6 +188,98 @@ export function enforceGlossaryTerms(
 }
 
 // ============================================================
+// 短标签扩写硬守卫
+// 源文 < 15 字符且译文 > 1.5x 源文长度时，做两件事：
+// 1. 降低阈值（3 字符起）重新匹配术语库 — 解决 enforceGlossaryTerms 的 8 字符下限问题
+// 2. 仍不匹配时做词边界截断，防止 UI 文本溢出
+// ============================================================
+export function enforceShortLabelLength(
+  sourceTexts: string[],
+  translatedTexts: string[],
+  glossaryMap: Map<string, string>,
+): string[] {
+  const SHORT_LABEL_MAX = 15
+  const LENGTH_RATIO = 1.5
+
+  // 构建去商标符号的归一化查找表
+  const normalizedGlossaryMap = new Map<string, string>()
+  for (const [key, value] of glossaryMap.entries()) {
+    const nk = key.replace(/[®™©]/g, '').trim()
+    if (!normalizedGlossaryMap.has(nk)) {
+      normalizedGlossaryMap.set(nk, value)
+    }
+  }
+
+  function stripTrademark(s: string): string {
+    return s.replace(/[®™©]/g, '').trim()
+  }
+
+  function isCJK(ch: string): boolean {
+    const c = ch.charCodeAt(0)
+    return (c >= 0x4e00 && c <= 0x9fff) || (c >= 0x3400 && c <= 0x4dbf) ||
+           (c >= 0x3040 && c <= 0x309f) || (c >= 0x30a0 && c <= 0x30ff) || // 日文假名
+           (c >= 0xac00 && c <= 0xd7af) || // 韩文
+           (c >= 0x0e00 && c <= 0x0e7f)    // 泰文
+  }
+
+  // 在词/字符边界截断到目标长度
+  function truncateAtBoundary(text: string, maxLen: number): string {
+    if (text.length <= maxLen) return text
+    // CJK 文本：直接按字符截断
+    if (isCJK(text[0])) {
+      return text.slice(0, maxLen)
+    }
+    // 拉丁文本：在词边界截断，避免断词
+    const truncated = text.slice(0, maxLen)
+    const lastSpace = truncated.lastIndexOf(' ')
+    if (lastSpace > maxLen * 0.6) {
+      return truncated.slice(0, lastSpace)
+    }
+    return truncated
+  }
+
+  return translatedTexts.map((translated, i) => {
+    const source = sourceTexts[i] || ''
+    if (!source || source.length >= SHORT_LABEL_MAX) return translated
+    if (translated.length <= source.length * LENGTH_RATIO) return translated
+
+    const normalizedSource = stripTrademark(source)
+
+    // 第一道：精确匹配（与 enforceGlossaryTerms 相同，但这里只做短标签兜底）
+    if (normalizedGlossaryMap.has(normalizedSource)) {
+      return normalizedGlossaryMap.get(normalizedSource)!
+    }
+
+    // 第二道：降低阈值到 3 字符的子串匹配
+    let bestMatch: { source: string; target: string; len: number } | null = null
+    for (const [glossarySource, glossaryTarget] of normalizedGlossaryMap.entries()) {
+      const gs = stripTrademark(glossarySource)
+      if (gs.length < 3) continue
+      if (normalizedSource.includes(gs)) {
+        if (!bestMatch || gs.length > bestMatch.len) {
+          bestMatch = { source: gs, target: glossaryTarget, len: gs.length }
+        }
+      }
+    }
+    if (bestMatch) {
+      // 术语占比 > 70% 才替换，避免误伤
+      if (bestMatch.len / normalizedSource.length > 0.7) {
+        return bestMatch.target
+      }
+    }
+
+    // 第三道：硬截断兜底 — 译文字符数不超过源文 1.5x
+    // 这是最后手段，只在译文明显过长时触发
+    if (translated.length > source.length * 2) {
+      const maxLen = Math.max(Math.ceil(source.length * 1.3), 3)
+      return truncateAtBoundary(translated, maxLen)
+    }
+
+    return translated
+  })
+}
+
+// ============================================================
 // 主入口
 // ============================================================
 export function postProcessTranslation(text: string, lang: string): string {

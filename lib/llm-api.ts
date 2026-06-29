@@ -4,7 +4,7 @@ import { getFewShotExamples } from '@lib/few-shot-examples'
 import { filterRelevantGlossary } from '@lib/glossary-filter'
 import { normalizeTextForLLM } from '@lib/text-normalizer'
 import { maskEntities, unmaskEntities } from '@lib/entity-masker'
-import { postProcessTranslation, restoreTrademarkSymbols, restoreStorageUnitFormatting, enforceGlossaryTerms, capitalizeFirstLetter } from '@lib/post-process'
+import { postProcessTranslation, restoreTrademarkSymbols, restoreStorageUnitFormatting, enforceGlossaryTerms, enforceShortLabelLength, capitalizeFirstLetter } from '@lib/post-process'
 import { GLOSSARY_PRODUCT_LINE_MAP, COMMON_GLOSSARY_SOURCES } from '@lib/default-glossary'
 
 interface XhrResponse {
@@ -1281,6 +1281,9 @@ ${isEnSource ? '[Output] Strictly follow "N. translation" format. Preserve origi
 
   // 术语库强制校准（翻译后直接替换，零 token 开销）
   result = enforceGlossaryTerms(texts, result, glossaryMap)
+
+  // 短标签扩写硬守卫（源文 < 15 字符且译文过长时，降低阈值重新匹配术语库并硬截断）
+  result = enforceShortLabelLength(texts, result, glossaryMap)
 
   // 商标符号还原（兜底：原文有则译文必有，原文无则不添加）
   result = restoreTrademarkSymbols(texts, result)

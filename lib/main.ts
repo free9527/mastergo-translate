@@ -91,6 +91,24 @@ async function applyTranslations(items: TextItem[]): Promise<void> {
   const failedNodeIds: string[] = []
 
   const fontSet = new Set<string>()
+  // Avenir 字体的 ® 符号渲染异常（过大且非上标），单独替换为 HarmonyOS Sans SC
+  function fixAvenirRegisterSymbol(node: TextNode, item: TextItem) {
+    const effectiveFamily = item.targetFontFamily || item.fontFamily
+    if (effectiveFamily !== 'Avenir') return
+    const text = item.translatedText
+    const symbol = '®'
+    let idx = -1
+    const effectiveStyle = item.targetFontStyle || item.fontStyle || 'Regular'
+    while ((idx = text.indexOf(symbol, idx + 1)) !== -1) {
+      try {
+        node.setRangeFontName(idx, idx + 1, {
+          family: 'HarmonyOS Sans SC',
+          style: effectiveStyle,
+        })
+      } catch (_) { /* 单字符字体设置失败不影响整体 */ }
+    }
+  }
+
   function applyTextStyle(node: TextNode, item: TextItem) {
     const len = item.translatedText.length
     if (item.targetFontFamily) {
@@ -134,6 +152,14 @@ async function applyTranslations(items: TextItem[]): Promise<void> {
   })
   if (fallbackMatch) {
     fallbackFont = { family: fallbackFamily, style: fallbackMatch.fontName.style }
+    // Avenir ® bug 修复：预加载 HarmonyOS Sans SC 用于替换 ® 字符
+    // Avenir 字体的 ® 符号过大且不是上标，需单独用 HarmonyOS Sans SC 渲染
+    const registerFixStyles = ['Regular', 'Bold', 'Medium', 'Semibold', 'Italic', 'BoldItalic']
+    for (const st of registerFixStyles) {
+      const fk = makeFontKey(fallbackFamily, st)
+      const f = fontMap.get(fk)
+      if (f) await mg.loadFontAsync(f.fontName)
+    }
   } else {
     const candidates = ['Inter', 'Sarasa Gothic', 'Roboto', 'Arial', 'PingFang SC']
     for (const name of candidates) {
@@ -209,6 +235,7 @@ async function applyTranslations(items: TextItem[]): Promise<void> {
           done++
           try {
             applyTextStyle(node, item)
+            fixAvenirRegisterSymbol(node, item)
           } catch (styleErr) {
             console.warn('[translate] style apply failed for node', nodeId, styleErr)
           }
