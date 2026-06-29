@@ -519,10 +519,12 @@ const STYLE_PRESETS_EN: Record<string, string> = {
 // ============================================================
 export const SCENE_PRESETS: Record<string, string> = {
   technical_params: `【场景：技术参数表】本场景翻译风格固定为严谨专业，以下约束优先级最高。所有数值、单位、符号原样保留（禁止改值、禁止加空格、禁止转换单位），仅翻译说明文字。表行1:1严格对应，不合并/拆分/增删行项。解释性文字长度≤原文，不自行补充技术说明。保留 "-"、"N/A"、"TBD" 等占位符原样。术语极致严谨，不做任何意译与发挥。`,
-  ecommerce: `【场景：电商详情页】卖点前置，短句为主，适合快速阅读。符合目标语言本土电商表达习惯，有感染力但不夸大。禁止直译中文网络热词、成语梗，做本土化意译。标题简洁有冲击力，详情段落逻辑清晰。细分市场语气：日语/韩语市场偏安心信赖感、避免过度夸张；德语市场以技术实力和数据说服；中东/东南亚市场偏柔和、价值导向；英语市场偏活力感、利益驱动。`,
+  ecommerce: `【场景：商品详情页】卖点前置，短句为主，适合快速阅读。符合目标语言本土电商表达习惯，有感染力但不夸大。禁止直译中文网络热词、成语梗，做本土化意译。标题简洁有冲击力，详情段落逻辑清晰。细分市场语气：日语/韩语市场偏安心信赖感、避免过度夸张；德语市场以技术实力和数据说服；中东/东南亚市场偏柔和、价值导向；英语市场偏活力感、利益驱动。`,
   packaging: `【场景：包装文案】本场景翻译风格固定为严谨专业，以下约束优先级最高。译文简洁，单行长度≤源文110%（预留印刷版面缓冲）。合规信息（产地、质保、警示语、认证标记）直译不可改写，符合目标国法规。品牌、型号、规格、条形码区域附近文字不遮挡核心标识。禁止断词换行（hyphenation-based line break），避免生僻词，确保普通消费者快速理解。`,
   ui: `【场景：软件UI】本场景翻译风格固定为严谨专业，以下约束优先级最高。按钮文字1~3词（主操作按钮优先1词），菜单项统一名词或动名词风格。报错/提示语 action-first（如"无法连接"而非"连接失败"），Toast消息≤15字(CJK)/≤40字符(拉丁)。统一使用指令式或名词式风格，前后一致，不堆砌专业术语。RTL语言（阿拉伯语）确保UI方向正确。预留文本膨胀空间，德语、荷兰语、波兰语等长词语言优先最短表达。`,
   after_sales: `【场景：售后文档/保修卡】本场景翻译风格固定为严谨专业，以下约束优先级最高。技术术语绝对精确，法律免责条款直译不可改写。保修期限、条件、联系方式等关键信息原样保留、不得遗漏。使用正式敬语（Sie/vous/usted/敬体），禁用口语/俚语。零营销语言——纯事实陈述和操作指引。`,
+  manual: `【场景：说明书/用户手册】本场景翻译风格固定为严谨专业，以下约束优先级最高。操作步骤编号与顺序严格1:1对应，不可跳步、合并或拆分。功能描述精确到位，禁止意译或发挥——"按住3秒"不可写成"长按"，"指示灯闪烁"不可写成"灯亮"。安全警告（⚠️/警告/注意/小心）逐字直译，任何歧义都可能造成人身伤害。按钮/接口/指示灯名称保持源文一致性，同一部件前后译名统一。使用指令式语气（"请连接电源"而非"您需要连接电源"），简短明确。图表标注文字与正文引用一致。禁用口语俚语，但避免法律文书式生硬——让普通用户能读懂并安全操作。`,
+  spec_sheet: `【场景：规格书/数据表】本场景翻译风格固定为严谨专业，以下约束优先级最高。所有数值、单位、符号、公差范围原样保留——禁止改值、禁止四舍五入、禁止转换单位、禁止增删空格。表格结构严格1:1，行项不合并、不拆分、不增删、不重排。参数名称使用行业标准译法，参考IEC/ISO/JIS等国际标准术语。"Typ."（典型值）、"Max."（最大值）、"Min."（最小值）、"TBD"、"N/A"、"-" 等标识原样保留。脚注、测试条件说明（如"Tested at 25°C"）精确翻译，不省略条件限定。禁止添加任何营销性描述或评价性语言——这是工程数据文档，不是广告。`,
 }
 
 export const SCENE_PRESETS_EN: Record<string, string> = {
@@ -531,31 +533,98 @@ export const SCENE_PRESETS_EN: Record<string, string> = {
   packaging: `[Scene: Packaging Copy] Style is locked to Professional. Keep translations concise — single line length ≤110% of source (preserve print layout buffer). Compliance info (origin, warranty, warnings, cert marks) must be translated literally per local regulations — no rewriting. Brand, model, spec labels, and barcode areas must not be obscured by translation. No hyphenation-based word breaks. Avoid obscure vocabulary; ensure quick comprehension by general consumers.`,
   ui: `[Scene: Software UI] Style is locked to Professional. Buttons: 1–3 words (primary actions prefer 1 word). Menus: consistent noun or verb-noun style. Error messages: action-first format (e.g. "Cannot connect" not "Connection failure"). Toast messages: ≤15 chars (CJK) / ≤40 chars (Latin). Use consistent style throughout. Avoid technical jargon overload. RTL languages (Arabic): ensure correct UI direction. Reserve space for text expansion; for German, Dutch, Polish, and other long-word languages, prefer the shortest viable expression.`,
   after_sales: `[Scene: After-Sales / Warranty Documents] Style is locked to Professional. Technical terms must be absolutely precise. Legal disclaimers must be translated literally — no paraphrasing. Warranty periods, conditions, and contact info must be preserved exactly. Use formal address (Sie/vous/usted/polite form). No slang or colloquialisms. Zero marketing language — pure factual and instructional content only.`,
+  manual: `[Scene: User Manual / Instruction Guide] Style is locked to Professional. Operation steps must maintain strict 1:1 numbering and sequence — no skipping, merging, or splitting steps. Functional descriptions must be precise — "hold for 3 seconds" must not become "long press", "indicator flashes" must not become "light turns on". Safety warnings (⚠️/WARNING/CAUTION/NOTICE) must be translated verbatim — any ambiguity could cause personal injury. Button/port/indicator names must stay consistent throughout the document. Use imperative tone ("Connect the power" not "You need to connect the power") — short and unambiguous. Diagram callouts must match body text terminology. No slang or colloquialisms, but avoid legalese stiffness — ensure the average user can read, understand, and operate safely.`,
+  spec_sheet: `[Scene: Specification Sheet / Data Sheet] Style is locked to Professional. All values, units, symbols, and tolerance ranges must be preserved as-is — no value changes, no rounding, no unit conversion, no adding or removing spaces. Table structure must be strictly 1:1 — no merging, splitting, adding, removing, or reordering rows. Parameter names must use industry-standard terminology (IEC/ISO/JIS conventions). "Typ.", "Max.", "Min.", "TBD", "N/A", "-" and similar qualifiers must be preserved exactly. Footnotes and test condition notes (e.g. "Tested at 25°C") must be translated precisely — never omit qualifying conditions. Absolutely no marketing language or evaluative commentary — this is an engineering data document, not an advertisement.`,
+}
+
+// 产品线策略精简版（非电商场景使用，仅保留术语映射，去掉营销语调）
+// 电商场景的产品线策略已迁移至 PRODUCT_LINE_STYLE_STRATEGIES（8产品线×3风格）
+const PRODUCT_LINE_STRATEGIES_TECH: Record<string, string> = {
+  professional_imaging: `【产品线：专业影像】"高速/性能"→8K RAW不掉帧、高速连拍不卡顿、极速导出。"可靠/耐用"→极端环境防护、数据绝对安全。`,
+  consumer_cards: `【产品线：消费存储卡】"高速/性能"→4K视频畅拍不中断、连拍不卡顿。"可靠"→数据安全不丢失。`,
+  gaming_card: `【产品线：游戏存储卡】⚠️ 读写速度必须严格区分："读取速度"/"写入速度"各有所指，禁止混用或一律写成读取速度。"高读写速度"→读取速度决定加载快慢，写入速度决定安装/存档效率，两者独立。"A2等级"→高随机读写IOPS（小文件随机读写），决定运行流畅度。"V30/V60/V90"→持续写入保证，大游戏安装不降速。"大容量"→海量存储空间。`,
+  gaming_ssd: `【产品线：电竞SSD】"游戏性能"→3A秒加载、消除材质延迟、DirectStorage潜能释放。`,
+  gaming_dimm: `【产品线：电竞内存】"游戏性能"→提升1% Low帧、拒绝团战掉帧、突破超频极限。`,
+  pc_productivity: `【产品线：PC/AI生产力】"高速/性能"→AI模型秒级响应、巨型文件秒传、多任务游刃有余。`,
+  portable_storage: `【产品线：移动存储】"高速/性能"→文件秒传、快速备份、即拍即传。"设计"→轻便随身、坚固耐用。`,
+  innovation_lifestyle: `【产品线：创新生活】"分享/连接"→跨越距离、一键上传。强调情感连接与隐私安全。`,
+}
+
+const PRODUCT_LINE_STRATEGIES_TECH_EN: Record<string, string> = {
+  professional_imaging: `[Product Line: Professional Imaging] "High-speed / performance" → no dropped frames at 8K RAW, uninterrupted burst shooting, instant offload. "Reliability / durability" → extreme environment protection, absolute data safety.`,
+  consumer_cards: `[Product Line: Consumer Cards] "High-speed / performance" → smooth 4K recording without interruption, burst shooting without lag. "Reliability" → data safety.`,
+  gaming_card: `[Product Line: Gaming Card] ⚠️ CRITICAL: "Read speed" and "Write speed" are distinct specifications — never confuse them. "High read/write speed" → read speed drives loading, write speed drives install/save efficiency — independent specs. "A2 rating" → high random read/write IOPS (small-file random I/O), determines gameplay smoothness. "V30/V60/V90" → sustained write guarantee, large game installs without throttling. "Large capacity" → massive storage space.`,
+  gaming_ssd: `[Product Line: Gaming SSD] "Gaming performance" → instant AAA loading, eliminate texture pop-in, unleash DirectStorage potential.`,
+  gaming_dimm: `[Product Line: Gaming Memory] "Gaming performance" → boost 1% Low FPS, eliminate team-fight frame drops, push overclocking limits.`,
+  pc_productivity: `[Product Line: PC / AI Productivity] "High-speed / performance" → near-instant AI model response, massive file transfers in seconds, effortless multitasking.`,
+  portable_storage: `[Product Line: Portable Storage] "High-speed / performance" → instant file transfers, fast backups, capture-and-transfer on the go. "Design" → lightweight, ruggedly durable.`,
+  innovation_lifestyle: `[Product Line: Innovation Lifestyle] "Sharing / connection" → bridge distances, upload in one tap. Emphasize emotional connection and privacy protection.`,
 }
 
 // ============================================================
-// 产品线策略（自动检测匹配，实现"同词不同境"语义映射）
+// 产品线×风格翻译策略（电商场景，8产品线 × 3风格 = 24块）
+// 原则：这是翻译指南，不是文案创作指南。只做术语消歧、受众校准、陷阱提醒。
+// 严禁教LLM"转化""改写""创作"——翻译必须忠实原文。
 // ============================================================
-const PRODUCT_LINE_STRATEGIES: Record<string, string> = {
-  professional_imaging: `【产品线：专业影像】受众为职业摄影师/影视团队。"高速/性能"→8K RAW不掉帧、高速连拍不卡顿、极速导出。"可靠/耐用"→极端环境防护、数据绝对安全。钢甲系列额外强调物理抗损。`,
-  consumer_cards: `【产品线：消费存储卡】受众为vlog创作者/旅拍爱好者/家庭用户。"高速/性能"→4K视频畅拍不中断、连拍不卡顿、记录生活每一帧。"可靠"→选对卡、少踩坑、数据不丢失。文案语气亲近可信赖，可适度使用痛点场景切入（"插卡提示错误？"类）。`,
-  gaming_card: `【产品线：游戏存储卡】受众为Switch/Steam Deck/ROG Ally等掌机玩家。"高读写速度"→UHS-I/V30高速读写确保游戏加载快、存档写入快、关卡秒切、开放世界无缝读图，读写速度不拖累游戏体验。"A2等级"→高随机读写IOPS提升掌机程序运行效率，游戏启动更快、运行更流畅、资源加载不卡顿。"大容量"→512GB/1TB海量空间，游戏库随身携带，告别反复删除重装的焦虑。⚠️ 读写速度必须严格区分："读取速度"/"写入速度"各有所指，禁止混用或一律写成读取速度。文案简洁有活力，可用游戏圈表达（"加载碾压""随身游戏库"）。`,
-  gaming_ssd: `【产品线：电竞SSD】受众为3A大作玩家/PS5玩家。"游戏性能"→3A秒加载、消除材质延迟、DirectStorage潜能释放。`,
-  gaming_dimm: `【产品线：电竞内存】受众为硬核电竞发烧友/超频玩家。"游戏性能"→提升1% Low帧、拒绝团战掉帧、突破超频极限。`,
-  pc_productivity: `【产品线：PC/AI生产力】受众为AI PC用户/内容创作者/PC升级用户。"高速/性能"→AI模型秒级响应、巨型工程文件秒传、多任务游刃有余、旧电脑焕新。`,
-  portable_storage: `【产品线：移动存储】受众为商务人士/学生/旅行者/移动创作者。"高速/性能"→手机文件秒传、旅行照片快速备份、移动办公不等待、拍摄素材即拍即传。"设计"→轻便随身、坚固耐用。`,
-  innovation_lifestyle: `【产品线：创新生活】受众为家庭用户/送礼人群。"分享/连接"→跨越距离陪伴家人、一键上传珍贵瞬间。文案温暖感性，强调情感连接与隐私安全。`,
+const PRODUCT_LINE_STYLE_STRATEGIES: Record<string, Record<string, string>> = {
+  professional_imaging: {
+    standard: `【翻译策略：专业影像-标准版】受众为职业摄影师/影视团队。V60/V90等速度等级标识按源文如实翻译，避免使用生僻影视工业黑话。设备兼容性说明需确保普通用户可理解。"高速/性能"→8K RAW不掉帧、高速连拍不卡顿、极速导出。"可靠/耐用"→极端环境防护、数据绝对安全。`,
+    professional: `【翻译策略：专业影像-专业版】受众为职业摄影师/影视团队。8K RAW码流、持续写入、IP68防护等专业参数使用目标语言影视工业标准术语（如Bitrate、Color Depth、Proxy Workflow的对应标准译法）。"高速/性能"→8K RAW不掉帧、高速连拍不卡顿、极速导出。"可靠/耐用"→极端环境防护、数据绝对安全。钢甲系列额外强调物理抗损。⚠️"数据安全"在此语境下不仅指技术可靠性，也涉及职业声誉——按源文措辞如实翻译，不自行发挥。`,
+    marketing: `【翻译策略：专业影像-营销版】源文为专业影像产品营销文案。"高速/性能"→8K RAW不掉帧、高速连拍不卡顿、极速导出。"可靠/耐用"→极端环境防护、数据绝对安全。按源文风格翻译，保持专业调性同时自然流畅。常见陷阱：将英文营销短句直译为生硬的目标语言——应使用目标市场摄影/影视圈自然表达。`,
+  },
+  consumer_cards: {
+    standard: `【翻译策略：消费存储卡-标准版】受众为vlog创作者/旅拍爱好者/家庭用户。"高速/性能"→4K视频畅拍不中断、连拍不卡顿、记录生活每一帧。"可靠"→选对卡、少踩坑、数据不丢失。4K拍摄兼容性、多设备适配等内容用通俗易懂的译法。常见陷阱：堆砌技术术语导致普通用户困惑——术语库译法已固定，其余用日常语言。`,
+    professional: `【翻译策略：消费存储卡-专业版】受众为有一定技术认知的消费者。"高速/性能"→4K视频畅拍不中断、连拍不卡顿。"可靠"→数据安全不丢失。闪存颗粒、UHS总线、U3/V30等参数使用行业标准译法。⚠️不回避性能边界——源文有则译，源文无则不添。`,
+    marketing: `【翻译策略：消费存储卡-营销版】源文为消费级产品营销文案。"高速/性能"→4K视频畅拍不中断、连拍不卡顿、记录生活每一帧。"可靠"→选对卡、少踩坑、数据不丢失。语气亲近可信赖。常见陷阱：中文营销四字格直译为目标语言字面意思——应做本土化意译。生活化场景（旅行、宠物、家庭）的翻译保持自然，不刻意煽情。`,
+  },
+  gaming_card: {
+    standard: `【翻译策略：游戏存储卡-标准版】受众为Switch/Steam Deck/ROG Ally/Legion Go等掌机玩家。"高读写速度"→读取速度决定加载快慢，写入速度决定安装/存档效率，两者独立，禁止一律写成"读取速度"。"A2等级"→高随机读写IOPS（小文件随机读写），决定运行流畅度。"V30/V60/V90"→持续写入保证，大游戏安装不降速。"大容量"→海量存储空间。A2/V30等规格用通俗语言解释其实际意义，不堆砌IOPS数据。`,
+    professional: `【翻译策略：游戏存储卡-专业版】受众为对技术参数有要求的硬核玩家。"高读写速度"→读取速度决定加载快慢（游戏启动、关卡切换、开放世界读图），写入速度决定安装/存档效率（大游戏安装省时、存档秒写、录屏不丢帧），两者独立。⚠️A2=Application Performance Class（小文件随机读写），决定运行流畅度而非加载速度——翻译时注意概念不混淆。"V30/V60/V90"→持续写入保证。读取和写入绝对禁止混译。`,
+    marketing: `【翻译策略：游戏存储卡-营销版】源文为游戏产品营销文案。"高读写速度"→读取速度决定加载快慢，写入速度决定安装/存档效率，两者独立，禁止一律写成"读取速度"。"A2等级"→高随机读写IOPS（小文件随机读写），决定运行流畅度。"V30/V60/V90"→持续写入保证，大游戏安装不降速。"大容量"→海量存储空间。语气有活力但不浮夸。⚠️严格区分读取和写入的译法。使用目标市场游戏社区的自然表达，禁止生造或直译其他语言的游戏梗。`,
+  },
+  gaming_ssd: {
+    standard: `【翻译策略：电竞SSD-标准版】受众为3A大作玩家/PS5玩家。"游戏性能"→3A秒加载、消除材质延迟、DirectStorage潜能释放。PCIe代数、顺序读写、接口差异（M.2/SATA/2230）如实翻译。安装要求和系统兼容性说明需准确清晰。`,
+    professional: `【翻译策略：电竞SSD-专业版】受众为关注硬件参数的硬核玩家。"游戏性能"→3A秒加载、消除材质延迟、DirectStorage潜能释放。4K随机读写、DRAM/SLC Cache、温控等使用目标语言硬件圈标准术语。PLAY 2230的单面PCB设计——源文有则如实翻译，源文无则不添。`,
+    marketing: `【翻译策略：电竞SSD-营销版】源文为电竞产品营销文案。"游戏性能"→3A秒加载、消除材质延迟、DirectStorage潜能释放。常见陷阱：过度夸张导致可信度下降——保持原文卖点力度，按目标市场电竞圈自然表达翻译。ARES/NM/PLAY系列名保留英文原词不变。`,
+  },
+  gaming_dimm: {
+    standard: `【翻译策略：电竞内存-标准版】受众为电竞玩家/PC DIY用户。"游戏性能"→提升1% Low帧、拒绝团战掉帧、突破超频极限。DDR代数、频率、时序(CL)、电压及RGB灯效如实翻译。XMP/EXPO一键超频的操作说明需准确清晰。`,
+    professional: `【翻译策略：电竞内存-专业版】受众为硬核超频玩家。"游戏性能"→提升1% Low帧、拒绝团战掉帧、突破超频极限。PMIC电源管理、散热马甲热阻、时序压缩等使用目标语言超频圈标准术语（如Sub-timings、IMC）。⚠️超频边际效应按源文客观翻译，不夸大不回避。`,
+    marketing: `【翻译策略：电竞内存-营销版】源文为电竞内存营销文案。"游戏性能"→提升1% Low帧、拒绝团战掉帧、突破超频极限。常见陷阱：中文竞技热血表达直译为目标语言显得浮夸——按目标市场电竞圈自然表达翻译。"1% Low帧""团战不掉帧"等概念按源文如实翻译，不自行添加。`,
+  },
+  pc_productivity: {
+    standard: `【翻译策略：PC/AI生产力-标准版】受众为AI PC用户/内容创作者/PC升级用户。"高速/性能"→AI模型秒级响应、巨型工程文件秒传、多任务游刃有余、旧电脑焕新。接口、协议、基础速度如实翻译。端侧AI相关概念用通俗语言翻译，确保非技术用户也能理解。`,
+    professional: `【翻译策略：PC/AI生产力-专业版】受众为关注性能的专业用户。"高速/性能"→AI模型秒级响应、巨型文件秒传、多任务游刃有余。多线程并发、本地LLM推理、I/O吞吐等使用目标语言行业标准术语（如Local LLM Inference、DaVinci Nodes）。⚠️性能数据按源文客观翻译，不添加未经验证的效率声明。`,
+    marketing: `【翻译策略：PC/AI生产力-营销版】源文为生产力产品营销文案。"高速/性能"→AI模型秒级响应、巨型工程文件秒传、多任务游刃有余、旧电脑焕新。常见陷阱：将"AI加速""效率提升"等概念翻译得过于空洞——按源文具体表述翻译。本地AI隐私保护角度按源文提及程度翻译，源文未提则不自行发挥。`,
+  },
+  portable_storage: {
+    standard: `【翻译策略：移动存储-标准版】受众为商务人士/学生/旅行者/移动创作者。"高速/性能"→文件秒传、快速备份、即拍即传。"设计"→轻便随身、坚固耐用。外观、重量、接口、基础速度及防护等级如实翻译。⚠️注意区分U盘（便携/小文件）和PSSD（大文件/剪辑）——品类词不可混用。`,
+    professional: `【翻译策略：移动存储-专业版】受众为关注数据安全的专业用户。"高速/性能"→文件秒传、快速备份、即拍即传。"设计"→轻便随身、坚固耐用。桥接芯片、持续写入温控、IP防护测试标准、AES 256-bit硬件加密等使用行业标准术语。⚠️数据完整性相关描述按源文客观翻译，不自行扩展安全承诺。`,
+    marketing: `【翻译策略：移动存储-营销版】源文为移动存储产品营销文案。"高速/性能"→文件秒传、快速备份、即拍即传。"设计"→轻便随身、坚固耐用。SL/D系列/U盘各有不同使用场景——按源文产品定位翻译，不混淆系列调性。移动场景描述保持自然，不刻意渲染。`,
+  },
+  innovation_lifestyle: {
+    standard: `【翻译策略：创新生活-标准版】受众为家庭用户/送礼人群。"分享/连接"→跨越距离陪伴家人、一键上传珍贵瞬间。Pexar相框的屏幕参数、App绑定、共享机制如实翻译，操作步骤需简单易懂。Hub接口及扩展功能翻译清晰准确。`,
+    professional: `【翻译策略：创新生活-专业版】受众为关注隐私和性能的用户。"分享/连接"→跨越距离、一键上传。Wi-Fi 6、云端/本地数据加密隔离、雷电/USB4协议、PD快充、多屏4K输出等使用行业标准术语。⚠️数据隐私保护机制按源文如实翻译，不自行添加安全声明。`,
+    marketing: `【翻译策略：创新生活-营销版】源文为创新生活产品营销文案。"分享/连接"→跨越距离陪伴家人、一键上传珍贵瞬间。Pexar相框源文偏情感化时保持温暖但不煽情；Hub源文偏设计美学时保持简洁优雅。常见陷阱：中文感性表达直译为目标语言显得矫情——按目标市场同类产品的自然表达翻译。`,
+  },
 }
 
-const PRODUCT_LINE_STRATEGIES_EN: Record<string, string> = {
-  professional_imaging: `[Product Line: Professional Imaging] Audience: professional photographers and filmmakers. "High-speed / performance" → no dropped frames at 8K RAW, uninterrupted burst shooting, instant offload. "Reliability / durability" → extreme environment protection, absolute data safety. ARMOR series: additionally emphasize physical damage resistance.`,
-  consumer_cards: `[Product Line: Consumer Cards] Audience: vloggers, travel photographers, families. "High-speed / performance" → smooth 4K recording without interruption, burst shooting without lag, capturing every frame of life. "Reliability" → choose the right card, avoid pitfalls, never lose data. Tone: approachable and trustworthy. May use relatable pain-point scenarios (e.g., "Card error?" moments).`,
-  gaming_card: `[Product Line: Gaming Card] Audience: Switch, Steam Deck, ROG Ally, and other handheld gamers. "High read/write speed" → UHS-I, V30 fast read/write speeds ensure quick game loading, fast save writing, instant level transitions, and seamless open-world streaming — never let the card bottleneck your gameplay. "A2 rating" → high random read/write IOPS boost app performance on handhelds: faster game launches, smoother in-game asset streaming, zero stutter. "Large capacity" → 512GB/1TB to carry your entire game library — no more deleting and reinstalling. ⚠️ CRITICAL: "Read speed" and "Write speed" are distinct specifications — never confuse them or default to "read speed" for all speed mentions. Keep copy concise and energetic. May use gaming-native language ("blazing load times", "carry your game library").`,
-  gaming_ssd: `[Product Line: Gaming SSD] Audience: AAA gamers and PS5 players. "Gaming performance" → instant AAA loading, eliminate texture pop-in, unleash DirectStorage potential.`,
-  gaming_dimm: `[Product Line: Gaming Memory] Audience: hardcore esports enthusiasts and overclockers. "Gaming performance" → boost 1% Low FPS, eliminate team-fight frame drops, push overclocking limits.`,
-  pc_productivity: `[Product Line: PC / AI Productivity] Audience: AI PC users, content creators, PC upgraders. "High-speed / performance" → near-instant AI model response, massive project file transfers in seconds, effortless multitasking, breathe new life into older systems.`,
-  portable_storage: `[Product Line: Portable Storage] Audience: business travelers, students, mobile creators. "High-speed / performance" → instant phone file transfers, fast travel photo backups, no-wait mobile productivity, capture-and-transfer on the go. "Design" → lightweight and portable, ruggedly durable.`,
-  innovation_lifestyle: `[Product Line: Innovation Lifestyle] Audience: families and gift-givers. "Sharing / connection" → bridge distances to be with loved ones, upload precious moments in one tap. Tone: warm and heartfelt. Emphasize emotional connection and privacy protection.`,
+// 非电商场景使用精简版产品线策略，避免营销语调污染技术文档
+function getProductLineBlock(productLine: string | undefined, isEnSource: boolean, scenePreset: string, style: string): string {
+  if (!productLine) return ''
+  const isNonEcommerce = scenePreset !== 'ecommerce'
+  if (isNonEcommerce) {
+    // 非电商场景：保留精简TECH版，不做风格细分
+    const block = isEnSource ? PRODUCT_LINE_STRATEGIES_TECH_EN[productLine] : PRODUCT_LINE_STRATEGIES_TECH[productLine]
+    return block ? `\n${block}` : ''
+  }
+  // 电商场景：使用产品线×风格组合策略，精确到"这个产品线×这个风格"该怎么做
+  const strategies = PRODUCT_LINE_STYLE_STRATEGIES[productLine]
+  if (strategies) {
+    const block = strategies[style] || strategies['standard']
+    return block ? `\n${block}` : ''
+  }
+  return ''
 }
 
 // 产品线 → 相关品类词映射（只注入跟当前产品线相关的品类词，省 token 减干扰）
@@ -762,10 +831,15 @@ const CRITICAL_REMINDER_EN = `[🔴 FINAL REMINDER — the following rules are a
 // ============================================================
 // 辅助函数
 // ============================================================
+function resolveEffectiveStyle(config: LLMConfig, scenePreset?: string): string {
+  const isSceneForced = scenePreset === 'technical_params' || scenePreset === 'packaging' || scenePreset === 'ui' || scenePreset === 'after_sales' || scenePreset === 'manual' || scenePreset === 'spec_sheet'
+  return isSceneForced ? 'professional' : config.translationStyle
+}
+
 function getStylePrompt(config: LLMConfig, isEnSource?: boolean, scenePreset?: string): string {
   // 非电商场景强制严谨专业版，消除风格×场景的矛盾组合
-  const isSceneForced = scenePreset === 'technical_params' || scenePreset === 'packaging' || scenePreset === 'ui' || scenePreset === 'after_sales'
-  const effectiveStyle = isSceneForced ? 'professional' : config.translationStyle
+  const isSceneForced = scenePreset === 'technical_params' || scenePreset === 'packaging' || scenePreset === 'ui' || scenePreset === 'after_sales' || scenePreset === 'manual' || scenePreset === 'spec_sheet'
+  const effectiveStyle = resolveEffectiveStyle(config, scenePreset)
 
   // 场景已锁定风格时，跳过独立风格块——场景提示词已声明"本场景翻译风格固定为严谨专业"
   if (isSceneForced && effectiveStyle === 'professional') return ''
@@ -1070,10 +1144,11 @@ export async function translateBatch(
   }
 
   // 全局铁则 + 风格 + 场景 + 产品线
+  // 电商场景且产品线已检测到时，产品线×风格策略已内置风格指导，跳过全局风格块避免冗余
   const globalRules = isEnSource ? GLOBAL_RULES_EN : GLOBAL_RULES
-  const styleBlock = getStylePrompt(config, isEnSource, config.scenePreset)
+  const styleBlock = productLine ? '' : getStylePrompt(config, isEnSource, config.scenePreset)
   const sceneBlock = getScenePrompt(config, isEnSource)
-  const productLineBlock = productLine ? `\n${isEnSource ? PRODUCT_LINE_STRATEGIES_EN[productLine] : PRODUCT_LINE_STRATEGIES[productLine]}` : ''
+  const productLineBlock = getProductLineBlock(productLine, isEnSource, config.scenePreset, resolveEffectiveStyle(config, config.scenePreset))
   const langBlock = getLangSpecificPrompt(targetLang)
 
   if (targetLang === 'zh-TW' && detectedSource === 'zh-CN') {
@@ -1267,9 +1342,9 @@ export async function proofreadBatch(
   const transLabel = isEnSource ? 'Trans' : '译'
   const textList = items.map((it, i) => `${i + 1}. ${normalizedSourceTexts[i]}\n${transLabel}：${it.translatedText}`).join('\n\n')
 
-  const styleBlock = getStylePrompt(config, isEnSource, config.scenePreset)
+  const styleBlock = productLine ? '' : getStylePrompt(config, isEnSource, config.scenePreset)
   const sceneBlock = getScenePrompt(config, isEnSource)
-  const productLineBlock = productLine ? `\n${isEnSource ? PRODUCT_LINE_STRATEGIES_EN[productLine] : PRODUCT_LINE_STRATEGIES[productLine]}` : ''
+  const productLineBlock = getProductLineBlock(productLine, isEnSource, config.scenePreset, resolveEffectiveStyle(config, config.scenePreset))
   const langBlock = getLangSpecificPrompt(targetLang)
 
   let systemPrompt: string

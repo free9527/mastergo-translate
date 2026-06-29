@@ -29,7 +29,7 @@
           :class="{ active: lastScanMode === 'selection' }"
           @click="scanSelection"
           :disabled="scanning"
-        >选中内容扫描</button>
+        >选中对象扫描</button>
       </div>
       <!-- 语言选择 -->
       <div class="lang-row">
@@ -108,11 +108,13 @@
         <div class="style-field">
           <label class="field-label">场景</label>
           <select class="style-select" v-model="llmConfig.scenePreset" @change="onSceneChange">
-            <option value="ecommerce">电商详情页</option>
+            <option value="ecommerce">商品详情页</option>
             <option value="technical_params">技术参数表</option>
             <option value="packaging">包装印刷</option>
             <option value="ui">软件UI</option>
             <option value="after_sales">售后/保修卡</option>
+            <option value="manual">说明书</option>
+            <option value="spec_sheet">规格书</option>
           </select>
         </div>
         <div class="style-field">
@@ -185,7 +187,7 @@
         <div class="empty-state" v-if="items.length === 0">
           <div class="empty-icon">⇧</div>
           <p>点击"当前页扫描"采集文本</p>
-          <p class="empty-sub">或先选中图层后点击"选中内容扫描"</p>
+          <p class="empty-sub">或先选中图层后点击"选中对象扫描"</p>
         </div>
         <div class="text-item" :class="{ corrected: item.corrected, 'csv-changed': csvChangedIds.has(item.nodeIds[0]), 'trans-error': translateErrors.has(item.nodeIds[0]) }" v-for="(item, idx) in items" :key="item.nodeIds[0] || idx">
           <div class="item-row">
@@ -273,9 +275,11 @@
             </div>
           </div>
 
-          <!-- 中间箭头 -->
+          <!-- 中间同步 -->
           <div class="font-arrow-col">
-            <svg width="20" height="20" viewBox="0 0 20 20"><path d="M3 10h14M13 5l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <button class="btn-sync" @click="syncFontAttrs(f)" title="同步属性">
+              <svg width="16" height="16" viewBox="0 0 16 16"><path d="M4 8a4 4 0 0 1 4-4 3.96 3.96 0 0 1 3.46 2M13 8a4 4 0 0 1-4 4 3.96 3.96 0 0 1-3.46-2" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M12 4l1.5-1.5L15 4M4 12l-1.5 1.5L1 12" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
           </div>
 
           <!-- 右栏：目标字体 -->
@@ -608,6 +612,18 @@ function onFontSelected(f: FontMapping) {
   }
 }
 
+function syncFontAttrs(f: FontMapping) {
+  // 直接改 items.value 才能触发 computed 重算（computed 返回的是普通对象，改其属性不触发响应式）
+  for (const item of items.value) {
+    if (item.fontFamily === f.sourceFamily && item.fontStyle === f.sourceStyle) {
+      item.targetFontSize = f.sourceFontSize
+      item.targetLineHeight = f.sourceLineHeight ?? null
+      item.targetLetterSpacing = f.sourceLetterSpacing ?? null
+      item.targetTextAlign = f.sourceTextAlign || ''
+    }
+  }
+}
+
 
 const toastMsg = ref('')
 const toastType = ref('info')
@@ -762,6 +778,9 @@ function findHighFreqGlossaryTerms(
   allTexts: string[],
   glossaryMap: Map<string, string>,
 ): string[] {
+  const result: string[] = []
+
+  // 1. 单词级别：统计词频，匹配单词语术
   const wordCounts = new Map<string, number>()
   for (const text of allTexts) {
     const words = text.toLowerCase().split(/[\s,.;:!?()\[\]{}<>]+/)
@@ -770,12 +789,31 @@ function findHighFreqGlossaryTerms(
       wordCounts.set(w, (wordCounts.get(w) || 0) + 1)
     }
   }
-  const result: string[] = []
   for (const [word, count] of wordCounts) {
     if (count >= 2 && glossaryMap.has(word)) {
       result.push(word)
     }
   }
+
+  // 2. 多词短语级别：扫描术语库中所有多词条目，检测在所有文本中的出现次数
+  //    修复 "Rigorously Tested" 等短语被单词拆分后无法检测到的 bug
+  const multiWordPhraseCounts = new Map<string, number>()
+  for (const [glossSource] of glossaryMap) {
+    const trimmed = glossSource.trim()
+    if (!trimmed.includes(' ')) continue  // 跳过单词语术（上面已处理）
+    const glossLower = trimmed.toLowerCase()
+    for (const text of allTexts) {
+      if (text.toLowerCase().includes(glossLower)) {
+        multiWordPhraseCounts.set(trimmed, (multiWordPhraseCounts.get(trimmed) || 0) + 1)
+      }
+    }
+  }
+  for (const [phrase, count] of multiWordPhraseCounts) {
+    if (count >= 2 && !result.includes(phrase)) {
+      result.push(phrase)
+    }
+  }
+
   return result
 }
 
@@ -1140,8 +1178,9 @@ async function startProofread() {
       }
 
       await Promise.allSettled(concurrentBatchPromises)
-      const doneSoFar = toCheck.filter(it => it.corrected || (it.translatedText && !it.proofreadText)).length + toCheck.filter(it => !it.translatedText).length
-      proofreadProgress.value = { current: toCheck.filter(it => it.corrected || it.translatedText).length, total }
+      // 进度：已校对的项 = 本轮并发覆盖到的最后一项索引
+      const processedSoFar = Math.min(i + PROOFREAD_BATCH_SIZE * P_CONCURRENCY, total)
+      proofreadProgress.value = { current: processedSoFar, total }
     }
 
     // 校对后兜底：术语库强制校准 → 语言后处理 → CJK格式 → 商标符号还原
@@ -1565,7 +1604,7 @@ function onSceneChange() {
     selectedPreset.value = 'professional'
     llmConfig.value.translationStyle = 'professional'
   } else {
-    // 切换回电商详情页：恢复之前的风格
+    // 切换回商品详情页：恢复之前的风格
     if (previousStyle.value && previousStyle.value !== 'professional') {
       selectedPreset.value = previousStyle.value
       llmConfig.value.translationStyle = previousStyle.value
@@ -2015,18 +2054,28 @@ body {
   white-space: nowrap;
   letter-spacing: -0.01em;
 }
-.seg-btn:hover:not(:disabled) { color: var(--gray-800); }
+.seg-btn:hover:not(:disabled):not(.active) { color: var(--gray-800); }
 .seg-btn.active {
-  background: #fff;
-  color: var(--blue);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 0 0 0.5px rgba(0,0,0,0.04);
+  background: var(--blue);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0,122,255,0.3);
   font-weight: 600;
 }
-.app.dark .seg-btn.active {
-  background: var(--gray-800);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+.seg-btn.active:hover:not(:disabled) {
+  background: var(--blue-hover);
+  box-shadow: 0 2px 8px rgba(0,122,255,0.3);
+  color: #fff;
 }
-.seg-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.seg-btn:active:not(:disabled) { transform: scale(0.97); }
+.app.dark .seg-btn.active {
+  background: var(--blue);
+  box-shadow: 0 2px 8px rgba(0,122,255,0.4);
+}
+.app.dark .seg-btn.active:hover:not(:disabled) {
+  background: var(--blue-hover);
+  box-shadow: 0 2px 8px rgba(0,122,255,0.4);
+}
+.seg-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
 /* ---- 操作按钮行 ---- */
 .action-row {
@@ -2395,12 +2444,27 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 2px;
-  color: var(--gray-200);
+  padding: 0 4px;
   flex-shrink: 0;
   background: #fff;
 }
 .app.dark .font-arrow-col { background: var(--gray-100); }
+
+.btn-sync {
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px;
+  border: 1px solid var(--gray-100); border-radius: var(--radius);
+  background: #fff; color: var(--gray-400);
+  cursor: pointer; transition: all var(--transition);
+}
+.btn-sync:hover {
+  background: var(--blue); color: #fff;
+  border-color: var(--blue);
+  box-shadow: 0 2px 8px rgba(0,122,255,0.3);
+}
+.btn-sync:active { transform: scale(0.92); }
+.app.dark .btn-sync { background: var(--gray-200); border-color: var(--gray-400); }
+.app.dark .btn-sync:hover { background: var(--blue); color: #fff; border-color: var(--blue); }
 
 .font-preview {
   padding: 10px 12px;
@@ -2430,37 +2494,42 @@ body {
 }
 
 .font-attrs {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 3px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 .font-attr {
   display: flex;
   align-items: baseline;
-  gap: 2px;
-  padding: 2px 0;
+  gap: 6px;
+  padding: 4px 0;
+  min-height: 28px;
 }
 .font-attr-val {
   font-size: 12px;
   font-weight: 600;
   color: var(--gray-800);
+  min-width: 36px;
 }
 .app.dark .font-attr-val { color: var(--gray-900); }
 .font-attr-unit {
   font-size: 10px;
   color: var(--gray-400);
   font-weight: 400;
+  min-width: 16px;
 }
 .font-attr-label {
   font-size: 10px;
   color: var(--gray-400);
-  margin-left: 4px;
+  margin-left: auto;
   font-weight: 400;
+  min-width: 22px;
+  text-align: right;
 }
 
 .font-attr-input {
-  width: 48px;
-  padding: 4px 6px;
+  width: 100%;
+  padding: 5px 6px;
   border: 1px solid var(--gray-200);
   border-radius: 6px;
   font-size: 12px;
@@ -2468,8 +2537,9 @@ body {
   font-family: inherit;
   color: var(--gray-800);
   background: #fff;
-  text-align: center;
+  text-align: right;
   transition: border-color var(--transition), box-shadow var(--transition);
+  min-width: 62px;
 }
 .font-attr-input:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(0,122,255,0.12); }
 .font-attr-input::placeholder { color: var(--gray-200); font-weight: 400; font-size: 10px; }
