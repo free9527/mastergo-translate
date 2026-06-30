@@ -3,11 +3,11 @@
 // ============================================================
 
 // 翻译批次大小
-export const TRANSLATE_BATCH_SIZE = 10
+export const TRANSLATE_BATCH_SIZE = 15
 export const PROOFREAD_BATCH_SIZE = 12
 
-// API 超时（毫秒）
-export const API_TIMEOUT_MS = 45000
+// API 超时（毫秒）— 15条批次模型处理可能需60s+，留足余量
+export const API_TIMEOUT_MS = 120000
 
 // API 重试
 export const API_MAX_RETRIES = 3

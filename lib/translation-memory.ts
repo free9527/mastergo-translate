@@ -43,8 +43,8 @@ function extractTemplate(text: string): {
     let match: RegExpExecArray | null
     while ((match = pattern.exec(result)) !== null) {
       const value = match[1]
-      if (value.includes('\x00TM')) continue
-      const placeholder = `\x00TM${counter}\x00`
+      if (value.includes('__TMVAL_')) continue
+      const placeholder = `__TMVAL_${counter}__`
       result = result.replace(value, placeholder)
       values.push({ placeholder, value })
       counter++

@@ -31,6 +31,7 @@
           :disabled="scanning"
         >选中对象扫描</button>
       </div>
+
       <!-- 语言选择 -->
       <div class="lang-row">
         <div class="lang-col">
@@ -51,28 +52,33 @@
         </div>
       </div>
 
-      <!-- 统计 -->
-      <div class="stats-row" v-if="items.length > 0">
-        <div class="stat-item">
-          <span class="stat-value">{{ items.length }}</span>
-          <span class="stat-label">文本数</span>
+      <!-- 统计 + 翻译按钮 -->
+      <div class="stats-card" v-if="items.length > 0">
+        <div class="stats-info">
+          <div class="stat-item">
+            <span class="stat-value">{{ items.length }}</span>
+            <span class="stat-label">文本数</span>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="stat-item">
+            <span class="stat-value">{{ charCount }}</span>
+            <span class="stat-label">字符数</span>
+          </div>
         </div>
-        <div class="stat-divider"></div>
-        <div class="stat-item">
-          <span class="stat-value">{{ charCount }}</span>
-          <span class="stat-label">字符数</span>
-        </div>
+        <button class="btn btn-primary btn-translate" @click="startTranslate" :disabled="translating || proofreading || items.length === 0">
+          <svg v-if="!translating" class="btn-icon-svg" width="14" height="14" viewBox="0 0 16 16"><path d="M2 4l4 4-4 4M8 2l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          {{ translating ? `翻译中 ${Math.floor(translateProgressPercent)}%` : '翻译' }}
+        </button>
       </div>
 
       <!-- 操作按钮 -->
       <div class="action-row">
-        <button class="btn btn-primary flex-1" @click="startTranslate" :disabled="translating || proofreading || items.length === 0">
-          <svg v-if="!translating" class="btn-icon-svg" width="14" height="14" viewBox="0 0 16 16"><path d="M2 4l4 4-4 4M8 2l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          {{ translating ? `翻译中 ${Math.floor(translateProgressPercent)}%` : '翻译' }}
-        </button>
-        <button class="btn btn-accent flex-1" @click="applyTranslations" :disabled="applying || translating || proofreading || !hasTranslation">
+        <button class="btn btn-accent flex-1" @click="applyTranslationsOnly" :disabled="applying || translating || proofreading || !hasTranslation">
           <svg v-if="!applying" class="btn-icon-svg" width="14" height="14" viewBox="0 0 16 16"><path d="M3 8l3 3 7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          {{ applying ? `应用中 ${Math.floor(applyingProgressPercent)}%` : '应用' }}
+          {{ applying && !applyingFonts ? `应用中 ${Math.floor(applyingProgressPercent)}%` : '应用翻译' }}
+        </button>
+        <button class="btn btn-accent flex-1" @click="applyTranslationsWithFonts" :disabled="applying || translating || proofreading || !hasTranslation">
+          应用翻译+字体
         </button>
         <button v-if="translating || proofreading" class="btn btn-ghost flex-1" @click="cancelOperation">
           取消
@@ -81,6 +87,8 @@
           撤销
         </button>
       </div>
+
+      <!-- 重翻 / 重试 -->
       <div class="toolbar-row" v-if="translateErrors.size > 0">
         <button class="btn btn-warning flex-1" @click="retryFailedTranslations" :disabled="applying || translating || proofreading">
           重翻失败 ({{ translateErrors.size }})
@@ -124,6 +132,7 @@
           </select>
           <span v-if="effectiveProductLine && manualProductLine === ''" class="auto-badge">自动</span>
           <span v-if="manualProductLine !== ''" class="manual-badge">手动</span>
+          <span v-if="!detectedProductLine && manualProductLine === '' && items.length > 0" class="pl-warning">⚠️ 未检测到产品线，建议手动选择</span>
         </div>
       </div>
       <textarea
@@ -190,38 +199,38 @@
           <p class="empty-sub">或先选中图层后点击"选中对象扫描"</p>
         </div>
         <div class="text-item" :class="{ corrected: item.corrected, 'csv-changed': csvChangedIds.has(item.nodeIds[0]), 'trans-error': translateErrors.has(item.nodeIds[0]) }" v-for="(item, idx) in items" :key="item.nodeIds[0] || idx">
-          <div class="item-row">
-            <div class="item-source">
-              <div class="item-label">
-                原文
-                <span class="merge-badge" v-if="item.nodeIds.length > 1">×{{ item.nodeIds.length }}</span>
-              </div>
-              <div class="source-box">{{ item.sourceText }}</div>
+          <!-- 原文 — 上方全宽 -->
+          <div class="item-source">
+            <div class="item-label">
+              原文
+              <span class="merge-badge" v-if="item.nodeIds.length > 1">×{{ item.nodeIds.length }}</span>
             </div>
-            <div class="item-target">
-              <div class="item-label">
-                译文
-                <span class="error-badge" v-if="translateErrors.has(item.nodeIds[0])">翻译失败</span>
-                <span class="proof-badge" v-if="item.corrected">校正</span>
-                <span class="csv-badge" v-if="csvChangedIds.has(item.nodeIds[0])">导入变更</span>
+            <div class="source-box">{{ item.sourceText }}</div>
+          </div>
+          <!-- 译文 — 下方全宽 -->
+          <div class="item-target">
+            <div class="item-label">
+              译文
+              <span class="error-badge" v-if="translateErrors.has(item.nodeIds[0])">翻译失败</span>
+              <span class="proof-badge" v-if="item.corrected">校正</span>
+              <span class="csv-badge" v-if="csvChangedIds.has(item.nodeIds[0])">导入变更</span>
+            </div>
+            <textarea
+              class="trans-input"
+              :class="{ proofread: item.corrected }"
+              v-model="item.translatedText"
+              rows="1"
+              :placeholder="translating ? '翻译中...' : '待翻译'"
+              @input="autoResize($event)"
+              @focus="autoResize($event); onTransInputFocus(item)"
+              @blur="onTransInputBlur(item)"
+            ></textarea>
+            <div class="proof-hint" v-if="item.corrected">
+              <div class="proof-hint-body">
+                <span class="proof-reason" v-if="item.proofreadReason">{{ item.proofreadReason }}</span>
+                <span class="proof-original">原译文：{{ item.proofreadText }}</span>
               </div>
-              <textarea
-                class="trans-input"
-                :class="{ proofread: item.corrected }"
-                v-model="item.translatedText"
-                rows="1"
-                :placeholder="translating ? '翻译中...' : '待翻译'"
-                @input="autoResize($event)"
-                @focus="autoResize($event); onTransInputFocus(item)"
-                @blur="onTransInputBlur(item)"
-              ></textarea>
-              <div class="proof-hint" v-if="item.corrected">
-                <div class="proof-hint-body">
-                  <span class="proof-reason" v-if="item.proofreadReason">{{ item.proofreadReason }}</span>
-                  <span class="proof-original">原译文：{{ item.proofreadText }}</span>
-                </div>
-                <button class="btn-revert-proof" @click="item.translatedText = item.proofreadText; item.proofreadText = ''; item.proofreadReason = ''; item.corrected = false">恢复</button>
-              </div>
+              <button class="btn-revert-proof" @click="item.translatedText = item.proofreadText; item.proofreadText = ''; item.proofreadReason = ''; item.corrected = false">恢复</button>
             </div>
           </div>
         </div>
@@ -243,48 +252,44 @@
         <span class="section-count">{{ fontMappings.length }}</span>
       </div>
       <div class="section-body" v-if="showFontMap">
-        <p class="field-hint">左侧为原文使用的字体属性，右侧选择替换后的目标字体</p>
+        <p class="field-hint">左侧为原文使用的字体属性，点击同步按钮可将属性传导至右侧替换目标</p>
         <div class="font-card" v-for="f in fontMappings" :key="f.key">
-          <!-- 左栏：源字体 -->
-          <div class="font-col font-col-source">
-            <div class="font-col-label">原文</div>
+          <!-- 左栏：源字体（缩小宽度） -->
+          <div class="font-panel font-panel-source">
+            <div class="font-panel-label">原文</div>
             <div class="font-preview" :style="{ fontFamily: f.sourceFamily }">
               <span class="font-preview-name">{{ f.sourceFamily }}</span>
               <span class="font-preview-style">{{ f.sourceStyle }}</span>
             </div>
-            <div class="font-attrs">
-              <div class="font-attr">
-                <span class="font-attr-val">{{ fmtNum(f.sourceFontSize) }}</span>
-                <span class="font-attr-unit">px</span>
-                <span class="font-attr-label">字号</span>
+            <div class="font-attrs-card font-attrs-source">
+              <div class="font-attr-col">
+                <div class="font-attr-val">{{ fmtNum(f.sourceFontSize) }}<span class="font-attr-unit">px</span></div>
+                <div class="font-attr-label">字号</div>
               </div>
-              <div class="font-attr">
-                <span class="font-attr-val">{{ f.sourceLineHeight !== null ? fmtNum(f.sourceLineHeight) : 'AUTO' }}</span>
-                <span class="font-attr-unit" v-if="f.sourceLineHeight !== null">px</span>
-                <span class="font-attr-label">行距</span>
+              <div class="font-attr-col">
+                <div class="font-attr-val">{{ f.sourceLineHeight !== null ? fmtNum(f.sourceLineHeight) : 'AUTO' }}<span class="font-attr-unit" v-if="f.sourceLineHeight !== null">px</span></div>
+                <div class="font-attr-label">行距</div>
               </div>
-              <div class="font-attr">
-                <span class="font-attr-val">{{ f.sourceLetterSpacing !== null ? fmtNum(f.sourceLetterSpacing) : '—' }}</span>
-                <span class="font-attr-unit" v-if="f.sourceLetterSpacing !== null">px</span>
-                <span class="font-attr-label">字距</span>
+              <div class="font-attr-col">
+                <div class="font-attr-val">{{ f.sourceLetterSpacing !== null ? fmtNum(f.sourceLetterSpacing) : '—' }}<span class="font-attr-unit" v-if="f.sourceLetterSpacing !== null">px</span></div>
+                <div class="font-attr-label">字距</div>
               </div>
-              <div class="font-attr">
-                <span class="font-attr-val">{{ ALIGN_LABELS[f.sourceTextAlign] || f.sourceTextAlign }}</span>
-                <span class="font-attr-label">对齐</span>
+              <div class="font-attr-col">
+                <div class="font-attr-val">{{ ALIGN_LABELS[f.sourceTextAlign] || f.sourceTextAlign }}</div>
+                <div class="font-attr-label">对齐</div>
               </div>
             </div>
           </div>
 
-          <!-- 中间同步 -->
-          <div class="font-arrow-col">
-            <button class="btn-sync" @click="syncFontAttrs(f)" title="同步属性">
-              <svg width="16" height="16" viewBox="0 0 16 16"><path d="M4 8a4 4 0 0 1 4-4 3.96 3.96 0 0 1 3.46 2M13 8a4 4 0 0 1-4 4 3.96 3.96 0 0 1-3.46-2" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M12 4l1.5-1.5L15 4M4 12l-1.5 1.5L1 12" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
-          </div>
-
           <!-- 右栏：目标字体 -->
-          <div class="font-col font-col-target">
-            <div class="font-col-label">替换为</div>
+          <div class="font-panel font-panel-target">
+            <div class="font-panel-head">
+              <div class="font-panel-label">替换为</div>
+              <button class="btn-sync" @click="syncFontAttrs(f)" title="将原文属性同步到替换目标">
+                <svg width="14" height="14" viewBox="0 0 16 16"><path d="M4 8a4 4 0 0 1 4-4 3.96 3.96 0 0 1 3.46 2M13 8a4 4 0 0 1-4 4 3.96 3.96 0 0 1-3.46-2" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M12 4l1.5-1.5L15 4M4 12l-1.5 1.5L1 12" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="btn-sync-text">同步</span>
+              </button>
+            </div>
             <input
               class="font-search-input"
               type="text"
@@ -302,20 +307,20 @@
               <span class="font-preview-name">{{ f.targetFamily || '—' }}</span>
               <span class="font-preview-style">{{ f.targetStyle || '—' }}</span>
             </div>
-            <div class="font-attrs font-attrs-target">
-              <div class="font-attr">
+            <div class="font-attrs-card font-attrs-target">
+              <div class="font-attr-col">
                 <input class="font-attr-input" type="number" :value="fmtNum(f.targetFontSize)" @input="f.targetFontSize = ($event.target as HTMLInputElement).valueAsNumber || 0" placeholder="继承" />
-                <span class="font-attr-label">字号</span>
+                <div class="font-attr-label">字号</div>
               </div>
-              <div class="font-attr">
+              <div class="font-attr-col">
                 <input class="font-attr-input" type="number" :value="fmtNum(f.targetLineHeight)" @input="f.targetLineHeight = ($event.target as HTMLInputElement).valueAsNumber || null" placeholder="继承" />
-                <span class="font-attr-label">行距</span>
+                <div class="font-attr-label">行距</div>
               </div>
-              <div class="font-attr">
+              <div class="font-attr-col">
                 <input class="font-attr-input" type="number" :value="fmtNum(f.targetLetterSpacing)" @input="f.targetLetterSpacing = ($event.target as HTMLInputElement).valueAsNumber || null" placeholder="继承" />
-                <span class="font-attr-label">字距</span>
+                <div class="font-attr-label">字距</div>
               </div>
-              <div class="font-attr">
+              <div class="font-attr-col">
                 <select class="font-attr-select" v-model="f.targetTextAlign">
                   <option value="">继承</option>
                   <option value="LEFT">左</option>
@@ -323,7 +328,7 @@
                   <option value="RIGHT">右</option>
                   <option value="JUSTIFIED">两端</option>
                 </select>
-                <span class="font-attr-label">对齐</span>
+                <div class="font-attr-label">对齐</div>
               </div>
             </div>
           </div>
@@ -447,8 +452,8 @@ import { UIMessage, PluginMessage, TextItem, LLMConfig, GlossaryEntry, Translati
 import { sendMsgToPlugin } from '@messages/ui-sender'
 import { parseCSVRow, csvEncodeCell } from '@lib/parse-csv'
 import { formatCJKSpace } from '@lib/format-text'
-import { postProcessTranslation, restoreTrademarkSymbols, restoreStorageUnitFormatting, enforceGlossaryTerms, enforceShortLabelLength } from '@lib/post-process'
-import { translateBatch, proofreadBatch, fetchWithRetry, isProofreadScriptMismatch, STYLE_PRESETS, SCENE_PRESETS, detectProductLine } from '@lib/llm-api'
+import { postProcessTranslation, restoreTrademarkSymbols, restoreStorageUnitFormatting, enforceGlossaryTerms, enforceShortLabelLength, detectTranslationExpansion } from '@lib/post-process'
+import { translateBatch, proofreadBatch, fetchWithRetry, isProofreadScriptMismatch, STYLE_PRESETS, SCENE_PRESETS, detectProductLine, buildTaskGlossaryHint } from '@lib/llm-api'
 import { DEFAULT_GLOSSARY_PRODUCTS_CSV, DEFAULT_GLOSSARY_EXCLUSIVE_CSV } from '@lib/default-glossary'
 import { TRANSLATE_BATCH_SIZE, PROOFREAD_BATCH_SIZE, TOAST_DURATION_MS, CORRECTION_THRESHOLD, makeFontKey, parseFontKey, normalizeText } from '@lib/constants'
 import { convertStorageUnit } from '@lib/unit-convert'
@@ -474,6 +479,7 @@ const fileName = ref('')
 const translating = ref(false)
 const proofreading = ref(false)
 const applying = ref(false)
+const applyingFonts = ref(false)
 const undoing = ref(false)
 const cancelFlag = ref(false)
 const failedNodeIds = ref<string[]>([])
@@ -615,7 +621,12 @@ function onFontSelected(f: FontMapping) {
 }
 
 function syncFontAttrs(f: FontMapping) {
-  // 直接改 items.value 才能触发 computed 重算（computed 返回的是普通对象，改其属性不触发响应式）
+  // 1. 直接更新 FontMapping 对象，UI 即时反映
+  f.targetFontSize = f.sourceFontSize
+  f.targetLineHeight = f.sourceLineHeight ?? null
+  f.targetLetterSpacing = f.sourceLetterSpacing ?? null
+  f.targetTextAlign = f.sourceTextAlign || ''
+  // 2. 同步到 items.value 以持久化（应用翻译+字体时会用到）
   for (const item of items.value) {
     if (item.fontFamily === f.sourceFamily && item.fontStyle === f.sourceStyle) {
       item.targetFontSize = f.sourceFontSize
@@ -917,10 +928,33 @@ async function startTranslate() {
       if (g.productLine) runtimeProductLines[g.source] = g.productLine
       if (g.termType) runtimeTermTypes[g.source] = g.termType
     }
+    // 反向术语库：非英文源语言时，从术语库的源语言列→目标语言列构建反向映射
+    // 解决 "无人机"（zh-CN）无法匹配术语库 key "Drones"（EN）的问题
+    if (sourceLang.value !== 'auto' && sourceLang.value !== 'en') {
+      const srcCol = sourceLang.value
+      for (const g of glossary.value) {
+        const srcVal = g.translations[srcCol]
+        const tgtVal = g.translations[targetLang.value]
+        if (srcVal && tgtVal && !glossaryMap.has(srcVal)) {
+          glossaryMap.set(srcVal, tgtVal)
+        }
+      }
+    }
+
 
   // 跨批次术语预扫描：找出全页高频术语，提前注入每个批次确保译文一致
   const allSourceTexts = items.value.map(it => it.sourceText)
   const crossBatchTerms = findHighFreqGlossaryTerms(allSourceTexts, glossaryMap)
+
+  // 任务级术语预计算：用全部源文本一次性过滤术语库，每个批次注入相同 glossaryHint
+  // → system prompt 跨批次 100% 一致 → LLM API 自动缓存命中，后续批次不消耗 prompt token
+  const taskGlossaryHint = buildTaskGlossaryHint(
+    glossaryMap,
+    effectiveProductLine.value,
+    llmConfig.value.scenePreset,
+    runtimeProductLines,
+    allSourceTexts,
+  )
 
   const toTranslate = items.value.filter(it => it.sourceText.trim())
   const total = toTranslate.length
@@ -1019,7 +1053,7 @@ async function startTranslate() {
             const uncachedTexts = uncachedIndices.map(idx => texts[idx])
             // 翻译记忆：同型号不同容量/速度的文本压缩为唯一模板，减少 API 调用
             const { uniqueTexts, expandData } = compressBatch(uncachedTexts)
-            const uniqueResult = await translateBatch(uniqueTexts, targetLang.value, glossaryMap, llmConfig.value, sourceLang.value === 'auto' ? undefined : sourceLang.value, items.value.map(it => it.sourceText), runtimeProductLines, runtimeTermTypes, pageName.value || undefined, fileName.value || undefined, crossBatchTerms)
+            const uniqueResult = await translateBatch(uniqueTexts, targetLang.value, glossaryMap, llmConfig.value, sourceLang.value === 'auto' ? undefined : sourceLang.value, items.value.map(it => it.sourceText), runtimeProductLines, runtimeTermTypes, pageName.value || undefined, fileName.value || undefined, crossBatchTerms, taskGlossaryHint)
             // 将模板译文展开回原始文本
             const expandedResult = expandBatch(uniqueResult, expandData, uncachedTexts.length)
             // 合并缓存+API结果
@@ -1130,6 +1164,15 @@ async function startProofread() {
     if (g.productLine) runtimeProductLines[g.source] = g.productLine
   }
 
+  // 任务级术语预计算：用全部源文本一次性过滤 → 校对各批次 system prompt 100% 一致 → 缓存命中
+  const proofreadGlossaryHint = buildTaskGlossaryHint(
+    glossaryMap,
+    effectiveProductLine.value,
+    llmConfig.value.scenePreset,
+    runtimeProductLines,
+    items.value.map(it => it.sourceText),
+  )
+
   try {
     let correctedCount = 0
     let failedBatches = 0
@@ -1159,6 +1202,7 @@ async function startProofread() {
               undefined,
               pageName.value || undefined,
               fileName.value || undefined,
+              proofreadGlossaryHint,
             )
             for (let j = 0; j < batch.length; j++) {
               const proofed = batchResults[j]
@@ -1168,6 +1212,10 @@ async function startProofread() {
                   continue
                 }
                 let fixed = postProcessTranslation(proofed.text, targetLang.value)
+                // 校对模型偶尔插入换行，原文无换行时强制还原为空格
+                if (!/[\n\r]/.test(batch[j].sourceText)) {
+                  fixed = fixed.replace(/[\n\r]+/g, ' ')
+                }
                 fixed = formatCJKSpace(fixed, targetLang.value)
                 if (fixed === batch[j].translatedText) continue
                 batch[j].proofreadText = batch[j].translatedText
@@ -1175,6 +1223,14 @@ async function startProofread() {
                 batch[j].proofreadReason = (proofed.reason || '').slice(0, 40)
                 batch[j].corrected = true
                 correctedCount++
+                // 闭环：将 AI 校对修正也存入反馈系统，触发术语库自动更新
+                sendMsgToPlugin(UIMessage.SAVE_CORRECTION, {
+                  source: batch[j].sourceText,
+                  targetLang: targetLang.value,
+                  originalTranslation: batch[j].proofreadText,
+                  correctedTranslation: fixed,
+                  correctedAt: Date.now(),
+                })
               }
             }
           } catch (e) {
@@ -1191,11 +1247,17 @@ async function startProofread() {
       proofreadProgress.value = { current: processedSoFar, total }
     }
 
-    // 校对后兜底：术语库强制校准 → 语言后处理 → CJK格式 → 商标符号还原
+    // 校对后兜底：扩写检测 → 术语库强制校准 → 语言后处理 → CJK格式 → 商标符号还原
     // 注意：首字母大写翻译管道已处理，校对后不重复执行
     // 注意：proofreading 必须保持 true 直到后处理完成，否则进度条提前消失
     const allSourceTexts = items.value.map(it => it.sourceText)
     let allTranslatedTexts = items.value.map(it => it.translatedText)
+    // 扩写检测：校对模型可能将被截断的译文重新扩写为营销文案
+    const expansionResult = detectTranslationExpansion(allSourceTexts, allTranslatedTexts)
+    if (expansionResult.expandedIndices.size > 0) {
+      console.warn('[proofread] 检测到 ' + expansionResult.expandedIndices.size + ' 条扩写，已截断')
+      allTranslatedTexts = expansionResult.texts
+    }
     allTranslatedTexts = enforceGlossaryTerms(allSourceTexts, allTranslatedTexts, glossaryMap)
     allTranslatedTexts = enforceShortLabelLength(allSourceTexts, allTranslatedTexts, glossaryMap)
     allTranslatedTexts = allTranslatedTexts.map(t => postProcessTranslation(t, targetLang.value))
@@ -1238,13 +1300,22 @@ async function startProofread() {
 // ============================================================
 // 应用 & 撤销
 // ============================================================
-function applyTranslations() {
+
+/** 仅应用翻译内容，不包含字体替换 */
+function applyTranslationsOnly() {
   if (items.value.length === 0) return
   applying.value = true
-  syncFontMappings()
+  applyingFonts.value = false
+  // 清除字体目标属性，确保只应用翻译内容不改字体
   const payload = items.value.map(function (it) {
     return {
       ...it,
+      targetFontFamily: '',
+      targetFontStyle: '',
+      targetFontSize: 0,
+      targetLineHeight: null,
+      targetLetterSpacing: null,
+      targetTextAlign: '',
       proofreadText: '',
       proofreadReason: '',
       corrected: false,
@@ -1252,6 +1323,33 @@ function applyTranslations() {
   })
   sendMsgToPlugin(UIMessage.APPLY_TRANSLATIONS, JSON.parse(JSON.stringify(payload)))
   // applying state reset by APPLY_DONE message
+}
+
+/** 先应用翻译，完成后自动触发字体替换 */
+async function applyTranslationsWithFonts() {
+  if (items.value.length === 0) return
+  applying.value = true
+  applyingFonts.value = true
+  // 1. 先只应用翻译内容（清除字体目标属性，字体后续单独应用）
+  syncFontMappings()  // 先同步字体映射以确保 items 上的字体属性是最新的
+  const textPayload = items.value.map(function (it) {
+    return {
+      ...it,
+      // 清除字体目标：翻译阶段不改字体
+      targetFontFamily: '',
+      targetFontStyle: '',
+      targetFontSize: 0,
+      targetLineHeight: null,
+      targetLetterSpacing: null,
+      targetTextAlign: '',
+      proofreadText: '',
+      proofreadReason: '',
+      corrected: false,
+    }
+  })
+  sendMsgToPlugin(UIMessage.APPLY_TRANSLATIONS, JSON.parse(JSON.stringify(textPayload)))
+  showToast('正在应用翻译，完成后自动替换字体...', 'info')
+  // APPLY_DONE 消息中检测 applyingFonts 并自动触发 applyFonts()
 }
 
 function syncFontMappings() {
@@ -1270,15 +1368,18 @@ function syncFontMappings() {
 
 // ============================================================
 // 自动字体映射：根据目标语言自动替换字体，字重/间距/行距全部继承原文
-// 仅当 targetFontFamily 为空时自动填充（用户手动覆盖优先）
+// 每次目标语言切换或扫描后重新计算，确保字体替换模块始终预填正确
 // ============================================================
 function autoMapFonts() {
   for (const item of items.value) {
-    // 已有手动设置的跳过
-    if (item.targetFontFamily) continue
-
     const mapping = getAutoFontMapping(item.fontFamily, targetLang.value)
-    if (!mapping) continue
+    if (!mapping) {
+      // 非品牌字体，清除之前的自动映射
+      item.targetFontFamily = ''
+      item.targetFontStyle = ''
+      item.targetTextAlign = ''
+      continue
+    }
 
     item.targetFontFamily = mapping.targetFamily
     // 继承源字体样式（字重），确保 Bold → Bold 等映射正确
@@ -1287,6 +1388,25 @@ function autoMapFonts() {
       item.targetTextAlign = mapping.targetTextAlign
     }
   }
+}
+
+/** 向主线程触发独立的字体替换操作 */
+function applyFonts() {
+  syncFontMappings()
+  const fontPayload = items.value.map(function (it) {
+    return {
+      nodeIds: it.nodeIds,
+      fontFamily: it.fontFamily,
+      fontStyle: it.fontStyle,
+      targetFontFamily: it.targetFontFamily || '',
+      targetFontStyle: it.targetFontStyle || '',
+      targetFontSize: it.targetFontSize || 0,
+      targetLineHeight: it.targetLineHeight,
+      targetLetterSpacing: it.targetLetterSpacing,
+      targetTextAlign: it.targetTextAlign || '',
+    }
+  })
+  sendMsgToPlugin(UIMessage.APPLY_FONTS, JSON.parse(JSON.stringify(fontPayload)))
 }
 
 function undoAll() {
@@ -1349,6 +1469,15 @@ async function retryFailedTranslations() {
     items.value.map(it => it.sourceText), glossaryMap,
   )
 
+  // 任务级术语预计算：用全部源文本一次性过滤 → system prompt 跨批次一致 → 缓存命中
+  const taskGlossaryHint = buildTaskGlossaryHint(
+    glossaryMap,
+    effectiveProductLine.value,
+    llmConfig.value.scenePreset,
+    runtimeProductLines,
+    items.value.map(it => it.sourceText),
+  )
+
   translating.value = true
   cancelFlag.value = false
   translateProgress.value = { current: 0, total: failedItems.length }
@@ -1368,7 +1497,7 @@ async function retryFailedTranslations() {
         items.value.map(it => it.sourceText),
         runtimeProductLines, runtimeTermTypes,
         pageName.value || undefined, fileName.value || undefined,
-        crossBatchTerms,
+        crossBatchTerms, taskGlossaryHint,
       )
       const expandedResult = expandBatch(uniqueResult, expandData, texts.length)
       for (let j = 0; j < batch.length; j++) {
@@ -1657,6 +1786,13 @@ watch(manualProductLine, (val) => {
   llmConfig.value.manualProductLine = val || undefined
 }, { immediate: true })
 
+// 目标语言切换时重新计算字体映射
+watch(targetLang, () => {
+  if (items.value.length > 0) {
+    nextTick(() => autoMapFonts())
+  }
+})
+
 // ============================================================
 // 设置
 // ============================================================
@@ -1786,6 +1922,8 @@ onMounted(() => {
           fileName.value = scanData.fileName || ''
         }
         resizeAllTextareas()
+        // 扫描后预填字体映射：根据目标语言自动确定替换字体
+        nextTick(() => autoMapFonts())
         showToast(`扫描到 ${items.value.length} 个文本节点`, 'success')
         break
       }
@@ -1802,15 +1940,42 @@ onMounted(() => {
       }
 
       case PluginMessage.APPLY_DONE: {
-        applying.value = false
-        applyingProgress.value.current = 0
-        applyingProgress.value.total = 0
         const d = data as { count: number; failed?: number; failedNodeIds?: string[] }
         failedNodeIds.value = d.failedNodeIds || []
         const msg = d.failed
           ? `已应用 ${d.count} 条，${d.failed} 处失败`
           : `已应用 ${d.count} 条译文到画布`
         showToast(msg, d.failed ? 'error' : 'success')
+
+        // 如果用户点击了"应用翻译+字体"，翻译完成后自动触发字体替换
+        if (applyingFonts.value) {
+          showToast('翻译已应用，正在替换字体...', 'info')
+          applyFonts()
+        } else {
+          applying.value = false
+          applyingProgress.value.current = 0
+          applyingProgress.value.total = 0
+        }
+        break
+      }
+
+      case PluginMessage.APPLY_FONTS_PROGRESS: {
+        const p = data as { current: number; total: number }
+        applyingProgress.value.current = p.current
+        applyingProgress.value.total = p.total
+        break
+      }
+
+      case PluginMessage.APPLY_FONTS_DONE: {
+        applying.value = false
+        applyingFonts.value = false
+        applyingProgress.value.current = 0
+        applyingProgress.value.total = 0
+        const fd = data as { count: number; failed?: number }
+        const fmsg = fd.failed
+          ? `字体替换完成：${fd.count} 处，${fd.failed} 处失败`
+          : `字体替换完成：${fd.count} 处`
+        showToast(fmsg, fd.failed ? 'warning' : 'success')
         break
       }
 
@@ -1980,7 +2145,7 @@ function handleCSVImportDone(data: { nodeIds: string[]; translatedText: string }
 :root {
   --blue: #007AFF;
   --blue-hover: #0062CC;
-  --blue-light: rgba(0,122,255,0.1);
+  --blue-light: rgba(0,122,255,0.08);
   --green: #34C759;
   --green-hover: #2DA64A;
   --orange: #FF9500;
@@ -1995,8 +2160,8 @@ function handleCSVImportDone(data: { nodeIds: string[]; translatedText: string }
   --radius-sm: 8px;
   --radius: 10px;
   --radius-lg: 14px;
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
-  --shadow: 0 4px 16px rgba(0,0,0,0.08);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.04);
+  --shadow: 0 4px 12px rgba(0,0,0,0.08);
   --transition: 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
@@ -2014,7 +2179,7 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .app.dark {
@@ -2057,61 +2222,94 @@ body {
 /* ---- 工具栏 ---- */
 .toolbar {
   background: #fff;
-  border-radius: var(--radius-lg);
-  padding: 18px;
+  border-radius: var(--radius);
+  padding: 16px;
   box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
+.toolbar:hover { box-shadow: var(--shadow); }
 .app.dark .toolbar { background: var(--gray-100); }
 
-/* ---- 分段控件 (Segmented Control) ---- */
+/* ---- 分段控件 (Segmented Control) — Apple 边框按钮风格 ---- */
 .segmented-control {
   display: flex;
-  background: var(--gray-100);
-  border-radius: var(--radius);
-  padding: 2px;
-  gap: 2px;
+  gap: 8px;
 }
-.app.dark .segmented-control { background: var(--gray-200); }
 .seg-btn {
   flex: 1;
-  padding: 8px 12px;
-  border: none;
-  border-radius: calc(var(--radius) - 2px);
+  padding: 8px 14px;
+  border: 1.5px solid var(--blue);
+  border-radius: var(--radius-sm);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   font-family: inherit;
   background: transparent;
-  color: var(--gray-600);
+  color: var(--blue);
   transition: all var(--transition);
   white-space: nowrap;
   letter-spacing: -0.01em;
 }
-.seg-btn:hover:not(:disabled):not(.active) { color: var(--gray-800); }
+.seg-btn:hover:not(:disabled):not(.active) {
+  background: var(--blue-light);
+}
 .seg-btn.active {
   background: var(--blue);
   color: #fff;
-  box-shadow: 0 2px 8px rgba(0,122,255,0.3);
   font-weight: 600;
 }
 .seg-btn.active:hover:not(:disabled) {
   background: var(--blue-hover);
-  box-shadow: 0 2px 8px rgba(0,122,255,0.3);
-  color: #fff;
 }
 .seg-btn:active:not(:disabled) { transform: scale(0.97); }
-.app.dark .seg-btn.active {
-  background: var(--blue);
-  box-shadow: 0 2px 8px rgba(0,122,255,0.4);
-}
-.app.dark .seg-btn.active:hover:not(:disabled) {
-  background: var(--blue-hover);
-  box-shadow: 0 2px 8px rgba(0,122,255,0.4);
-}
 .seg-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* ---- 统计卡片 + 翻译按钮 ---- */
+.stats-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--gray-50);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  gap: 12px;
+}
+.app.dark .stats-card { background: var(--gray-200); }
+.stats-info {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.stat-item {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+.stat-value {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--gray-800);
+  letter-spacing: -0.02em;
+}
+.stat-label {
+  font-size: 11px;
+  color: var(--gray-400);
+  font-weight: 500;
+}
+.stat-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--gray-200);
+}
+.app.dark .stat-value { color: var(--gray-900); }
+.app.dark .stat-divider { background: var(--gray-400); }
+.btn-translate {
+  flex-shrink: 0;
+  padding: 8px 18px;
+  font-weight: 600;
+}
 
 /* ---- 操作按钮行 ---- */
 .action-row {
@@ -2124,13 +2322,14 @@ body {
 /* ---- 翻译风格栏 ---- */
 .style-bar {
   background: #fff;
-  border-radius: var(--radius-lg);
-  padding: 16px 18px;
+  border-radius: var(--radius);
+  padding: 16px;
   box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
+.style-bar:hover { box-shadow: var(--shadow); }
 .app.dark .style-bar { background: var(--gray-100); }
 .style-row {
   display: flex;
@@ -2144,7 +2343,7 @@ body {
   width: 100%;
   padding: 8px 10px;
   border: 1px solid var(--gray-100);
-  border-radius: var(--radius);
+  border-radius: var(--radius-sm);
   font-size: 13px;
   background: #fff;
   color: var(--gray-800);
@@ -2158,7 +2357,8 @@ body {
 .style-select:disabled { opacity: 0.5; cursor: not-allowed; background: var(--gray-50); }
 .auto-badge, .manual-badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 3px; margin-left: 6px; vertical-align: middle; }
 .auto-badge { color: var(--blue); background: rgba(66,133,244,0.10); }
-.manual-badge { color: var(--orange, #e67e22); background: rgba(230,126,34,0.10); }
+.manual-badge { color: var(--orange); background: rgba(230,126,34,0.10); }
+.pl-warning { display: inline-block; font-size: 11px; color: var(--orange); margin-left: 8px; vertical-align: middle; }
 .app.dark .style-select {
   background: var(--gray-200);
   border-color: var(--gray-200);
@@ -2226,48 +2426,44 @@ body {
 
 /* ---- 语言选择行 ---- */
 .lang-row {
-  display: flex; align-items: flex-end; gap: 6px;
+  display: flex; align-items: flex-end; gap: 8px;
   padding: 2px 0;
 }
 .lang-col { flex: 1; min-width: 0; }
 .lang-arrow {
   display: flex; align-items: center; justify-content: center;
-  padding-bottom: 6px; color: var(--gray-200); flex-shrink: 0;
+  padding-bottom: 8px; color: var(--gray-200); flex-shrink: 0;
 }
 .app.dark .lang-arrow { color: var(--gray-400); }
 
-/* ---- 统计行 ---- */
-.stats-row {
-  display: flex; align-items: center; justify-content: center;
-  gap: 16px; padding: 2px 0;
+/* ---- 语言选择 ---- */
+.lang-select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--gray-100);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  background: #fff;
+  color: var(--gray-800);
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color var(--transition);
+  -webkit-appearance: none;
+  appearance: none;
 }
-.stat-item {
-  display: flex; align-items: baseline; gap: 5px;
-}
-.stat-value {
-  font-size: 14px; font-weight: 600; color: var(--gray-800);
-  letter-spacing: -0.02em;
-}
-.stat-label {
-  font-size: 11px; color: var(--gray-400); font-weight: 500;
-}
-.stat-divider {
-  width: 1px; height: 18px; background: var(--gray-100);
-}
-.app.dark .stat-value { color: var(--gray-900); }
-.app.dark .stat-divider { background: var(--gray-200); }
+.lang-select:focus { outline: none; border-color: var(--blue); }
+.app.dark .lang-select { background: var(--gray-200); border-color: var(--gray-200); color: var(--gray-900); }
 
 /* ---- 按钮 ---- */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 5px;
-  padding: 9px 16px; border: none; border-radius: var(--radius);
+  padding: 9px 16px; border: none; border-radius: var(--radius-sm);
   font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap;
   transition: all var(--transition); font-family: inherit;
   letter-spacing: -0.01em; position: relative;
 }
 .btn:active:not(:disabled) { transform: scale(0.97); }
 .btn:disabled { opacity: 0.3; cursor: not-allowed; }
-.btn-icon { font-size: 11px; opacity: 0.7; }
 .btn-icon-svg {
   flex-shrink: 0; opacity: 0.9;
 }
@@ -2282,22 +2478,11 @@ body {
 .btn-ghost { background: transparent; color: var(--gray-400); padding: 9px 12px; }
 .btn-ghost:hover:not(:disabled) { background: var(--gray-100); color: var(--gray-600); }
 .btn-sm { padding: 5px 12px; font-size: 12px; border-radius: var(--radius-sm); }
-.btn-block { width: 100%; }
 .flex-1 { flex: 1; }
 
 .app.dark .btn-secondary { background: var(--gray-200); }
 .app.dark .btn-ghost { color: var(--gray-400); }
 .app.dark .btn-ghost:hover:not(:disabled) { background: var(--gray-200); color: var(--gray-600); }
-
-/* ---- 语言选择 ---- */
-.lang-select {
-  flex: 1; padding: 7px 10px; border: 1px solid var(--gray-100);
-  border-radius: var(--radius); font-size: 13px; background: #fff;
-  color: var(--gray-800); cursor: pointer; font-family: inherit;
-  transition: border-color var(--transition);
-}
-.lang-select:focus { outline: none; border-color: var(--blue); }
-.app.dark .lang-select { background: var(--gray-200); border-color: var(--gray-200); color: var(--gray-900); }
 
 /* ---- 进度条 ---- */
 .progress-wrap { display: flex; align-items: center; gap: 10px; padding: 4px 2px; }
@@ -2315,9 +2500,10 @@ body {
 
 /* ---- 面板 ---- */
 .section {
-  background: #fff; border-radius: var(--radius-lg);
+  background: #fff; border-radius: var(--radius);
   box-shadow: var(--shadow-sm); overflow: hidden;
 }
+.section:hover { box-shadow: var(--shadow); }
 .app.dark .section { background: var(--gray-100); }
 .section-header {
   display: flex; align-items: center; gap: 8px;
@@ -2345,16 +2531,22 @@ body {
 .empty-state p { font-size: 13px; line-height: 1.6; font-weight: 500; }
 .empty-sub { font-size: 12px !important; opacity: 0.5; font-weight: 400; }
 
-/* ---- 文本项 ---- */
+/* ---- 文本项 — 垂直布局 ---- */
 .text-item {
   border: 1px solid var(--gray-100); border-radius: var(--radius);
-  padding: 12px 14px; margin-bottom: 8px;
-  transition: all var(--transition); background: #fff;
+  padding: 12px; margin-bottom: 8px;
+  transition: all var(--transition); background: var(--gray-50);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 .text-item:hover { border-color: var(--gray-200); box-shadow: var(--shadow-sm); }
 .app.dark .text-item { border-color: var(--gray-200); background: transparent; }
-.item-row { display: flex; gap: 12px; }
-.item-source, .item-target { flex: 1; min-width: 0; }
+
+.item-source, .item-target {
+  width: 100%;
+  min-width: 0;
+}
 .item-label {
   font-size: 10px; font-weight: 600; color: var(--gray-400);
   text-transform: uppercase; letter-spacing: 0.04em;
@@ -2366,23 +2558,27 @@ body {
   text-transform: none; letter-spacing: 0;
 }
 .app.dark .merge-badge { background: rgba(0,122,255,0.2); }
+
 .source-box {
-  font-size: 13px; padding: 10px 12px; background: var(--gray-50);
+  font-size: 13px; padding: 10px 12px; background: #fff;
   border-radius: var(--radius-sm); word-break: break-all;
-  line-height: 1.5; min-height: 44px; color: var(--gray-800);
-  border: 1px solid transparent;
+  line-height: 1.5; min-height: 48px; color: var(--gray-600);
+  border: 1px solid var(--gray-200);
+  width: 100%;
 }
-.app.dark .source-box { background: var(--gray-200); color: var(--gray-900); }
+.app.dark .source-box { background: var(--gray-100); color: var(--gray-600); border-color: var(--gray-400); }
+
 .trans-input {
   width: 100%; padding: 10px 12px; border: 1px solid var(--gray-200); border-radius: var(--radius-sm);
   font-size: 13px; resize: none; font-family: inherit; line-height: 1.5;
   color: var(--gray-900); overflow: hidden; background: #fff;
   transition: border-color var(--transition), box-shadow var(--transition), height 0.15s;
+  font-weight: 500;
 }
-.trans-input:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(0,122,255,0.12); }
-.trans-input::placeholder { color: var(--gray-200); }
-.app.dark .trans-input { background: var(--gray-200); border-color: var(--gray-400); color: var(--gray-900); }
-.app.dark .trans-input:focus { border-color: var(--blue); }
+.trans-input:focus { outline: none; border-color: var(--gray-900); box-shadow: 0 0 0 3px rgba(0,0,0,0.08); }
+.trans-input::placeholder { color: var(--gray-200); font-weight: 400; }
+.app.dark .trans-input { background: var(--gray-100); border-color: var(--gray-400); color: var(--gray-900); }
+.app.dark .trans-input:focus { border-color: var(--gray-800); box-shadow: 0 0 0 3px rgba(255,255,255,0.1); }
 
 /* 校对 */
 .text-item.corrected { border-color: var(--orange); background: rgba(255,149,0,0.03); }
@@ -2435,82 +2631,82 @@ body {
 }
 .btn-revert-proof:hover { border-color: var(--orange); color: var(--orange); background: rgba(255,149,0,0.05); }
 
-/* ---- 字体映射 ---- */
+/* ---- 字体替换 ---- */
 .field-hint { font-size: 11px; color: var(--gray-400); padding: 0 0 8px; }
 
 .font-card {
   display: flex;
   align-items: stretch;
-  gap: 0;
-  padding: 0;
-  margin-bottom: 8px;
-  background: #fff;
+  gap: 10px;
+  margin-bottom: 12px;
+  background: transparent;
   border-radius: var(--radius);
-  border: 1px solid var(--gray-100);
-  overflow: hidden;
-  box-shadow: var(--shadow-sm);
+  overflow: visible;
 }
-.app.dark .font-card { background: var(--gray-100); border-color: var(--gray-400); }
 
-.font-col {
+/* 字体面板 — 源/目标两侧匹配的卡片风格 */
+.font-panel {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 12px;
-}
-.font-col-source {
-  flex: 1;
+  padding: 14px;
+  background: #fff;
+  border-radius: var(--radius);
+  border: 1px solid var(--gray-100);
+  box-shadow: var(--shadow-sm);
+  min-height: 0;
   min-width: 0;
-  background: var(--gray-50);
-  border-right: 1px solid var(--gray-100);
+  overflow: hidden;
 }
-.app.dark .font-col-source { background: rgba(0,0,0,0.15); border-color: var(--gray-200); }
-.font-col-target { flex: 1.15; min-width: 0; }
+.font-panel:hover { box-shadow: var(--shadow); }
+.app.dark .font-panel { background: var(--gray-100); border-color: var(--gray-400); }
+.font-panel-source { width: 120px; flex-shrink: 0; }
+.font-panel-target { flex: 1; min-width: 0; }
 
-.font-col-label {
+.font-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0;
+}
+
+.font-panel-label {
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--gray-400);
 }
-.font-col-target .font-col-label { color: var(--blue); }
+.font-panel-target .font-panel-label { color: var(--blue); }
 
-.font-arrow-col {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 4px;
-  flex-shrink: 0;
-  background: #fff;
-}
-.app.dark .font-arrow-col { background: var(--gray-100); }
-
+/* 同步按钮 — 内嵌在替换为卡片头部 */
 .btn-sync {
-  display: flex; align-items: center; justify-content: center;
-  width: 28px; height: 28px;
-  border: 1px solid var(--gray-100); border-radius: var(--radius);
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 3px 8px;
+  border: 1px solid var(--gray-200); border-radius: 6px;
   background: #fff; color: var(--gray-400);
-  cursor: pointer; transition: all var(--transition);
+  cursor: pointer; font-size: 11px; font-family: inherit; font-weight: 500;
+  transition: all var(--transition);
 }
 .btn-sync:hover {
   background: var(--blue); color: #fff;
   border-color: var(--blue);
   box-shadow: 0 2px 8px rgba(0,122,255,0.3);
 }
-.btn-sync:active { transform: scale(0.92); }
+.btn-sync:active { transform: scale(0.94); }
+.btn-sync-text { font-size: 10px; }
 .app.dark .btn-sync { background: var(--gray-200); border-color: var(--gray-400); }
 .app.dark .btn-sync:hover { background: var(--blue); color: #fff; border-color: var(--blue); }
 
 .font-preview {
   padding: 10px 12px;
-  background: #fff;
+  background: var(--gray-50);
   border-radius: var(--radius-sm);
   border: 1px solid var(--gray-100);
   display: flex;
   flex-direction: column;
   gap: 2px;
-  min-height: 42px;
+  min-height: 44px;
   justify-content: center;
 }
 .app.dark .font-preview { background: var(--gray-200); border-color: var(--gray-400); }
@@ -2529,43 +2725,49 @@ body {
   font-weight: 500;
 }
 
-.font-attrs {
+/* 字体属性 — 源面板 2×2 网格，目标面板 4 列网格 */
+.font-attrs-card {
+  display: grid;
+  gap: 8px;
+}
+.font-attrs-source {
+  grid-template-columns: repeat(2, 1fr);
+}
+.font-attrs-target {
+  grid-template-columns: repeat(2, 1fr);
+}
+.font-attr-col {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 4px;
-}
-.font-attr {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  padding: 4px 0;
-  min-height: 28px;
+  min-height: 44px;
+  justify-content: center;
 }
 .font-attr-val {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--gray-800);
-  min-width: 36px;
+  text-align: center;
+  line-height: 1.3;
 }
 .app.dark .font-attr-val { color: var(--gray-900); }
 .font-attr-unit {
   font-size: 10px;
   color: var(--gray-400);
   font-weight: 400;
-  min-width: 16px;
+  margin-left: 1px;
 }
 .font-attr-label {
   font-size: 10px;
   color: var(--gray-400);
-  margin-left: auto;
-  font-weight: 400;
-  min-width: 22px;
-  text-align: right;
+  font-weight: 500;
+  text-align: center;
 }
 
 .font-attr-input {
   width: 100%;
-  padding: 5px 6px;
+  padding: 5px 4px;
   border: 1px solid var(--gray-200);
   border-radius: 6px;
   font-size: 12px;
@@ -2573,16 +2775,16 @@ body {
   font-family: inherit;
   color: var(--gray-800);
   background: #fff;
-  text-align: right;
+  text-align: center;
   transition: border-color var(--transition), box-shadow var(--transition);
-  min-width: 62px;
 }
 .font-attr-input:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(0,122,255,0.12); }
 .font-attr-input::placeholder { color: var(--gray-200); font-weight: 400; font-size: 10px; }
 .app.dark .font-attr-input { background: var(--gray-200); border-color: var(--gray-400); color: var(--gray-900); }
 
 .font-attr-select {
-  padding: 4px 4px;
+  width: 100%;
+  padding: 5px 4px;
   border: 1px solid var(--gray-200);
   border-radius: 6px;
   font-size: 11px;
@@ -2590,22 +2792,23 @@ body {
   color: var(--gray-800);
   background: #fff;
   cursor: pointer;
+  text-align: center;
   transition: border-color var(--transition);
 }
 .font-attr-select:focus { outline: none; border-color: var(--blue); }
 .app.dark .font-attr-select { background: var(--gray-200); border-color: var(--gray-400); color: var(--gray-900); }
 
 .font-search-input {
-  padding: 6px 10px;
-  border: none;
+  padding: 7px 10px;
+  border: 1px solid var(--gray-200);
   border-radius: var(--radius-sm);
   font-size: 12px;
   font-family: inherit;
   color: var(--gray-900);
   background: var(--gray-50);
-  transition: background var(--transition);
+  transition: background var(--transition), border-color var(--transition);
 }
-.font-search-input:focus { outline: none; background: #fff; box-shadow: 0 0 0 3px rgba(0,122,255,0.12); }
+.font-search-input:focus { outline: none; background: #fff; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(0,122,255,0.12); }
 .font-search-input::placeholder { color: var(--gray-400); font-size: 12px; }
 .app.dark .font-search-input { background: var(--gray-200); color: var(--gray-900); }
 .app.dark .font-search-input:focus { background: var(--gray-100); }
@@ -2623,12 +2826,12 @@ body {
 }
 .font-family-select:focus { outline: none; border-color: var(--blue); }
 .app.dark .font-family-select { background: var(--gray-200); border-color: var(--gray-400); }
-.field { width: 100%; padding: 7px 10px; border: 1px solid var(--gray-200); border-radius: var(--radius-sm); font-size: 13px; font-family: inherit; color: var(--gray-900); background: #fff; transition: border-color var(--transition); }
+
+/* ---- 表单 ---- */
+.field { width: 100%; padding: 8px 10px; border: 1px solid var(--gray-200); border-radius: var(--radius-sm); font-size: 13px; font-family: inherit; color: var(--gray-900); background: #fff; transition: border-color var(--transition); }
 .field:focus { outline: none; border-color: var(--blue); }
 .field::placeholder { color: var(--gray-200); }
 .app.dark .field { background: var(--gray-200); border-color: var(--gray-400); }
-.field-sm { flex: 1; min-width: 80px; padding: 5px 8px; font-size: 12px; }
-.field-xs { flex: 0.8; min-width: 50px; padding: 5px 8px; font-size: 12px; }
 
 /* ---- 内联操作 ---- */
 .inline-actions { display: flex; gap: 6px; padding: 2px 0; flex-wrap: wrap; }
@@ -2645,13 +2848,7 @@ body {
 /* ---- 表单 ---- */
 .field-group { margin-bottom: 10px; }
 .field-label { display: block; font-size: 11px; font-weight: 600; color: var(--gray-400); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
-textarea.field { resize: vertical; }
-.preset-row { margin-bottom: 6px; }
-.preset-select {
-  color: var(--blue); font-weight: 500; cursor: pointer;
-  font-size: 12px; padding: 5px 8px;
-}
-.preset-select option { color: var(--gray-900); font-weight: 400; }
+.btn-row { display: flex; gap: 8px; }
 
 /* ---- 校对模型 ---- */
 .proof-section-label {
@@ -2717,20 +2914,4 @@ textarea.field { resize: vertical; }
 
 .footer { text-align: center; padding: 16px 0 4px; font-size: 11px; color: var(--gray-200); letter-spacing: 0.3px; font-weight: 500; }
 .app.dark .footer { color: var(--gray-400); }
-
-/* ---- 语言选择 ---- */
-.lang-select {
-  flex: 1; padding: 8px 10px; border: 1px solid var(--gray-100);
-  border-radius: var(--radius); font-size: 13px; background: #fff;
-  color: var(--gray-800); cursor: pointer; font-family: inherit;
-  transition: border-color var(--transition); -webkit-appearance: none; appearance: none;
-}
-.lang-select:focus { outline: none; border-color: var(--blue); }
-.app.dark .lang-select { background: var(--gray-200); border-color: var(--gray-200); color: var(--gray-900); }
-
-/* ---- 滚动条 ---- */
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--gray-200); border-radius: 2px; }
-.app.dark ::-webkit-scrollbar-thumb { background: var(--gray-400); }
 </style>

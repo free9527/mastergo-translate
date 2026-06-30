@@ -112,7 +112,7 @@ export function filterRelevantGlossary(
     return { filteredMap: {}, glossaryHint: '' }
   }
 
-  const lines = Object.entries(filtered).map(([k, v]) => `"${k}" → "${v}"`)
+  const lines = Object.entries(filtered).map(([k, v]) => `${k} → ${v}`)
   const glossaryHint = `\n术语库（最高优先级，仅列出当前文本中出现的术语，必须严格使用）：\n${lines.join('\n')}`
 
   return { filteredMap: filtered, glossaryHint }

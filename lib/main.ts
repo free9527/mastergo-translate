@@ -259,6 +259,111 @@ async function applyTranslations(items: TextItem[]): Promise<void> {
 }
 
 // ============================================================
+// 字体替换（独立操作，不修改文字内容）
+// ============================================================
+
+interface FontPayload {
+  nodeIds: string[]
+  fontFamily: string
+  fontStyle: string
+  targetFontFamily: string
+  targetFontStyle: string
+  targetFontSize: number
+  targetLineHeight: number | null
+  targetLetterSpacing: number | null
+  targetTextAlign: string
+}
+
+async function applyFontsOnly(payloads: FontPayload[]): Promise<void> {
+  const total = payloads.length
+  let done = 0
+  let failed = 0
+
+  // 1. 收集所有需要加载的目标字体
+  const fontSet = new Set<string>()
+  for (const p of payloads) {
+    if (p.targetFontFamily) {
+      fontSet.add(makeFontKey(p.targetFontFamily, p.targetFontStyle || 'Regular'))
+    }
+  }
+  // 预加载 HarmonyOS Sans SC 用于 Avenir ® 修复
+  fontSet.add(makeFontKey('HarmonyOS Sans SC', 'Regular'))
+
+  const availableFonts = await mg.listAvailableFontsAsync()
+  const fontMap = new Map(availableFonts.map(f => [makeFontKey(f.fontName.family, f.fontName.style), f]))
+
+  // 2. 批量加载所有字体（在设置文字前完成，避免文字不显示）
+  for (const fk of fontSet) {
+    const font = fontMap.get(fk)
+    if (font) {
+      try {
+        await mg.loadFontAsync(font.fontName)
+      } catch (_) { /* 字体加载失败不阻塞 */ }
+    }
+  }
+
+  sendMsgToUI(PluginMessage.APPLY_FONTS_PROGRESS, { current: 0, total })
+
+  // 3. 遍历节点，应用字体替换（不修改文字内容）
+  for (const p of payloads) {
+    for (const nodeId of p.nodeIds) {
+      const node = mg.getNodeById<TextNode>(nodeId)
+      if (!node) { failed++; continue }
+
+      const textLen = node.characters.length
+      if (textLen === 0) { done++; continue }
+
+      try {
+        // 处理缺失字体：先加载原字体确保文字正常渲染
+        if (node.hasMissingFont && node.textStyles[0]) {
+          try { await mg.loadFontAsync(node.textStyles[0].textStyle.fontName) } catch (_) {}
+        }
+
+        // 应用目标字体
+        if (p.targetFontFamily) {
+          node.setRangeFontName(0, textLen, {
+            family: p.targetFontFamily,
+            style: p.targetFontStyle || 'Regular',
+          })
+          // Avenir ® 符号修复
+          if (p.targetFontFamily === 'Avenir') {
+            const text = node.characters
+            let idx = -1
+            while ((idx = text.indexOf('®', idx + 1)) !== -1) {
+              try {
+                node.setRangeFontName(idx, idx + 1, {
+                  family: 'HarmonyOS Sans SC',
+                  style: p.targetFontStyle || 'Regular',
+                })
+              } catch (_) {}
+            }
+          }
+        }
+        if (p.targetFontSize > 0) {
+          node.setRangeFontSize(0, textLen, p.targetFontSize)
+        }
+        if (p.targetLineHeight !== null) {
+          node.setRangeLineHeight(0, textLen, { value: p.targetLineHeight, unit: 'PIXELS' })
+        }
+        if (p.targetLetterSpacing !== null) {
+          node.setRangeLetterSpacing(0, textLen, { value: p.targetLetterSpacing, unit: 'PIXELS' })
+        }
+        if (p.targetTextAlign) {
+          node.textAlignHorizontal = p.targetTextAlign as TextNode['textAlignHorizontal']
+        }
+        done++
+      } catch (e) {
+        failed++
+        console.error('[translate] applyFonts failed for node', nodeId, e)
+      }
+    }
+  }
+
+  sendMsgToUI(PluginMessage.APPLY_FONTS_DONE, { count: done, failed })
+  mg.notify('字体替换完成：' + done + ' 处' + (failed > 0 ? '，' + failed + ' 处失败' : ''), { type: failed > 0 ? 'error' : 'success' })
+}
+
+// ============================================================
 // 撤销
 // ============================================================
 async function undoAll(): Promise<void> {
@@ -408,9 +513,15 @@ function parseCSVToGlossary(csv: string): GlossaryEntry[] {
   const rows = csv.split('\n')
   if (rows.length < 2) return []
   const headerCells = parseCSVRow(rows[0])
-  // 检测「术语类型」「产品线」列位置
-  const termTypeIdx = headerCells.findIndex((h: string) => h.trim() === '术语类型')
-  const productLineIdx = headerCells.findIndex((h: string) => h.trim() === '产品线')
+  // 检测「术语类型」「产品线」列位置（兼容中英文列名）
+  const termTypeIdx = headerCells.findIndex((h: string) => {
+    const t = h.trim()
+    return t === '术语类型' || t === 'termType'
+  })
+  const productLineIdx = headerCells.findIndex((h: string) => {
+    const t = h.trim()
+    return t === '产品线' || t === 'productLine'
+  })
   const skippedCols = new Set([termTypeIdx, productLineIdx].filter(i => i >= 0))
   // 语言列：记录实际列位置（跳过 source 和非语言列）
   const langCols: string[] = []
@@ -556,6 +667,15 @@ mg.ui.onmessage = async function (msg: UIMessageEvent) {
         console.error('[translate] applyTranslations crashed', e)
         sendMsgToUI(PluginMessage.APPLY_DONE, { count: 0, failed: 0, failedNodeIds: [] })
         sendMsgToUI(PluginMessage.ERROR, '应用译文时出错: ' + (e instanceof Error ? e.message : String(e)))
+      }
+      break
+    case UIMessage.APPLY_FONTS:
+      try {
+        await applyFontsOnly(data as FontPayload[])
+      } catch (e) {
+        console.error('[translate] applyFonts crashed', e)
+        sendMsgToUI(PluginMessage.APPLY_FONTS_DONE, { count: 0, failed: 0 })
+        sendMsgToUI(PluginMessage.ERROR, '替换字体时出错: ' + (e instanceof Error ? e.message : String(e)))
       }
       break
     case UIMessage.UNDO_ALL:

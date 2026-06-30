@@ -2,10 +2,10 @@ import { LLMConfig, LANGUAGES } from '@messages/types'
 import { API_MAX_RETRIES, API_RETRY_DELAY_MS, API_TIMEOUT_MS } from '@lib/constants'
 import { getFewShotExamples } from '@lib/few-shot-examples'
 import { filterRelevantGlossary } from '@lib/glossary-filter'
-import { normalizeTextForLLM } from '@lib/text-normalizer'
+import { normalizeTextForLLM, protectCjkSpaces } from '@lib/text-normalizer'
 import { maskEntities, unmaskEntities } from '@lib/entity-masker'
-import { postProcessTranslation, restoreTrademarkSymbols, restoreStorageUnitFormatting, enforceGlossaryTerms, enforceShortLabelLength, capitalizeFirstLetter } from '@lib/post-process'
-import { GLOSSARY_PRODUCT_LINE_MAP, COMMON_GLOSSARY_SOURCES } from '@lib/default-glossary'
+import { postProcessTranslation, restoreTrademarkSymbols, restoreStorageUnitFormatting, enforceGlossaryTerms, enforceShortLabelLength, capitalizeFirstLetter, detectTranslationExpansion } from '@lib/post-process'
+import { GLOSSARY_TAG_MAP } from '@lib/default-glossary'
 
 interface XhrResponse {
   ok: boolean
@@ -84,28 +84,6 @@ export function detectSourceLanguage(texts: string[]): string {
     }
   }
   return cjkChars > latinChars ? 'zh-CN' : 'en'
-}
-
-// ============================================================
-// 内容类型检测
-// ============================================================
-type ContentType = 'title' | 'specification' | 'marketing' | 'description'
-
-export function detectContentType(texts: string[]): ContentType {
-  const joined = texts.join(' ')
-  // 优先检测技术规格（含参数关键词，避免被 title 短路）
-  if (/(\d+\s*(TB|GB|MB|MB\/s|GB\/s|MT\/s|MHz|PCIe|NVMe|SATA|USB|Gen\d|M\.2|IOPS|TBW))/.test(joined)) {
-    return 'specification'
-  }
-  // 营销文案特征词（在 title 之前检测，避免短营销文案被误判为标题）
-  if (/\b(experience|perfect|ultimate|unleash|revolutioniz|seamless|effortless|exceptional|game-?changing|cutting-?edge|state-?of-?the-?art|reliabl|designed for|protect|defend|powerful|compact|stylish|anxiety|potential|unmatched|capture|unlock|boost|perform)\b/i.test(joined)) {
-    return 'marketing'
-  }
-  // 短文本（无句号/问号）→ 标题/功能名称
-  if (texts.length > 0 && texts.every(t => t.length < 50) && texts.every(t => !/[。\?!?.]/.test(t))) {
-    return 'title'
-  }
-  return 'description'
 }
 
 // ============================================================
@@ -279,39 +257,121 @@ function getEffectiveProductLine(config: LLMConfig, texts: string[], pageName?: 
 // 术语库按产品线过滤
 // 只保留「通用术语」+「当前产品线相关术语」，其余不注入
 // 预期节省约 40-60% 的术语注入 token
+//
+// v2 增强（2026-06-30）：产品名条目要求型号关键词在源文本中出现，
+// 未匹配则完全跳过产品名表格，按命名规则直接翻译。
 // ============================================================
+
+/**
+ * 判断术语条目是否为产品名（需型号检测才注入）
+ * 规则：GLOSSARY_TAG_MAP tag 不含 "common" 且 source 以 "Lexar " 开头
+ */
+function isProductNameEntry(source: string): boolean {
+  const tags = GLOSSARY_TAG_MAP[source]
+  if (!tags || tags.length === 0) return false
+  if (tags.includes('common')) return false
+  return /^Lexar\s/i.test(source)
+}
+
+/**
+ * 从产品名中提取型号关键词，用于源文本匹配
+ * "Lexar NM790 M.2 2280 PCIe Gen 4x4 NVMe SSD" → ["NM790", "2280", "Gen", "4x4", "NVMe"]
+ * "Lexar ARES RGB DDR5 Desktop Memory" → ["ARES", "RGB", "DDR5"]
+ * "Lexar SL500 Portable SSD" → ["SL500"]
+ */
+function extractModelKeywords(source: string): string[] {
+  const name = source.replace(/^Lexar\s+/i, '')
+  const keywords: string[] = []
+
+  // 1. 首段字母+数字型号（如 NM790, SL500, D70E, ES3）
+  const modelMatch = name.match(/^([A-Z]+\d+[A-Za-z]*)($|\s)/)
+  if (modelMatch) keywords.push(modelMatch[1])
+
+  // 1b. 产品名中后段的单字母+数字型号（如 JumpDrive S80, Dual Drive D300, E300, E6）
+  const shortCodes = name.match(/\b([A-Z]\d+[A-Za-z]?)\b/g)
+  if (shortCodes) keywords.push(...shortCodes)
+
+  // 1c. 产品名中任意的多字母+数字型号（如 Professional NM1090, Elite E32c）
+  const longCodes = name.match(/\b([A-Z]{2,}\d+[A-Za-z]?)\b/g)
+  if (longCodes) keywords.push(...longCodes)
+
+  // 2. 产品系列名
+  const seriesMatch = name.match(/\b(ARES|THOR|ARMOR|PLAY|JUMPDRIVE|Workflow)\b/gi)
+  if (seriesMatch) keywords.push(...seriesMatch)
+  // "Go" 单独处理：仅大写（Lexar Professional Go / Workflow Go）
+  if (/\bGo\b/.test(name)) keywords.push('Go')
+
+  // 3. 数字标识（如 1066x, 2000x, 800x, 2280, 700）
+  const numMatches = name.match(/\b(\d{3,4}x|\d{3,}[A-Z]?)\b/g)
+  if (numMatches) {
+    for (const n of numMatches) {
+      // 过滤掉太通用的数字（如纯 2.5, 3.1, 3.2 这类 USB 版本号）
+      if (/^\d{3,}/.test(n) || /[A-Z]$/.test(n) || n.endsWith('x')) {
+        keywords.push(n)
+      }
+    }
+  }
+
+  // 4. 系列变体（如 SILVER, GOLD, DIAMOND, BLUE）
+  const colorMatch = name.match(/\b(SILVER|GOLD|DIAMOND)\b/i)
+  if (colorMatch) keywords.push(colorMatch[1])
+
+  // 5. 过滤通用技术词/规格：这些词出现在多个不同产品名中，不能作为唯一型号标识
+  const GENERIC_TECH = new Set([
+    'DDR4', 'DDR5', 'RGB', 'OC', 'PRO', 'SSD', 'NVMe', 'PCIe',
+    'SD', 'SDXC', 'SDHC', 'UHS', 'USB', 'SATA', 'M2', 'Type',
+    'Express', 'CUDIMM', 'UDIMM', 'SODIMM', 'DIMM', 'TLC', 'NAND',
+    '2280', '2230', '2242',  // M.2 规格 — 跨产品通用
+    'Gen', 'Gen4', 'Gen3', 'Gen5',  // PCIe 代数
+    'Card', 'Reader', 'Drive', 'SSD',  // 品类词 — 跨产品通用
+  ])
+  return [...new Set(keywords)].filter(k => !GENERIC_TECH.has(k.toUpperCase()))
+}
+
+/**
+ * 检查产品名是否在源文本中被提及（型号关键词匹配）
+ * 能提取关键词时做精准匹配；无法提取关键词时用全名子串匹配
+ */
+function isProductInText(source: string, sourceTexts: string[]): boolean {
+  const keywords = extractModelKeywords(source)
+  const joinedText = sourceTexts.join(' ').toLowerCase()
+
+  if (keywords.length > 0) {
+    // 有关键词：精准型号匹配
+    for (const kw of keywords) {
+      if (kw.length >= 2 && joinedText.includes(kw.toLowerCase())) {
+        return true
+      }
+    }
+    return false
+  }
+
+  // 无法提取关键词：用去除 "Lexar " 前缀后的产品名做子串匹配
+  // 例如 "Lexar SSD Dash" → 检查源文本是否包含 "SSD Dash"
+  const strippedName = source.replace(/^Lexar\s+/i, '').toLowerCase()
+  return joinedText.includes(strippedName)
+}
+
 function filterGlossaryByProductLine(
   glossaryMap: Map<string, string>,
   productLine: string | null,
   runtimeProductLines?: Record<string, string>,  // source → productLine，来自上传的CSV
+  sourceTexts?: string[],  // 源文本，用于产品名型号检测
 ): Map<string, string> {
-  // 收集需要保留的术语 source
-  const allowedSources = new Set<string>(COMMON_GLOSSARY_SOURCES)
+  const allowedSources = new Set<string>()
 
-  if (productLine) {
-    const lineSources = GLOSSARY_PRODUCT_LINE_MAP[productLine]
-    if (lineSources) {
-      for (const s of lineSources) {
-        allowedSources.add(s)
-      }
+  // Tag-based 过滤：从 GLOSSARY_TAG_MAP 中筛选
+  // 规则：tag 包含 'common'（通用术语）或当前产品线 tag 的术语
+  for (const [source, tags] of Object.entries(GLOSSARY_TAG_MAP)) {
+    if (tags.includes('common') || (productLine ? tags.includes(productLine) : false)) {
+      allowedSources.add(source)
     }
-    // 运行时产品线数据（来自上传CSV的「产品线」列）
-    if (runtimeProductLines) {
-      for (const [source, pl] of Object.entries(runtimeProductLines)) {
-        if (pl === productLine || pl === 'common') {
-          allowedSources.add(source)
-        }
-      }
-    }
-  } else {
-    // 无产品线时：保留通用 + 所有产品线的术语（兜底）
-    for (const sources of Object.values(GLOSSARY_PRODUCT_LINE_MAP)) {
-      for (const s of sources) {
-        allowedSources.add(s)
-      }
-    }
-    if (runtimeProductLines) {
-      for (const source of Object.keys(runtimeProductLines)) {
+  }
+
+  // 运行时产品线数据（来自上传CSV的「产品线」列）
+  if (productLine && runtimeProductLines) {
+    for (const [source, pl] of Object.entries(runtimeProductLines)) {
+      if (pl === productLine || pl === 'common') {
         allowedSources.add(source)
       }
     }
@@ -320,9 +380,15 @@ function filterGlossaryByProductLine(
   // 过滤 glossaryMap
   const filtered = new Map<string, string>()
   for (const [source, target] of glossaryMap.entries()) {
-    if (allowedSources.has(source)) {
-      filtered.set(source, target)
+    if (!allowedSources.has(source)) continue
+
+    // 产品名条目：要求型号关键词在源文本中出现，否则跳过
+    if (isProductNameEntry(source)) {
+      if (!sourceTexts || sourceTexts.length === 0) continue
+      if (!isProductInText(source, sourceTexts)) continue
     }
+
+    filtered.set(source, target)
   }
 
   return filtered
@@ -374,6 +440,25 @@ function filterGlossaryByScene(
 }
 
 // ============================================================
+// 预计算任务级术语提示词 — 用全部源文本一次性过滤术语库，
+// 将相同的 glossaryHint 注入每个批次，确保 system prompt 100% 一致 → API 缓存命中
+// ============================================================
+export function buildTaskGlossaryHint(
+  glossaryMap: Map<string, string>,
+  productLine: string | null,
+  scenePreset: string,
+  runtimeProductLines?: Record<string, string>,
+  allSourceTexts?: string[],
+): string {
+  const filteredGlossaryMap = filterGlossaryByProductLine(glossaryMap, productLine, runtimeProductLines, allSourceTexts)
+  const glossaryObj: Record<string, string> = {}
+  for (const [k, v] of filteredGlossaryMap.entries()) { glossaryObj[k] = v }
+  const sceneFiltered = filterGlossaryByScene(glossaryObj, scenePreset)
+  const { glossaryHint } = filterRelevantGlossary(sceneFiltered, allSourceTexts || [], 100)
+  return glossaryHint
+}
+
+// ============================================================
 // HTML 标签保护
 // ============================================================
 function protectHtmlTags(texts: string[]): { texts: string[]; tags: Map<string, string> } {
@@ -381,7 +466,7 @@ function protectHtmlTags(texts: string[]): { texts: string[]; tags: Map<string, 
   let counter = 0
   const result = texts.map(t => {
     return t.replace(/<[^>]+>/g, match => {
-      const key = `\x00HTML${counter}\x00`
+      const key = `__HTML_${counter}__`
       tagMap.set(key, match)
       counter++
       return key
@@ -401,230 +486,158 @@ function restoreHtmlTags(texts: string[], tags: Map<string, string>): string[] {
 }
 
 // ============================================================
-// 内容类型风格指南
-// ============================================================
-const CONTENT_TYPE_GUIDES: Record<ContentType, string> = {
-  title: `【标题/功能名】简短精准，品牌和产品系列名不翻译，保留容量/接口/速度参数。术语库最高优先级。`,
-  specification: `【技术规格】参数/数值/单位原样保留（TB/GB/MB/s、PCIe、NVMe、SATA、USB等）。术语库强制标准。句式简洁客观。`,
-  marketing: `【营销文案】术语库强制标准，在此基础上本土化润色。保留卖点力度，句式通顺自然，首字母大写。数字/规格原样不动。`,
-  description: `【产品描述】术语库强制标准。保留原文段落结构。用词自然通顺，首字母大写，符合目标语言行业习惯。`,
-}
-
-const CONTENT_TYPE_GUIDES_EN: Record<ContentType, string> = {
-  title: `[Title / Feature Name] Concise and precise. Brand names and product series names must NOT be translated. Preserve capacity/interface/speed parameters. Glossary terms are highest priority.`,
-  specification: `[Technical Specifications] Parameters, values, and units must be preserved as-is (TB/GB/MB/s, PCIe, NVMe, SATA, USB, etc.). Glossary terms are mandatory. Concise, objective phrasing.`,
-  marketing: `[Marketing Copy] Glossary terms are mandatory. Adapt and localize naturally on top of that. Preserve selling-point impact. Smooth, natural phrasing. Capitalize first letter of sentences. Numbers/specs remain unchanged.`,
-  description: `[Product Description] Glossary terms are mandatory. Preserve the original paragraph structure. Use natural, fluent wording with first-letter capitalization, matching target-language industry conventions.`,
-}
-
-// ============================================================
 // 全局铁则（所有翻译强制注入，主规则源）
 // 基于 Lexar × Qwen 3.7 翻译质量提升手册 Section 二
 // ============================================================
-const GLOBAL_RULES = `【品牌与专有名词铁则】
-1. 品牌名保护：所有品牌名（Lexar、雷克沙、DJI、Canon、Sony、PlayStation、iPhone、SanDisk、Kingston、Samsung、WD、Intel、AMD、NVIDIA等）和标准协议名（DirectStorage、XMP、EXPO、CUDIMM、UDIMM、SODIMM等）在任何语言中禁止翻译、禁止音译，必须原样保留。
-2. 所有技术规格、行业标准符号原样保留不翻译，包括但不限于：GB/TB/MB/s、UHS-I/II、V30/V60/V90、A1/A2、PCIe、NVMe、CFexpress Type A/B、SD、microSD、SSD、USB 3.2、4K/8K、UHD、RAW。
-3. 产品系列名/型号名（ARES、THOR、ARMOR、NM、NQ、PLAY、SILVER、Silver PLUS、Silver PRO、BLUE、GOLD、DIAMOND、JUMPDRIVE、Professional、WorkFlow 等）保留英文原词，仅可在正文中补充目标语言释义，禁止单独翻译系列名。特别注意：Silver/Blue/Gold/Diamond 等看似颜色词的词汇在 Lexar 语境下均为产品系列名，禁止翻译为"银色/蓝色/金色/钻石"等。
-4. 产品完整型号（如 Lexar Professional CFexpress Type B 1800GB）字母数字格式完全保留，不得拆分、改写、本地化数字。
-5. 禁止对任何缩写和标准协议名进行无依据展开；所有行业通用缩写和标准协议名（DirectStorage、XMP、EXPO、CUDIMM、UDIMM、SODIMM等）直接保留，不得擅自补全翻译。
-
-【品类词严格区分】
-6. 存储品类词固定区分，严禁混用：台式机内存=Desktop Memory（非PC RAM）、笔记本内存=Laptop Memory（非Notebook RAM）、内置固态=SSD（非Solid State Drive全拼）、移动固态=Portable SSD、U盘=Flash Drive、双接口U盘=Dual Drive、固态U盘=Solid State Dual Drive、存储卡=Card、读卡器=Reader、硬盘盒=Enclosure、扩展坞=Hub。
-
-【领域与语体原则】
-7. 领域锚定：数码存储、专业摄影摄像、消费电子行业。遇到多义词时，必须以此领域为第一判断标准选择释义。
-8. 受众：面向专业摄影师、影视创作者与普通消费者，技术说明严谨客观，营销文案符合目标语言本土表达习惯，禁止中式外语直译。
-9. 忠实原文：严格对应原文信息，不得漏译、增译、自行补充原文没有的卖点与修饰；禁止为了流畅度篡改产品参数、性能描述。
-10. 术语统一：同一概念全文使用同一译法，禁止前后不一致。
-
-【格式与合规铁则】
-11. 数字、标点、千位分隔符、小数点严格遵循目标语言国家官方规范，禁止自动套用中文或英文格式。
-12. 目标语言为非拉丁字母时，嵌入的英文/数字保持原书写方向，不得整体反转。
-13. 严格遵守目标语言地区广告法规，禁止使用「最、第一、顶级、最强」等极限违禁词，替换为「专业级、旗舰、高性能」等合规表述。
-14. 输出要求：仅输出纯目标语言译文，禁止夹带原文、注释、序号、翻译说明；禁止混合多种语言输出。
-
-【Qwen 模型易错点强制修正】
-15. 禁止静默回退到英文：即使表达困难，也必须使用目标语言完成翻译，不得出现英文解释或中英混排。
-16. 所有带声调、变音、附标的字符必须完整保留，不得省略、替换为普通字母。
-17. 禁止将中文成语、四字营销话术直译成目标语言字面意思，需做本土化意译，保留核心卖点。
-18. 禁止破坏原文结构：列表、表格、层级关系保持原样，仅翻译文字内容。
-19. ⚠️ 禁止在译文任何位置使用括号添加解释、英文原文、别名、读音、补充说明。尤其是以下 Qwen 常见错误模式必须杜绝：
-    - "高速存储(High-speed storage)" → 错误，应为纯译文
-    - "Lexar（雷克沙）" → 错误，品牌名禁止翻译或注音
-    - "PCIe(高速接口标准)" → 错误，协议名保留原词无需解释
-    - "紧凑型(compact)设计" → 错误，禁止在括号内夹带英文原文
-    译文必须纯粹——任何补充信息、解释、双语对照均不得以括号或任何其他形式嵌入输出。
-20. ⚠️ 读取速度和写入速度必须严格区分，禁止混淆：Read speed→读取速度、Write speed→写入速度，两者互不替代。尤其是在游戏存储语境下，禁止因"游戏看重读取"而将写入速度错误翻译为读取速度。写入和读取是独立技术指标，必须各译各的。`
+const GLOBAL_RULES = `【铁则 — 绝对不可违反】
+1. 品牌名/系列名禁止翻译：Lexar、雷克沙、ARES、THOR、ARMOR、NM、NQ、PLAY、SILVER、BLUE、GOLD、DIAMOND、JUMPDRIVE、Professional、WorkFlow 等必须原样保留。Silver/Blue/Gold/Diamond 是产品系列名，禁止译为"银色/蓝色/金色/钻石"。
+2. 技术规格/行业标准符号原样保留：GB/TB/MB/s、UHS-I/II、V30/V60/V90、A1/A2、PCIe、NVMe、CFexpress、SD、microSD、SSD、USB 3.2、4K/8K、DirectStorage、XMP、EXPO、CUDIMM 等。
+3. 品类词固定区分，严禁混用：台式机内存=Desktop Memory、笔记本内存=Laptop Memory、内置固态=SSD、移动固态=Portable SSD、U盘=Flash Drive、双接口U盘=Dual Drive、存储卡=Card、读卡器=Reader、硬盘盒=Enclosure、扩展坞=Hub。
+4. 术语库译法为最高优先级，必须严格使用。数字/容量/速度值原样保留，绝对不可更改。
+5. 读取速度(Read speed)≠写入速度(Write speed)，严格区分，禁止混译。
+6. 禁止在译文任何位置使用括号添加解释、原文、别名。输出必须为纯译文，禁止混合多种语言。
+7. 短标签/按钮/参数名(<15字符)禁止扩写为长句，保持同等简洁度。
+8. 忠实原文不扩写：不得漏译、增译、添加原文没有的卖点、功能说明、品牌故事或使用场景。译文信息量与原文完全一致。即使知道相关背景也不得补充。
+9. 合规信息（保修条款、认证标志CE/FCC、法律免责声明）必须逐字直译，不得改写、省略或替换为目标市场等效条款。`
 
 // ============================================================
 // 全局铁则（英文版，EN 源时注入）
 // ============================================================
-const GLOBAL_RULES_EN = `[Brand & Proper Noun Rules]
-1. Brand name protection: all brand names (Lexar, 雷克沙, DJI, Canon, Sony, PlayStation, iPhone, SanDisk, Kingston, Samsung, WD, Intel, AMD, NVIDIA, etc.) and standard protocol names (DirectStorage, XMP, EXPO, CUDIMM, UDIMM, SODIMM, etc.) must remain in their original form in any language — no translation, no transliteration.
-2. All technical specifications and industry standard symbols must be preserved untranslated, including but not limited to: GB/TB/MB/s, UHS-I/II, V30/V60/V90, A1/A2, PCIe, NVMe, CFexpress Type A/B, SD, microSD, SSD, USB 3.2, 4K/8K, UHD, RAW.
-3. Product series/model names (ARES, THOR, ARMOR, NM, NQ, PLAY, SILVER, Silver PLUS, Silver PRO, BLUE, GOLD, DIAMOND, JUMPDRIVE, Professional, WorkFlow, etc.) must remain in English. Explanatory translations may be added in body text only; never translate series names standalone. CRITICAL: Words like Silver, Blue, Gold, Diamond may look like color/descriptor words but in Lexar context they are product series names — do NOT translate them as "银色/蓝色/金色/钻石".
-4. Complete product model numbers (e.g. Lexar Professional CFexpress Type B 1800GB) must be preserved in full alphanumeric format — no splitting, rewriting, or localizing digits.
-5. Never expand abbreviations or standard protocol names without basis. All industry-standard abbreviations and protocol names (DirectStorage, XMP, EXPO, CUDIMM, UDIMM, SODIMM, etc.) must be preserved as-is.
-
-[Category Word Strict Distinction]
-6. Storage category words are fixed and must not be mixed: Desktop Memory (NOT PC RAM), Laptop Memory (NOT Notebook RAM), internal SSD (NOT spelled out as Solid State Drive), Portable SSD, Flash Drive (single port), Dual Drive (dual port), Solid State Dual Drive, Card, Reader, Enclosure, Hub.
-
-[Domain & Register Principles]
-7. Domain anchoring: digital storage, professional photography/videography, consumer electronics. When encountering ambiguous terms, use this domain as the primary criterion for selecting the correct meaning.
-8. Audience: professional photographers, filmmakers, and general consumers. Technical descriptions must be rigorous and objective. Marketing copy must conform to target language native expression conventions — no calqued Chinese-style foreign language.
-9. Faithfulness to source: strictly correspond to the original information. No omissions, additions, or self-supplied selling points or embellishments not present in the source. Do not alter product parameters or performance descriptions for the sake of fluency.
-10. Terminology consistency: use the same translation for the same concept throughout the entire text. No inconsistency.
-
-[Format & Compliance Rules]
-11. Numbers, punctuation, thousands separators, and decimal points must strictly follow the target language country's official conventions. Do not auto-apply Chinese or English formatting.
-12. When the target language uses a non-Latin script, embedded English/numbers must maintain their original writing direction — do not reverse.
-13. Strictly comply with target language regional advertising regulations. Prohibited superlative claims such as "best", "#1", "top-tier", "strongest" must be replaced with compliant alternatives like "professional-grade", "flagship", "high-performance".
-14. Output requirement: only output pure target language translation. No source text, notes, numbering, or translation explanations. No mixing of multiple languages.
-
-[Qwen Model Error-Prone Fixes]
-15. No silent fallback to English: even when expression is difficult, must complete translation in the target language. No English explanations or mixed Chinese-English output.
-16. All characters with tones, diacritics, and accents must be fully preserved — no omission or replacement with plain letters.
-17. Do not literally translate Chinese idioms or four-character marketing phrases into the target language. Use localized paraphrasing while preserving core selling points.
-18. Do not destroy original document structure: lists, tables, and hierarchical relationships must remain intact. Only translate text content.
-19. ⚠️ NEVER add parenthetical explanations, original English text, aliases, pronunciation guides, or supplementary notes anywhere in the translation output. These Qwen-common error patterns are strictly forbidden:
-    - "High-speed storage (高速存储)" → WRONG, must be pure translation
-    - "Lexar (雷克沙)" → WRONG, brand names must stay in original form only
-    - "compact (紧凑型) design" → WRONG, never embed source language in parentheses
-    The output must be PURE translation — no supplementary information, no bilingual glosses, no explanations embedded in parentheses or any other form.
-20. ⚠️ Read speed and Write speed must be strictly distinguished — never confuse them. "Read speed" and "Write speed" are independent specifications. In gaming storage contexts especially, do NOT default to "read speed" for all speed mentions. Each must be translated correctly per the actual specification.`
-
-// ============================================================
-// 翻译风格预设（仅含风格差异化描述，全局铁则单独注入）
-// ============================================================
-export const STYLE_PRESETS: Record<string, string> = {
-  standard: `【翻译风格：通用标准版】
-【风格】翻译风格自然流畅，句式通顺，符合目标语言的表达习惯。术语库固定译法为最高标准。根据不同目标市场调整语序和用词，避免机械直译源语言结构。`,
-  professional: `【翻译风格：严谨专业版】
-【风格】翻译风格严谨正式，技术表述精准客观，术语前后统一，不美化不夸张。句式简洁，避免冗余修饰词。符合技术文档与产品规格说明的行业编写规范。`,
-  marketing: `【翻译风格：电商营销版】
-【风格】在准确传达产品卖点的基础上，优化句式使其更具吸引力和说服力。符合目标市场电商产品页的本土表达风格。保持高端数码品牌质感，不过度夸张。英语市场可偏活力感，日语市场偏安心信赖感，德语市场以技术实力和数据说话。`,
-}
-
-const STYLE_PRESETS_EN: Record<string, string> = {
-  standard: `[Translation Style: Standard]
-[Style] Natural, fluent, and idiomatic in the target language. Balance accuracy with readability. Glossary terms are the highest authority. Adapt sentence structure and word choice to the target market conventions — do not calque the source-language structure.`,
-  professional: `[Translation Style: Professional]
-[Style] Rigorous and formal. Technically precise and objective. Consistent terminology throughout — no embellishment or exaggeration. Use concise sentences without redundant modifiers. Conform to technical documentation and product specification writing standards.`,
-  marketing: `[Translation Style: E-commerce Marketing]
-[Style] Engaging, persuasive e-commerce copy. Accurately convey product selling points while optimizing for impact and natural readability. Match the target market's native e-commerce expression style. Maintain premium digital brand quality — never overstate or use empty superlatives. Adapt tone per market: English-speaking markets can be benefit-driven and energetic; German market values fact-based, specification-led persuasion; Japanese market values trust-building and politeness; Nordic markets prefer understated, minimal copy.`,
-}
+const GLOBAL_RULES_EN = `[IRON RULES]
+1. Brand/series names preserved as-is: Lexar, ARES, THOR, ARMOR, NM, NQ, PLAY, SILVER, BLUE, GOLD, DIAMOND, JUMPDRIVE, Professional, WorkFlow. Silver/Blue/Gold/Diamond are Lexar series names — NOT colors.
+2. Tech specs preserved: GB/TB/MB/s, UHS-I/II, V30/V60/V90, A1/A2, PCIe, NVMe, CFexpress, SD, microSD, SSD, USB 3.2, 4K/8K, DirectStorage, XMP, EXPO, CUDIMM.
+3. Category words fixed: Desktop Memory, Laptop Memory, internal SSD, Portable SSD, Flash Drive, Dual Drive, Card, Reader, Enclosure, Hub.
+4. Glossary terms: highest priority, use exactly. Numbers/specs preserved verbatim.
+5. Read speed ≠ Write speed.
+6. No parenthetical explanations or mixed languages in output.
+7. Short labels (<15 chars): keep short, don't expand into sentences.
+8. Faithful to source — no omissions, additions, embellished claims, marketing copy, feature descriptions, brand stories, or usage scenarios. Suppress background knowledge.
+9. Compliance text (warranty, CE/FCC, legal): verbatim only.`
 
 // ============================================================
 // 场景提示词（用户可选，默认电商详情页）
+// 已瘦身：删除铁则已覆盖的内容（数值原样/忠实原文/品牌保护等）
 // ============================================================
+
+// STYLE_PRESETS 仅用于 UI 预览面板（翻译时语气由 getTranslationContext 注入）
+export const STYLE_PRESETS: Record<string, string> = {
+  standard: `【语气】平实自然，通顺易读。`,
+  professional: `【语气】严谨正式，技术表述精准客观。句式简洁，避免冗余修饰。`,
+  marketing: `【语气】有说服力，突出卖点。保持高端品牌调性，不虚构不夸大。`,
+}
+
 export const SCENE_PRESETS: Record<string, string> = {
-  technical_params: `【场景：技术参数表】本场景翻译风格固定为严谨专业，以下约束优先级最高。所有数值、单位、符号原样保留（禁止改值、禁止加空格、禁止转换单位），仅翻译说明文字。表行1:1严格对应，不合并/拆分/增删行项。解释性文字长度≤原文，不自行补充技术说明。保留 "-"、"N/A"、"TBD" 等占位符原样。术语极致严谨，不做任何意译与发挥。`,
-  ecommerce: `【场景：商品详情页】卖点前置，短句为主，适合快速阅读。符合目标语言本土电商表达习惯，有感染力但不夸大。禁止直译中文网络热词、成语梗，做本土化意译。标题简洁有冲击力，详情段落逻辑清晰。细分市场语气：日语/韩语市场偏安心信赖感、避免过度夸张；德语市场以技术实力和数据说服；中东/东南亚市场偏柔和、价值导向；英语市场偏活力感、利益驱动。`,
-  packaging: `【场景：包装文案】本场景翻译风格固定为严谨专业，以下约束优先级最高。译文简洁，单行长度≤源文110%（预留印刷版面缓冲）。合规信息（产地、质保、警示语、认证标记）直译不可改写，符合目标国法规。品牌、型号、规格、条形码区域附近文字不遮挡核心标识。禁止断词换行（hyphenation-based line break），避免生僻词，确保普通消费者快速理解。`,
-  ui: `【场景：软件UI】本场景翻译风格固定为严谨专业，以下约束优先级最高。按钮文字1~3词（主操作按钮优先1词），菜单项统一名词或动名词风格。报错/提示语 action-first（如"无法连接"而非"连接失败"），Toast消息≤15字(CJK)/≤40字符(拉丁)。统一使用指令式或名词式风格，前后一致，不堆砌专业术语。RTL语言（阿拉伯语）确保UI方向正确。预留文本膨胀空间，德语、荷兰语、波兰语等长词语言优先最短表达。`,
-  after_sales: `【场景：售后文档/保修卡】本场景翻译风格固定为严谨专业，以下约束优先级最高。技术术语绝对精确，法律免责条款直译不可改写。保修期限、条件、联系方式等关键信息原样保留、不得遗漏。使用正式敬语（Sie/vous/usted/敬体），禁用口语/俚语。零营销语言——纯事实陈述和操作指引。`,
-  manual: `【场景：说明书/用户手册】本场景翻译风格固定为严谨专业，以下约束优先级最高。操作步骤编号与顺序严格1:1对应，不可跳步、合并或拆分。功能描述精确到位，禁止意译或发挥——"按住3秒"不可写成"长按"，"指示灯闪烁"不可写成"灯亮"。安全警告（⚠️/警告/注意/小心）逐字直译，任何歧义都可能造成人身伤害。按钮/接口/指示灯名称保持源文一致性，同一部件前后译名统一。使用指令式语气（"请连接电源"而非"您需要连接电源"），简短明确。图表标注文字与正文引用一致。禁用口语俚语，但避免法律文书式生硬——让普通用户能读懂并安全操作。`,
-  spec_sheet: `【场景：规格书/数据表】本场景翻译风格固定为严谨专业，以下约束优先级最高。所有数值、单位、符号、公差范围原样保留——禁止改值、禁止四舍五入、禁止转换单位、禁止增删空格。表格结构严格1:1，行项不合并、不拆分、不增删、不重排。参数名称使用行业标准译法，参考IEC/ISO/JIS等国际标准术语。"Typ."（典型值）、"Max."（最大值）、"Min."（最小值）、"TBD"、"N/A"、"-" 等标识原样保留。脚注、测试条件说明（如"Tested at 25°C"）精确翻译，不省略条件限定。禁止添加任何营销性描述或评价性语言——这是工程数据文档，不是广告。`,
+  technical_params: `【场景：技术参数表】表格行项1:1严格对应，不合并/拆分/增删。保留 "-"、"N/A"、"TBD" 等占位符原样。`,
+  ecommerce: `【场景：商品详情页】卖点前置，短句为主。源语言特有表达（俚语/热词/习语）不直译，找目标语言等效说法。市场适配方向见语言专属提示。`,
+  packaging: `【场景：包装文案】禁止断词换行。避免生僻词。合规信息直译不可改写。`,
+  ui: `【场景：软件UI】报错action-first。预留文本膨胀空间（DE/NL/PL优先最短表达）。RTL确保UI方向正确。`,
+  after_sales: `【场景：售后/保修卡】零营销语言。法律免责条款直译不可改写。敬语体系见语言专属提示。`,
+  manual: `【场景：说明书】操作步骤1:1严格对应。安全警告逐字直译。使用指令式语气，简短明确。`,
+  spec_sheet: `【场景：规格书/数据表】表格1:1。参数名使用行业标准译法。"Typ."/"Max."/"Min." 等标注原样保留。禁止营销描述。`,
 }
 
 export const SCENE_PRESETS_EN: Record<string, string> = {
-  technical_params: `[Scene: Technical Parameter Table] Style is locked to Professional. All values, units, and symbols must be preserved as-is (no value changes, no added spaces, no unit conversion). Translate only explanatory text. Table rows must be 1:1 — no merging, splitting, adding, or removing rows. Explanatory text length must not exceed source. Preserve "-", "N/A", "TBD" placeholders exactly. Be rigorously precise with terminology — no paraphrasing or creative interpretation.`,
-  ecommerce: `[Scene: E-commerce Product Page] Lead with key selling points. Use short sentences for quick scanning. Match the target market's native e-commerce expression style — compelling but not exaggerated. Never calque English marketing slang or idioms; adapt them natively. Titles should be punchy and concise; body copy should flow logically. Market-specific tone: Japanese/Korean — trust-building and polite, avoid hyperbole. German — data-driven, specification-led persuasion. Middle East/SEA — softer tone, value-oriented. English-speaking — benefit-driven and energetic.`,
-  packaging: `[Scene: Packaging Copy] Style is locked to Professional. Keep translations concise — single line length ≤110% of source (preserve print layout buffer). Compliance info (origin, warranty, warnings, cert marks) must be translated literally per local regulations — no rewriting. Brand, model, spec labels, and barcode areas must not be obscured by translation. No hyphenation-based word breaks. Avoid obscure vocabulary; ensure quick comprehension by general consumers.`,
-  ui: `[Scene: Software UI] Style is locked to Professional. Buttons: 1–3 words (primary actions prefer 1 word). Menus: consistent noun or verb-noun style. Error messages: action-first format (e.g. "Cannot connect" not "Connection failure"). Toast messages: ≤15 chars (CJK) / ≤40 chars (Latin). Use consistent style throughout. Avoid technical jargon overload. RTL languages (Arabic): ensure correct UI direction. Reserve space for text expansion; for German, Dutch, Polish, and other long-word languages, prefer the shortest viable expression.`,
-  after_sales: `[Scene: After-Sales / Warranty Documents] Style is locked to Professional. Technical terms must be absolutely precise. Legal disclaimers must be translated literally — no paraphrasing. Warranty periods, conditions, and contact info must be preserved exactly. Use formal address (Sie/vous/usted/polite form). No slang or colloquialisms. Zero marketing language — pure factual and instructional content only.`,
-  manual: `[Scene: User Manual / Instruction Guide] Style is locked to Professional. Operation steps must maintain strict 1:1 numbering and sequence — no skipping, merging, or splitting steps. Functional descriptions must be precise — "hold for 3 seconds" must not become "long press", "indicator flashes" must not become "light turns on". Safety warnings (⚠️/WARNING/CAUTION/NOTICE) must be translated verbatim — any ambiguity could cause personal injury. Button/port/indicator names must stay consistent throughout the document. Use imperative tone ("Connect the power" not "You need to connect the power") — short and unambiguous. Diagram callouts must match body text terminology. No slang or colloquialisms, but avoid legalese stiffness — ensure the average user can read, understand, and operate safely.`,
-  spec_sheet: `[Scene: Specification Sheet / Data Sheet] Style is locked to Professional. All values, units, symbols, and tolerance ranges must be preserved as-is — no value changes, no rounding, no unit conversion, no adding or removing spaces. Table structure must be strictly 1:1 — no merging, splitting, adding, removing, or reordering rows. Parameter names must use industry-standard terminology (IEC/ISO/JIS conventions). "Typ.", "Max.", "Min.", "TBD", "N/A", "-" and similar qualifiers must be preserved exactly. Footnotes and test condition notes (e.g. "Tested at 25°C") must be translated precisely — never omit qualifying conditions. Absolutely no marketing language or evaluative commentary — this is an engineering data document, not an advertisement.`,
-}
-
-// 产品线策略精简版（非电商场景使用，仅保留术语映射，去掉营销语调）
-// 电商场景的产品线策略已迁移至 PRODUCT_LINE_STYLE_STRATEGIES（8产品线×3风格）
-const PRODUCT_LINE_STRATEGIES_TECH: Record<string, string> = {
-  professional_imaging: `【产品线：专业影像】"高速/性能"→8K RAW不掉帧、高速连拍不卡顿、极速导出。"可靠/耐用"→极端环境防护、数据绝对安全。`,
-  consumer_cards: `【产品线：消费存储卡】"高速/性能"→4K视频畅拍不中断、连拍不卡顿。"可靠"→数据安全不丢失。`,
-  gaming_card: `【产品线：游戏存储卡】⚠️ 读写速度必须严格区分："读取速度"/"写入速度"各有所指，禁止混用或一律写成读取速度。"高读写速度"→读取速度决定加载快慢，写入速度决定安装/存档效率，两者独立。"A2等级"→高随机读写IOPS（小文件随机读写），决定运行流畅度。"V30/V60/V90"→持续写入保证，大游戏安装不降速。"大容量"→海量存储空间。`,
-  gaming_ssd: `【产品线：电竞SSD】"游戏性能"→3A秒加载、消除材质延迟、DirectStorage潜能释放。`,
-  gaming_dimm: `【产品线：电竞内存】"游戏性能"→提升1% Low帧、拒绝团战掉帧、突破超频极限。`,
-  pc_productivity: `【产品线：PC/AI生产力】"高速/性能"→AI模型秒级响应、巨型文件秒传、多任务游刃有余。`,
-  portable_storage: `【产品线：移动存储】"高速/性能"→文件秒传、快速备份、即拍即传。"设计"→轻便随身、坚固耐用。`,
-  innovation_lifestyle: `【产品线：创新生活】"分享/连接"→跨越距离、一键上传。强调情感连接与隐私安全。`,
-}
-
-const PRODUCT_LINE_STRATEGIES_TECH_EN: Record<string, string> = {
-  professional_imaging: `[Product Line: Professional Imaging] "High-speed / performance" → no dropped frames at 8K RAW, uninterrupted burst shooting, instant offload. "Reliability / durability" → extreme environment protection, absolute data safety.`,
-  consumer_cards: `[Product Line: Consumer Cards] "High-speed / performance" → smooth 4K recording without interruption, burst shooting without lag. "Reliability" → data safety.`,
-  gaming_card: `[Product Line: Gaming Card] ⚠️ CRITICAL: "Read speed" and "Write speed" are distinct specifications — never confuse them. "High read/write speed" → read speed drives loading, write speed drives install/save efficiency — independent specs. "A2 rating" → high random read/write IOPS (small-file random I/O), determines gameplay smoothness. "V30/V60/V90" → sustained write guarantee, large game installs without throttling. "Large capacity" → massive storage space.`,
-  gaming_ssd: `[Product Line: Gaming SSD] "Gaming performance" → instant AAA loading, eliminate texture pop-in, unleash DirectStorage potential.`,
-  gaming_dimm: `[Product Line: Gaming Memory] "Gaming performance" → boost 1% Low FPS, eliminate team-fight frame drops, push overclocking limits.`,
-  pc_productivity: `[Product Line: PC / AI Productivity] "High-speed / performance" → near-instant AI model response, massive file transfers in seconds, effortless multitasking.`,
-  portable_storage: `[Product Line: Portable Storage] "High-speed / performance" → instant file transfers, fast backups, capture-and-transfer on the go. "Design" → lightweight, ruggedly durable.`,
-  innovation_lifestyle: `[Product Line: Innovation Lifestyle] "Sharing / connection" → bridge distances, upload in one tap. Emphasize emotional connection and privacy protection.`,
+  technical_params: `[Scene: Technical Specs] Table rows 1:1 — no merge/split/add/remove. Preserve "-", "N/A", "TBD" exactly.`,
+  ecommerce: `[Scene: E-commerce] Lead with selling points, short sentences. Never calque source-language slang. See language-specific rules for market adaptation.`,
+  packaging: `[Scene: Packaging] No hyphenation breaks. Avoid obscure vocabulary. Compliance text verbatim.`,
+  ui: `[Scene: Software UI] Error messages action-first. Reserve expansion space for DE/NL/PL. RTL: ensure correct direction.`,
+  after_sales: `[Scene: After-Sales/Warranty] Zero marketing language. Legal disclaimers verbatim. See language-specific rules for formality.`,
+  manual: `[Scene: User Manual] Steps strictly 1:1. Safety warnings verbatim. Imperative tone, short and unambiguous.`,
+  spec_sheet: `[Scene: Spec Sheet] Table 1:1. Use industry-standard terms for parameter names. Preserve "Typ."/"Max."/"Min." labels. No marketing language.`,
 }
 
 // ============================================================
-// 产品线×风格翻译策略（电商场景，8产品线 × 3风格 = 24块）
-// 原则：这是翻译指南，不是文案创作指南。只做术语消歧、受众校准、陷阱提醒。
-// 严禁教LLM"转化""改写""创作"——翻译必须忠实原文。
+// 产品线翻译策略（8条产品线，统一中/英文版）
+// 每块 = 语义映射 + 术语要点 + 陷阱提醒，不承载风格（风格由 TRANSLATION_CONTEXT 的语气行独立表达）
 // ============================================================
-const PRODUCT_LINE_STYLE_STRATEGIES: Record<string, Record<string, string>> = {
-  professional_imaging: {
-    standard: `【翻译策略：专业影像-标准版】受众为职业摄影师/影视团队。V60/V90等速度等级标识按源文如实翻译，避免使用生僻影视工业黑话。设备兼容性说明需确保普通用户可理解。"高速/性能"→8K RAW不掉帧、高速连拍不卡顿、极速导出。"可靠/耐用"→极端环境防护、数据绝对安全。`,
-    professional: `【翻译策略：专业影像-专业版】受众为职业摄影师/影视团队。8K RAW码流、持续写入、IP68防护等专业参数使用目标语言影视工业标准术语（如Bitrate、Color Depth、Proxy Workflow的对应标准译法）。"高速/性能"→8K RAW不掉帧、高速连拍不卡顿、极速导出。"可靠/耐用"→极端环境防护、数据绝对安全。钢甲系列额外强调物理抗损。⚠️"数据安全"在此语境下不仅指技术可靠性，也涉及职业声誉——按源文措辞如实翻译，不自行发挥。`,
-    marketing: `【翻译策略：专业影像-营销版】源文为专业影像产品营销文案。"高速/性能"→8K RAW不掉帧、高速连拍不卡顿、极速导出。"可靠/耐用"→极端环境防护、数据绝对安全。按源文风格翻译，保持专业调性同时自然流畅。常见陷阱：将英文营销短句直译为生硬的目标语言——应使用目标市场摄影/影视圈自然表达。`,
-  },
-  consumer_cards: {
-    standard: `【翻译策略：消费存储卡-标准版】受众为vlog创作者/旅拍爱好者/家庭用户。"高速/性能"→4K视频畅拍不中断、连拍不卡顿、记录生活每一帧。"可靠"→选对卡、少踩坑、数据不丢失。4K拍摄兼容性、多设备适配等内容用通俗易懂的译法。常见陷阱：堆砌技术术语导致普通用户困惑——术语库译法已固定，其余用日常语言。`,
-    professional: `【翻译策略：消费存储卡-专业版】受众为有一定技术认知的消费者。"高速/性能"→4K视频畅拍不中断、连拍不卡顿。"可靠"→数据安全不丢失。闪存颗粒、UHS总线、U3/V30等参数使用行业标准译法。⚠️不回避性能边界——源文有则译，源文无则不添。`,
-    marketing: `【翻译策略：消费存储卡-营销版】源文为消费级产品营销文案。"高速/性能"→4K视频畅拍不中断、连拍不卡顿、记录生活每一帧。"可靠"→选对卡、少踩坑、数据不丢失。语气亲近可信赖。常见陷阱：中文营销四字格直译为目标语言字面意思——应做本土化意译。生活化场景（旅行、宠物、家庭）的翻译保持自然，不刻意煽情。`,
-  },
-  gaming_card: {
-    standard: `【翻译策略：游戏存储卡-标准版】受众为Switch/Steam Deck/ROG Ally/Legion Go等掌机玩家。"高读写速度"→读取速度决定加载快慢，写入速度决定安装/存档效率，两者独立，禁止一律写成"读取速度"。"A2等级"→高随机读写IOPS（小文件随机读写），决定运行流畅度。"V30/V60/V90"→持续写入保证，大游戏安装不降速。"大容量"→海量存储空间。A2/V30等规格用通俗语言解释其实际意义，不堆砌IOPS数据。`,
-    professional: `【翻译策略：游戏存储卡-专业版】受众为对技术参数有要求的硬核玩家。"高读写速度"→读取速度决定加载快慢（游戏启动、关卡切换、开放世界读图），写入速度决定安装/存档效率（大游戏安装省时、存档秒写、录屏不丢帧），两者独立。⚠️A2=Application Performance Class（小文件随机读写），决定运行流畅度而非加载速度——翻译时注意概念不混淆。"V30/V60/V90"→持续写入保证。读取和写入绝对禁止混译。`,
-    marketing: `【翻译策略：游戏存储卡-营销版】源文为游戏产品营销文案。"高读写速度"→读取速度决定加载快慢，写入速度决定安装/存档效率，两者独立，禁止一律写成"读取速度"。"A2等级"→高随机读写IOPS（小文件随机读写），决定运行流畅度。"V30/V60/V90"→持续写入保证，大游戏安装不降速。"大容量"→海量存储空间。语气有活力但不浮夸。⚠️严格区分读取和写入的译法。使用目标市场游戏社区的自然表达，禁止生造或直译其他语言的游戏梗。`,
-  },
-  gaming_ssd: {
-    standard: `【翻译策略：电竞SSD-标准版】受众为3A大作玩家/PS5玩家。"游戏性能"→3A秒加载、消除材质延迟、DirectStorage潜能释放。PCIe代数、顺序读写、接口差异（M.2/SATA/2230）如实翻译。安装要求和系统兼容性说明需准确清晰。`,
-    professional: `【翻译策略：电竞SSD-专业版】受众为关注硬件参数的硬核玩家。"游戏性能"→3A秒加载、消除材质延迟、DirectStorage潜能释放。4K随机读写、DRAM/SLC Cache、温控等使用目标语言硬件圈标准术语。PLAY 2230的单面PCB设计——源文有则如实翻译，源文无则不添。`,
-    marketing: `【翻译策略：电竞SSD-营销版】源文为电竞产品营销文案。"游戏性能"→3A秒加载、消除材质延迟、DirectStorage潜能释放。常见陷阱：过度夸张导致可信度下降——保持原文卖点力度，按目标市场电竞圈自然表达翻译。ARES/NM/PLAY系列名保留英文原词不变。`,
-  },
-  gaming_dimm: {
-    standard: `【翻译策略：电竞内存-标准版】受众为电竞玩家/PC DIY用户。"游戏性能"→提升1% Low帧、拒绝团战掉帧、突破超频极限。DDR代数、频率、时序(CL)、电压及RGB灯效如实翻译。XMP/EXPO一键超频的操作说明需准确清晰。`,
-    professional: `【翻译策略：电竞内存-专业版】受众为硬核超频玩家。"游戏性能"→提升1% Low帧、拒绝团战掉帧、突破超频极限。PMIC电源管理、散热马甲热阻、时序压缩等使用目标语言超频圈标准术语（如Sub-timings、IMC）。⚠️超频边际效应按源文客观翻译，不夸大不回避。`,
-    marketing: `【翻译策略：电竞内存-营销版】源文为电竞内存营销文案。"游戏性能"→提升1% Low帧、拒绝团战掉帧、突破超频极限。常见陷阱：中文竞技热血表达直译为目标语言显得浮夸——按目标市场电竞圈自然表达翻译。"1% Low帧""团战不掉帧"等概念按源文如实翻译，不自行添加。`,
-  },
-  pc_productivity: {
-    standard: `【翻译策略：PC/AI生产力-标准版】受众为AI PC用户/内容创作者/PC升级用户。"高速/性能"→AI模型秒级响应、巨型工程文件秒传、多任务游刃有余、旧电脑焕新。接口、协议、基础速度如实翻译。端侧AI相关概念用通俗语言翻译，确保非技术用户也能理解。`,
-    professional: `【翻译策略：PC/AI生产力-专业版】受众为关注性能的专业用户。"高速/性能"→AI模型秒级响应、巨型文件秒传、多任务游刃有余。多线程并发、本地LLM推理、I/O吞吐等使用目标语言行业标准术语（如Local LLM Inference、DaVinci Nodes）。⚠️性能数据按源文客观翻译，不添加未经验证的效率声明。`,
-    marketing: `【翻译策略：PC/AI生产力-营销版】源文为生产力产品营销文案。"高速/性能"→AI模型秒级响应、巨型工程文件秒传、多任务游刃有余、旧电脑焕新。常见陷阱：将"AI加速""效率提升"等概念翻译得过于空洞——按源文具体表述翻译。本地AI隐私保护角度按源文提及程度翻译，源文未提则不自行发挥。`,
-  },
-  portable_storage: {
-    standard: `【翻译策略：移动存储-标准版】受众为商务人士/学生/旅行者/移动创作者。"高速/性能"→文件秒传、快速备份、即拍即传。"设计"→轻便随身、坚固耐用。外观、重量、接口、基础速度及防护等级如实翻译。⚠️注意区分U盘（便携/小文件）和PSSD（大文件/剪辑）——品类词不可混用。`,
-    professional: `【翻译策略：移动存储-专业版】受众为关注数据安全的专业用户。"高速/性能"→文件秒传、快速备份、即拍即传。"设计"→轻便随身、坚固耐用。桥接芯片、持续写入温控、IP防护测试标准、AES 256-bit硬件加密等使用行业标准术语。⚠️数据完整性相关描述按源文客观翻译，不自行扩展安全承诺。`,
-    marketing: `【翻译策略：移动存储-营销版】源文为移动存储产品营销文案。"高速/性能"→文件秒传、快速备份、即拍即传。"设计"→轻便随身、坚固耐用。SL/D系列/U盘各有不同使用场景——按源文产品定位翻译，不混淆系列调性。移动场景描述保持自然，不刻意渲染。`,
-  },
-  innovation_lifestyle: {
-    standard: `【翻译策略：创新生活-标准版】受众为家庭用户/送礼人群。"分享/连接"→跨越距离陪伴家人、一键上传珍贵瞬间。Pexar相框的屏幕参数、App绑定、共享机制如实翻译，操作步骤需简单易懂。Hub接口及扩展功能翻译清晰准确。`,
-    professional: `【翻译策略：创新生活-专业版】受众为关注隐私和性能的用户。"分享/连接"→跨越距离、一键上传。Wi-Fi 6、云端/本地数据加密隔离、雷电/USB4协议、PD快充、多屏4K输出等使用行业标准术语。⚠️数据隐私保护机制按源文如实翻译，不自行添加安全声明。`,
-    marketing: `【翻译策略：创新生活-营销版】源文为创新生活产品营销文案。"分享/连接"→跨越距离陪伴家人、一键上传珍贵瞬间。Pexar相框源文偏情感化时保持温暖但不煽情；Hub源文偏设计美学时保持简洁优雅。常见陷阱：中文感性表达直译为目标语言显得矫情——按目标市场同类产品的自然表达翻译。`,
-  },
+const PRODUCT_LINE_STRATEGIES: Record<string, string> = {
+  professional_imaging: `【专业影像 — 受众：专业摄影师、影视从业者、内容工作室】
+品牌定位：影视工业级可靠性，数据即资产不可丢失。
+语调：严谨克制，数据说话（比特率/MB/s/VPG）。避免消费级形容词（"超快""惊人"）。
+词汇：不掉帧(dropped frames)、连拍(burst shooting)、导出(offload)、VPG(Video Performance Guarantee)、影院级(cinema-grade)。
+禁忌：不可称为"游戏卡"、不可使用消费级速度形容词。`,
+  consumer_cards: `【消费存储卡 — 受众：主流消费者、家庭用户、日常拍摄者】
+品牌定位：买得起的高品质存储，稳定耐用是核心竞争力。
+语调：实用、可靠、不浮夸。功能描述清晰直接。
+词汇：4K畅拍、数据安全、持久耐用、即插即用。UHS总线/U3/V30用行业标准表达。
+禁忌：不可夸大性能为"专业级""旗舰级"。不可暗示游戏性能。`,
+  gaming_card: `【游戏存储卡 — 受众：主机/掌机玩家、Switch/Steam Deck用户】
+品牌定位：消除游戏加载等待，大容量游戏库随身携带。
+语调：硬核但不浮夸，性能数据导向（A2/IOPS/V30）。
+⚠️ 核心陷阱：读取速度(游戏加载) ≠ 写入速度(安装/存档效率)。A2 = 高随机读写IOPS(运行流畅度)。V30/V60/V90 = 持续写入保证(录制不掉帧)。
+禁忌：不可混淆读取/写入性能。不可夸大游戏体验（"开挂""碾压"）。`,
+  gaming_ssd: `【电竞SSD — 受众：硬核PC玩家、DIY装机爱好者、性能发烧友】
+品牌定位：消除加载瓶颈，3A秒进、DirectStorage就绪。
+语调：极客但不傲慢。参数说话（PCIe代数/顺序读写/随机IOPS/散热方案）。
+⚠️ 核心陷阱：读取速度(游戏加载) ≠ 写入速度(安装/存档)。DirectStorage = GPU直读SSD绕开CPU解压。散热方案决定持续性能。
+禁忌：不可混淆读取/写入。不可承诺非特定游戏的帧率提升。`,
+  gaming_dimm: `【电竞内存 — 受众：超频玩家、DIY装机、电竞战队】
+品牌定位：1% Low帧提升者，拒绝团战掉帧，突破超频极限。
+语调：硬核极客，参数精确（DDR代数/频率MHz/CL时序/电压）。
+词汇：1% Low帧、团战稳定性、XMP/EXPO一键超频、PMIC独立供电、散热马甲热阻。
+禁忌：不可承诺所有CPU/主板都能达到标称频率。不可暗示内存频率=游戏帧率线性提升。`,
+  pc_productivity: `【PC/AI生产力 — 受众：内容创作者、AI开发者、企业IT、工作站用户】
+品牌定位：AI时代的效率基石，海量数据处理从容不迫。
+语调：专业高效，技术表述严谨。避免消费级营销口吻。
+词汇：多线程并发、本地LLM推理、I/O吞吐、内容创作流水线、巨型文件传输。
+禁忌：不可简化AI性能为单一数字。不可与游戏SSD共用游戏化语言。`,
+  portable_storage: `【移动存储 — 受众：移动办公者、内容创作者、户外摄影师、普通用户】
+品牌定位：数据随身，坚固可靠，疾速传输。
+语调：便捷实用导向，强调场景价值（即拍即传、快速备份、跨设备兼容）。
+词汇：桥接芯片、温控保护、IP防护等级、AES加密、即拍即传、跨平台兼容。
+⚠️ 品类词严禁混用：U盘(Flash Drive) ≠ 移动固态(Portable SSD) ≠ 双接口U盘(Dual Drive) ≠ 硬盘盒(Enclosure) ≠ 扩展坞(Hub)。
+禁忌：不可将PSSD称为"U盘"。不可将Hub称为"扩展器"。`,
+  innovation_lifestyle: `【创新生活 — 受众：家庭用户、数码礼品购买者、生活品质消费者】
+品牌定位：科技温暖生活，连接家人情感。
+语调：温暖但不煽情，简洁优雅。避免硬核参数堆砌。
+词汇：一键分享、家庭云相框、跨越距离、陪伴家人。屏幕参数/App绑定如实呈现。
+品牌区分：pexar = 温暖科技陪伴；Lexar Hub = 简洁优雅效率工具。
+禁忌：不可用"孝顺""送礼"等道德绑架式文案。不可过度情感化。`,
 }
 
-// 非电商场景使用精简版产品线策略，避免营销语调污染技术文档
-function getProductLineBlock(productLine: string | undefined, isEnSource: boolean, scenePreset: string, style: string): string {
-  if (!productLine) return ''
-  const isNonEcommerce = scenePreset !== 'ecommerce'
-  if (isNonEcommerce) {
-    // 非电商场景：保留精简TECH版，不做风格细分
-    const block = isEnSource ? PRODUCT_LINE_STRATEGIES_TECH_EN[productLine] : PRODUCT_LINE_STRATEGIES_TECH[productLine]
-    return block ? `\n${block}` : ''
-  }
-  // 电商场景：使用产品线×风格组合策略，精确到"这个产品线×这个风格"该怎么做
-  const strategies = PRODUCT_LINE_STYLE_STRATEGIES[productLine]
-  if (strategies) {
-    const block = strategies[style] || strategies['standard']
-    return block ? `\n${block}` : ''
-  }
-  return ''
+const PRODUCT_LINE_STRATEGIES_EN: Record<string, string> = {
+  professional_imaging: `[Professional Imaging — Audience: Pro photographers, filmmakers, content studios]
+Brand position: Cinema-grade reliability. Data is the asset — never compromise.
+Tone: Restrained, data-backed, technical. No consumer-grade hype ("stunning", "incredible", "blazing" for cards).
+Vocabulary: dropped frames, burst shooting, offload, VPG (Video Performance Guarantee), bitrate, cinema-grade, IP rating.
+Taboo: Never call it a "gaming card". Never apply consumer-tier speed adjectives to professional cards.`,
+  consumer_cards: `[Consumer Cards — Audience: Mainstream consumers, families, everyday shooters]
+Brand position: Quality storage everyone can trust. Stability and endurance are core strengths.
+Tone: Practical, reliable, straightforward. Function-first descriptions.
+Vocabulary: smooth 4K, data safety, durable, plug-and-play. UHS bus/U3/V30: industry-standard.
+Taboo: Never upsell as "pro-grade" or "flagship". Never imply gaming performance.`,
+  gaming_card: `[Gaming Card — Audience: Console/handheld gamers, Switch/Steam Deck users]
+Brand position: Eliminate game-loading wait. Carry your full game library anywhere.
+Tone: Hardcore but honest. Performance-data driven (A2/IOPS/V30).
+⚠️ CRITICAL: Read speed (game loading) ≠ Write speed (install/archive efficiency). A2 = high random IOPS (gameplay smoothness). V30/V60/V90 = sustained write (no dropped frames in recording).
+Taboo: Never conflate read/write speeds. Never overstate gaming experience.`,
+  gaming_ssd: `[Gaming SSD — Audience: Hardcore PC gamers, DIY builders, performance enthusiasts]
+Brand position: Eliminate loading bottlenecks. Instant AAA loading, DirectStorage-ready.
+Tone: Geeky but not arrogant. Spec-driven (PCIe generation, sequential R/W, random IOPS, thermal solution).
+⚠️ CRITICAL: Read speed (game loading) ≠ Write speed (install/archival). DirectStorage = GPU reads SSD directly, bypassing CPU decompression. Thermal solution dictates sustained performance.
+Taboo: Never conflate read/write. Never promise FPS boosts for unspecified titles.`,
+  gaming_dimm: `[Gaming Memory — Audience: Overclockers, DIY builders, esports teams]
+Brand position: The 1% Low FPS improver. Eliminate team-fight stutters, push OC limits.
+Tone: Hardcore geek, spec-precise (DDR generation, frequency MHz, CL timings, voltage).
+Vocabulary: 1% Low FPS, team-fight stability, XMP/EXPO one-click OC, PMIC independent power, heatsink thermal resistance.
+Taboo: Never promise rated frequency on all CPU/motherboard combinations. Never imply linear frequency-to-FPS scaling.`,
+  pc_productivity: `[PC / AI Productivity — Audience: Content creators, AI developers, enterprise IT, workstation users]
+Brand position: The efficiency foundation for the AI era. Massive data handled effortlessly.
+Tone: Professional, technically rigorous. No consumer-marketing fluff.
+Vocabulary: multi-threaded concurrency, local LLM inference, I/O throughput, content creation pipeline, massive file transfer.
+Taboo: Never reduce AI performance to a single number. Never recycle gaming SSD language.`,
+  portable_storage: `[Portable Storage — Audience: Mobile professionals, creators, outdoor photographers, general users]
+Brand position: Your data, anywhere. Rugged, reliable, blazing transfers.
+Tone: Practical and scenario-driven. Emphasize use-case value (capture-and-transfer, fast backup, cross-device compatibility).
+Vocabulary: bridge chip, thermal protection, IP rating, AES encryption, capture-and-transfer, cross-platform.
+⚠️ Category words NEVER interchangeable: Flash Drive ≠ Portable SSD ≠ Dual Drive ≠ Enclosure ≠ Hub.
+Taboo: Never call a PSSD a "flash drive" or "USB stick". Never call a Hub an "extender".`,
+  innovation_lifestyle: `[Innovation Lifestyle — Audience: Families, gift buyers, lifestyle-oriented consumers]
+Brand position: Technology that warms life, connecting families across distance.
+Tone: Warm but not saccharine. Clean and elegant. No spec-dumping.
+Vocabulary: one-tap sharing, family cloud frame, bridge distances, family connection. Screen specs/App pairing: accurately represented.
+Brand distinction: pexar = warm tech companionship; Lexar Hub = clean, elegant efficiency tool.
+Taboo: Never use guilt-based marketing ("filial piety", "obligation"). Never over-sentimentalize.`,
 }
 
 // 产品线 → 相关品类词映射（只注入跟当前产品线相关的品类词，省 token 减干扰）
@@ -644,221 +657,113 @@ const PRODUCT_LINE_CATEGORY_MAP: Record<string, string[]> = {
 // 原则：只写LLM容易出错、代码无法自动修复的专属规则
 // ============================================================
 const LANG_SPECIFIC: Record<string, string> = {
-  'zh-CN': `【zh-CN 专项】
-术语强制统一：存储卡、固态硬盘、读卡器、读取速度、写入速度、移动固态硬盘。禁止"内存卡"→统一"存储卡"。
-禁止港台用语混入：禁用「記憶卡、固態硬碟、讀卡機、行動硬碟、相機、影片」等繁体词汇。
-数字格式：1,000 MB/s（逗号千分位），MB/s 不空格。品牌名"雷克沙 Lexar"标注可选，全文统一即可。
-广告合规：严格遵守中国大陆广告法，禁用「最佳、第一、顶级、秒杀、极致、碾压」等极限词。禁止直译英文营销俚语为中文网络梗，保持专业数码产品文案调性。禁止自行增加原文没有的夸张修饰。`,
-
-  'zh-TW': `【zh-TW 专项】
-不是简体转繁体，而是台湾本土术语本地化：記憶卡（非存儲卡）、固態硬碟（非固態硬盤）、讀卡機（非讀卡器）、行動硬碟（非移動硬盤）、相機、影片、軟體、程式、螢幕、隨身碟。禁止"内存卡"→统一"記憶卡"。USB隨身碟 = USB flash drive。
-数字格式：1,000 MB/s（逗号千分位），MB/s 不空格。
-用字严格遵循台湾正体规范：身分（非身份）、週（非周）、裡（非里）、後（非后），避免简体异体字混入。一对多繁简必须准确：只→隻/衹、干→乾/幹/干、复→復/複，禁止机械一对一转换。禁用大陆特有政策词汇与网络用语，文案符合台湾3C产品市场表达习惯。`,
-
-  'ja': `【ja 专项】
-品牌首次出现标注「レクサー」，后文统一使用 Lexar。⚠️ 禁止将 Lexar 误写为任何其他形式。
-文体统一：商品详情页统一使用です・ます敬体。
-术语标准化：SDカード、リード速度（读取速度）、ライト速度（写入速度）、プロフェッショナル、ポータブルSSD、カードリーダー（读卡器）、USBメモリ（闪存盘）。
-数字格式：1,000 MB/s（逗号千分位），半角数字。
-技术符号保留英文，通用词汇使用行业标准和制汉语。禁止中式日语直译；强调稳定、安心、長寿命、高耐久等符合日本市场偏好的表达。避免过度夸张营销词，符合日本广告法规范。片假名外来语使用行业标准转写，禁止自行音译。
-电商语体：商品详细介绍用です・ます調，建立信赖感而非压迫感。多用量化数据和具体场景（如"最大読み取り速度 X MB/s"），避免空泛形容词（"驚異的""圧倒的"等慎重使用）。禁止机械直译英文比较级/最高级（better→より優れた，NOT より良いだけ）。`,
-
-  'ko': `【ko 专项】
-品牌首次标注 렉사르，正文保留 Lexar。
-术语标准化：SD 카드、SSD、읽기 속도（读取速度）、쓰기 속도（写入速度）、휴대용 SSD（便携SSD）、카드 리더기（读卡器）、USB 플래시 드라이브（闪存盘）。
-数字格式：1,000 MB/s（逗号千分位），半角数字。
-技术术语优先使用行业通用英文外来语，不强行使用生僻汉字词。文案使用通用书面语体（해요체/하오체），避免高阶敬语与非正式平语。禁止使用日语来源的汉字词汇（如"取扱説明書"→"사용 설명서"），符合韩国市场用语习惯。严格限制极限修饰词，遵守韩国广告法规。
-电商语体：韩国电商产品页常用简洁有力短句，关键卖点数据前置。"최대""초고속"等可用但需有数据支撑。避免日式长定语修饰句，改用韩语自然的多短句结构。`,
-
-  'fr': `[French-specific rules]
-Use Metropolitan French (France), NOT Quebec French. All nouns must have correct gender, adjectives must agree in gender and number.
-Fixed terminology: carte microSD/SD, SSD portable (portable SSD), lecteur de cartes (card reader), clé USB (flash drive), vitesse de lecture (read speed), vitesse d'écriture (write speed).
-⚠️ Non-breaking spaces (espace insécable): before colons, semicolons, exclamation marks, question marks. Use thin non-breaking space before units → « 280 Mo/s ».
-⚠️ Accent check: Conçu, écrire, déjà, grâce — never omit accents.
-Number format: 1 000 Mo/s (non-breaking thin space as thousands separator), space before unit.
-Keep UI and short copy concise — avoid long adjective chains that cause text overflow. Minimize English loanwords; prefer native French technical terms (e.g. micrologiciel NOT firmware).
-E-commerce tone: French product copy should be elegant and precise — warm but not overly familiar. Use "vous" (not "tu"). Marketing copy can highlight design and quality-of-life benefits alongside specs. Never use "meilleur", "n°1", "incroyable" without concrete substantiation — French advertising law enforces this strictly. Include standard consumer protection phrasing where applicable (garantie, SAV).`,
-
-  'de': `[German-specific rules]
-🚨 BRAND RED LINE: Lexar ≠ Lexware! Lexware is a different German software company — NEVER confuse them. The brand is ALWAYS "Lexar".
-ALL nouns MUST be capitalized, no exceptions.
-Fixed terminology: Speicherkarte (memory card), Tragbare SSD (portable SSD), Kartenleser (card reader), USB-Stick (flash drive), Lesegeschwindigkeit (read speed), Schreibgeschwindigkeit (write speed).
-⚠️ Compound noun integrity check: Lesegeschwindigkeit (one word, never split), Speicherkarte (one word), Schreibgeschwindigkeit (one word).
-Number format: 14.000 MB/s (dot as thousands separator), 14,5 MB/s (comma as decimal).
-Copy should be factual and objective, matching German professional market expectations — even marketing copy should remain grounded and evidence-based, avoiding unsupported superlatives. Do NOT calque English word order into German (verb-final in subordinate clauses).
-E-commerce tone: German consumers expect specification-driven copy. Lead with technical data and certifications. "Professionell", "zuverlässig", "leistungsstark" are acceptable but must be backed by specs. Avoid empty intensifiers like "unglaublich", "revolutionär", "der Beste" — these undermine credibility. "Sie" is correct for product copy; never use "du" in marketing.`,
-
-  'es': `[Spanish-specific rules]
-Use International Castilian Spanish — do NOT mix in Mexican, Argentine, or other regional slang. All nouns must have correct gender and number agreement.
-Fixed terminology: tarjeta microSD/SD, SSD portátil (portable SSD), lector de tarjetas (card reader), unidad flash USB (flash drive), velocidad de lectura (read speed), velocidad de escritura (write speed).
-🚨 Spelling check: tarjeta ≠ trajeta, máximo ≠ maximo, compatible ≠ compatible, portátil ≠ portatil — all accents required.
-Number format: 1.000 MB/s (dot as thousands separator).
-Use formal Usted imperative: Aproveche, Combine, Descargue (NOT informal tú forms Aprovecha, Combina, Descarga). Marketing copy can be warm and direct, matching both Latin American and Spanish market expectations.`,
-
-  'pt': `[European Portuguese rules]
-Use Portugal mainland formal Portuguese. Do NOT mix in Brazilian Portuguese vocabulary or grammar.
-Fixed terminology: cartão de memória, SSD portátil, leitor de cartões, velocidade de leitura (read speed), velocidade de gravação (write speed).
-⚠️ Adjective-noun agreement: adjectives must agree in GENDER and NUMBER with the noun they modify. "Cartão" is masculine singular → use masculine singular adjectives (impressionante, rápido, etc.). Never use plural adjectives with singular nouns ("é impressionantes" → WRONG, must be "é impressionante" or "impressionantemente" for adverbs).
-⚠️ Adverb vs Adjective: when modifying a verb or an entire clause, use the -mente adverb form (impressionantemente, rapidamente), NOT the adjective. English often uses flat adverbs — Portuguese does NOT.
-⚠️ False friends / calques to avoid: "emparelhado" is ONLY for Bluetooth/wireless pairing — do NOT use for "used with" or "combined with". "When paired with" → "quando utilizado com" or "quando usado com".
-Keep sentences natural, not word-for-word translations. Portuguese prefers shorter, more direct phrasing than English.
-Pronouns and clitics follow European Portuguese rules (post-position: "carrega-se", not "se carrega").
-"Mais depressa" is acceptable for colloquial speed; "mais rapidamente" is preferred for technical/product copy.
-⛔ RED LINE: U盘=Pen USB (NOT Pen Drive), 笔记本=Portátil (NOT Notebook), 硬盘盒=Caixa (NOT Case).`,
-
-  'pt-BR': `[Brazilian Portuguese rules]
-Use Brazilian Portuguese throughout. Do NOT mix in European Portuguese vocabulary.
-Fixed terminology: cartão de memória, SSD portátil, leitor de cartões, pendrive (flash drive), velocidade de leitura (read speed), velocidade de gravação (write speed).
-Number format: 1.000 MB/s (dot as thousands separator).
-Watch for false friends: atualmente = currently (NOT actually), sensível = sensitive (NOT sensible).
-Marketing copy should be more engaging, matching Brazilian e-commerce style. Use você forms (not tu).
-⛔ RED LINE: U盘=Pen Drive (NOT Pen USB), 笔记本=Notebook (NOT Portátil), 硬盘盒=Case (NOT Caixa).`,
-
-  'it': `[Italian-specific rules]
-All nouns and adjectives must agree in gender and number.
-Fixed terminology: scheda microSD/SD, SSD portatile (portable SSD), lettore di schede (card reader), chiavetta USB (flash drive), velocità di lettura (read speed), velocità di scrittura (write speed).
-⚠️ Accent check: è (is), perché, più — required accents, never omit.
-Number format: 1.000 MB/s (dot as thousands separator).
-Photography-related copy can be slightly softer and more elegant, matching Italian photography culture. Keep pace lively but don't overdo colloquialisms. Keep UI copy concise — avoid long subordinate clauses.`,
-
-  'nl': `[Dutch-specific rules]
-Fixed terminology: microSD-kaart, Draagbare SSD (portable SSD — prefer over "Portable SSD"), kaartlezer (card reader), USB-stick (flash drive), leessnelheid (read speed), schrijfsnelheid (write speed).
-🚨 Spelling check: SILVER ≠ SLVER — do not drop letters.
-Compound nouns must be correctly joined as one word: leessnelheid, schrijfsnelheid, snelheidsklasse — no spacing errors.
-Number format: 1.000 MB/s (dot as thousands separator).
-Copy should be factual and objective, suitable for professional product descriptions. Expect text expansion of ~20% — keep short copy concise.`,
-
-  'pl': `[Polish-specific rules]
-ALL special diacritic characters must be preserved: ą ę ł ń ó ś ź ż — never omit or replace with plain letters. Nouns and adjectives must be correctly declined for case.
-Fixed terminology: karta microSD/SD, Przenośny dysk SSD (portable SSD), czytnik kart (card reader), pendrive (flash drive), prędkość odczytu (read speed), prędkość zapisu (write speed).
-Number format: 1 000 MB/s (space as thousands separator).
-Allow extra space for text expansion in UI — prefer short forms.`,
-
-  'sv': `[Swedish-specific rules]
-Preserve special characters: å ä ö.
-Fixed terminology: microSD-kort, bärbar SSD (portable SSD), kortläsare (card reader), USB-minne (flash drive), läshastighet (read speed), skrivhastighet (write speed).
-🚨 Spelling check: bärbar ≠ bärbär (portable = bärbar, single 'r' in the second syllable).
-Number format: 1 000 MB/s (space as thousands separator).
-Copy should be minimal and restrained — avoid verbose embellishment, matching Nordic aesthetic. Prefer Swedish terms over English (spelande over gaming, läsare over reader). Compound nouns must be correctly spelled — do not split them.`,
-
-  'tr': `[Turkish-specific rules]
-ALL special characters must be preserved: ı İ ö ü ç ş ğ. Strictly distinguish i/ı and I/İ — dots matter.
-Fixed terminology: microSD kart, Taşınabilir SSD (portable SSD), kart okuyucu (card reader), USB bellek (flash drive), okuma hızı (read speed), yazma hızı (write speed).
-⚠️ I/ı vs İ/i check: uppercase İ → lowercase i, uppercase I → lowercase ı. Never confuse them.
-Suffixes separated by apostrophe: 280 MB/s'ye, cihazı'na.
-Number format: 1.000 MB/s (dot as thousands separator).
-Use standard formal written Turkish, suitable for both professional users and consumers. Maintain cultural neutrality — avoid religiously sensitive expressions.`,
-
-  'ru': `[Russian-specific rules]
-Use Cyrillic throughout; Lexar and technical symbols remain in Latin script, embedded LTR within the text.
-Fixed terminology: скорость чтения (read speed), скорость записи (write speed), карта памяти (memory card), портативный SSD (portable SSD), кардридер (card reader).
-All nouns and adjectives must be correctly declined (6 cases). Emphasize cold-weather durability and ruggedness where relevant to the Russian market.
-Number format: 1 000 MB/s (space as thousands separator), comma as decimal (14,5).`,
-
-  'vi': `[Vietnamese-specific rules]
-ALL tone marks and special characters must be preserved: đ ư ơ ă â — missing tones change word meaning entirely. Never truncate text at byte boundaries that break combined tone marks; every syllable's tone must be complete.
-Use Northern standard Vietnamese (Hanoi official accent), NOT Southern dialect.
-Fixed terminology: thẻ nhớ (memory card), ổ cứng SSD di động (portable SSD), đầu đọc thẻ (card reader), ổ USB (flash drive), tốc độ đọc (read speed), tốc độ ghi (write speed).
-Number format: 1.000 MB/s (dot as thousands separator).
-Use correct classifiers (measure words) for product categories — do not calque from English. E-commerce copy should be lively and direct, matching Vietnamese market style.`,
-
-  'th': `[Thai-specific rules]
-All superscript/subscript vowels and tone marks must display completely — no character overlap, loss, or distortion.
-Use standard common register, NOT royal/high honorifics, and NOT overly casual speech.
-Brand annotation: เล็กซาร์; technical parameters remain in English.
-Avoid Buddhist-sensitive vocabulary and imagery. Default left-aligned layout; reserve sufficient line height to prevent character clipping. Word breaking must follow Thai writing conventions — never break mid-word.`,
-
-  'id': `[Indonesian-specific rules]
-Use official standard Indonesian (Bahasa Indonesia) — do NOT mix in Malay vocabulary.
-Fixed terminology: kartu memori (memory card), SSD portabel (portable SSD), pembaca kartu (card reader), flashdisk (flash drive), kecepatan baca (read speed), kecepatan tulis (write speed).
-Language should be accessible and direct, suitable for both general users and photography enthusiasts. Avoid overly formal/stiff expressions; match Indonesian 3C product copy style.`,
-
-  'ar': `[Arabic-specific rules]
-Use Modern Standard Arabic (MSA/fusha) — do NOT mix in any national dialect.
-Full text RTL; embedded Lexar, English terms, numbers, and symbols remain LTR — bidirectional text logic must be correct.
-Fixed terminology: بطاقة ذاكرة (memory card), سرعة القراءة (read speed), سرعة الكتابة (write speed), قرص SSD محمول (portable SSD), قارئ بطاقات (card reader).
-Cultural compliance: gender-neutral phrasing; avoid sensitive imagery and religious references. Avoid exaggerated marketing language unsuitable for Middle Eastern markets. Number format: consistently use either Arabic-Indic (١٬٠٠٠) or Western (1,000) numerals throughout.`,
-
-  'en': `[English-specific rules]
-Use American English spelling consistently: color, center, fiber, license — do NOT mix in British spelling.
-⚡ Category word calibration: Desktop Memory / Laptop Memory / Portable SSD / Flash Drive / Dual Drive / Solid State Dual Drive / Card / Reader / Enclosure / Hub — verify against category word glossary, never improvise.
-Fixed terminology: Read speed / Write speed, Professional filmmaker, Content creator, Rugged design.
-Number format: 1,000 MB/s (comma as thousands separator).
-Technical copy should be concise and objective; marketing copy should use short sentences, avoid complex clauses. Distinguish consumer vs. professional product line tone — do not mix them.
-⚠️ Do NOT literally translate Chinese four-character marketing slogans into awkward English; use native digital industry expressions.`,
+  'zh-CN': `【zh-CN】存储卡(非内存卡)、固态硬盘、读卡器、读取速度、写入速度、移动固态硬盘。禁用港台词汇。禁用极限词(最佳/第一/顶级)。中英文/数字间加半角空格。使用自然的简体中文表达，避免翻译腔。`,
+  'zh-TW': `【zh-TW】詞彙在地化（禁止只做簡繁字體轉換）：无人机→空拍機、內存→記憶體、硬盤→硬碟、U盘→隨身碟、移動固態→可攜式固態硬碟、屏幕→螢幕、分辨率→解析度、固件→韌體。記憶卡(非内存卡)、固態硬碟、讀卡機、行動硬碟、隨身碟。正体字规范：身分(非身份)、週(非周)。禁用大陆政策词汇与网络用语。使用自然的台灣繁體中文表達，避免翻譯腔。`,
+  'ja': `【ja】初出「レクサー」、以降Lexar。です・ます調。SDカード、リード速度、ライト速度、ポータブルSSD、カードリーダー、USBメモリ。カタカナ優先：新技術用語はカタカナ表記。和製英語を使用、英語直訳を避ける。過度な誇張禁止。说明书/包装用极其克制的客观描述。自然な日本語の表現を用い、翻訳調を避ける。`,
+  'ko': `【ko】初出렉사르、以降Lexar。읽기 속도、쓰기 속도、휴대용 SSD、카드 리더기、USB 플래시 드라이브。하십시오체(습니다/ㅂ니다) 통일, 반말 금지。외래어 우선 사용、간결하게。띄어쓰기 엄수。IT 용어: 영어 차용어 우선 (SSD, NVMe, 게이밍)。자연스러운 한국어 표현, 번역투를 피할 것.`,
+  'fr': `[fr] Metropolitan French (NOT Quebec). Carte microSD/SD, SSD portable, lecteur de cartes, clé USB, vitesse de lecture/écriture. Espace insécable avant : ; ! ?. Use "vous" not "tu". Séparateur décimal : virgule (7,5 Mo/s). Utilisez des expressions naturelles en français, évitez les calques.`,
+  'de': `[de] 🚨 Lexar ≠ Lexware! Speicherkarte, Tragbare SSD, Kartenleser, USB-Stick, Lese-/Schreibgeschwindigkeit. Compound nouns: one word. "Sie" not "du". UI: use shortest form to avoid text overflow. Natürliche deutsche Ausdrucksweise — keine wortwörtlichen Übersetzungen.`,
+  'es': `[es] International Castilian Spanish. Tarjeta microSD/SD, SSD portátil, lector de tarjetas, velocidad de lectura/escritura. Use formal "Usted". "ordenador" NOT "computadora", "tarjeta de memoria" NOT "memoria". Usa expresiones naturales en español, evita calcos del original.`,
+  'pt': `[pt] Portugal mainland Portuguese. Cartão de memória, SSD portátil, leitor de cartões, velocidade de leitura/gravação. ⛔ Pen USB (NOT Pen Drive), Portátil (NOT Notebook), Caixa (NOT Case). Adjective-noun gender/number agreement. Use expressões naturais do português europeu, evite decalques.`,
+  'pt-BR': `[pt-BR] Brazilian Portuguese. Cartão de memória, SSD portátil, leitor de cartões, pendrive, velocidade de leitura/gravação. ⛔ Pen Drive (NOT Pen USB), Notebook (NOT Portátil), Case (NOT Caixa). Use "você". IT术语常直接借用英语。语气可相对热情。Use expressões naturais do português brasileiro, evite decalques.`,
+  'it': `[it] Scheda microSD/SD, SSD portatile, lettore di schede, chiavetta USB, velocità di lettura/scrittura. Accents: è, perché, più — never omit. Keep English tech terms (SSD, NVMe, gaming). Usa espressioni naturali in italiano, evita calchi dalla lingua di partenza.`,
+  'nl': `[nl] microSD-kaart, Draagbare SSD, kaartlezer, USB-stick, leessnelheid, schrijfsnelheid. Compound nouns as one word. Expect ~20% text expansion. Gebruik natuurlijk Nederlands, vermijd letterlijke vertalingen.`,
+  'pl': `[pl] Karta microSD/SD, Przenośny dysk SSD, czytnik kart, pendrive, prędkość odczytu/zapisu. Preserve ą ę ł ń ó ś ź ż. Correct case declension. "dysk SSD" (nie "napęd SSD"). Używaj naturalnych polskich wyrażeń, unikaj kalk językowych.`,
+  'sv': `[sv] microSD-kort, bärbar SSD, kortläsare, USB-minne, läshastighet, skrivhastighet. Preserve å ä ö. Minimal, restrained copy — Nordic aesthetic. Retain English IT terms (SSD, NVMe, PCIe, gaming, flash). Använd naturliga svenska uttryck — ingen översättningssvenska.`,
+  'tr': `[tr] microSD kart, Taşınabilir SSD, kart okuyucu, USB bellek, okuma hızı, yazma hızı. Preserve ı İ ö ü ç ş ğ. Distinguish I/ı vs İ/i. Apostrophe-separated suffixes. Doğal Türkçe ifadeler kullanın, çeviri kokusundan kaçının.`,
+  'ru': `[ru] карта памяти, портативный SSD, кардридер, скорость чтения/записи. Cyrillic text; Latin for Lexar/tech symbols (embedded LTR). 6-case declension. Используйте естественные русские выражения, избегайте калькирования.`,
+  'vi': `[vi] thẻ nhớ, ổ cứng SSD di động, đầu đọc thẻ, ổ USB, tốc độ đọc/ghi. Preserve đ ư ơ ă â + tone marks. Northern standard (Hanoi). Confirm ALL tone marks (sắc, huyền, hỏi, ngã, nặng). Diễn đạt tự nhiên theo tiếng Việt, tránh dịch sát từng chữ.`,
+  'th': `[th] การ์ดหน่วยความจำ, SSD แบบพกพา, เครื่องอ่านการ์ด, แฟลชไดรฟ์, ความเร็วอ่าน/เขียน. Standard register (NOT royal/casual). Avoid Buddhist-sensitive vocabulary. Polite particles (ครับ/ค่ะ) only in customer-facing UI. ใช้สำนวนภาษาไทยที่เป็นธรรมชาติ หลีกเลี่ยงการแปลตรงตัว`,
+  'id': `[id] kartu memori, SSD portabel, pembaca kartu, flashdisk, kecepatan baca/tulis. Official Bahasa Indonesia (NOT Malay). Formal "Anda", avoid colloquial "kamu"/"lu"/"gue". Prefix system (me-, di-, ter-, pe-) correctly applied. Gunakan ungkapan alami bahasa Indonesia, hindari penerjemahan kaku.`,
+  'ar': `[ar] بطاقة ذاكرة, قرص SSD محمول, قارئ بطاقات, سرعة القراءة/الكتابة. MSA (fusha) only. Full RTL; embedded Latin LTR. Gender-neutral. Diacritics (tashkeel): add only on ambiguous terms. Avoid Egyptian/Levantine colloquialisms. استخدم تعبيرات عربية طبيعية، وتجنب الترجمة الحرفية.`,
+  'en': `[en] American English spelling. Read speed / Write speed. Use native digital industry expressions. Keep it concise and punchy. Use natural American English — no translationese.`,
 }
+
 
 // ============================================================
 // 输出前自检规则（精简版，注入任务结尾，模型自我校验）
 // ============================================================
 // 精简自检：只检查输出后才能验证的东西（全局铁则已覆盖品牌/术语/忠实性）
-const SELF_CHECK = `【输出前自检 — 内部校验，禁止输出到译文】
-1. 目标语言特殊字符、变音符号、声调是否完整无遗漏？
-2. 输出是否为纯目标语言 — 无原文、无注释、无混合语言？
-3. 原文结构（列表、层级、换行）是否完整保留？
-4. 译文中是否出现括号解释（如"存储(fast)"、"品牌(中文)"）？如有则必须移除，输出纯净译文。
-5. 短文本标签/按钮/参数名（源文<15个单词或字符）是否被过度扩写？如译文长度超出源文50%以上，压缩至最精练表达。`
-const SELF_CHECK_EN = `[Pre-output self-check — internal only, do NOT include in output]
-1. Are all target language special characters, diacritics, and tone marks fully preserved?
-2. Is the output pure target language — no source text, no explanatory notes, no mixed languages?
-3. Is the original structure (lists, hierarchy, line breaks) fully preserved?
-4. Does any translation contain parenthetical explanations (e.g. "storage (存储)", "brand (品牌)")? If so, remove them — output pure translation only.
-5. Did any short label/button/parameter name (source <15 words or characters) get over-expanded? If the translation exceeds 50% of the source length, compress to the most concise viable expression.`
-
-// ============================================================
-// 尾部加固提醒（Qwen 对 prompt 首尾注意力最高，在末尾重申不可违抗规则）
-// ============================================================
-const CRITICAL_REMINDER = `【🔴 再次强调 — 以下规则绝对不可违反】
-- 品牌名（Lexar/DJI/Canon/Sony/SanDisk/Kingston/Samsung/WD/Intel/AMD/NVIDIA等）和产品系列名（ARES/THOR/SILVER/BLUE/GOLD/DIAMOND/PLAY/ARMOR/NM/NQ/NS/EQ等）在任何语言中禁止翻译、禁止音译、禁止加注音
-- 技术规格（GB/MB/s/PCIe/NVMe/CFexpress/SD/microSD/USB等）原样保留不翻译
-- Silver/Blue/Gold/Diamond 是产品系列名，禁止翻译为颜色词
-- 禁止在括号中添加解释、原文、别名——输出必须纯净
-- 禁止回退到英文——必须使用目标语言完成全部翻译
-- 术语库译法为最高优先级，必须严格使用
-- 原文中的所有数字、容量值、速度值必须原样保留，数值绝对不可更改
-- 短标签/按钮/参数名（<15字符）禁止扩写为长句——保持同等简洁度`
-
-const CRITICAL_REMINDER_EN = `[🔴 FINAL REMINDER — the following rules are absolute and must not be violated]
-- Brand names (Lexar, DJI, Canon, Sony, SanDisk, Kingston, Samsung, WD, Intel, AMD, NVIDIA, etc.) and product series names (ARES, THOR, SILVER, BLUE, GOLD, DIAMOND, PLAY, ARMOR, NM, NQ, NS, EQ, etc.) must NEVER be translated, transliterated, or annotated in any language
-- Technical specs (GB, MB/s, PCIe, NVMe, CFexpress, SD, microSD, USB, etc.) must be preserved as-is
-- Silver, Blue, Gold, Diamond are product series names — NEVER translate as color words
-- NEVER add parenthetical explanations, original text, or aliases — output must be pure
-- NEVER fall back to English — all output must be in the target language
-- Glossary terms are the highest authority — use them exactly as specified
-- All numbers, capacity values, and speed values in the source must be preserved exactly — NEVER alter any numeric value
-- Short labels, buttons, and parameter names (<15 characters) must NOT be expanded into full sentences — maintain the same conciseness`
+// 输出纯度锚点（利用 Qwen 对 prompt 首尾注意力最高的特性，末尾放核心输出约束）
+const OUTPUT_ANCHOR = `输出前内存校验（不要输出校验过程）：
+1. 占位符 __TRM_N__ 完好无损且位置正确
+2. ↵ 换行标记原样保留、位置不变
+3. 术语库译法正确使用
+4. 未添加原文不存在的信息
+5. 遵守目标语言专属规则
+校验通过后直接输出纯译文——无解释、无括号、无混合语言。禁止扩写为营销文案。短标签保持同等简洁。`
+const OUTPUT_ANCHOR_EN = `Self-check in memory (don't output):
+1. __TRM_N__ placeholders intact
+2. ↵ line-break markers preserved exactly at original positions
+3. Glossary terms applied correctly
+4. No added info absent from source
+5. Target language rules followed
+→ Output pure translation only. No expansion. Short labels stay short.`
 
 // ============================================================
 // 辅助函数
 // ============================================================
-function resolveEffectiveStyle(config: LLMConfig, scenePreset?: string): string {
-  const isSceneForced = scenePreset === 'technical_params' || scenePreset === 'packaging' || scenePreset === 'ui' || scenePreset === 'after_sales' || scenePreset === 'manual' || scenePreset === 'spec_sheet'
-  return isSceneForced ? 'professional' : config.translationStyle
+// ============================================================
+// 场景→风格路由：纯技术场景强制严谨专业版
+// spec_sheet/technical_params/manual/after_sales 天然是技术性的，
+// 即使 UI 选择了 marketing 风格，也应强制覆盖为 professional。
+// ============================================================
+function getEffectiveStyle(scenePreset: string, requestedStyle: string): string {
+  // 只有商品详情页允许三种风格（standard/professional/marketing），
+  // 其他所有场景（包装/ui/售后/说明书/规格书/技术参数）强制严谨专业版
+  if (scenePreset !== 'ecommerce') return 'professional'
+  return requestedStyle
 }
 
-function getStylePrompt(config: LLMConfig, isEnSource?: boolean, scenePreset?: string): string {
-  // 非电商场景强制严谨专业版，消除风格×场景的矛盾组合
-  const isSceneForced = scenePreset === 'technical_params' || scenePreset === 'packaging' || scenePreset === 'ui' || scenePreset === 'after_sales' || scenePreset === 'manual' || scenePreset === 'spec_sheet'
-  const effectiveStyle = resolveEffectiveStyle(config, scenePreset)
+// ============================================================
+// TRANSLATION_CONTEXT — 统一的翻译上下文注入
+// 合并 STYLE + SCENE + PRODUCT_LINE，消除模块互斥和重叠
+// ============================================================
+function getTranslationContext(
+  productLine: string | null,
+  scenePreset: string,
+  style: string,
+  isEnSource: boolean,
+): string {
+  // 纯技术场景强制专业版风格
+  const effectiveStyle = getEffectiveStyle(scenePreset, style)
+  const parts: string[] = []
 
-  // 场景已锁定风格时，跳过独立风格块——场景提示词已声明"本场景翻译风格固定为严谨专业"
-  if (isSceneForced && effectiveStyle === 'professional') return ''
-
-  if (effectiveStyle === 'custom') {
-    const custom = (config.translationStyleCustom || '').trim()
-    if (!custom) return ''
-    const label = isEnSource ? '\n[Translation Style: Custom] ' : '\n【翻译风格：自定义】'
-    return label + custom
+  // —— 产品语境 ——
+  if (productLine) {
+    const plBlocks = isEnSource ? PRODUCT_LINE_STRATEGIES_EN : PRODUCT_LINE_STRATEGIES
+    const block = plBlocks[productLine]
+    if (block) parts.push(block)
+  } else {
+    parts.push(isEnSource
+      ? '[Product Context] General 3C/storage product. Translate accurately with industry-standard terminology.'
+      : '【产品语境】通用3C存储产品。使用行业标准术语，准确翻译。')
   }
-  const presets = isEnSource ? STYLE_PRESETS_EN : STYLE_PRESETS
-  const preset = presets[effectiveStyle]
-  return preset ? `\n${preset}` : ''
-}
 
-function getScenePrompt(config: LLMConfig, isEnSource?: boolean): string {
-  const presets = isEnSource ? SCENE_PRESETS_EN : SCENE_PRESETS
-  const preset = presets[config.scenePreset]
-  return preset ? `\n${preset}` : ''
+  // —— 场景约束 ——
+  const scenePresets = isEnSource ? SCENE_PRESETS_EN : SCENE_PRESETS
+  const scene = scenePresets[scenePreset]
+  if (scene) parts.push(scene)
+
+  // —— 语气方向（始终注入，永不跳过） ——
+  const toneMap: Record<string, Record<string, string>> = {
+    standard: {
+      cn: '【语气】平实自然，通顺易读。',
+      en: '[Tone] Clear, natural, easy to read.',
+    },
+    professional: {
+      cn: '【语气】严谨正式，精准客观。句式简洁，无冗余修饰。',
+      en: '[Tone] Formal, precise, objective. Concise — no redundant modifiers.',
+    },
+    marketing: {
+      cn: '【语气】有说服力，突出卖点。保持高端品牌调性，不虚构不夸大。',
+      en: '[Tone] Persuasive, benefit-led. Premium brand voice. Never fabricate or exaggerate.',
+    },
+  }
+  const tone = toneMap[effectiveStyle] || toneMap['standard']
+  parts.push(isEnSource ? tone.en : tone.cn)
+
+  return '\n' + parts.join('\n')
 }
 
 function getLangSpecificPrompt(targetLang: string): string {
@@ -867,48 +772,156 @@ function getLangSpecificPrompt(targetLang: string): string {
 }
 
 // ============================================================
-// 目标语言 TAIL 加固（弱语言专属）
-// 根因：Qwen 弱语言子网在英文→目标语言切换时丢失指令约束。
-// 方案：在 TAIL 最后用目标语言本身注入硬规则，激活目标语言子网。
+// 校对专用精简产品语境（相比翻译版去掉受众/品牌定位/语气指导，
+// 只保留术语规则和禁忌——校对的核心是检查准确性而非风格创作）
 // ============================================================
-function getTargetLangReinforcement(targetLang: string): string {
+const PROOFREAD_PL_CN: Record<string, string> = {
+  professional_imaging: '\n【专业影像】检查：不掉帧/连拍/导出/VPG术语正确，禁止称"游戏卡"。',
+  consumer_cards: '\n【消费存储卡】检查：4K畅拍/数据安全/即插即用术语正确，禁止夸大性能。',
+  gaming_card: '\n【游戏存储卡】读取速度≠写入速度，A2=随机IOPS，V30=持续写入。',
+  gaming_ssd: '\n【电竞SSD】读取速度≠写入速度，DirectStorage=GPU直读SSD。散热决定持续性能。',
+  gaming_dimm: '\n【电竞内存】1% Low帧/XMP/EXPO/PMIC，不承诺所有平台可达标称频率。',
+  pc_productivity: '\n【PC/AI生产力】多线程/LLM推理/I/O吞吐，禁止使用游戏化语言。',
+  portable_storage: '\n【移动存储】品类词严禁混用：U盘≠移动固态≠双接口U盘≠硬盘盒≠扩展坞。',
+  innovation_lifestyle: '\n【创新生活】pexar=温暖科技陪伴，禁止道德绑架式文案。',
+}
+
+const PROOFREAD_PL_EN: Record<string, string> = {
+  professional_imaging: '\n[Professional Imaging] Check: dropped frames, burst shooting, offload, VPG. Never "gaming card".',
+  consumer_cards: '\n[Consumer Cards] Check: smooth 4K, data safety, plug-and-play. No "pro-grade" or "flagship".',
+  gaming_card: '\n[Gaming Card] Read speed ≠ Write speed. A2=random IOPS. V30=sustained write.',
+  gaming_ssd: '\n[Gaming SSD] Read speed ≠ Write speed. DirectStorage=GPU reads SSD directly. Thermal dictates sustained perf.',
+  gaming_dimm: '\n[Gaming Memory] 1% Low FPS, XMP/EXPO, PMIC. Never promise rated freq on all platforms.',
+  pc_productivity: '\n[PC/AI Productivity] Multi-threaded, LLM inference, I/O throughput. No gaming language.',
+  portable_storage: '\n[Portable Storage] Category words NEVER interchangeable: Flash Drive≠Portable SSD≠Dual Drive≠Enclosure≠Hub.',
+  innovation_lifestyle: '\n[Innovation Lifestyle] pexar=warm tech companionship. No guilt-based marketing.',
+}
+
+function getProofreadContext(productLine: string | null, isEnSource: boolean): string {
+  if (!productLine) {
+    return isEnSource
+      ? '\n[Product Context] General 3C/storage product. Verify terminology consistency.'
+      : '\n【产品语境】通用3C存储产品。检查术语一致性。'
+  }
+  const block = isEnSource ? PROOFREAD_PL_EN[productLine] : PROOFREAD_PL_CN[productLine]
+  return block || ''
+}
+
+
+/**
+ * 校对专用目标语言末尾规则
+ *
+ * 与 getTargetLangReinforcement（翻译用）不同，校对规则聚焦于：
+ * 1. 检测译文是否异常扩展（校对的核心价值）
+ * 2. 术语合规性检查
+ * 3. 长度匹配检查
+ *
+ * 用目标语言书写以利用语言启动效应，让校对模型在目标语言语境中评审。
+ */
+function getProofreadTargetLangReinforcement(targetLang: string): string {
   switch (targetLang) {
+    case 'zh-TW':
+      return `\n[🔍 校對檢查清單 — 繁體中文]
+- 擴展檢測：譯文是否比原文長很多？如有，標記為「過度擴寫」並壓縮至原文長度。
+- 術語合規：譯文中的術語是否與術語庫一致？不一致則修正。
+- 保護術語：軟體名/品牌名（如 Lexar Recovery Tool）是否在譯文中被翻譯或擴寫？如有，恢復為原始名稱。
+- 原創內容：譯文是否添加了原文沒有的產品功能/優惠/故事？如有，刪除。
+- 簡繁轉換：用語是否為台灣繁體？（硬盤→硬碟、固態→固態硬碟、U盤→隨身碟、內存→記憶體）`
+    case 'zh-CN':
+      return `\n[🔍 校对检查清单 — 简体中文]
+- 扩展检测：译文是否比原文长很多？如是，标记为「过度扩写」并压缩至原文长度。
+- 术语合规：译文中的术语是否与术语库一致？不一致则修正。
+- 原创内容：译文是否添加了原文没有的产品功能/优惠/故事？如有，删除。`
+    case 'ja':
+      return `\n[🔍 校正チェックリスト — 日本語]
+- 拡張検出：訳文が原文より大幅に長いか？長い場合は「過剰拡張」として原文長に圧縮。
+- 用語合规：訳文中の用語は用語集と一致しているか？不一致なら修正。
+- オリジナル内容：原文にない製品機能や特典情報が追加されていないか？あれば削除。`
+    case 'ko':
+      return `\n[🔍 교정 체크리스트 — 한국어]
+- 확장 감지: 번역문이 원문보다 훨씬 긴가? 길면 "과도확장"으로 표시하고 원문 길이로 압축.
+- 용어 규정: 번역문의 용어가 용어집과 일치하는가? 불일치 시 수정.
+- 원본 내용: 원문에 없는 제품 기능/혜택 정보가 추가되었는가? 있으면 삭제.`
+    case 'fr':
+      return `\n[🔍 CHECKLIST DE RELECTURE — FRANÇAIS]
+- Détection d'expansion : la traduction est-elle beaucoup plus longue que la source ? Si oui, compresser.
+- Conformité terminologique : les termes correspondent-ils au glossaire ? Corriger si non.
+- Contenu original : des fonctions/produits/promotions absents de la source ont-ils été ajoutés ? Supprimer.`
+    case 'de':
+      return `\n[🔍 PRÜFCHECKLISTE — DEUTSCH]
+- Expansionserkennung: Ist die Übersetzung viel länger als die Quelle? Falls ja, auf Quelllänge komprimieren.
+- Terminologie-Compliance: Stimmen die Begriffe mit dem Glossar überein? Falls nicht, korrigieren.
+- Originalinhalte: Wurden nicht in der Quelle enthaltene Funktionen/Angebote hinzugefügt? Löschen.`
+    case 'es':
+      return `\n[🔍 CHECKLIST DE REVISIÓN — ESPAÑOL]
+- Detección de expansión: ¿la traducción es mucho más larga que el original? Si sí, comprimir.
+- Conformidad terminológica: ¿coinciden los términos con el glosario? Corregir si no.
+- Contenido original: ¿se añadieron funciones/ofertas no presentes en el original? Eliminar.`
     case 'pt':
-      return `\n[⚠️ REGRAS FINAIS EM PORTUGUÊS — LEIA ANTES DE GERAR]
-1. "Write speed" = velocidade de GRAVAÇÃO. "Read speed" = velocidade de LEITURA. São coisas DIFERENTES. NUNCA troque.
-2. Concordância de género e número: "o cartão é impressionante" (não "impressionantes"). Advérbios usam -mente: "impressionantemente rápido".
-3. Termos técnicos em INGLÊS: "host", "firmware", "driver", "chipset" NÃO se traduzem. "Dispositivo host" (NUNCA "anfitrião").
-4. "Emparelhado" é SÓ para Bluetooth/pareamento sem fios. "When paired with" = "quando utilizado com" ou "quando usado com".
-5. UHS-I e UHS-II são especificações técnicas DISTINTAS. Não as confunda nem as altere.
-6. NÃO invente nada que não esteja no texto original. NÃO adicione contexto sobre produtos futuros.
-7. Texto curto na origem = texto curto na tradução. NÃO expanda frases curtas em parágrafos.
-8. Escreva frases naturais em português, não traduções palavra-por-palavra do inglês. Seja direto e conciso.`
+      return `\n[🔍 CHECKLIST DE REVISÃO — PORTUGUÊS]
+- Deteção de expansão: a tradução está muito mais longa que o original? Se sim, comprimir.
+- Conformidade terminológica: os termos correspondem ao glossário? Corrigir se não.
+- Conteúdo original: foram adicionadas funções/ofertas ausentes no original? Eliminar.`
     case 'pt-BR':
-      return `\n[⚠️ ANTES DE GERAR — REGRAS EM PORTUGUÊS (BR)]
-- Concordância: adjetivos concordam em GÉNERO e NÚMERO com o substantivo.
-- Termos técnicos NÃO se traduzem: "host", "firmware", "driver", "chipset" mantêm-se em inglês.
-- "Write speed" = "velocidade de gravação", "Read speed" = "velocidade de leitura". NUNCA confundir.
-- UHS-I e UHS-II são especificações distintas — não as altere.
-- Texto curto na origem = texto curto na tradução. NÃO expanda.
-- NÃO invente informação que não está no texto original.`
+      return `\n[🔍 CHECKLIST DE REVISÃO — PORTUGUÊS BRASILEIRO]
+- Detecção de expansão: a tradução está muito mais longa que o original? Se sim, comprimir.
+- Conformidade terminológica: os termos correspondem ao glossário? Corrigir se não.
+- Conteúdo original: foram adicionadas funções/ofertas ausentes no original? Eliminar.`
+    case 'it':
+      return `\n[🔍 CHECKLIST DI REVISIONE — ITALIANO]
+- Rilevamento espansione: la traduzione è molto più lunga dell'originale? Se sì, comprimere.
+- Conformità terminologica: i termini corrispondono al glossario? Correggere se no.
+- Contenuto originale: sono state aggiunte funzioni/offerte non presenti nell'originale? Eliminare.`
+    case 'nl':
+      return `\n[🔍 CONTROLELIJST — NEDERLANDS]
+- Expansiedetectie: is de vertaling veel langer dan het origineel? Zo ja, comprimeren.
+- Terminologische conformiteit: komen de termen overeen met de woordenlijst? Corrigeer indien niet.
+- Originele inhoud: zijn er functies/aanbiedingen toegevoegd die niet in het origineel staan? Verwijderen.`
+    case 'pl':
+      return `\n[🔍 LISTA KONTROLNA — POLSKI]
+- Wykrywanie rozszerzenia: czy tłumaczenie jest znacznie dłuższe niż oryginał? Jeśli tak, skompresuj.
+- Zgodność terminologiczna: czy terminy są zgodne z glosariuszem? Popraw jeśli nie.
+- Oryginalna treść: czy dodano funkcje/oferty nieobecne w oryginale? Usuń.`
+    case 'sv':
+      return `\n[🔍 CHECKLISTA — SVENSKA]
+- Expansionsdetektering: är översättningen mycket längre än originalet? Komprimera i så fall.
+- Terminologisk efterlevnad: matchar termerna ordlistan? Korrigera om inte.
+- Originalinnehåll: har funktioner/erbjudanden som saknas i originalet lagts till? Ta bort.`
+    case 'tr':
+      return `\n[🔍 KONTROL LİSTESİ — TÜRKÇE]
+- Genişletme tespiti: çeviri orijinalden çok daha uzun mu? Uzunsa sıkıştır.
+- Terminoloji uyumu: terimler sözlükle eşleşiyor mu? Eşleşmiyorsa düzelt.
+- Orijinal içerik: orijinalde olmayan işlevler/teklifler eklendi mi? Kaldır.`
+    case 'ru':
+      return `\n[🔍 КОНТРОЛЬНЫЙ СПИСОК — РУССКИЙ]
+- Обнаружение расширения: перевод намного длиннее оригинала? Если да, сжать.
+- Терминологическое соответствие: термины совпадают с глоссарием? Исправить, если нет.
+- Оригинальный контент: добавлены ли функции/предложения, отсутствующие в оригинале? Удалить.`
     case 'vi':
-      return `\n[⚠️ TRƯỚC KHI DỊCH — QUY TẮC TIẾNG VIỆT]
-- Thuật ngữ kỹ thuật KHÔNG dịch: "host", "firmware", "driver", "chipset" giữ nguyên tiếng Anh.
-- "Write speed" = "tốc độ ghi", "Read speed" = "tốc độ đọc". KHÔNG nhầm lẫn.
-- Văn bản nguồn ngắn = bản dịch ngắn. KHÔNG mở rộng câu ngắn thành đoạn dài.
-- KHÔNG thêm thông tin không có trong văn bản gốc.`
+      return `\n[🔍 DANH SÁCH KIỂM TRA — TIẾNG VIỆT]
+- Phát hiện mở rộng: bản dịch có dài hơn nhiều so với bản gốc không? Nếu có, hãy nén lại.
+- Tuân thủ thuật ngữ: các thuật ngữ có khớp với bảng thuật ngữ không? Sửa nếu không.
+- Nội dung gốc: có thêm chức năng/ưu đãi không có trong bản gốc không? Xóa bỏ.`
     case 'th':
-      return `\n[⚠️ ก่อนแปล — กฎภาษาไทย]
-- คำศัพท์เทคนิคห้ามแปล: "host", "firmware", "driver", "chipset" เก็บเป็นภาษาอังกฤษ
-- "Write speed" = "ความเร็วเขียน", "Read speed" = "ความเร็วอ่าน" ห้ามสลับ
-- ต้นฉบับสั้น = คำแปลสั้น ห้ามขยายความ
-- ห้ามเพิ่มข้อมูลที่ไม่มีในต้นฉบับ`
+      return `\n[🔍 รายการตรวจสอบ — ภาษาไทย]
+- การตรวจจับการขยายความ: ฉบับแปลยาวกว่าต้นฉบับมากหรือไม่? หากใช่ ให้บีบอัด
+- การปฏิบัติตามคำศัพท์: คำศัพท์ตรงกับอภิธานศัพท์หรือไม่? แก้ไขหากไม่ตรง
+- เนื้อหาต้นฉบับ: มีการเพิ่มฟังก์ชัน/ข้อเสนอที่ไม่มีในต้นฉบับหรือไม่? ลบออก`
+    case 'id':
+      return `\n[🔍 DAFTAR PERIKSA — BAHASA INDONESIA]
+- Deteksi ekspansi: apakah terjemahan jauh lebih panjang dari aslinya? Jika ya, kompres.
+- Kepatuhan terminologi: apakah istilah sesuai dengan glosarium? Perbaiki jika tidak.
+- Konten orisinal: apakah ada fungsi/penawaran yang tidak ada di sumber asli? Hapus.`
     case 'ar':
-      return `\n[⚠️ قبل الترجمة — قواعد اللغة العربية]
-- المصطلحات التقنية لا تترجم: "host", "firmware", "driver", "chipset" تبقى بالإنجليزية
-- "Write speed" = "سرعة الكتابة", "Read speed" = "سرعة القراءة" — لا تخلط بينهما
-- النص القصير = ترجمة قصيرة. لا توسع
-- لا تضف معلومات غير موجودة في النص الأصلي`
+      return `\n[🔍 قائمة التحقق — العربية]
+- كشف التوسع: هل الترجمة أطول بكثير من النص الأصلي؟ إذا كان الأمر كذلك، قم بالضغط.
+- الامتثال للمصطلحات: هل تتطابق المصطلحات مع المسرد؟ صحح إذا لم تتطابق.
+- المحتوى الأصلي: هل تمت إضافة وظائف/عروض غير موجودة في النص الأصلي؟ احذف.`
+    case 'en':
+      return `\n[🔍 PROOFREAD CHECKLIST — ENGLISH]
+- Expansion detection: is the translation much longer than the source? If so, compress to source length.
+- Terminology compliance: do terms match the glossary? Correct if not.
+- Original content: were functions/offers not in the source added? Remove.`
     default:
       return ''
   }
@@ -916,21 +929,9 @@ function getTargetLangReinforcement(targetLang: string): string {
 
 function getGlobalRulesForProofread(isEnSource?: boolean): string {
   if (isEnSource) {
-    return `[Brand & Terminology] All brand names (Lexar, DJI, Canon, Sony, SanDisk, Kingston, Samsung, WD, Intel, AMD, NVIDIA, etc.) and standard protocol names (DirectStorage, XMP, EXPO, etc.) must remain in original form — no translation. All technical specs and industry standard symbols must be preserved untranslated. Product series/model names (ARES, THOR, ARMOR, BLUE, SILVER, etc.) remain in English — color-looking words like Silver/Blue/Gold are Lexar series names, do NOT translate. Product model numbers must keep original alphanumeric format.
-
-[Category Words] Storage category words must be strictly distinguished: Desktop Memory (NOT PC RAM), Laptop Memory (NOT Notebook RAM), internal SSD, Portable SSD, Flash Drive, Dual Drive, Solid State Dual Drive, Card, Reader, Enclosure, Hub.
-
-[Compliance] Follow target language advertising regulations — no superlative claims. Numbers, punctuation, and symbols must follow target language conventions.
-
-[Faithfulness] Strictly match original information — no omissions, additions, or embellishments not in the source.`
+    return `[Rules] Brand/series names untranslated. Technical specs preserved as-is. Silver/Blue/Gold are Lexar series names — never translate as colors. Category words strictly distinguished: Desktop Memory, Laptop Memory, SSD, Portable SSD, Flash Drive, Dual Drive, Card, Reader, Enclosure, Hub. Read speed ≠ Write speed. No omissions or additions. No expansion into marketing copy. Short labels stay short. Compliance text verbatim. No parenthetical explanations.`
   }
-  return `【品牌与专有名词铁则】所有品牌名（Lexar、DJI、Canon、Sony、SanDisk、Kingston、Samsung、WD、Intel、AMD、NVIDIA等）和标准协议名（DirectStorage、XMP、EXPO等）禁止翻译、必须原样保留。所有技术规格、行业标准符号原样保留不翻译。产品系列名/型号名（ARES、THOR、ARMOR、BLUE、SILVER等）保留英文原词——Silver/Blue/Gold等看似颜色词的词汇均为Lexar产品系列名，禁止翻译。产品完整型号字母数字格式完全保留。
-
-【品类词区分】存储品类词固定区分，严禁混用：台式机内存=Desktop Memory、笔记本内存=Laptop Memory、内置固态=SSD、移动固态=Portable SSD、U盘=Flash Drive、双接口U盘=Dual Drive、固态U盘=Solid State Dual Drive、存储卡=Card、读卡器=Reader、硬盘盒=Enclosure、扩展坞=Hub。
-
-【格式合规】遵守目标语言广告法规，禁止使用极限违禁词。数字、标点、符号遵循目标语言规范。
-
-【忠实原文】严格对应原文信息，不得漏译、增译、自行补充原文没有的卖点与修饰。`
+  return `【规则】品牌/系列名禁止翻译。技术规格原样保留。Silver/Blue/Gold是产品系列名禁止译为颜色词。品类词严格区分：台式机内存、笔记本内存、SSD、移动固态、U盘、双接口U盘、存储卡、读卡器、硬盘盒、扩展坞。读取速度≠写入速度。不得漏译增译。严禁扩写为营销文案。短标签保持简洁。合规信息逐字直译。禁止添加括号解释。`
 }
 
 // ============================================================
@@ -1063,7 +1064,7 @@ return `\n${label}\n${lines.join('\n')}`
 
 // 注入品类词：所有内容类型均需术语一致性保障
 // 产品线过滤 + 内容类型相关词汇，省 token
-function getCategoryWordGuideIfNeeded(targetLang: string, _contentType: ContentType, productLine?: string | null, isEnSource?: boolean): string {
+function getCategoryWordGuideIfNeeded(targetLang: string, productLine?: string | null, isEnSource?: boolean): string {
   return getCategoryWordGuide(targetLang, productLine, isEnSource)
 }
 
@@ -1071,7 +1072,7 @@ function getCategoryWordGuideIfNeeded(targetLang: string, _contentType: ContentT
 // 上下文关联提示
 // ============================================================
 const CONTEXT_HINT = `文本按设计稿层级排列，相邻条目存在上下文关联（如标题→副标题→正文），翻译时注意语义连贯和术语风格一致。`
-const CONTEXT_HINT_EN = `Texts are arranged in design-layer order. Adjacent entries have contextual relationships (e.g. title→subtitle→body). Maintain semantic coherence and consistent terminology/style across entries.`
+const CONTEXT_HINT_EN = `Adjacent entries share context (title→subtitle→body). Keep terminology and style consistent across entries.`
 
 export async function translateBatch(
   texts: string[],
@@ -1085,6 +1086,7 @@ export async function translateBatch(
   pageName?: string,
   fileName?: string,
   crossBatchTerms?: string[],
+  taskGlossaryHint?: string,
 ): Promise<string[]> {
   const targetName = LANGUAGES.find(l => l.code === targetLang)?.name || targetLang
 
@@ -1092,48 +1094,84 @@ export async function translateBatch(
   const isEnSource = detectedSource === 'en'
   const sourceName = detectedSource === 'zh-CN' ? '简体中文' : '英文'
 
-  const contentType = detectContentType(texts)
-  const contentTypeGuide = isEnSource ? CONTENT_TYPE_GUIDES_EN[contentType] : CONTENT_TYPE_GUIDES[contentType]
-
   const { texts: cleanTexts, tags: htmlTags } = protectHtmlTags(texts)
 
   // 源文本预标准化（Unicode NFC + 全角→半角 + 零宽字符移除 + 兼容字符规范化）
   const normalizedTexts = normalizeTextForLLM(cleanTexts)
 
-  // 实体遮蔽（产品型号/URL/Email/纯测量值 → 占位符，防止 LLM 幻觉）
-  const { texts: maskedTexts, entityMap } = maskEntities(normalizedTexts)
+  // 提取不应翻译的术语（两层：1. source===target 2. termType==='保留原文'）
+  // 这些术语在翻译时必须保持原样，需要遮蔽后发给 LLM
+  const protectedTerms: string[] = []
+  for (const [src, tgt] of glossaryMap.entries()) {
+    if (src.length < 3) continue
+    // 第1层：当前目标语言下 source === target（术语库明确指示不翻译）
+    if (src === tgt) {
+      protectedTerms.push(src)
+      continue
+    }
+    // 第2层：termType 标记为"保留原文"的术语（软件名/品牌名等始终不翻译）
+    if (runtimeTermTypes && runtimeTermTypes[src]?.startsWith('保留原文')) {
+      protectedTerms.push(src)
+    }
+  }
+
+  // ⚠️ 实体遮蔽必须在 CJK 空格保护之前执行！
+  // 实体遮蔽先将多词术语（如 "Lexar Recovery Tool"）整体替换为占位符，
+  // 然后 CJK 空格保护删除剩余的空格（v2：直接删除，不引入任何占位符字符）
+  const { texts: maskedTexts, entityMap } = maskEntities(normalizedTexts, protectedTerms)
+
+  // CJK 空格保护：删除 CJK 主导文本中的空格，防止 LLM（Qwen）误判为条目分隔符
+  // v2：直接删除空格而非占位替换——任何占位符字符都可能被 tokenizer 当作边界
+  const { texts: spaceProtectedTexts } = protectCjkSpaces(maskedTexts)
 
   // 产品线检测（提前到术语过滤之前）
   const productLine = getEffectiveProductLine(config, texts, pageName, fileName)
 
-  // 术语三层过滤：产品线 → 场景 → 相关性
-  const filteredGlossaryMap = filterGlossaryByProductLine(glossaryMap, productLine, runtimeProductLines)
-  let glossaryObj: Record<string, string> = {}
-  for (const [k, v] of filteredGlossaryMap.entries()) { glossaryObj[k] = v }
-  glossaryObj = filterGlossaryByScene(glossaryObj, config.scenePreset)
-  let { glossaryHint } = filterRelevantGlossary(glossaryObj, texts, 10)
+  // 术语注入：优先使用任务级预计算提示词（跨批次 system prompt 一致 → API 缓存命中）
+  // 无预计算时回退到逐批次术语过滤（兼容旧调用路径）
+  let glossaryHint: string
+  if (taskGlossaryHint !== undefined) {
+    glossaryHint = taskGlossaryHint
+  } else {
+    const filteredGlossaryMap = filterGlossaryByProductLine(glossaryMap, productLine, runtimeProductLines, texts)
+    let glossaryObj: Record<string, string> = {}
+    for (const [k, v] of filteredGlossaryMap.entries()) { glossaryObj[k] = v }
+    glossaryObj = filterGlossaryByScene(glossaryObj, config.scenePreset)
+    const filtered = filterRelevantGlossary(glossaryObj, texts, 100)
+    glossaryHint = filtered.glossaryHint
 
-  // 跨批次术语注入：将其他批次中也会出现的术语及其标准译法提前注入本批次
-  if (crossBatchTerms && crossBatchTerms.length > 0) {
-    const extraLines: string[] = []
-    for (const term of crossBatchTerms) {
-      const termTarget = glossaryMap.get(term) || glossaryObj[term]
-      if (termTarget && !glossaryObj[term]) {
-        extraLines.push(`"${term}" → "${termTarget}"`)
+    // 跨批次术语注入：将其他批次中也会出现的术语及其标准译法提前注入本批次
+    // 仅在逐批次模式下执行——任务级预计算已包含所有跨批次术语
+    if (crossBatchTerms && crossBatchTerms.length > 0) {
+      const extraLines: string[] = []
+      for (const term of crossBatchTerms) {
+        const termTarget = glossaryMap.get(term) || glossaryObj[term]
+        if (termTarget && !glossaryObj[term]) {
+          extraLines.push(`"${term}" → "${termTarget}"`)
+        }
       }
-    }
-    if (extraLines.length > 0) {
-      const label = isEnSource
-        ? '\n[Cross-batch terms — also use these standardized translations]:'
-        : '\n【跨批次术语 — 以下术语译文也需统一使用】：'
-      glossaryHint += label + '\n' + extraLines.join('\n')
+      if (extraLines.length > 0) {
+        const label = isEnSource
+          ? '\n[Cross-batch terms — also use these standardized translations]:'
+          : '\n【跨批次术语 — 以下术语译文也需统一使用】：'
+        glossaryHint += label + '\n' + extraLines.join('\n')
+      }
     }
   }
 
-  const textList = maskedTexts.map((t, i) => `${i + 1}. ${t}`).join('\n')
+  // 使用 [N] 格式包裹每条文本，防止 LLM（Qwen）将文本内部空格误判为条目分隔符
+  // 含空格的文本加引号包裹，LLM 识别为单个实体
+  const quotedIndices = new Set<number>()
+  const textList = spaceProtectedTexts.map((t, i) => {
+    if (/\s/.test(t)) {
+      quotedIndices.add(i)
+      return `[${i + 1}] "${t}"`
+    }
+    return `[${i + 1}] ${t}`
+  }).join('\n')
 
   // few-shot 示例
-  const fewShot = getFewShotExamples(detectedSource, targetLang, contentType, 2)
+  const fewShot = getFewShotExamples(detectedSource, targetLang, 1)
 
   let systemPrompt: string
 
@@ -1146,62 +1184,60 @@ export async function translateBatch(
   // 全局铁则 + 风格 + 场景 + 产品线
   // 电商场景且产品线已检测到时，产品线×风格策略已内置风格指导，跳过全局风格块避免冗余
   const globalRules = isEnSource ? GLOBAL_RULES_EN : GLOBAL_RULES
-  const styleBlock = productLine ? '' : getStylePrompt(config, isEnSource, config.scenePreset)
-  const sceneBlock = getScenePrompt(config, isEnSource)
-  const productLineBlock = getProductLineBlock(productLine, isEnSource, config.scenePreset, resolveEffectiveStyle(config, config.scenePreset))
+  const contextBlock = getTranslationContext(productLine, config.scenePreset, config.translationStyle, isEnSource)
   const langBlock = getLangSpecificPrompt(targetLang)
 
   if (targetLang === 'zh-TW' && detectedSource === 'zh-CN') {
-    // ============================================================
-    // 简体中文 → 台湾繁体：专门用语本地化 prompt
-    // ============================================================
-    systemPrompt = `你是專業的簡→繁轉換+在地化專家，專精3C存儲行業。
+    // 简体中文 → 台湾繁体：特殊ROLE，共用通用路径（不重复铁则）
+    const roleZhTw = '你是 Lexar（雷克沙）首席本地化翻譯專家，精通存儲、電競、影像及消費電子領域。核心使命：將簡體中文精準轉換為台灣繁體並完成用語在地化。嚴格忠實於原文信息邊界——透過調整詞彙色彩、句式結構來適配產品線與受眾，但絕對禁止自由創作、腦補參數或誇大宣傳。不擴寫、不補充、不美化。'
+    systemPrompt = `${roleZhTw}
 
 ${globalRules}
 
-${contentTypeGuide}
+将以下文本从${sourceName}翻译成${targetName}。
+⚠️ 原文中的 ↵ 符號代表換行，譯文中請保留同樣的換行位置。
 
-${styleBlock}${sceneBlock}${productLineBlock}${pageContextBlock}
+${contextBlock}${pageContextBlock}
 
-${getCategoryWordGuideIfNeeded(targetLang, contentType, productLine, isEnSource)}
+${getCategoryWordGuideIfNeeded(targetLang, productLine, isEnSource)}
 
-【規則】術語庫最高優先級，必須嚴格使用${glossaryHint}
+【规则】术语库最高优先级，必须严格使用${glossaryHint}
 
 ${htmlTags.size > 0 ? '【HTML标签】保留原文中所有HTML标签位置不变。\n' : ''}【上下文】${CONTEXT_HINT}
 
 ${langBlock}
-${CRITICAL_REMINDER}
+${fewShot}
+${OUTPUT_ANCHOR}
+__XXX_N__ 格式标记必须原样保留在译文对应位置。
 
-${SELF_CHECK}
-${getTargetLangReinforcement(targetLang)}
-【輸出】全形標點。嚴格按編號對應，格式「編號. 結果」。${fewShot}`
+【輸出】嚴格按 "[N] 譯文" 格式，一行一條。⚠️ 每條 [N] 是一段完整文本，空格不是分隔符，嚴禁只翻前半段或分多行輸出！`
   } else {
     // ============================================================
     // 通用：3C存储行业翻译 prompt（多层提示词架构）
     // ============================================================
-    const roleEn = isEnSource ? 'You are a professional translator for Lexar storage products, specializing in 3C/storage cross-border e-commerce.' : '你是Lexar存储品牌专业翻译，专精3C/存储跨境电商。'
-    systemPrompt = `${roleEn}
+    const roleCn = '你是 Lexar（雷克沙）首席本地化翻譯專家，精通存儲、電競、影像及消費電子領域。核心使命：將源文本精準、地道地翻譯為目標語言。嚴格忠實於原文信息邊界——透過調整詞彙色彩、句式結構來適配產品線與受眾，但絕對禁止自由創作、腦補參數或誇大宣傳。'
+    const roleEn = 'You are Lexar\'s lead localization expert, specializing in storage, gaming, imaging, and consumer electronics. Core mission: Translate source text accurately and idiomatically into the target language. Stay strictly within the source\'s information boundary — adapt vocabulary, sentence structure, and register to fit the product line and audience, but NEVER fabricate, embellish specifications, or add claims not in the source.'
+    systemPrompt = `${isEnSource ? roleEn : roleCn}
 
 ${globalRules}
 
 ${isEnSource ? `Translate the following text from ${sourceName} to ${targetName}.` : `将以下文本从${sourceName}翻译成${targetName}。`}
+	${isEnSource ? '⚠️ The ↵ symbol in source text represents a line break. Preserve it at the same position in your translation.' : '⚠️ 原文中的 ↵ 符号代表换行，译文中请保留同样的换行位置。'}
 
-${contentTypeGuide}
+${contextBlock}${pageContextBlock}
 
-${styleBlock}${sceneBlock}${productLineBlock}${pageContextBlock}
-
-${getCategoryWordGuideIfNeeded(targetLang, contentType, productLine, isEnSource)}
+${getCategoryWordGuideIfNeeded(targetLang, productLine, isEnSource)}
 
 ${isEnSource ? '[Rule] Glossary terms are highest priority. You MUST use them exactly as specified:' : '【规则】术语库最高优先级，必须严格使用'}${glossaryHint}
 
 ${htmlTags.size > 0 ? (isEnSource ? '[HTML Tags] Preserve all HTML tags in their original positions.\n' : '【HTML标签】保留原文中所有HTML标签位置不变。\n') : ''}${isEnSource ? 'Context' : '【上下文】'}${isEnSource ? CONTEXT_HINT_EN : CONTEXT_HINT}
 
 ${langBlock}
-${isEnSource ? CRITICAL_REMINDER_EN : CRITICAL_REMINDER}
+${fewShot}
+${(isEnSource || !["zh-CN","zh-TW","ja","ko"].includes(targetLang)) ? OUTPUT_ANCHOR_EN : OUTPUT_ANCHOR}
+${isEnSource ? 'Keep __XXX_N__ markers exactly as-is in your output.' : '__XXX_N__ 格式标记必须原样保留在译文对应位置。'}
 
-${isEnSource ? SELF_CHECK_EN : SELF_CHECK}
-${getTargetLangReinforcement(targetLang)}
-${isEnSource ? '[Output] Strictly follow "N. translation" format. Preserve original line breaks and paragraph structure.' : '【输出】严格按 "编号. 译文" 格式，保持原文换行分段。'}${fewShot}`
+${isEnSource ? '[Output] Strictly follow "[N] translation" format - one line per item. Each [N] is ONE complete text; do NOT split by internal spaces. No line breaks inside a single result.' : '【输出】严格按 "[N] 译文" 格式，一行一条。⚠️ 每条 [N] 是一段完整文本，空格不是分隔符，严禁只翻前半段或分多行输出！'}`
   }
 
   const temperature = 0.2
@@ -1244,12 +1280,29 @@ ${isEnSource ? '[Output] Strictly follow "N. translation" format. Preserve origi
     } catch { /* fall through to line parsing */ }
   }
 
-  // 后备：逐行解析 "编号. 译文" 格式
+  // 后备：逐行解析 "[N] 译文" 或 "N. 译文" 格式
+  // 支持多行译文：LLM 可能输出真正的换行而非 ↵ 标记，导致单条译文跨多行
   if (result.length === 0) {
     const lines = content.split('\n')
-    for (const line of lines) {
-      const match = line.match(/^\d+\.\s*(.+)/)
-      if (match) result.push(match[1].trim())
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i]
+      // 支持 [N] 和 N. 两种格式
+      let match = line.match(/^\s*\[(\d+)\]\s*(.*)/)
+      if (!match) match = line.match(/^\s*(\d+)\.\s*(.*)/)
+      if (match) {
+        let translation = match[2].trim()
+        // 收集后续行直到遇到下一个 [N] 或 N. 标记
+        while (i + 1 < lines.length) {
+          const nextLine = lines[i + 1]
+          if (/^\s*\[\d+\]/.test(nextLine) || /^\s*\d+\./.test(nextLine)) break
+          const continuation = nextLine.trim()
+          if (continuation) {
+            translation += '\n' + continuation
+          }
+          i++
+        }
+        result.push(translation)
+      }
     }
   }
 
@@ -1266,7 +1319,23 @@ ${isEnSource ? '[Output] Strictly follow "N. translation" format. Preserve origi
   while (result.length < texts.length) result.push('')
   result = result.slice(0, texts.length)
 
-  // 还原实体占位符（必须在 restoreHtmlTags 之前，确保占位符层级正确）
+  // v3：含空格源文本用 "[N] \"text\"" 包裹发送，LLM 可能将引号一同输出。
+  // 对源文本被引号包裹的条目，自动剥离译文首尾的配对引号。
+  if (quotedIndices.size > 0) {
+    result = result.map((t, i) => {
+      if (!quotedIndices.has(i)) return t
+      // 仅当首尾是配对引号时才剥离（避免剥离译文本身包含的引号）
+      if (t.startsWith('"') && t.endsWith('"') && t.length >= 2) {
+        const inner = t.slice(1, -1)
+        // 防止过度剥离：如果内部还有引号（嵌套），保留原样
+        if (inner.includes('"')) return t
+        return inner
+      }
+      return t
+    })
+  }
+
+  // 还原实体占位符（必须在 restoreHtmlTags 之前）
   if (entityMap.size > 0) {
     result = unmaskEntities(result, entityMap)
   }
@@ -1292,9 +1361,21 @@ ${isEnSource ? '[Output] Strictly follow "N. translation" format. Preserve origi
   // 修复 AI 常见错误：900MB/s → 900 MB/s 还原为 900MB/s
   result = restoreStorageUnitFormatting(texts, result)
 
-  // 首字母大写（仅营销文案和产品描述需要）
-  if (contentType === 'marketing' || contentType === 'description') {
-    result = result.map(t => capitalizeFirstLetter(t))
+  // 首字母大写
+  result = result.map(t => capitalizeFirstLetter(t))
+
+  // 译文扩展检测：检测 LLM 是否异常扩展了译文（最后一道防线）
+  const expansionResult = detectTranslationExpansion(texts, result)
+  if (expansionResult.expandedIndices.size > 0) {
+    console.warn(
+      `[translateBatch] 检测到 ${expansionResult.expandedIndices.size} 条异常扩展译文，已自动截断`,
+      [...expansionResult.expandedIndices].map(j => ({
+        source: texts[j].slice(0, 50),
+        original: result[j].slice(0, 80),
+        fixed: expansionResult.texts[j].slice(0, 80),
+      })),
+    )
+    result = expansionResult.texts
   }
 
   return result
@@ -1319,6 +1400,7 @@ export async function proofreadBatch(
   runtimeTermTypes?: Record<string, string>,
   pageName?: string,
   fileName?: string,
+  taskGlossaryHint?: string,
 ): Promise<ProofreadResult[]> {
   const targetName = LANGUAGES.find(l => l.code === targetLang)?.name || targetLang
 
@@ -1326,88 +1408,88 @@ export async function proofreadBatch(
   const detectedSource = detectSourceLanguage(sourceTexts)
   const isEnSource = detectedSource === 'en'
 
-  // 校对也做内容类型和产品线检测，补全闭环
-  const contentType = detectContentType(sourceTexts)
-  const contentTypeGuide = isEnSource ? CONTENT_TYPE_GUIDES_EN[contentType] : CONTENT_TYPE_GUIDES[contentType]
+  // 校对也做产品线检测，补全闭环
   const productLine = getEffectiveProductLine(config, sourceTexts, pageName, fileName)
-  const categoryWordGuide = getCategoryWordGuideIfNeeded(targetLang, contentType, productLine, isEnSource)
+  const categoryWordGuide = getCategoryWordGuideIfNeeded(targetLang, productLine, isEnSource)
 
-  // 术语三层过滤：产品线 → 场景 → 相关性（校对也需要检查术语合规）
-  const filteredGlossaryMap = filterGlossaryByProductLine(glossaryMap, productLine, runtimeProductLines)
-  let glossaryObjProof: Record<string, string> = {}
-  for (const [k, v] of filteredGlossaryMap.entries()) { glossaryObjProof[k] = v }
-  glossaryObjProof = filterGlossaryByScene(glossaryObjProof, config.scenePreset)
-  const { glossaryHint } = filterRelevantGlossary(glossaryObjProof, sourceTexts, 10)
+  // 术语注入：优先使用任务级预计算提示词（跨批次 system prompt 一致 → API 缓存命中）
+  let glossaryHint: string
+  if (taskGlossaryHint !== undefined) {
+    glossaryHint = taskGlossaryHint
+  } else {
+    const filteredGlossaryMap = filterGlossaryByProductLine(glossaryMap, productLine, runtimeProductLines, sourceTexts)
+    let glossaryObjProof: Record<string, string> = {}
+    for (const [k, v] of filteredGlossaryMap.entries()) { glossaryObjProof[k] = v }
+    glossaryObjProof = filterGlossaryByScene(glossaryObjProof, config.scenePreset)
+    const result = filterRelevantGlossary(glossaryObjProof, sourceTexts, 100)
+    glossaryHint = result.glossaryHint
+  }
 
-  // 源文本预标准化（仅对 sourceText，不动 translatedText）
+  // 源文本预标准化（\n → ↵，供 LLM 识别换行位置）
   const normalizedSourceTexts = normalizeTextForLLM(sourceTexts)
+  // 译文中的实际 \n 也统一转为 ↵，确保源/译格式一致，避免校对模型误删换行
+  const normalizedTranslatedTexts = items.map(it => it.translatedText.replace(/[\n\r]+/g, ' ↵ '))
 
   const transLabel = isEnSource ? 'Trans' : '译'
-  const textList = items.map((it, i) => `${i + 1}. ${normalizedSourceTexts[i]}\n${transLabel}：${it.translatedText}`).join('\n\n')
+  const textList = items.map((it, i) => `[${i + 1}] ${normalizedSourceTexts[i]}\n${transLabel}：${normalizedTranslatedTexts[i]}`).join('\n\n')
 
-  const styleBlock = productLine ? '' : getStylePrompt(config, isEnSource, config.scenePreset)
-  const sceneBlock = getScenePrompt(config, isEnSource)
-  const productLineBlock = getProductLineBlock(productLine, isEnSource, config.scenePreset, resolveEffectiveStyle(config, config.scenePreset))
+  const proofreadContextBlock = getProofreadContext(productLine, isEnSource)
   const langBlock = getLangSpecificPrompt(targetLang)
 
   let systemPrompt: string
 
   if (targetLang === 'zh-TW' && detectedSource === 'zh-CN') {
-    systemPrompt = `你是專業的簡→繁在地化校稿專家，專精3C存儲行業。
+    systemPrompt = `你是 Lexar（雷克沙）首席校稿專家，精通存儲、電競、影像及消費電子領域。核心使命：檢查簡→繁轉換與用語在地化品質，嚴格忠實於原文信息邊界——發現擴寫、增譯、腦補參數或營銷語言時必須修正。
 
 ${getGlobalRulesForProofread(false)}
-${styleBlock}
-${sceneBlock}
-${productLineBlock}
-${contentTypeGuide}
+
+${proofreadContextBlock}
+
 ${categoryWordGuide}
+${CONTEXT_HINT}
 
-【上下文】${CONTEXT_HINT}
-
-對照原文與譯文逐條檢查：1.台灣用語正確性 2.術語庫譯法合規 3.語句自然流暢 4.場景適應性 5.全形標點。${glossaryHint}
-⚠️ 校對鐵則：譯文長度必須與原文匹配——原文短句→譯文短句，原文長句→譯文長句。禁止將短標語/短規格/短描述擴寫為長段落。若譯文已正確且長度匹配，直接回「OK」，不得改寫。
+逐條檢查：1.台灣用語正確性 2.術語合規 3.語句自然流暢。${glossaryHint}
+⚠️ 保護術語檢查：軟體名/品牌名如在譯文中被翻譯或擴寫為營銷文案，修正為保留原始名稱。
+⚠️ 譯文長度必須與原文匹配。若已正確且長度匹配回「OK」，不得改寫。
+⚠️ 換行位置請保留 ↵ 標記，嚴禁在 JSON 輸出中插入真正的換行或回車！
 
 ${langBlock}
-${CRITICAL_REMINDER}
-${getTargetLangReinforcement(targetLang)}
+${OUTPUT_ANCHOR}
 輸出 JSON 陣列，reason 用4字以內簡述：[{"i":1,"text":"修正譯文","reason":"用語修正"},{"i":2,"text":"OK","reason":""}] 無需修正 text 填 "OK"。`
   } else if (isEnSource) {
-    systemPrompt = `You are a 3C storage industry translation proofreader. Review ${targetName} translations for quality.
+    systemPrompt = `You are Lexar's lead proofreader, specializing in storage, gaming, imaging, and consumer electronics. Core mission: Review ${targetName} translations against the source's information boundary — detect and correct any expansion, fabrication, embellished claims, or terminology violations.
 
 ${getGlobalRulesForProofread(true)}
-${styleBlock}
-${sceneBlock}
-${productLineBlock}
-${contentTypeGuide}
-${categoryWordGuide}
 
+${proofreadContextBlock}
+
+${categoryWordGuide}
 Context: ${CONTEXT_HINT_EN}
 
-Check each source→translation pair: 1. Accuracy — no omissions or mistranslations 2. Glossary compliance 3. Natural flow 4. Scene fitness.${glossaryHint}
-⚠️ PROOFREADING RULE: Translation length MUST match source — short source → short translation. Do NOT expand short labels/specs into long paragraphs. If correct and length-matched, return "OK" — do NOT rewrite.
+Check each pair: 1. Accuracy — no omissions 2. Glossary compliance 3. Natural flow.${glossaryHint}
+⚠️ Translation length MUST match source. If correct and length-matched, return "OK" — do NOT rewrite.
+⚠️ Use ↵ for line breaks. NEVER insert actual newlines or carriage returns in JSON output!
 
 ${langBlock}
-${CRITICAL_REMINDER_EN}
-${getTargetLangReinforcement(targetLang)}
-Output JSON array, reason must be in Chinese (max 4 Chinese characters): [{"i":1,"text":"corrected text","reason":"术语修正"},{"i":2,"text":"OK","reason":""}] If no correction needed, text = "OK".`
+${OUTPUT_ANCHOR_EN}
+Output JSON array, reason in Chinese (max 4 chars): [{"i":1,"text":"corrected text","reason":"术语修正"},{"i":2,"text":"OK","reason":""}] If no correction needed, text = "OK".`
   } else {
-    systemPrompt = `你是3C存储行业翻译校对专家，检查${targetName}译文质量。
+    systemPrompt = `你是 Lexar（雷克沙）首席校稿專家，精通存儲、電競、影像及消費電子領域。核心使命：檢查${targetName}譯文品質，嚴格忠實於原文信息邊界——發現擴寫、增譯、腦補參數或營銷語言時必須修正。
 
 ${getGlobalRulesForProofread(false)}
-${styleBlock}
-${sceneBlock}
-${productLineBlock}
-${contentTypeGuide}
-${categoryWordGuide}
 
+${proofreadContextBlock}
+
+${categoryWordGuide}
 【上下文】${CONTEXT_HINT}
 
-对照原文与译文逐条检查：1.准确无漏译错译 2.术语库译法合規 3.标点规范句式自然 4.场景适应性。${glossaryHint}
-⚠️ 校对铁则：译文长度必须与原文匹配——短句→短句，长句→长句。禁止将短标签/短规格扩写为长段落。若译文已正确且长度匹配，回"OK"，不得改写。
+逐条检查：1.准确无漏译错译 2.术语库译法合規 3.标点规范句式自然。${glossaryHint}
+⚠️ 保护术语检查：软件名/品牌名如在译文中被翻译或扩写为营销文案，修正为保留原始名称。
+⚠️ 译文长度必须与原文匹配。若已正确且长度匹配回"OK"，不得改写。
+⚠️ 换行位置请保留 ↵ 标记，严禁在 JSON 输出中插入真正的换行或回车！
 
 ${langBlock}
-${CRITICAL_REMINDER}
-${getTargetLangReinforcement(targetLang)}
+${OUTPUT_ANCHOR}
 输出 JSON 数组，reason 用4字以内简述：[{"i":1,"text":"修正译文","reason":"术语修正"},{"i":2,"text":"OK","reason":""}] 无需修正 text 填 "OK"。`
   }
 
@@ -1459,10 +1541,11 @@ ${getTargetLangReinforcement(targetLang)}
     } catch { /* fall through to line parsing */ }
   }
 
-  // 后备：逐行解析
+  // 后备：逐行解析（支持 [N] 和 N. 两种格式）
   const lines = content.split('\n')
   for (const line of lines) {
-    const match = line.match(/^(\d+)\.\s*(.+)/)
+    let match = line.match(/^\s*\[(\d+)\]\s*(.+)/)
+    if (!match) match = line.match(/^\s*(\d+)\.\s*(.+)/)
     if (match) {
       const idx = parseInt(match[1], 10) - 1
       if (idx >= 0 && idx < results.length) {

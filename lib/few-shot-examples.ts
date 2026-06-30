@@ -451,7 +451,6 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
 export function getFewShotExamples(
   sourceLang: string,
   targetLang: string,
-  contentType: ContentType,
   maxExamples = 3,
 ): string {
   // 标准化语言代码
@@ -464,34 +463,20 @@ export function getFewShotExamples(
     return ''
   }
 
-  // 先找精确匹配
-  let key = `${src}_${tgt}_${contentType}`
+  // 全部使用 description 类型示例（内容类型指南已由场景预设覆盖）
+  let key = `${src}_${tgt}_description`
   let examples = FEWSHOT_STORE[key]
-
-  // 如果当前内容类型没有，回退到 description
-  if (!examples || examples.length === 0) {
-    key = `${src}_${tgt}_description`
-    examples = FEWSHOT_STORE[key]
-  }
 
   // zh-TW 没有示例时，回退到 zh (zh-CN)
   if ((!examples || examples.length === 0) && tgt === 'zh-TW') {
-    key = `${src}_zh_${contentType}`
+    key = `${src}_zh_description`
     examples = FEWSHOT_STORE[key]
-    if (!examples || examples.length === 0) {
-      key = `${src}_zh_description`
-      examples = FEWSHOT_STORE[key]
-    }
   }
 
-  // 如果目标语言没有，回退到 en
-  if (!examples || examples.length === 0 && src === 'zh') {
-    key = `zh_en_${contentType}`
+  // 如果目标语言没有，回退到 en description 示例
+  if ((!examples || examples.length === 0) && src === 'zh') {
+    key = 'zh_en_description'
     examples = FEWSHOT_STORE[key]
-    if (!examples || examples.length === 0) {
-      key = 'zh_en_description'
-      examples = FEWSHOT_STORE[key]
-    }
   }
 
   if (!examples || examples.length === 0) {

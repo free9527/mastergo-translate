@@ -82,6 +82,10 @@ export function normalizeTextForLLM(texts: string[]): string[] {
     // 1. Unicode NFC 正规化（组合字符统一为规范形式）
     result = result.normalize('NFC')
 
+    // 1.5. 换行符保护：将硬件换行替换为 ↵（U+21B5），防止 LLM（Qwen）将换行视为条目分隔符。
+    // 翻译完成后由 postProcessTranslation 还原为实际换行。
+    result = result.replace(/[\n\r]+/g, ' ↵ ')
+
     // 2. 全角字母/数字 → 半角
     result = fullwidthToHalfwidth(result)
 
@@ -93,4 +97,58 @@ export function normalizeTextForLLM(texts: string[]): string[] {
 
     return result
   })
+}
+
+// ============================================================
+// CJK 空格保护 — 防止 LLM 将 CJK 文本中的空格误判为条目分隔符
+//
+// 根因：Qwen 等模型在遇到 "超会玩 A2性能 体验3A游戏大作" 时，
+// 会将空格视为分隔符，只翻译前半段 "超會玩" 而丢弃后续内容。
+//
+// 方案（v2）：直接删除 CJK 主导文本（CJK 字符占比 > 30%）中的 ASCII 空格。
+// CJK 文本本身不需要空格即可被 LLM 正确理解，翻译后的拉丁语言输出
+// 会自动包含正确间距，因此无需还原。
+//
+// 历史：曾使用 SP{N} 占位符（PUA 字符 U+E000），但该字符同样
+// 不在 Qwen BPE tokenizer 词汇表中，被当作 token 边界处理，导致
+// 占位符处文本被拆分，保护失效。详见 2026-06-29 根因分析。
+// ============================================================
+
+function isCJK(charCode: number): boolean {
+  return (charCode >= 0x4e00 && charCode <= 0x9fff) ||   // CJK统一汉字
+    (charCode >= 0x3400 && charCode <= 0x4dbf) ||          // CJK扩展A
+    (charCode >= 0x3040 && charCode <= 0x309f) ||          // 平假名
+    (charCode >= 0x30a0 && charCode <= 0x30ff) ||          // 片假名
+    (charCode >= 0xac00 && charCode <= 0xd7af)             // 韩文
+}
+
+function isCJKDominant(text: string): boolean {
+  if (!text || text.length === 0) return false
+  let cjkCount = 0
+  for (let i = 0; i < text.length; i++) {
+    if (isCJK(text.charCodeAt(i))) cjkCount++
+  }
+  return cjkCount / text.length > 0.3
+}
+
+/**
+ * CJK 空格保护 — 不再删除空格。
+ *
+ * v2 曾直接删除 CJK 主导文本中的空格以避 Qwen 误判为条目分隔符，
+ * 但导致设计稿中刻意保留的空格（如 "超疾速 超体验"）在翻译中丢失。
+ *
+ * v3：空格原样保留，改由 translateBatch 的 "[N] \"text\"" 引号包裹机制保护。
+ * 有空格 → 加引号包裹，LLM 不会误拆；无空格 → 不加引号。
+ */
+export function protectCjkSpaces(texts: string[]): { texts: string[]; spaceMap: Map<string, string> } {
+  const spaceMap = new Map<string, string>()
+  // v3：空格不再删除，保留原样。引号包裹在 translateBatch 中根据 /\s/ 检测自动触发。
+  return { texts, spaceMap }
+}
+
+/**
+ * 还原空格占位符（v3：空格从未被修改，保留函数签名兼容调用方）
+ */
+export function restoreCjkSpaces(texts: string[], _spaceMap: Map<string, string>): string[] {
+  return texts
 }

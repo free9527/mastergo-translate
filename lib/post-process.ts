@@ -163,21 +163,27 @@ export function enforceGlossaryTerms(
       if (target !== translated) return target
     }
 
-    // 2. 子串匹配：源文本包含术语库条目（产品名嵌入在长句中）
+    // 2. 子串匹配：源文本包含术语库条目（产品名/软件名嵌入在长句中）
+    // 阈值从 85% 降至 40%，使嵌入术语的句子也能触发替换
     for (const [glossarySource, glossaryTarget] of glossaryMap.entries()) {
       const normalizedGlossarySource = stripTrademark(glossarySource)
-      // 至少 8 个字符避免短词误匹配
-      if (normalizedGlossarySource.length < 8) continue
+      // 至少 3 个字符（降低下限，覆盖短术语）
+      if (normalizedGlossarySource.length < 3) continue
       if (normalizedSource.includes(normalizedGlossarySource)) {
         // 检查译文是否已包含正确的术语译法
         if (!translated.includes(glossaryTarget)) {
-          // 尝试用规范化方式找到译文中的对应部分并替换
-          // 简单策略：如果源文本就是术语+少量后缀，直接替换
-          const before = normalizedSource.indexOf(normalizedGlossarySource)
-          const after = normalizedSource.length - before - normalizedGlossarySource.length
-          // 如果术语占据了源文本 85% 以上，直接用术语译法
-          if (normalizedGlossarySource.length / normalizedSource.length > 0.85) {
+          // 策略 A：术语占据源文本 40% 以上 → 直接用术语译法替换整个译文
+          if (normalizedGlossarySource.length / normalizedSource.length > 0.4) {
             return glossaryTarget
+          }
+          // 策略 B：术语占比较低但在译文中能找到 LLM 翻译的术语变体 → 局部替换
+          // 用术语源文在译文中搜索（LLM 可能保留了英文原名），找到后替换为术语目标译法
+          const escapedSource = normalizedGlossarySource.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+          const termInTranslation = new RegExp(escapedSource, 'i').exec(translated)
+          if (termInTranslation) {
+            const before = translated.slice(0, termInTranslation.index)
+            const after = translated.slice(termInTranslation.index + termInTranslation[0].length)
+            return before + glossaryTarget + after
           }
         }
       }
@@ -284,6 +290,10 @@ export function enforceShortLabelLength(
 // ============================================================
 export function postProcessTranslation(text: string, lang: string): string {
   let result = text
+
+  // 还原换行符占位符 ↵（U+21B5）→ 实际换行
+  // 由 text-normalizer 在预处理时替换，此处还原以保留源文断行
+  result = result.replace(/\s*↵\s*/g, '\n')
 
   switch (lang) {
     case 'fr':
@@ -570,4 +580,81 @@ function postProcessEuropeanNumbers(text: string, lang: string): string {
  */
 export function postProcessBatch(texts: string[], lang: string): string[] {
   return texts.map(t => postProcessTranslation(t, lang))
+}
+
+// ============================================================
+// 译文扩展检测
+// 检测 LLM 是否在译文中添加了原文没有的内容（异常扩展）
+// 返回标记了异常扩展的译文数组 + 异常索引集合
+// ============================================================
+export interface ExpansionResult {
+  texts: string[]
+  expandedIndices: Set<number>
+}
+
+/**
+ * 检测并修复译文异常扩展。
+ *
+ * 规则：
+ * - 译文长度 > 源文长度 × 3 时视为异常扩展
+ * - 短源文（<10字符）使用更宽松的阈值（5x），因为短文本翻译后变长是正常的
+ * - 检测到异常扩展时：
+ *   1. 尝试从译文中提取核心信息（取前 ~源文长度×2 的字符，在词边界截断）
+ *   2. 如果无法修复，标记该索引
+ */
+export function detectTranslationExpansion(
+  sourceTexts: string[],
+  translatedTexts: string[],
+): ExpansionResult {
+  const expandedIndices = new Set<number>()
+
+  const result = translatedTexts.map((translated, i) => {
+    const source = sourceTexts[i] || ''
+    if (!source || !translated) return translated
+
+    const sourceLen = source.length
+    const translatedLen = translated.length
+
+    // 短源文使用更宽松的阈值
+    const threshold = sourceLen < 10 ? 3 : 2
+
+    if (translatedLen > sourceLen * threshold) {
+      expandedIndices.add(i)
+
+      // 尝试修复：提取译文的核心部分
+      // 策略：取译文的开头部分（约源文长度 × 2），在词/句边界截断
+      const maxLen = Math.max(Math.ceil(sourceLen * 2), 10)
+
+      // 尝试在句号处截断
+      const firstSentence = translated.slice(0, maxLen)
+      const sentenceEnd = Math.max(
+        firstSentence.lastIndexOf('。'),
+        firstSentence.lastIndexOf('. '),
+        firstSentence.lastIndexOf('！'),
+        firstSentence.lastIndexOf('？'),
+      )
+
+      if (sentenceEnd > maxLen * 0.5) {
+        return translated.slice(0, sentenceEnd + 1)
+      }
+
+      // 尝试在逗号/空格处截断
+      const wordBoundary = Math.max(
+        firstSentence.lastIndexOf('，'),
+        firstSentence.lastIndexOf(', '),
+        firstSentence.lastIndexOf(' '),
+      )
+
+      if (wordBoundary > maxLen * 0.5) {
+        return translated.slice(0, wordBoundary)
+      }
+
+      // 硬截断
+      return translated.slice(0, maxLen)
+    }
+
+    return translated
+  })
+
+  return { texts: result, expandedIndices }
 }

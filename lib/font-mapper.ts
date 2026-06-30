@@ -64,5 +64,16 @@ export function getAutoFontMapping(
   targetLang: string,
 ): AutoFontResult | null {
   if (!SPECIAL_FONTS.has(sourceFamily)) return null
-  return getCanonicalFont(targetLang)
+  const result = getCanonicalFont(targetLang)
+  if (!result) return null
+
+  // 互译闭环：原文字体与替换字体相同，且无额外属性需改变 → 跳过不替换
+  // 例如：Avenir 原文 + en/fr/de 目标语言 → Avenir，无需替换
+  // 例如：HarmonyOS Sans SC 原文 + zh-CN/ja 目标语言 → HarmonyOS Sans SC，无需替换
+  // 例外：ar 目标语言即使源字体是 Naskh Arabic，仍需返回对齐属性
+  if (sourceFamily === result.targetFamily && !result.targetTextAlign) {
+    return null
+  }
+
+  return result
 }
