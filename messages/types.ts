@@ -23,6 +23,8 @@ export enum UIMessage {
   SAVE_CORRECTION = 'SAVE_CORRECTION',
   LOAD_CORRECTIONS = 'LOAD_CORRECTIONS',
   CORRECTION_SUGGESTION = 'CORRECTION_SUGGESTION',
+  LOCATE_NODE = 'LOCATE_NODE',
+  APPLY_SINGLE = 'APPLY_SINGLE',
 }
 
 export interface TestConnectionResult {
@@ -106,8 +108,51 @@ export interface TranslationCorrection {
 export interface GlossaryEntry {
   source: string
   translations: Record<string, string>  // 语言代码 → 翻译
-  productLine?: string  // 产品线标签
-  termType?: string     // 术语类型: 技术术语|产品品类|产品系列|品牌术语|说明文案|功能特性|营销文案
+}
+
+// ============================================================
+// 术语行为判定（替代旧的三重标签体系）
+// ============================================================
+
+/** 营销文案术语 — 非电商场景自动过滤，不注入 prompt */
+export const MARKETING_ONLY_TERMS = new Set([
+  'End Storage Anxiety',
+  'Power Up Your Play',
+  'Seamless Play, Ultimate Gaming',
+  'Zero Lag Game Loading',
+  'Capture the Diamond Moments',
+  'Unleash Your Full Potential in Work and Play',
+  'Unlock Device Potential',
+  'Unmatched Performance',
+  'Unleash Your Computer with Next-Gen DDR5',
+  'Smooth 4K Video Recording',
+  'No dropped frames',
+  'No sudden speed drop',
+  'Play Hard, Work Hard',
+  'Professional Grade Performance',
+  'Steel-Armored, Unstoppable Performance',
+  'Full Game Library Storage',
+  'Seamlessly compatible with Intel XMP 3.0 & AMD EXPO for one-click overclocking.',
+  'DDR5 Performance with Powerful Heatsink',
+  'Heat-Defying 6nm Controller',
+  'Compact & Portable',
+  '4X Faster than USB 3.0',
+])
+
+/** 合规声明术语 — 强制注入，不受场景/产品线过滤影响 */
+export const COMPLIANCE_TERMS = new Set([
+  'Limited Lifetime Warranty',
+  'Limited Warranty',
+  'Product images are for reference only',
+  'Please back up important data properly',
+])
+
+export function isMarketingTerm(source: string): boolean {
+  return MARKETING_ONLY_TERMS.has(source)
+}
+
+export function isComplianceTerm(source: string): boolean {
+  return COMPLIANCE_TERMS.has(source)
 }
 
 /** 产品线标签说明（用于术语库模板） */

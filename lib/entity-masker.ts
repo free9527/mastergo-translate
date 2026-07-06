@@ -1,23 +1,13 @@
 /**
  * 翻译前实体遮蔽
  *
- * 在文本送入 LLM 之前，将不应被翻译或修改的实体（产品型号、URL、Email、
- * 纯测量值、术语库中不应翻译的软件名/品牌名等）替换为占位符，翻译完成后再还原。
- * 避免 LLM 对这些实体产生幻觉。
+ * 将不应被 LLM 翻译或修改的实体（产品型号、URL、Email、术语库中不应翻译的
+ * 软件名/品牌名）替换为 __XXX_N__ 占位符，翻译完成后还原。
  *
- * 占位符使用 __XXX_N__ 格式（纯 ASCII 双下划线定界），确保所有 tokenizer
- * 都能正确识别为连续 token 而非文本边界。
- *
- * 历史：曾使用  (U+E000) PUA 字符作为定界符，但该字符不在 Qwen BPE
- * tokenizer 词汇表中，被当作 token 边界处理，导致文本在占位符处被拆分。
- * 详见 2026-06-29 根因分析。
- *
- * 占位符格式（不同前缀避免冲突）：
- *   HTML: __HTML_N__
+ * 占位符格式：
  *   PRD (产品型号): __PRD_N__
  *   URL: __URL_N__
  *   EML (Email): __EML_N__
- *   MSR (测量值): __MSR_N__
  *   TRM (术语/软件名): __TRM_N__
  */
 
@@ -49,16 +39,6 @@ const URL_RE = /((?:https?:\/\/|www\.)[^\s<>"')\\]+)/gi
  * Email 匹配
  */
 const EMAIL_RE = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g
-
-/**
- * 纯测量值匹配 — 仅匹配整个文本就是测量值的情况
- * 测量值通常以 "数字 + 可选空格 + 单位" 的形式出现
- * 示例: 6.5cm, 100W, 12V, 2.4GHz, 85°C
- *
- * 注意：不匹配 MB/s, GB/s 等存储速度单位（这些由 restoreStorageUnitFormatting 处理）
- * 不匹配 mm 作为单独单位时的情况（太短易误匹配）
- */
-const MEASUREMENT_RE = /\b(\d+(?:\.\d+)?\s*(?:[cm]m|m|g|kg|W|V|A|(?:k|M|G)?Hz|°[CF]|℃|℉))\b/gi
 
 // ============================================================
 // 遮蔽与还原
@@ -159,20 +139,205 @@ export function maskEntities(texts: string[], protectedTerms?: string[]): Entity
       return key
     })
 
-    // 4. 纯测量值
-    result = result.replace(MEASUREMENT_RE, (match) => {
-      // 跳过已遮蔽的内容（__XXX_N__ 格式）
-      if (/__[A-Z]+_\d+__/.test(match)) return match
-      const key = `__MSR_${counter}__`
-      allEntityMap.set(key, match)
-      counter++
-      return key
-    })
-
     return result
   })
 
   return { texts: masked, entityMap: allEntityMap }
+}
+
+/**
+ * 对源文和译文联合做实体遮蔽，保证两边占位符一致。
+ */
+export function maskEntitiesForProofread(
+  sources: string[],
+  translations: string[],
+  protectedTerms?: string[]
+): {
+  maskedSources: string[]
+  maskedTranslations: string[]
+  entityMap: Map<string, string>
+} {
+  const combined = [...sources, ...translations]
+  const { texts: maskedCombined, entityMap } = maskEntities(combined, protectedTerms)
+  const n = sources.length
+  return {
+    maskedSources: maskedCombined.slice(0, n),
+    maskedTranslations: maskedCombined.slice(n),
+    entityMap,
+  }
+}
+
+// ============================================================
+// 术语遮蔽（译前）：将术语替换为 ZZ{N}ZZ 占位符
+// LLM 只看到占位符无法扩展为营销文案，译后还原为术语库译文
+// ============================================================
+
+export interface GlossaryMaskResult {
+  texts: string[]
+  termMap: Map<string, string>   // ZZ0ZZ → 术语库目标语言译文
+}
+
+/** 去除商标符号 + 空白归一化（与 post-process.ts:cleanKey 一致） */
+function cleanKeyForMask(s: string): string {
+  return s.replace(/[®™©]/g, '').replace(/\s+/g, ' ').trim()
+}
+
+/**
+ * 将文本中匹配术语库的子串替换为 ZZ{N}ZZ 占位符。
+ *
+ * - 按术语长度降序替换，避免短术语先匹配导致长术语部分被遮蔽
+ * - 用 cleanKey 归一化后匹配（忽略 ®™© 和多余空格）
+ * - 占位符格式 ZZ{N}ZZ，全大写+数字，外观类似硬件型号，LLM 会保留
+ */
+export function maskGlossaryTerms(
+  texts: string[],
+  glossaryMap: Map<string, string>,
+): GlossaryMaskResult {
+  // 预扫描：源文中天然存在 ZZ\d+ZZ → 换用 YY\d+YY
+  let prefix = 'ZZ'
+  for (const t of texts) {
+    if (/ZZ\d+ZZ/i.test(t)) { prefix = 'YY'; break }
+  }
+
+  const termMap = new Map<string, string>()
+  let counter = 0
+
+  // 构建排序术语列表：cleanKey 版本用于匹配，保留原始 source 用于在原文中定位
+  const terms = [...glossaryMap.entries()]
+    .filter(([source]) => source.length >= 3)
+    .map(([source, target]) => ({ ck: cleanKeyForMask(source), source, target }))
+    .filter(t => t.ck.length >= 3)
+    .sort((a, b) => b.ck.length - a.ck.length)
+
+  if (terms.length === 0) {
+    return { texts: [...texts], termMap }
+  }
+
+  const masked = texts.map((text) => {
+    if (!text) return text
+
+    const textClean = cleanKeyForMask(text)
+    // 记录原始文本中已被替换的区间，避免重叠
+    const replacedRanges: Array<[number, number]> = []
+
+    // 在 cleanKey 空间中查找术语，按位置排序后从后往前替换原始文本
+    interface MatchPos { start: number; end: number; source: string; target: string }
+    const matches: MatchPos[] = []
+
+    for (const { ck, source, target } of terms) {
+      let searchPos = 0
+      while (searchPos < textClean.length) {
+        const idx = textClean.indexOf(ck, searchPos)
+        if (idx === -1) break
+
+        // 检查是否与已有区间重叠
+        const overlaps = replacedRanges.some(([s, e]) => idx < e && idx + ck.length > s)
+        if (overlaps) { searchPos = idx + 1; continue }
+
+        matches.push({ start: idx, end: idx + ck.length, source, target })
+        replacedRanges.push([idx, idx + ck.length])
+        searchPos = idx + ck.length
+      }
+    }
+
+    if (matches.length === 0) return text
+
+    // 按 cleanKey 空间的位置升序排列
+    matches.sort((a, b) => a.start - b.start)
+
+    // 在原始文本中定位并替换
+    // 策略：用原始 source 构建宽松正则（允许 ®™© 和灵活空格），按序替换
+    let result = text
+    // 记录每次替换后的偏移量变化
+    let offset = 0
+
+    for (const m of matches) {
+      // 构建宽松正则：将原始 source 中的空格替换为 [®™©]*\s* 模式
+      const escaped = m.source.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const flexible = escaped.replace(/ /g, '[®™©]*\\s*')
+      const regex = new RegExp(flexible, 'gi')
+
+      let found = false
+      let searchIdx = 0
+      let execResult: RegExpExecArray | null
+      // 重置 regex（每次使用前需要新实例或重置 lastIndex）
+      const freshRegex = new RegExp(flexible, 'gi')
+      while ((execResult = freshRegex.exec(result)) !== null) {
+        // 验证这个匹配对应到 cleanKey 空间中的正确位置
+        const matchClean = cleanKeyForMask(execResult[0])
+        const estimatedCleanPos = cleanKeyForMask(result.slice(0, execResult.index)).length
+        // 用 start+offset 估算在原始文本 cleanKey 中的位置
+        const expectedPos = m.start + offset
+
+        if (Math.abs(estimatedCleanPos - expectedPos) <= 5) {  // 5 字符容差
+          const placeholder = `${prefix}${counter}${prefix}`
+          termMap.set(placeholder, m.target)
+          result = result.slice(0, execResult.index) + placeholder + result.slice(execResult.index + execResult[0].length)
+          offset += placeholder.length - execResult[0].length
+          counter++
+          found = true
+          break
+        }
+      }
+
+      if (!found) {
+        console.warn('[maskGlossaryTerms] could not locate term in original text:', m.source.slice(0, 50))
+      }
+    }
+
+    return result
+  })
+
+  return { texts: masked, termMap }
+}
+
+/**
+ * 将译文中 ZZ{N}ZZ 占位符还原为术语库译文。
+ *
+ * 使用模糊正则匹配，容忍 LLM 的大小写变化和空格插入（如 ZZ 0 ZZ, zz0zz）。
+ * 如果占位符找不到，标记该条索引。
+ */
+export function unmaskGlossaryTerms(
+  texts: string[],
+  termMap: Map<string, string>,
+): { texts: string[]; missingIndices: Set<number> } {
+  const missingIndices = new Set<number>()
+
+  if (termMap.size === 0) {
+    return { texts: [...texts], missingIndices }
+  }
+
+  const result = texts.map((text, i) => {
+    if (!text) return text
+    let result = text
+    let allFound = true
+
+    for (const [placeholder, target] of termMap) {
+      // 提取数字部分构建模糊正则：ZZ 任意空格 数字 任意空格 ZZ
+      const numMatch = placeholder.match(/\d+/)
+      if (!numMatch) continue
+      const num = numMatch[0]
+      const prefix = placeholder[0] + placeholder[1] // "ZZ" or "YY"
+      const fuzzyRegex = new RegExp(`${prefix}\\s*${num}\\s*${prefix}`, 'gi')
+
+      if (fuzzyRegex.test(result)) {
+        fuzzyRegex.lastIndex = 0
+        result = result.replace(fuzzyRegex, target)
+      } else if (result.includes(placeholder)) {
+        // 严格匹配兜底
+        result = result.split(placeholder).join(target)
+      } else {
+        allFound = false
+      }
+    }
+
+    if (!allFound) {
+      missingIndices.add(i)
+    }
+    return result
+  })
+
+  return { texts: result, missingIndices }
 }
 
 /**

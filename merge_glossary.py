@@ -10,15 +10,19 @@
 import os, re, glob, csv, io
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-GLOSSARY_DIR = os.path.join(BASE, '术语素材')  # 产品名 CSV
-EXCLUSIVE_FILE = os.path.join(BASE, '术语素材', 'Lexar术语库_专属_校正版.csv')
+GLOSSARY_DIR = os.path.join(BASE, '术语素材')
+EXCLUSIVE_FILE = os.path.join(BASE, '术语素材', 'Lexar术语库_专属.csv')
 OUTPUT = os.path.join(BASE, 'lib', 'default-glossary.ts')
 
 def find_latest(prefix):
+    # 兼容新版（无版本号）和旧版（带 _v{N}）文件名
+    exact = os.path.join(GLOSSARY_DIR, f'{prefix}.csv')
+    if os.path.exists(exact):
+        return exact, 4  # 语义化版本号，无 _v 后缀视为 v4
     pattern = os.path.join(GLOSSARY_DIR, f'{prefix}_v*.csv')
     files = glob.glob(pattern)
     if not files:
-        raise FileNotFoundError(f'Cannot find {prefix}_v*.csv in {GLOSSARY_DIR}')
+        raise FileNotFoundError(f'Cannot find {prefix}.csv or {prefix}_v*.csv in {GLOSSARY_DIR}')
     def version(f):
         m = re.search(r'_v(\d+)\.csv$', f)
         return int(m.group(1)) if m else 0
@@ -97,15 +101,6 @@ def classify_product(source):
 
     return None
 
-ALL_PRODUCT_LINES = [
-    'gaming_dimm', 'gaming_ssd', 'gaming_card',
-    'professional_imaging', 'pc_productivity', 'consumer_cards',
-    'portable_storage', 'innovation_lifestyle',
-]
-
-# 合法的产品线标签
-VALID_LINES = set(ALL_PRODUCT_LINES) | {'common'}
-
 def main():
     prod_file, prod_ver = find_latest('Lexar术语库_产品名')
 
@@ -115,35 +110,38 @@ def main():
     # 产品名 header 格式: source,zh-CN,zh-TW,...
     # 专属术语 header 格式: source,产品线,zh-CN,zh-TW,...（无术语类型列）
     excl_header_cells = [c.strip() for c in excl_header.split(',')]
-    normalized_excl_header = ','.join(excl_header_cells)
+    # 新版 CSV 无标签列时跳过旧元数据列，header 只保留 source + 语言列
+    skip_excl_cols = {'产品线', '处理方式', '术语分类', '术语类型'}
+    clean_excl_header_cells = [c for c in excl_header_cells if c not in skip_excl_cols]
+    normalized_excl_header = ','.join(clean_excl_header_cells)
 
     # 允许产品名和专属术语的 header 不完全一致，不报 warning
 
-    # 解析专属术语：source, 产品线, 语言列...
+    # 解析专属术语
+    # 新版 CSV（无标签列）：source, zh-CN, zh-TW, ...
+    # 旧版 CSV（含标签列）：source, 产品线, 处理方式, 术语分类, zh-CN, zh-TW, ...
     # 使用 csv 模块处理引号内逗号（如 "Play Hard, Work Hard"）
-    excl_entries = []  # (source, product_line, csv_line)
+    has_product_line_col = '产品线' in excl_header_cells
+    excl_entries = []  # (source, csv_line)
     excl_reader = csv.reader(io.StringIO('\n'.join(excl_lines)))
     for cells in excl_reader:
-        if len(cells) < 3:
+        if len(cells) < 2:
             continue
         source = cells[0].strip()
-        product_line = cells[1].strip() if len(cells) > 1 else 'common'
-        if product_line not in VALID_LINES:
-            print(f'[WARN] Invalid product line "{product_line}" for "{source}", falling back to common')
-            product_line = 'common'
-        # 语言列从第2列开始（跳过 source, 产品线）
-        lang_cells = cells[2:]
-        normalized_line = source + ',' + product_line + ',' + ','.join(lang_cells)
-        excl_entries.append((source, product_line, normalized_line))
+        if has_product_line_col:
+            # 旧版：跳过产品线列，语言列从第 2 列开始
+            output_cells = [source] + (cells[2:] if len(cells) > 2 else [])
+        else:
+            # 新版：无标签列，语言列从第 1 列开始
+            output_cells = [source] + cells[1:]
+        # 使用 csv.writer 正确输出带引号的 CSV 行，避免 source 中的逗号导致串行
+        buf = io.StringIO()
+        writer = csv.writer(buf, lineterminator='\n')
+        writer.writerow(output_cells)
+        normalized_line = buf.getvalue().rstrip('\n')
+        excl_entries.append((source, normalized_line))
 
-    # 构建产品线映射
-    # PRODUCT_LINE_GLOSSARY_MAP: product_line → [source1, source2, ...]
-    # COMMON_GLOSSARY_SOURCES: [source1, source2, ...]
-    from collections import defaultdict
-    product_line_glossary = defaultdict(list)
-    common_glossary = []
-
-    # 1. 产品名分类
+    # 产品名分类（仅统计用）
     prod_classified = 0
     prod_unclassified = []
     for line in prod_lines:
@@ -152,7 +150,6 @@ def main():
             continue
         pl = classify_product(source)
         if pl:
-            product_line_glossary[pl].append(source)
             prod_classified += 1
         else:
             prod_unclassified.append(source)
@@ -162,52 +159,19 @@ def main():
         print(f'[INFO] Products unclassified ({len(prod_unclassified)}):')
         for s in prod_unclassified:
             print(f'  - {s}')
-        # 未分类的产品名放入通用（保守策略）
-        common_glossary.extend(prod_unclassified)
-
-    # 2. 专属术语分类（直接从「产品线」列读取）
-    for source, product_line, _ in excl_entries:
-        if product_line == 'common':
-            common_glossary.append(source)
-        else:
-            product_line_glossary[product_line].append(source)
 
     print(f'[INFO] Exclusive entries: {len(excl_entries)}')
-
-    # 去重
-    for pl in product_line_glossary:
-        product_line_glossary[pl] = list(set(product_line_glossary[pl]))
-    common_glossary = list(set(common_glossary))
-
-    # 统计
-    total_mapped = sum(len(v) for v in product_line_glossary.values())
-    print(f'[INFO] Product line glossary: {total_mapped} entries across {len(product_line_glossary)} lines')
-    for pl in ALL_PRODUCT_LINES:
-        count = len(product_line_glossary.get(pl, []))
-        print(f'  {pl}: {count} entries')
-    print(f'[INFO] Common glossary: {len(common_glossary)} entries')
 
     def csv_block(lines):
         return '\n'.join(lines)
 
-    def js_array(items):
-        """生成 JS 字符串数组字面量"""
-        return '[\n  ' + ',\n  '.join(f"'{s}'" for s in sorted(items)) + '\n]'
-
-    # 生成产品线映射 TS 代码
-    pl_map_lines = []
-    for pl in ALL_PRODUCT_LINES:
-        sources = product_line_glossary.get(pl, [])
-        pl_map_lines.append(f"  '{pl}': {js_array(sources)}")
-    pl_map_str = '{\n' + ',\n'.join(pl_map_lines) + '\n}'
-
     excl_csv_lines = [normalized_excl_header]
-    for _, _, normalized_line in excl_entries:
+    for _, normalized_line in excl_entries:
         excl_csv_lines.append(normalized_line)
 
     content = f"""// Auto-generated by merge_glossary.py
-// Sources: Lexar术语库_产品名_v{prod_ver}.csv ({len(prod_lines)} entries) + Lexar术语库_LLM优化版_含小语种校验.csv ({len(excl_entries)} entries)
-// Version: {prod_ver}.2
+// Sources: Lexar术语库_产品名_v{prod_ver}.csv ({len(prod_lines)} entries) + Lexar术语库_专属_校正版.csv ({len(excl_entries)} entries)
+// Version: {prod_ver}.3
 
 export const DEFAULT_GLOSSARY_PRODUCTS_CSV = `{prod_header}
 {csv_block(prod_lines)}
@@ -216,13 +180,6 @@ export const DEFAULT_GLOSSARY_PRODUCTS_CSV = `{prod_header}
 export const DEFAULT_GLOSSARY_EXCLUSIVE_CSV = `{normalized_excl_header}
 {csv_block(excl_csv_lines[1:])}
 `
-
-// 术语库产品线映射：产品线 key → 该产品线相关的术语 source 列表
-// 由 merge_glossary.py 根据产品名关键词 + 专属术语「产品线」列自动生成
-export const GLOSSARY_PRODUCT_LINE_MAP: Record<string, string[]> = {pl_map_str}
-
-// 通用术语（所有产品线都需要注入）
-export const COMMON_GLOSSARY_SOURCES: string[] = {js_array(common_glossary)}
 """
 
     with open(OUTPUT, 'w', encoding='utf-8') as f:
@@ -230,9 +187,7 @@ export const COMMON_GLOSSARY_SOURCES: string[] = {js_array(common_glossary)}
 
     print(f'[OK] Generated {OUTPUT}')
     print(f'   Products: {len(prod_lines)} entries (v{prod_ver})')
-    print(f'   Exclusive: {len(excl_entries)} entries (LLM优化版)')
-    print(f'   Product lines: {len(product_line_glossary)} lines, {total_mapped} entries')
-    print(f'   Common: {len(common_glossary)} entries')
+    print(f'   Exclusive: {len(excl_entries)} entries')
 
 if __name__ == '__main__':
     main()

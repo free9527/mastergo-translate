@@ -198,7 +198,7 @@
           <p>点击"当前页扫描"采集文本</p>
           <p class="empty-sub">或先选中图层后点击"选中对象扫描"</p>
         </div>
-        <div class="text-item" :class="{ corrected: item.corrected, 'csv-changed': csvChangedIds.has(item.nodeIds[0]), 'trans-error': translateErrors.has(item.nodeIds[0]) }" v-for="(item, idx) in items" :key="item.nodeIds[0] || idx">
+        <div class="text-item" :class="{ corrected: item.corrected, 'csv-changed': csvChangedIds.has(item.nodeIds[0]), 'trans-error': translateErrors.has(item.nodeIds[0]), 'applied-manually': appliedNodeIds.has(item.nodeIds[0]) }" v-for="(item, idx) in items" :key="item.nodeIds[0] || idx" @dblclick="navigateToNode(item)">
           <!-- 原文 — 上方全宽 -->
           <div class="item-source">
             <div class="item-label">
@@ -214,6 +214,8 @@
               <span class="error-badge" v-if="translateErrors.has(item.nodeIds[0])">翻译失败</span>
               <span class="proof-badge" v-if="item.corrected">校正</span>
               <span class="csv-badge" v-if="csvChangedIds.has(item.nodeIds[0])">导入变更</span>
+              <span class="applied-badge" v-if="appliedNodeIds.has(item.nodeIds[0])">已应用</span>
+              <button class="btn-apply-single" v-if="item.translatedText && !appliedNodeIds.has(item.nodeIds[0])" @click.stop="applySingle(item)">应用</button>
             </div>
             <textarea
               class="trans-input"
@@ -419,6 +421,9 @@
           <button class="btn btn-primary flex-1" @click="saveSettings" :disabled="saving">
             {{ saving ? '保存中...' : '保存配置' }}
           </button>
+          <button class="btn btn-secondary flex-1" @click="useDefaultConfig">
+            使用默认配置
+          </button>
           <button class="btn btn-secondary flex-1" @click="testTranslationConnection" :disabled="testingTrans">
             {{ testingTrans ? '测试中...' : '测试翻译' }}
           </button>
@@ -452,7 +457,7 @@ import { UIMessage, PluginMessage, TextItem, LLMConfig, GlossaryEntry, Translati
 import { sendMsgToPlugin } from '@messages/ui-sender'
 import { parseCSVRow, csvEncodeCell } from '@lib/parse-csv'
 import { formatCJKSpace } from '@lib/format-text'
-import { postProcessTranslation, restoreTrademarkSymbols, restoreStorageUnitFormatting, enforceGlossaryTerms, enforceShortLabelLength, detectTranslationExpansion } from '@lib/post-process'
+import { postProcessTranslation, restoreTrademarkSymbols, restoreStorageUnitFormatting, enforceGlossaryTerms, detectTranslationExpansion, sanitizeLineBreaks, cleanKey } from '@lib/post-process'
 import { translateBatch, proofreadBatch, fetchWithRetry, isProofreadScriptMismatch, STYLE_PRESETS, SCENE_PRESETS, detectProductLine, buildTaskGlossaryHint } from '@lib/llm-api'
 import { DEFAULT_GLOSSARY_PRODUCTS_CSV, DEFAULT_GLOSSARY_EXCLUSIVE_CSV } from '@lib/default-glossary'
 import { TRANSLATE_BATCH_SIZE, PROOFREAD_BATCH_SIZE, TOAST_DURATION_MS, CORRECTION_THRESHOLD, makeFontKey, parseFontKey, normalizeText } from '@lib/constants'
@@ -470,7 +475,7 @@ const glossaryProducts = ref<GlossaryEntry[]>([])
 const glossaryExclusive = ref<GlossaryEntry[]>([])
 const glossary = computed(() => [...glossaryProducts.value, ...glossaryExclusive.value])
 const translationCache = ref<Record<string, string>>({})
-const llmConfig = ref<LLMConfig>({ apiKey: '', apiUrl: '', model: 'gpt-4o', translationStyle: 'standard', translationStyleCustom: '', scenePreset: 'ecommerce', enableProofread: false, proofreadApiKey: '', proofreadApiUrl: '', proofreadModel: '' })
+const llmConfig = ref<LLMConfig>({ apiKey: '', apiUrl: '', model: 'gpt-4o', translationStyle: 'standard', translationStyleCustom: '', scenePreset: 'ecommerce', enableProofread: false, proofreadApiKey: '', proofreadApiUrl: '', proofreadModel: 'qwen3.7-plus' })
 
 const scanning = ref(false)
 const lastScanMode = ref<'all' | 'selection' | null>(null)
@@ -484,6 +489,8 @@ const undoing = ref(false)
 const cancelFlag = ref(false)
 const failedNodeIds = ref<string[]>([])
 const translateErrors = ref<Set<string>>(new Set())
+/** 已被手动应用过的 nodeId 集合，批量应用时自动跳过 */
+const appliedNodeIds = ref<Set<string>>(new Set())
 
 const translateProgress = ref({ current: 0, total: 0 })
 const translateProgressPercent = computed(() =>
@@ -920,15 +927,10 @@ async function startTranslate() {
 
   try {
     const glossaryMap = new Map<string, string>()
-    const runtimeProductLines: Record<string, string> = {}
-    const runtimeTermTypes: Record<string, string> = {}
     for (const g of glossary.value) {
       const t = g.translations[targetLang.value]
       if (t) glossaryMap.set(g.source, t)
-      if (g.productLine) runtimeProductLines[g.source] = g.productLine
-      if (g.termType) runtimeTermTypes[g.source] = g.termType
     }
-    // 反向术语库：非英文源语言时，从术语库的源语言列→目标语言列构建反向映射
     // 解决 "无人机"（zh-CN）无法匹配术语库 key "Drones"（EN）的问题
     if (sourceLang.value !== 'auto' && sourceLang.value !== 'en') {
       const srcCol = sourceLang.value
@@ -941,6 +943,15 @@ async function startTranslate() {
       }
     }
 
+    // 构建归一化术语查找表（去®™© + 空白归一化），用于译前精确匹配跳过LLM
+    const normalizedGlossaryMap = new Map<string, string>()
+    for (const [key, value] of glossaryMap) {
+      const ck = cleanKey(key)
+      if (ck.length >= 3 && !normalizedGlossaryMap.has(ck)) {
+        normalizedGlossaryMap.set(ck, value)
+      }
+    }
+
 
   // 跨批次术语预扫描：找出全页高频术语，提前注入每个批次确保译文一致
   const allSourceTexts = items.value.map(it => it.sourceText)
@@ -950,9 +961,7 @@ async function startTranslate() {
   // → system prompt 跨批次 100% 一致 → LLM API 自动缓存命中，后续批次不消耗 prompt token
   const taskGlossaryHint = buildTaskGlossaryHint(
     glossaryMap,
-    effectiveProductLine.value,
     llmConfig.value.scenePreset,
-    runtimeProductLines,
     allSourceTexts,
   )
 
@@ -967,10 +976,25 @@ async function startTranslate() {
 
   // 纯数字、单字符、纯存储规格文本直接沿用/本地转换，不请求 API
   let autoSkipped = 0
+  // 预收集术语库中 source===target 的产品名（全语种保留的硬件型号/系列名，无需翻译）
+  const noTranslateTerms = new Set<string>()
+  for (const [src, tgt] of glossaryMap) {
+    if (src === tgt && src.length >= 4) {
+      noTranslateTerms.add(src)
+    }
+  }
   for (const item of toTranslate) {
     const trimmed = item.sourceText.trim()
     if (/^\d+(\.\d+)?$/.test(trimmed) || (trimmed.length === 1 && !/[一-鿿぀-ヿ가-힯]/.test(trimmed))) {
       item.translatedText = trimmed
+      autoSkipped++
+    } else if (noTranslateTerms.has(trimmed)) {
+      // 术语库中 source===target 的产品名，全语种保留英文原样，不送 API
+      item.translatedText = trimmed
+      autoSkipped++
+    } else if (normalizedGlossaryMap.has(cleanKey(trimmed))) {
+      // 术语库精确匹配（去®™©后）：直接使用术语库译文，不送API
+      item.translatedText = normalizedGlossaryMap.get(cleanKey(trimmed))!
       autoSkipped++
     } else {
       // 检测纯存储规格（如 128GB、256MB/s），本地做单位转换
@@ -984,6 +1008,8 @@ async function startTranslate() {
 
   // 分离需要 API 翻译和已自动沿用的
   const needApi = toTranslate.filter(it => !it.translatedText)
+  // 按源文长度排序：短技术标签聚在一起，长营销文案聚在一起，避免批次内交叉污染
+  needApi.sort((a, b) => a.sourceText.length - b.sourceText.length)
   const apiTotal = needApi.length
 
   if (apiTotal === 0) {
@@ -1053,7 +1079,7 @@ async function startTranslate() {
             const uncachedTexts = uncachedIndices.map(idx => texts[idx])
             // 翻译记忆：同型号不同容量/速度的文本压缩为唯一模板，减少 API 调用
             const { uniqueTexts, expandData } = compressBatch(uncachedTexts)
-            const uniqueResult = await translateBatch(uniqueTexts, targetLang.value, glossaryMap, llmConfig.value, sourceLang.value === 'auto' ? undefined : sourceLang.value, items.value.map(it => it.sourceText), runtimeProductLines, runtimeTermTypes, pageName.value || undefined, fileName.value || undefined, crossBatchTerms, taskGlossaryHint)
+            const uniqueResult = await translateBatch(uniqueTexts, targetLang.value, glossaryMap, llmConfig.value, sourceLang.value === 'auto' ? undefined : sourceLang.value, pageName.value || undefined, fileName.value || undefined, crossBatchTerms, taskGlossaryHint)
             // 将模板译文展开回原始文本
             const expandedResult = expandBatch(uniqueResult, expandData, uncachedTexts.length)
             // 合并缓存+API结果
@@ -1132,6 +1158,13 @@ async function startTranslate() {
   unifyTerminologyAcrossBatches(items.value, glossaryMap)
   // 同源一致化：无论是否开启校对都执行，确保相同源文本译文一致
   enforceSameSourceConsistency()
+  // 换行保护：修复翻译/校对中引入的多余换行
+  const allSrcTexts = items.value.map(it => it.sourceText)
+  let allTgtTexts = items.value.map(it => it.translatedText)
+  allTgtTexts = sanitizeLineBreaks(allSrcTexts, allTgtTexts)
+  for (let i = 0; i < items.value.length; i++) {
+    items.value[i].translatedText = allTgtTexts[i]
+  }
   // 自动字体映射（仅对未手动设置字体的条目生效）
   autoMapFonts()
   } catch (e) {
@@ -1146,30 +1179,29 @@ async function startProofread() {
   cancelFlag.value = false
   proofreadProgress.value = { current: 0, total: 0 }
 
-  const toCheck = items.value.filter(it => it.translatedText.trim())
+  // 跳过无需校对的条目：源文=译文（产品名原样保留/数字/单位转换等），AI 未实际翻译
+  const allCandidate = items.value.filter(it => it.translatedText.trim())
+  const toCheck = allCandidate.filter(it => it.sourceText.trim() !== it.translatedText.trim())
+  const skipped = allCandidate.length - toCheck.length
   const total = toCheck.length
 
   if (total === 0) {
     proofreading.value = false
-    showToast('没有可校对的译文', 'info')
+    showToast(skipped > 0 ? `校对完成，${skipped} 条无需校对（原文保留）` : '没有可校对的译文', 'info')
     return
   }
 
   // 提前构建 glossaryMap，供校对后 enforceGlossaryTerms 兜底使用
   const glossaryMap = new Map<string, string>()
-  const runtimeProductLines: Record<string, string> = {}
   for (const g of glossary.value) {
     const t = g.translations[targetLang.value]
     if (t) glossaryMap.set(g.source, t)
-    if (g.productLine) runtimeProductLines[g.source] = g.productLine
   }
 
   // 任务级术语预计算：用全部源文本一次性过滤 → 校对各批次 system prompt 100% 一致 → 缓存命中
   const proofreadGlossaryHint = buildTaskGlossaryHint(
     glossaryMap,
-    effectiveProductLine.value,
     llmConfig.value.scenePreset,
-    runtimeProductLines,
     items.value.map(it => it.sourceText),
   )
 
@@ -1198,8 +1230,6 @@ async function startProofread() {
               targetLang.value,
               glossaryMap,
               llmConfig.value,
-              runtimeProductLines,
-              undefined,
               pageName.value || undefined,
               fileName.value || undefined,
               proofreadGlossaryHint,
@@ -1209,6 +1239,24 @@ async function startProofread() {
               if (proofed.text && proofed.text !== 'OK' && proofed.text !== batch[j].translatedText) {
                 if (isProofreadScriptMismatch(proofed.text, targetLang.value)) {
                   console.warn('[translate] proofread script mismatch, rejected:', proofed.text)
+                  continue
+                }
+                // 校对安全网 — 长度爆炸守卫：校对修正不应远超原译文长度
+                // 防止 LLM 将短译文替换为无关长文案（同批次交叉污染）
+                if (batch[j].sourceText.length >= 15 &&
+                    proofed.text.length > batch[j].translatedText.length * 2) {
+                  console.warn('[translate] proofread length explosion guard, rejected:',
+                    batch[j].sourceText.slice(0, 50), '|',
+                    batch[j].translatedText.length, '→', proofed.text.length)
+                  continue
+                }
+                // 校对安全网 — 长度坍缩守卫：校对修正不应将长译文缩成极短片段
+                // 防止 LLM 将正确译文过度精简为只言片语
+                if (batch[j].sourceText.length >= 15 &&
+                    proofed.text.length < batch[j].translatedText.length * 0.2) {
+                  console.warn('[translate] proofread length collapse guard, rejected:',
+                    batch[j].sourceText.slice(0, 50), '|',
+                    batch[j].translatedText.length, '→', proofed.text.length)
                   continue
                 }
                 let fixed = postProcessTranslation(proofed.text, targetLang.value)
@@ -1231,6 +1279,32 @@ async function startProofread() {
                   correctedTranslation: fixed,
                   correctedAt: Date.now(),
                 })
+              }
+            }
+            // 校对安全网 — 跨条目污染守卫：防止 LLM 将多条不同源文的译文输出为相同内容
+            {
+              const dedup = new Map<string, number>()
+              for (let j = 0; j < batch.length; j++) {
+                const key = batch[j].translatedText.slice(0, 60)
+                dedup.set(key, (dedup.get(key) || 0) + 1)
+              }
+              for (let j = 0; j < batch.length; j++) {
+                const key = batch[j].translatedText.slice(0, 60)
+                if (dedup.get(key)! > 1 && batch[j].proofreadText) {
+                  const hasConflict = batch.some((other, k) =>
+                    k !== j && other.translatedText.slice(0, 60) === key &&
+                    other.sourceText !== batch[j].sourceText
+                  )
+                  if (hasConflict) {
+                    console.warn('[translate] proofread cross-contamination guard, reverted:',
+                      batch[j].sourceText.slice(0, 50))
+                    batch[j].translatedText = batch[j].proofreadText
+                    batch[j].proofreadText = undefined
+                    batch[j].proofreadReason = undefined
+                    batch[j].corrected = false
+                    correctedCount--
+                  }
+                }
               }
             }
           } catch (e) {
@@ -1259,11 +1333,11 @@ async function startProofread() {
       allTranslatedTexts = expansionResult.texts
     }
     allTranslatedTexts = enforceGlossaryTerms(allSourceTexts, allTranslatedTexts, glossaryMap)
-    allTranslatedTexts = enforceShortLabelLength(allSourceTexts, allTranslatedTexts, glossaryMap)
     allTranslatedTexts = allTranslatedTexts.map(t => postProcessTranslation(t, targetLang.value))
     allTranslatedTexts = allTranslatedTexts.map(t => formatCJKSpace(t, targetLang.value))
     allTranslatedTexts = restoreStorageUnitFormatting(allSourceTexts, allTranslatedTexts)
     allTranslatedTexts = restoreTrademarkSymbols(allSourceTexts, allTranslatedTexts)
+    allTranslatedTexts = sanitizeLineBreaks(allSourceTexts, allTranslatedTexts)
     for (let i = 0; i < items.value.length; i++) {
       if (allTranslatedTexts[i] !== items.value[i].translatedText) {
         items.value[i].translatedText = allTranslatedTexts[i]
@@ -1286,7 +1360,8 @@ async function startProofread() {
       showToast('校对全部失败: ' + proofLastError.slice(0, 80), 'error')
     } else {
       const failMsg = failedBatches > 0 ? `，${failedBatches} 批次校对失败` : ''
-      showToast('校对完成: ' + correctedCount + ' 处被修正' + failMsg, correctedCount > 0 ? 'success' : 'info')
+      const skipMsg = skipped > 0 ? `，${skipped} 条无需校对` : ''
+      showToast('校对完成: ' + correctedCount + ' 处被修正' + failMsg + skipMsg, correctedCount > 0 ? 'success' : 'info')
     }
   } catch (e) {
     proofreading.value = false
@@ -1304,10 +1379,18 @@ async function startProofread() {
 /** 仅应用翻译内容，不包含字体替换 */
 function applyTranslationsOnly() {
   if (items.value.length === 0) return
+  // 跳过已手动应用的节点
+  const unapplied = items.value.filter(function (it) { return !it.nodeIds.some(function (id) { return appliedNodeIds.value.has(id) }) })
+  const skipped = items.value.length - unapplied.length
+  if (unapplied.length === 0) {
+    showToast(skipped > 0 ? '所有条目已手动应用，无需批量操作' : '没有待应用的译文', 'info')
+    return
+  }
   applying.value = true
   applyingFonts.value = false
+  if (skipped > 0) showToast('跳过 ' + skipped + ' 条已手动应用，正在应用剩余 ' + unapplied.length + ' 条...', 'info')
   // 清除字体目标属性，确保只应用翻译内容不改字体
-  const payload = items.value.map(function (it) {
+  const payload = unapplied.map(function (it) {
     return {
       ...it,
       targetFontFamily: '',
@@ -1328,11 +1411,19 @@ function applyTranslationsOnly() {
 /** 先应用翻译，完成后自动触发字体替换 */
 async function applyTranslationsWithFonts() {
   if (items.value.length === 0) return
+  // 跳过已手动应用的节点
+  const unapplied = items.value.filter(function (it) { return !it.nodeIds.some(function (id) { return appliedNodeIds.value.has(id) }) })
+  const skipped = items.value.length - unapplied.length
+  if (unapplied.length === 0) {
+    showToast(skipped > 0 ? '所有条目已手动应用，无需批量操作' : '没有待应用的译文', 'info')
+    return
+  }
   applying.value = true
   applyingFonts.value = true
+  if (skipped > 0) showToast('跳过 ' + skipped + ' 条已手动应用，正在应用剩余 ' + unapplied.length + ' 条...', 'info')
   // 1. 先只应用翻译内容（清除字体目标属性，字体后续单独应用）
   syncFontMappings()  // 先同步字体映射以确保 items 上的字体属性是最新的
-  const textPayload = items.value.map(function (it) {
+  const textPayload = unapplied.map(function (it) {
     return {
       ...it,
       // 清除字体目标：翻译阶段不改字体
@@ -1456,13 +1547,9 @@ async function retryFailedTranslations() {
 
   // 构建术语库并调用翻译
   const glossaryMap = new Map<string, string>()
-  const runtimeProductLines: Record<string, string> = {}
-  const runtimeTermTypes: Record<string, string> = {}
   for (const g of glossary.value) {
     const t = g.translations[targetLang.value]
     if (t) glossaryMap.set(g.source, t)
-    if (g.productLine) runtimeProductLines[g.source] = g.productLine
-    if (g.termType) runtimeTermTypes[g.source] = g.termType
   }
 
   const crossBatchTerms = findHighFreqGlossaryTerms(
@@ -1472,9 +1559,7 @@ async function retryFailedTranslations() {
   // 任务级术语预计算：用全部源文本一次性过滤 → system prompt 跨批次一致 → 缓存命中
   const taskGlossaryHint = buildTaskGlossaryHint(
     glossaryMap,
-    effectiveProductLine.value,
     llmConfig.value.scenePreset,
-    runtimeProductLines,
     items.value.map(it => it.sourceText),
   )
 
@@ -1494,8 +1579,6 @@ async function retryFailedTranslations() {
       const uniqueResult = await translateBatch(
         uniqueTexts, targetLang.value, glossaryMap, llmConfig.value,
         sourceLang.value === 'auto' ? undefined : sourceLang.value,
-        items.value.map(it => it.sourceText),
-        runtimeProductLines, runtimeTermTypes,
         pageName.value || undefined, fileName.value || undefined,
         crossBatchTerms, taskGlossaryHint,
       )
@@ -1569,14 +1652,17 @@ const VALID_LANG_CODES = new Set(LANGUAGES.map(l => l.code))
 function parseGlossaryCSV(text: string): GlossaryEntry[] {
   const rows = text.replace(/^﻿/, '').trim().split('\n')
   const headerCells = parseCSVRow(rows[0])
-  // 检测「术语类型」「产品线」列
-  const termTypeIdx = headerCells.findIndex((h: string) => h.trim() === '术语类型')
-  const productLineIdx = headerCells.findIndex((h: string) => h.trim() === '产品线')
-  const skippedCols = new Set([termTypeIdx, productLineIdx].filter(i => i >= 0))
+  // 跳过旧版元数据列（兼容旧 CSV 格式）
+  const skipCols = new Set([
+    headerCells.findIndex((h: string) => h.trim() === '处理方式'),
+    headerCells.findIndex((h: string) => h.trim() === '术语分类'),
+    headerCells.findIndex((h: string) => h.trim() === '产品线'),
+    headerCells.findIndex((h: string) => h.trim() === '术语类型'),
+  ].filter(i => i >= 0))
   const langCols: string[] = []
-  const dataCols: number[] = []  // 实际在 CSV 行中的列索引
+  const dataCols: number[] = []
   for (let i = 1; i < headerCells.length; i++) {
-    if (skippedCols.has(i)) continue
+    if (skipCols.has(i)) continue
     const colName = headerCells[i].trim()
     if (VALID_LANG_CODES.has(colName)) {
       dataCols.push(i)
@@ -1593,16 +1679,7 @@ function parseGlossaryCSV(text: string): GlossaryEntry[] {
       const val = (cells[dataCols[j]] || '').trim()
       if (val) translations[langCols[j]] = val
     }
-    const entry: GlossaryEntry = { source, translations }
-    if (termTypeIdx >= 0 && termTypeIdx < cells.length) {
-      const tt = cells[termTypeIdx].trim()
-      if (tt) entry.termType = tt
-    }
-    if (productLineIdx >= 0 && productLineIdx < cells.length) {
-      const pl = cells[productLineIdx].trim()
-      if (pl) entry.productLine = pl
-    }
-    entries.push(entry)
+    entries.push({ source, translations })
   }
   return entries
 }
@@ -1794,8 +1871,41 @@ watch(targetLang, () => {
 })
 
 // ============================================================
+// 节点定位
+// ============================================================
+/** 记录每个合并组的当前定位索引，用于双击循环切换 */
+const locateIndexMap = new Map<string, number>()
+
+function navigateToNode(item: TextItem) {
+  if (!item.nodeIds || item.nodeIds.length === 0) return
+  const key = item.nodeIds[0]  // 用首个 nodeId 作为组的唯一标识
+  const prev = locateIndexMap.get(key) ?? -1
+  const next = (prev + 1) % item.nodeIds.length
+  locateIndexMap.set(key, next)
+  sendMsgToPlugin(UIMessage.LOCATE_NODE, item.nodeIds[next])
+}
+
+/** 手动应用单条翻译（译文+字体）到画布 */
+async function applySingle(item: TextItem) {
+  if (!item.translatedText) return
+  syncFontMappings()
+  sendMsgToPlugin(UIMessage.APPLY_SINGLE, [JSON.parse(JSON.stringify(item))])
+  item.nodeIds.forEach(function (id) { appliedNodeIds.value.add(id) })
+  showToast('已应用到画布', 'success')
+}
+
+// ============================================================
 // 设置
 // ============================================================
+function useDefaultConfig() {
+  llmConfig.value.apiKey = 'sk-FS2AGf1vcZU1OpIIho7nBd8bQGcm45nII6UlZAECxj5Iaamn'
+  llmConfig.value.apiUrl = 'https://aigo.lexar.com/v1/chat/completions'
+  llmConfig.value.model = 'qwen3.7-max'
+  llmConfig.value.enableProofread = true
+  llmConfig.value.proofreadModel = 'qwen3.7-plus'
+  showToast('已填入默认团队配置，可修改后保存', 'success')
+}
+
 function saveSettings() {
   saving.value = true
   translationCache.value = {}  // 设置变更后清除缓存
@@ -2013,7 +2123,11 @@ onMounted(() => {
           if (raw.scenePreset === undefined) {
             raw.scenePreset = 'ecommerce'
           }
-          llmConfig.value = { translationStyle: 'standard', translationStyleCustom: '', scenePreset: 'ecommerce', enableProofread: false, proofreadApiKey: '', proofreadApiUrl: '', proofreadModel: '', ...(raw as LLMConfig) }
+          llmConfig.value = { translationStyle: 'standard', translationStyleCustom: '', scenePreset: 'ecommerce', enableProofread: false, proofreadApiKey: '', proofreadApiUrl: '', proofreadModel: 'qwen3.7-plus', ...(raw as LLMConfig) }
+          // 兜底：旧版配置可能没有 proofreadModel / 为空 / 等于翻译模型（冗余配置）
+          if (!llmConfig.value.proofreadModel || llmConfig.value.proofreadModel === llmConfig.value.model) {
+            llmConfig.value.proofreadModel = 'qwen3.7-plus'
+          }
         }
         selectedPreset.value = detectPreset()
         settingsReady = true
@@ -2631,6 +2745,24 @@ body {
 }
 .btn-revert-proof:hover { border-color: var(--orange); color: var(--orange); background: rgba(255,149,0,0.05); }
 
+/* 手动应用按钮 */
+.btn-apply-single {
+  padding: 2px 8px; border: 1px solid var(--green); border-radius: 4px;
+  background: transparent; color: var(--green); font-size: 10px; font-weight: 600;
+  cursor: pointer; font-family: inherit; white-space: nowrap; margin-left: auto;
+  transition: all var(--transition);
+}
+.btn-apply-single:hover { background: var(--green); color: #fff; }
+
+/* 已应用标签 */
+.applied-badge {
+  font-size: 10px; padding: 1px 5px; border-radius: 4px; font-weight: 600;
+  background: var(--green); color: #fff; text-transform: none; letter-spacing: 0;
+}
+
+/* 手动已应用卡片 */
+.text-item.applied-manually { opacity: 0.45; }
+
 /* ---- 字体替换 ---- */
 .field-hint { font-size: 11px; color: var(--gray-400); padding: 0 0 8px; }
 
@@ -2848,7 +2980,7 @@ body {
 /* ---- 表单 ---- */
 .field-group { margin-bottom: 10px; }
 .field-label { display: block; font-size: 11px; font-weight: 600; color: var(--gray-400); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
-.btn-row { display: flex; gap: 8px; }
+.btn-row { display: flex; flex-wrap: wrap; gap: 8px; }
 
 /* ---- 校对模型 ---- */
 .proof-section-label {

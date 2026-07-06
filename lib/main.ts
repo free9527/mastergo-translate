@@ -44,6 +44,11 @@ function scanAllTextNodes(): void {
     return
   }
 
+  // 扫描时立即保存原始文本，确保撤销时还原的是最原始的设计稿文字
+  for (const node of textNodes) {
+    if (node.characters) originalTexts.set(node.id, node.characters)
+  }
+
   const items = mergeDuplicates(textNodes)
   pruneStaleOriginals(items)
   console.log('[translate] final merged items:', items.length)
@@ -72,6 +77,11 @@ function scanSelectedTextNodes(): void {
   if (allTextNodes.length === 0) {
     sendMsgToUI(PluginMessage.ERROR, '选中的图层中未找到文本节点')
     return
+  }
+
+  // 扫描时立即保存原始文本，确保撤销时还原的是最原始的设计稿文字
+  for (const node of allTextNodes) {
+    if (node.characters) originalTexts.set(node.id, node.characters)
   }
 
   const items = mergeDuplicates(allTextNodes)
@@ -192,10 +202,6 @@ async function applyTranslations(items: TextItem[]): Promise<void> {
         const node = mg.getNodeById<TextNode>(nodeId)
         if (!node) continue
 
-        if (!originalTexts.has(nodeId)) {
-          originalTexts.set(nodeId, item.sourceText)
-        }
-
         // 缺字体时先挂载兜底字体，否则修改文字会被拒绝
         if (node.hasMissingFont) {
           // 优先用原字体的 style 去找兜底字族的对应 variant
@@ -286,8 +292,12 @@ async function applyFontsOnly(payloads: FontPayload[]): Promise<void> {
       fontSet.add(makeFontKey(p.targetFontFamily, p.targetFontStyle || 'Regular'))
     }
   }
-  // 预加载 HarmonyOS Sans SC 用于 Avenir ® 修复
-  fontSet.add(makeFontKey('HarmonyOS Sans SC', 'Regular'))
+  // Avenir ® 修复：预加载 HarmonyOS Sans SC 的常用样式
+  // (与 applyTranslations 中的预加载保持一致，避免非 Regular 字重时修复失效)
+  const registerFixStyles = ['Regular', 'Bold', 'Medium', 'Semibold', 'Italic', 'BoldItalic']
+  for (const st of registerFixStyles) {
+    fontSet.add(makeFontKey('HarmonyOS Sans SC', st))
+  }
 
   const availableFonts = await mg.listAvailableFontsAsync()
   const fontMap = new Map(availableFonts.map(f => [makeFontKey(f.fontName.family, f.fontName.style), f]))
@@ -333,7 +343,7 @@ async function applyFontsOnly(payloads: FontPayload[]): Promise<void> {
               try {
                 node.setRangeFontName(idx, idx + 1, {
                   family: 'HarmonyOS Sans SC',
-                  style: p.targetFontStyle || 'Regular',
+                  style: p.targetFontStyle || p.fontStyle || 'Regular',
                 })
               } catch (_) {}
             }
@@ -513,45 +523,42 @@ function parseCSVToGlossary(csv: string): GlossaryEntry[] {
   const rows = csv.split('\n')
   if (rows.length < 2) return []
   const headerCells = parseCSVRow(rows[0])
-  // 检测「术语类型」「产品线」列位置（兼容中英文列名）
-  const termTypeIdx = headerCells.findIndex((h: string) => {
+
+  // 跳过旧版元数据列（兼容旧 CSV 格式），新格式中这些列不存在 → findCol 返回 -1 → 过滤掉
+  const findCol = (names: string[]) => headerCells.findIndex((h: string) => {
     const t = h.trim()
-    return t === '术语类型' || t === 'termType'
+    return names.includes(t)
   })
-  const productLineIdx = headerCells.findIndex((h: string) => {
-    const t = h.trim()
-    return t === '产品线' || t === 'productLine'
-  })
-  const skippedCols = new Set([termTypeIdx, productLineIdx].filter(i => i >= 0))
-  // 语言列：记录实际列位置（跳过 source 和非语言列）
+  const skipCols = new Set([
+    findCol(['处理方式', 'action']),
+    findCol(['术语分类', 'category']),
+    findCol(['产品线', 'productLine']),
+    findCol(['术语类型', 'termType']),
+  ].filter(i => i >= 0))
+
+  // 语言列：跳过 source 和旧元数据列
   const langCols: string[] = []
-  const colPositions: number[] = []  // 实际在 CSV 行中的列索引
+  const colPositions: number[] = []
   for (let i = 1; i < headerCells.length; i++) {
-    if (skippedCols.has(i)) continue
+    if (skipCols.has(i)) continue
     colPositions.push(i)
     langCols.push(headerCells[i].trim())
   }
+
   const entries: GlossaryEntry[] = []
   for (let i = 1; i < rows.length; i++) {
     const cells = parseCSVRow(rows[i])
     if (cells.length < 2) continue
     const source = cells[0].trim()
     if (!source) continue
+
     const translations: Record<string, string> = {}
     for (let j = 0; j < colPositions.length; j++) {
       const val = (cells[colPositions[j]] || '').trim()
       if (val) translations[langCols[j]] = val
     }
-    const entry: GlossaryEntry = { source, translations }
-    if (termTypeIdx >= 0 && termTypeIdx < cells.length) {
-      const tt = cells[termTypeIdx].trim()
-      if (tt) entry.termType = tt
-    }
-    if (productLineIdx >= 0 && productLineIdx < cells.length) {
-      const pl = cells[productLineIdx].trim()
-      if (pl) entry.productLine = pl
-    }
-    entries.push(entry)
+
+    entries.push({ source, translations })
   }
   return entries
 }
@@ -669,6 +676,14 @@ mg.ui.onmessage = async function (msg: UIMessageEvent) {
         sendMsgToUI(PluginMessage.ERROR, '应用译文时出错: ' + (e instanceof Error ? e.message : String(e)))
       }
       break
+    case UIMessage.APPLY_SINGLE:
+      try {
+        await applyTranslations(data as TextItem[])
+      } catch (e) {
+        console.error('[translate] applySingle crashed', e)
+        sendMsgToUI(PluginMessage.APPLY_DONE, { count: 0, failed: 0, failedNodeIds: [] })
+      }
+      break
     case UIMessage.APPLY_FONTS:
       try {
         await applyFontsOnly(data as FontPayload[])
@@ -734,6 +749,15 @@ mg.ui.onmessage = async function (msg: UIMessageEvent) {
     case UIMessage.NOTIFY:
       mg.notify(data.message, { type: data.type || 'normal' })
       break
+    case UIMessage.LOCATE_NODE: {
+      const nodeId = data as string
+      const node = mg.getNodeById<SceneNode>(nodeId)
+      if (node) {
+        mg.document.currentPage.selection = [node]
+        mg.viewport.scrollAndZoomIntoView([node])
+      }
+      break
+    }
   }
 }
 

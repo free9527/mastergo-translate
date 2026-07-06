@@ -49,8 +49,8 @@ function termMatches(term: string, sourceTexts: string[]): boolean {
   const termLower = term.toLowerCase().trim()
   if (termLower.length < 2) return false
 
-  // 规范化：去掉 ® ™ © 等特殊符号，使 "Lexar®" 能匹配 "Lexar"
-  const normalize = (s: string) => s.replace(/[®™©]/g, '').trim()
+  // 规范化：去 ®™© + 空白归一化（合并多余空格），解决 CSV 数据中 "CFexpress  4.0" 双空格问题
+  const normalize = (s: string) => s.replace(/[®™©]/g, '').replace(/\s+/g, ' ').trim()
   const termNorm = normalize(termLower)
 
   for (const text of sourceTexts) {
@@ -102,6 +102,11 @@ export function filterRelevantGlossary(
   const filtered: GlossaryMap = {}
 
   for (const [source, target] of Object.entries(glossaryMap)) {
+    // 跳过 source === target 的条目：产品名在目标语言中保持英文原样，
+    // 注入 prompt 无翻译价值，反而挤占 token、给 LLM 混淆信号。
+    // 后处理 enforceGlossaryTerms 对这类条目本身是 no-op，不影响最终结果。
+    // 依据：Lexar 产品命名规则 — 硬件参数/系列名/型号全语种保留英文。
+    if (source === target) continue
     if (termMatches(source, sourceTexts)) {
       filtered[source] = target
     }

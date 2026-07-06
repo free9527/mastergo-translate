@@ -119,169 +119,149 @@ export function restoreStorageUnitFormatting(sourceTexts: string[], translatedTe
 // 优先精确匹配，其次子串匹配
 // ============================================================
 
-// ============================================================
-// 术语库强制校准
-// 翻译完成后，将术语库中的固定译法强制替换到译文中
-// 优先精确匹配，其次子串匹配
-// ============================================================
+/**
+ * 文本归一化：去除商标符号 + 空白归一化。
+ * 用于术语匹配时忽略 ®™© 和多余空格的干扰。
+ */
+export function cleanKey(s: string): string {
+  return s.replace(/[®™©]/g, '').replace(/\s+/g, ' ').trim()
+}
+
 export function enforceGlossaryTerms(
   sourceTexts: string[],
   translatedTexts: string[],
   glossaryMap: Map<string, string>,
 ): string[] {
-  // 构建去商标符号的归一化查找表（一次构建，避免 O(n*m) 循环）
-  // 解决术语库条目带 ®™© 而设计稿文本不带（或反之）导致的精确匹配失效
+  // 构建去商标符号 + 空白归一化的查找表
+  // 空白归一化解决 CSV 数据中可能存在的多余空格（如 "CFexpress  4.0" → "CFexpress 4.0"）
   const normalizedGlossaryMap = new Map<string, string>()
   for (const [key, value] of glossaryMap.entries()) {
-    const normalizedKey = key.replace(/[®™©]/g, '').trim()
+    const normalizedKey = cleanKey(key)
     if (!normalizedGlossaryMap.has(normalizedKey)) {
       normalizedGlossaryMap.set(normalizedKey, value)
     }
   }
 
-  function stripTrademark(s: string): string {
-    return s.replace(/[®™©]/g, '').trim()
+  function isCJK(ch: string): boolean {
+    const c = ch.charCodeAt(0)
+    return (c >= 0x4e00 && c <= 0x9fff) || (c >= 0x3400 && c <= 0x4dbf) ||
+           (c >= 0x3040 && c <= 0x309f) || (c >= 0x30a0 && c <= 0x30ff) ||
+           (c >= 0xac00 && c <= 0xd7af) || (c >= 0x0e00 && c <= 0x0e7f)
+  }
+
+  function truncateAtBoundary(text: string, maxLen: number): string {
+    if (text.length <= maxLen) return text
+    if (isCJK(text[0])) return text.slice(0, maxLen)
+    const truncated = text.slice(0, maxLen)
+    const lastSpace = truncated.lastIndexOf(' ')
+    if (lastSpace > maxLen * 0.6) return truncated.slice(0, lastSpace)
+    return truncated
   }
 
   return translatedTexts.map((translated, i) => {
     const source = sourceTexts[i] || ''
     if (!source) return translated
 
-    const normalizedSource = stripTrademark(source)
+    const normalizedSource = cleanKey(source)
+    let result = translated
 
-    // 1. 精确匹配（三层：原文 → 去商标原文 → 术语库去商标 key）
+    // 1. 精确匹配（三层：原文 → 去商标原文 → 术语库去商标key）
     if (glossaryMap.has(source)) {
       const target = glossaryMap.get(source)!
-      if (target !== translated) return target
+      if (target !== result) {
+        console.info('[enforceGlossaryTerms] exact match (raw):', source.slice(0, 60), '→', target.slice(0, 60))
+        result = target
+      }
     }
     if (glossaryMap.has(normalizedSource)) {
       const target = glossaryMap.get(normalizedSource)!
-      if (target !== translated) return target
+      if (target !== result) {
+        console.info('[enforceGlossaryTerms] exact match (cleanKey):', normalizedSource.slice(0, 60), '→', target.slice(0, 60))
+        result = target
+      }
     }
     if (normalizedGlossaryMap.has(normalizedSource)) {
       const target = normalizedGlossaryMap.get(normalizedSource)!
-      if (target !== translated) return target
+      if (target !== result) {
+        console.info('[enforceGlossaryTerms] exact match (normalizedMap):', normalizedSource.slice(0, 60), '→', target.slice(0, 60))
+        result = target
+      }
     }
 
-    // 2. 子串匹配：源文本包含术语库条目（产品名/软件名嵌入在长句中）
-    // 阈值从 85% 降至 40%，使嵌入术语的句子也能触发替换
-    for (const [glossarySource, glossaryTarget] of glossaryMap.entries()) {
-      const normalizedGlossarySource = stripTrademark(glossarySource)
-      // 至少 3 个字符（降低下限，覆盖短术语）
-      if (normalizedGlossarySource.length < 3) continue
-      if (normalizedSource.includes(normalizedGlossarySource)) {
-        // 检查译文是否已包含正确的术语译法
-        if (!translated.includes(glossaryTarget)) {
-          // 策略 A：术语占据源文本 40% 以上 → 直接用术语译法替换整个译文
-          if (normalizedGlossarySource.length / normalizedSource.length > 0.4) {
-            return glossaryTarget
-          }
-          // 策略 B：术语占比较低但在译文中能找到 LLM 翻译的术语变体 → 局部替换
-          // 用术语源文在译文中搜索（LLM 可能保留了英文原名），找到后替换为术语目标译法
-          const escapedSource = normalizedGlossarySource.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-          const termInTranslation = new RegExp(escapedSource, 'i').exec(translated)
-          if (termInTranslation) {
-            const before = translated.slice(0, termInTranslation.index)
-            const after = translated.slice(termInTranslation.index + termInTranslation[0].length)
-            return before + glossaryTarget + after
+    // 2. 子串匹配：源文本包含术语库条目
+    if (result === translated) {
+      for (const [glossarySource, glossaryTarget] of glossaryMap.entries()) {
+        const normalizedGlossarySource = cleanKey(glossarySource)
+        if (normalizedGlossarySource.length < 3) continue
+        if (normalizedSource.includes(normalizedGlossarySource)) {
+          if (!result.includes(glossaryTarget)) {
+            const escapedSource = normalizedGlossarySource.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+            const termInTranslation = new RegExp(escapedSource, 'i').exec(result)
+            if (termInTranslation) {
+              result = result.slice(0, termInTranslation.index) + glossaryTarget + result.slice(termInTranslation.index + termInTranslation[0].length)
+            } else if (normalizedGlossarySource === cleanKey(glossaryTarget)) {
+              // CJK fallback: 模型翻译了"保持原文"的术语（source==target），正则搜不到。
+              // 用源文中术语位置比例推算译文插入点。仅 CJK→CJK（1:1 字符映射）启用。
+              if (/[一-鿿]/.test(normalizedSource)) {
+                const srcIdx = normalizedSource.indexOf(normalizedGlossarySource)
+                if (srcIdx >= 0) {
+                  const srcRatio = srcIdx / Math.max(normalizedSource.length, 1)
+                  const estIdx = Math.min(Math.floor(srcRatio * result.length), result.length)
+                  // 用术语前后的源文字符作为锚点，在译文中定位
+                  const ctxBefore = normalizedSource.slice(Math.max(0, srcIdx - 2), srcIdx)
+                  const ctxAfter = normalizedSource.slice(
+                    srcIdx + normalizedGlossarySource.length,
+                    srcIdx + normalizedGlossarySource.length + 2,
+                  )
+                  let insPos = estIdx
+                  let endPos = estIdx
+                  if (ctxBefore) {
+                    const ctxIdx = result.indexOf(ctxBefore, Math.max(0, estIdx - 10))
+                    if (ctxIdx >= 0) insPos = ctxIdx + ctxBefore.length
+                  }
+                  if (ctxAfter) {
+                    const afterIdx = result.indexOf(ctxAfter, insPos)
+                    if (afterIdx > insPos) endPos = afterIdx
+                  }
+                  if (endPos > insPos) {
+                    // 有明确边界：替换模型翻译的文本
+                    result = result.slice(0, insPos) + glossaryTarget + result.slice(endPos)
+                  } else if (insPos < result.length) {
+                    // 无法确定边界：在推定位置插入术语目标
+                    const prefix = insPos > 0 && !/[ \s]$/.test(result.slice(0, insPos)) ? ' ' : ''
+                    const suffix = insPos < result.length && !/^[ \s]/.test(result.slice(insPos)) ? ' ' : ''
+                    result = result.slice(0, insPos) + prefix + glossaryTarget + suffix + result.slice(insPos)
+                  }
+                }
+              }
+            }
           }
         }
       }
     }
 
-    return translated
-  })
-}
-
-// ============================================================
-// 短标签扩写硬守卫
-// 源文 < 15 字符且译文 > 1.5x 源文长度时，做两件事：
-// 1. 降低阈值（3 字符起）重新匹配术语库 — 解决 enforceGlossaryTerms 的 8 字符下限问题
-// 2. 仍不匹配时做词边界截断，防止 UI 文本溢出
-// ============================================================
-export function enforceShortLabelLength(
-  sourceTexts: string[],
-  translatedTexts: string[],
-  glossaryMap: Map<string, string>,
-): string[] {
-  const SHORT_LABEL_MAX = 15
-  const LENGTH_RATIO = 1.5
-
-  // 构建去商标符号的归一化查找表
-  const normalizedGlossaryMap = new Map<string, string>()
-  for (const [key, value] of glossaryMap.entries()) {
-    const nk = key.replace(/[®™©]/g, '').trim()
-    if (!normalizedGlossaryMap.has(nk)) {
-      normalizedGlossaryMap.set(nk, value)
-    }
-  }
-
-  function stripTrademark(s: string): string {
-    return s.replace(/[®™©]/g, '').trim()
-  }
-
-  function isCJK(ch: string): boolean {
-    const c = ch.charCodeAt(0)
-    return (c >= 0x4e00 && c <= 0x9fff) || (c >= 0x3400 && c <= 0x4dbf) ||
-           (c >= 0x3040 && c <= 0x309f) || (c >= 0x30a0 && c <= 0x30ff) || // 日文假名
-           (c >= 0xac00 && c <= 0xd7af) || // 韩文
-           (c >= 0x0e00 && c <= 0x0e7f)    // 泰文
-  }
-
-  // 在词/字符边界截断到目标长度
-  function truncateAtBoundary(text: string, maxLen: number): string {
-    if (text.length <= maxLen) return text
-    // CJK 文本：直接按字符截断
-    if (isCJK(text[0])) {
-      return text.slice(0, maxLen)
-    }
-    // 拉丁文本：在词边界截断，避免断词
-    const truncated = text.slice(0, maxLen)
-    const lastSpace = truncated.lastIndexOf(' ')
-    if (lastSpace > maxLen * 0.6) {
-      return truncated.slice(0, lastSpace)
-    }
-    return truncated
-  }
-
-  return translatedTexts.map((translated, i) => {
-    const source = sourceTexts[i] || ''
-    if (!source || source.length >= SHORT_LABEL_MAX) return translated
-    if (translated.length <= source.length * LENGTH_RATIO) return translated
-
-    const normalizedSource = stripTrademark(source)
-
-    // 第一道：精确匹配（与 enforceGlossaryTerms 相同，但这里只做短标签兜底）
-    if (normalizedGlossaryMap.has(normalizedSource)) {
-      return normalizedGlossaryMap.get(normalizedSource)!
-    }
-
-    // 第二道：降低阈值到 3 字符的子串匹配
-    let bestMatch: { source: string; target: string; len: number } | null = null
-    for (const [glossarySource, glossaryTarget] of normalizedGlossaryMap.entries()) {
-      const gs = stripTrademark(glossarySource)
-      if (gs.length < 3) continue
-      if (normalizedSource.includes(gs)) {
-        if (!bestMatch || gs.length > bestMatch.len) {
-          bestMatch = { source: gs, target: glossaryTarget, len: gs.length }
+    // 3. 短标签硬守卫：源文<15字符 且 译文长度>3x源文长度 时硬截断
+    if (source.length < 15 && result.length > source.length * 3) {
+      // 再次尝试术语匹配（更低阈值）
+      let bestMatch: { target: string; len: number } | null = null
+      for (const [gs, gt] of normalizedGlossaryMap.entries()) {
+        const gsClean = cleanKey(gs)
+        if (gsClean.length < 3) continue
+        if (normalizedSource.includes(gsClean)) {
+          if (!bestMatch || gsClean.length > bestMatch.len) {
+            bestMatch = { target: gt, len: gsClean.length }
+          }
         }
       }
-    }
-    if (bestMatch) {
-      // 术语占比 > 70% 才替换，避免误伤
-      if (bestMatch.len / normalizedSource.length > 0.7) {
-        return bestMatch.target
+      if (bestMatch && bestMatch.len / normalizedSource.length > 0.4) {
+        result = bestMatch.target
+      } else {
+        const maxLen = Math.max(Math.ceil(source.length * 1.5), 3)
+        result = truncateAtBoundary(result, maxLen)
       }
     }
 
-    // 第三道：硬截断兜底 — 译文字符数不超过源文 1.5x
-    // 这是最后手段，只在译文明显过长时触发
-    if (translated.length > source.length * 2) {
-      const maxLen = Math.max(Math.ceil(source.length * 1.3), 3)
-      return truncateAtBoundary(translated, maxLen)
-    }
-
-    return translated
+    return result
   })
 }
 
@@ -615,8 +595,8 @@ export function detectTranslationExpansion(
     const sourceLen = source.length
     const translatedLen = translated.length
 
-    // 短源文使用更宽松的阈值
-    const threshold = sourceLen < 10 ? 3 : 2
+    // 短源文使用更宽松的阈值；常规阈值从2降到1.5，更早捕获LLM异常扩展
+    const threshold = sourceLen < 10 ? 3 : 1.5
 
     if (translatedLen > sourceLen * threshold) {
       expandedIndices.add(i)
@@ -657,4 +637,139 @@ export function detectTranslationExpansion(
   })
 
   return { texts: result, expandedIndices }
+}
+
+// ============================================================
+// 品牌注入检测：检查译文是否添加了源文中不存在的品牌名或技术规格标识。
+// 三层检测：
+//   1. 品牌标记：Lexar®、pexar 等源文没有的品牌名
+//   2. 规格注入：M.2、NVMe、PCIe代数、外形尺寸等源文没有的技术参数
+//   3. 数值注入：译文有带单位的数字（5200MB/s、128GB等）但源文没有
+// 检测到注入 → 回退到源文（避免显示错误译文）
+// ============================================================
+export interface InjectionResult {
+  texts: string[]
+  injectedIndices: Set<number>
+}
+
+export function detectBrandInjection(
+  sourceTexts: string[],
+  translatedTexts: string[],
+  glossaryMap?: Map<string, string>,
+): InjectionResult {
+  // 品牌标记（Lexar 生态系统中已知的品牌/系列名）
+  // 注意：不含 "雷克沙" — 这是 Lexar 在中文里的合法翻译，术语库会正确处理
+  const brandTokens = new Set([
+    'lexar', 'lexar®', 'pexar',
+    'ares', 'thor', 'armor', 'play',
+    'silver', 'gold', 'diamond',
+  ])
+
+  // 从术语库额外提取品牌 token：所有首字母大写的专有名词
+  if (glossaryMap) {
+    for (const key of glossaryMap.keys()) {
+      const firstWord = key.split(/\s+/)[0]
+      if (firstWord && /^[A-Z][a-zA-Z]{2,}$/.test(firstWord)) {
+        brandTokens.add(firstWord.toLowerCase())
+      }
+    }
+  }
+
+  // 规格注入模式（不在源文中的技术参数标识）
+  const specPatterns: Array<{ re: RegExp; name: string }> = [
+    { re: /\bM\.2\b/i, name: 'M.2 form factor' },
+    { re: /\bNVMe\b/i, name: 'NVMe protocol' },
+    { re: /\bPCIe\s*[345]\.0\b/i, name: 'PCIe generation' },
+    { re: /\bGen\s*[345]\s*x?\s*4\b/i, name: 'PCIe Gen x4' },
+    { re: /\b(2230|2242|2280)\b/, name: 'M.2 form factor size' },
+    { re: /®/, name: 'registered trademark symbol' },
+  ]
+
+  // 数值规格注入模式（LLM 编造的带单位的数字：5200MB/s、128GB等）
+  const measurePatterns: Array<{ re: RegExp; name: string }> = [
+    { re: /\d[\d,]*\s*(?:MB\/s|GB\/s|TB\/s|MBps|GBps)\b/i, name: 'speed value' },
+    { re: /\d[\d,]*\s*(?:GB|TB|PB)\b(?!\/s)/i, name: 'capacity value' },
+    { re: /\d[\d,]*\s*(?:MHz|GHz)\b/i, name: 'frequency value' },
+    { re: /\d[\d,]*\s*(?:MB|KB)\b(?!\/s)/i, name: 'size value' },
+  ]
+
+  const injectedIndices = new Set<number>()
+
+  const result = translatedTexts.map((trans, i) => {
+    const src = sourceTexts[i] || ''
+    if (!src || !trans) return trans
+
+    const srcLower = src.toLowerCase()
+    const transLower = trans.toLowerCase()
+
+    // 1. 品牌标记注入检测：译文有但源文没有的品牌词
+    for (const token of brandTokens) {
+      if (transLower.includes(token) && !srcLower.includes(token)) {
+        injectedIndices.add(i)
+        return src // 回退到源文
+      }
+    }
+
+    // 2. 规格注入检测：译文匹配但源文不匹配的规格模式
+    for (const { re } of specPatterns) {
+      const transMatch = re.test(trans)
+      const srcMatch = re.test(src)
+      if (transMatch && !srcMatch) {
+        injectedIndices.add(i)
+        return src // 回退到源文
+      }
+    }
+
+    // 3. 数值规格注入检测：译文有带单位的数字但源文没有
+    for (const { re, name } of measurePatterns) {
+      const transMatch = re.test(trans)
+      const srcMatch = re.test(src)
+      if (transMatch && !srcMatch) {
+        injectedIndices.add(i)
+        return src // 回退到源文
+      }
+    }
+
+    return trans
+  })
+
+  return { texts: result, injectedIndices }
+}
+
+// ============================================================
+// 换行保护：校对/翻译后如有多余换行，按原文断行方式还原
+// 日语/韩语/英语按词断行，不在词中间插入换行
+// ============================================================
+export function sanitizeLineBreaks(
+  sourceTexts: string[],
+  translatedTexts: string[],
+): string[] {
+  return translatedTexts.map((translated, i) => {
+    const source = sourceTexts[i] || ''
+    if (!source || !translated) return translated
+
+    const sourceBreaks = (source.match(/\n/g) || []).length
+    const translatedBreaks = (translated.match(/\n/g) || []).length
+
+    // 原文没有换行但译文有 → 去掉译文中的多余换行
+    if (sourceBreaks === 0 && translatedBreaks > 0) {
+      return translated.replace(/\n+/g, ' ')
+    }
+
+    // 原文有换行但译文换行过多 → 保留与原文数量一致的换行
+    if (translatedBreaks > sourceBreaks * 2) {
+      const parts = translated.split('\n')
+      // 按原文换行数合并：尽可能保留前面的分段
+      const targetParts = Math.max(1, sourceBreaks + 1)
+      const merged: string[] = []
+      const chunkSize = Math.ceil(parts.length / targetParts)
+      for (let j = 0; j < targetParts; j++) {
+        const chunk = parts.slice(j * chunkSize, (j + 1) * chunkSize).filter(p => p.trim())
+        if (chunk.length > 0) merged.push(chunk.join(' '))
+      }
+      return merged.join('\n')
+    }
+
+    return translated
+  })
 }

@@ -132,23 +132,18 @@ function isCJKDominant(text: string): boolean {
 }
 
 /**
- * CJK 空格保护 — 不再删除空格。
+ * CJK 空格保护 — 合并多余连续空格，保留有效空格和 ↵ 断行标记周围的空格。
  *
- * v2 曾直接删除 CJK 主导文本中的空格以避 Qwen 误判为条目分隔符，
- * 但导致设计稿中刻意保留的空格（如 "超疾速 超体验"）在翻译中丢失。
- *
- * v3：空格原样保留，改由 translateBatch 的 "[N] \"text\"" 引号包裹机制保护。
- * 有空格 → 加引号包裹，LLM 不会误拆；无空格 → 不加引号。
+ * 历史：曾直接删除所有空格（text.replace(/ /g, '')），因为 Qwen 可能将 CJK 文本
+ * 中的空格误判为条目分隔符。但该逻辑导致两个问题：
+ * 1. CJK 短语间的有效空格被删除（"生而强大 耐力十足" → "生而强大耐力十足"）
+ * 2. ↵ 断行标记被 CJK 字符夹住（"强大↵耐力"），LLM 难以识别
+ * 现在文本已用 [N] "..." 格式包裹，空格不再被误解为分隔符 → 只合并多余空格。
  */
-export function protectCjkSpaces(texts: string[]): { texts: string[]; spaceMap: Map<string, string> } {
-  const spaceMap = new Map<string, string>()
-  // v3：空格不再删除，保留原样。引号包裹在 translateBatch 中根据 /\s/ 检测自动触发。
-  return { texts, spaceMap }
-}
-
-/**
- * 还原空格占位符（v3：空格从未被修改，保留函数签名兼容调用方）
- */
-export function restoreCjkSpaces(texts: string[], _spaceMap: Map<string, string>): string[] {
-  return texts
+export function protectCjkSpaces(texts: string[]): string[] {
+  return texts.map((text) => {
+    if (!text || !isCJKDominant(text)) return text
+    // 合并连续空格为单空格，保留有效空格和 ↵ 周围的间距
+    return text.replace(/ {2,}/g, ' ')
+  })
 }

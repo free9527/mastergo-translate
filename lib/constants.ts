@@ -4,7 +4,7 @@
 
 // 翻译批次大小
 export const TRANSLATE_BATCH_SIZE = 15
-export const PROOFREAD_BATCH_SIZE = 12
+export const PROOFREAD_BATCH_SIZE = 20
 
 // API 超时（毫秒）— 15条批次模型处理可能需60s+，留足余量
 export const API_TIMEOUT_MS = 120000
@@ -17,7 +17,7 @@ export const API_RETRY_DELAY_MS = 1000
 export const MAX_CACHE_SIZE = 500
 
 // 术语库版本号（更新 default-glossary.ts 后手动 +1，旧版自动覆盖升级）
-export const GLOSSARY_VERSION = 2  // 拆分术语库 + 产品线映射 + LLM优化版专属术语
+export const GLOSSARY_VERSION = 3  // 修复专属术语CSV逗号引号丢失导致的串行问题
 
 // UI 超时（仅用于 toast 消失等非关键逻辑）
 export const TOAST_DURATION_MS = 2500
