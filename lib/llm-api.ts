@@ -8,14 +8,12 @@ import {
   IRON_RULES,
   IDENTITY_MISSION,
   getProductLineTone,
-  SCENE_CONSTRAINTS,
   getStyleGuide,
-  getLangSpecificPrompt,
-  getCategoryWordGuide,
+  renderLangForTranslate,
+  renderLangForProofread,
   getFewShotExamplesV2,
   OUTPUT_ANCHOR,
   PROOFREAD_SYSTEM_PROMPT,
-  getProofreadQualityInstruction,
 } from '@lib/prompt-constants'
 
 interface XhrResponse {
@@ -112,6 +110,33 @@ export function detectSourceLanguage(texts: string[]): string {
   // 西里尔（俄语等）
   if (cyrillic > latinChars * 0.5) return 'ru'
   // 中文 vs 英文
+  return cjkChars > latinChars ? 'zh-CN' : 'en'
+}
+
+/**
+ * 单条文本源语言检测。
+ * 与 detectSourceLanguage 逻辑一致，但仅对单条文本做字符统计。
+ * 用于逐条标注源语言，解决批次内混合语种导致 LLM 漏翻的问题。
+ */
+export function detectSingleTextLanguage(text: string): string {
+  if (!text) return 'en'
+  let cjkChars = 0, latinChars = 0, hiragana = 0, katakana = 0, hangul = 0, thai = 0, arabic = 0, cyrillic = 0
+  for (const ch of text) {
+    const code = ch.charCodeAt(0)
+    if (code >= 0x4E00 && code <= 0x9FFF) cjkChars++
+    else if (code >= 0x3040 && code <= 0x309F) hiragana++
+    else if (code >= 0x30A0 && code <= 0x30FF) katakana++
+    else if (code >= 0xAC00 && code <= 0xD7AF) hangul++
+    else if (code >= 0x0E00 && code <= 0x0E7F) thai++
+    else if (code >= 0x0600 && code <= 0x06FF) arabic++
+    else if (code >= 0x0400 && code <= 0x04FF) cyrillic++
+    else if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')) latinChars++
+  }
+  if (hiragana + katakana > 0 && (hiragana + katakana) >= cjkChars * 0.15) return 'ja'
+  if (hangul > 0 && hangul >= (cjkChars + hangul) * 0.1) return 'ko'
+  if (thai > latinChars * 0.5) return 'th'
+  if (arabic > latinChars * 0.5) return 'ar'
+  if (cyrillic > latinChars * 0.5) return 'ru'
   return cjkChars > latinChars ? 'zh-CN' : 'en'
 }
 
@@ -402,14 +427,16 @@ export const SCENE_PRESETS: Record<string, string> = {
 /**
  * Build the complete system prompt from clearly-bounded modules.
  *
- *   M1 IDENTITY      (always)       — Role + Mission, target language
- *   M3 CONSTRAINTS    (always)       — Iron rules + glossary + category + context, English
- *   LANG_SPECIFIC     (always)       — Per-language localization rules, target language
- *   M2 TONE & STYLE   (ecommerce)    — Product tone + style, target language
- *   M4 FEW-SHOT       (ecommerce)    — Examples, target language
- *   M5 OUTPUT         (always)       — Format, English
+ * Assembly order:
+ *   IDENTITY+MISSION  (always, target lang) — 角色+使命
+ *   CONSTRAINTS       (always, English)      — IRON_RULES + GLOSSARY + CONTEXT
+ *   LANG_SPECIFIC     (always, target lang)  — 品类词+规则+合规 (renderLangForTranslate)
+ *   TONE & STYLE      (ecommerce only)       — 产品线调性+风格
+ *   FEW-SHOT          (ecommerce only)       — 翻译示例
+ *   OUTPUT            (always, English)      — 输出格式锚点
  *
- * Each rule appears exactly once. No cross-module duplication.
+ * ⛔ IRON_RULES 只注入翻译 prompt，校对 prompt 有独立的 CHECKLIST。
+ * ⛔ 品类词不再独立注入，已合并到 LANG_SPECIFIC 渲染中。
  */
 export function buildSystemPrompt(params: {
   targetLang: string
@@ -419,29 +446,26 @@ export function buildSystemPrompt(params: {
   scenePreset: string
   style: string
   glossaryHint: string
-  categoryWordGuide: string
   langBlock: string
   fewShot: string
   useEnInstruction: boolean
 }): string {
   const { targetLang, sourceName, targetDisplayName, productLine, scenePreset, style,
-    glossaryHint, categoryWordGuide, langBlock, fewShot, useEnInstruction } = params
+    glossaryHint, langBlock, fewShot, useEnInstruction } = params
 
-  // ── M1: IDENTITY (target language) ──
+  // ── IDENTITY + MISSION (target language, always) ──
   const mission = IDENTITY_MISSION[targetLang] || IDENTITY_MISSION['en'] || ''
   const role = `[IDENTITY]\nYou are the Chief Localization Expert for Lexar (雷克沙), specializing in storage, gaming, imaging, and consumer electronics.\n\n[MISSION]\n${mission}`
 
-  // ── M3: CONSTRAINTS (English, always) ──
+  // ── CONSTRAINTS: Iron Rules + Glossary + Context (English, always) ──
   const glossaryLabel = '\n\n[GLOSSARY]\nUse the translations below for exact matches (case-insensitive).'
   const glossaryBlock = glossaryHint ? `${glossaryLabel}${glossaryHint}` : ''
 
-  const categoryBlock = categoryWordGuide || ''
-
   const contextHint = '\n\n[CONTEXT] Independent UI strings from the same design file. Translate each entry independently. When the same source term appears across entries, use the same target term.'
 
-  const constraintsBlock = `${IRON_RULES}${glossaryBlock}${categoryBlock}${contextHint}`
+  const constraintsBlock = `${IRON_RULES}${glossaryBlock}${contextHint}`
 
-  // ── LANG_SPECIFIC: per-language localization rules (target language, always) ──
+  // ── LANG_SPECIFIC: language-specific rules + category words (target language, always) ──
   const langBlock_str = langBlock ? `\n\n${langBlock}` : ''
 
   // ── M2: TONE & STYLE (target language, ecommerce only) ──
@@ -542,23 +566,22 @@ export async function translateBatch(
 
   // 使用 [N] 格式包裹每条文本，防止 LLM（Qwen）将文本内部空格误判为条目分隔符
   // 含空格的文本加引号包裹，LLM 识别为单个实体
+  // v7.1: 逐条标注 (源语言→目标语言)，解决批次内混合语种导致漏翻的问题
   const quotedIndices = new Set<number>()
   const textList = spaceProtectedTexts.map((t, i) => {
+    const srcLang = detectSingleTextLanguage(t)
     if (/\s/.test(t)) {
       quotedIndices.add(i)
-      return `[${i + 1}] "${t}"`
+      return `[${i + 1}] (${srcLang}→${targetLang}) "${t}"`
     }
-    return `[${i + 1}] ${t}`
+    return `[${i + 1}] (${srcLang}→${targetLang}) ${t}`
   }).join('\n')
 
   // few-shot 示例
   const fewShot = getFewShotExamplesV2(detectedSource, targetLang, productLine, config.translationStyle, 2)
 
-  // 品类词对照表 (v7: all languages, filtered by product line)
-  const categoryWordGuide = getCategoryWordGuide(targetLang, productLine)
-
-  // 语言专属提示词
-  const langBlock = getLangSpecificPrompt(targetLang)
+  // 语言专属提示词（含品类词+规则+合规，统一由 LANG_SPECIFIC 渲染）
+  const langBlock = renderLangForTranslate(targetLang, productLine)
 
   // 5-Module System Prompt Assembly
   const systemPrompt = buildSystemPrompt({
@@ -569,7 +592,6 @@ export async function translateBatch(
     scenePreset: config.scenePreset,
     style: config.translationStyle,
     glossaryHint,
-    categoryWordGuide,
     langBlock,
     fewShot,
     useEnInstruction,
@@ -766,6 +788,15 @@ export async function translateBatch(
     }
   }
 
+  // 漏翻检测：译文与源文实质相同且应被翻译 → 记录 warn 日志
+  const untranslatedIndices = detectUntranslatedText(texts, result, targetLang)
+  if (untranslatedIndices.size > 0) {
+    console.warn(
+      `[translateBatch] 检测到 ${untranslatedIndices.size} 条漏翻（译文==源文），建议检查批次内混合语种问题`,
+      [...untranslatedIndices].map(j => ({ idx: j, text: texts[j].slice(0, 80) })),
+    )
+  }
+
   return result
 }
 
@@ -800,7 +831,6 @@ export async function proofreadBatch(
 
   // 校对也做产品线检测，补全闭环
   const productLine = getEffectiveProductLine(config, sourceTexts, pageName, fileName)
-  const categoryWordGuide = getCategoryWordGuide(targetLang, productLine)
 
   // 术语注入：优先使用任务级预计算提示词（跨批次 system prompt 一致 → API 缓存命中）
   let glossaryHint: string
@@ -827,7 +857,11 @@ export async function proofreadBatch(
   const proofreadSpaceProtected = protectCjkSpaces(maskedSources)
 
   const transLabel = useEnInstruction ? 'Trans' : '译'
-  const textList = items.map((it, i) => `[${i + 1}] ${proofreadSpaceProtected[i]}\n${transLabel}：${maskedTranslations[i]}`).join('\n\n')
+  // v7.1: 逐条标注源语言，校对 LLM 需检查每条是否确实翻译到了目标语言
+  const textList = items.map((it, i) => {
+    const srcLang = detectSingleTextLanguage(it.sourceText)
+    return `[${i + 1}] (${srcLang}→${targetLang}) ${proofreadSpaceProtected[i]}\n${transLabel}：${maskedTranslations[i]}`
+  }).join('\n\n')
 
   // ⛔ 校对环节术语反补全闭环：术语 hint 的 label 不含反补全指令，
   // 需在注入前追加以防校对模型参照术语格式"纠正"译文（添加原文没有的品牌/规格）
@@ -837,11 +871,18 @@ export async function proofreadBatch(
       : '\n⛔ 以上术语仅当完全一致时才套用。严禁参照术语格式"纠正"译文，将部分产品名补全为全称。'
   }
 
-  // v7: QA Checklist proofread (not re-translate)
-  // Inject IRON_RULES so proofread LLM works under the same constraints as translation LLM
-  const langBlock = getLangSpecificPrompt(targetLang)
-  const qualityInstruction = getProofreadQualityInstruction(targetLang)
-  const systemPrompt = IRON_RULES + '\n\n' + PROOFREAD_SYSTEM_PROMPT + glossaryHint + categoryWordGuide + langBlock + qualityInstruction
+  // ═══════════════════════════════════════════════════════════
+  // 校对 system prompt 组装
+  // ═══════════════════════════════════════════════════════════
+  // ROLE+CHECKLIST (PROOFREAD_SYSTEM_PROMPT) — 独立 QA 视角
+  // GLOSSARY (glossaryHint)                 — 术语参照
+  // LANG_SPECIFIC (renderLangForProofread)  — 校验标准+品类词+品质
+  //
+  // ⛔ 不注入 IRON_RULES — 校对用独立的 CHECKLIST，不共享翻译规则
+  // ⛔ 不注入 TONE/STYLE/FEW-SHOT — 校对不需要这些
+  // ═══════════════════════════════════════════════════════════
+  const langBlock = renderLangForProofread(targetLang, productLine)
+  const systemPrompt = PROOFREAD_SYSTEM_PROMPT + glossaryHint + langBlock
 
   const apiKey = config.proofreadApiKey || config.apiKey
   const apiUrl = config.proofreadApiUrl || config.apiUrl
@@ -992,6 +1033,19 @@ export async function proofreadBatch(
     results[i].text = resultTexts[i]
   }
 
+  // 漏翻检测：校对后译文仍与源文相同 → 记录 warn 日志
+  const proofreadUntranslated = detectUntranslatedText(
+    items.map(it => it.sourceText),
+    resultTexts,
+    targetLang,
+  )
+  if (proofreadUntranslated.size > 0) {
+    console.warn(
+      `[proofreadBatch] 校对后检测到 ${proofreadUntranslated.size} 条漏翻（译文==源文），校对也未发现`,
+      [...proofreadUntranslated].map(j => ({ idx: j, text: items[j].sourceText.slice(0, 80) })),
+    )
+  }
+
   return results
 }
 
@@ -1006,4 +1060,42 @@ export function isProofreadScriptMismatch(text: string, targetLang: string): boo
     return /[一-鿿㐀-䶿]/.test(text)
   }
   return false
+}
+
+// ============================================================
+// 漏翻检测：检查译文是否与源文实质相同（即 LLM 没翻译）
+// 正常化比较（去 ®™© + 合并空格 + 小写），排除商标/空格差异
+// ============================================================
+
+/**
+ * 检测翻译/校对后是否存在漏翻（译文==源文但应被翻译）。
+ * 返回漏翻条目的索引集合，由调用方决定处理策略。
+ */
+export function detectUntranslatedText(
+  sourceTexts: string[],
+  translatedTexts: string[],
+  targetLang: string,
+): Set<number> {
+  const untranslatedIndices = new Set<number>()
+
+  function normalize(s: string): string {
+    return s.replace(/[®™©]/g, '').replace(/\s+/g, ' ').trim().toLowerCase()
+  }
+
+  for (let i = 0; i < sourceTexts.length; i++) {
+    const src = sourceTexts[i] || ''
+    const trans = translatedTexts[i] || ''
+    if (!src || !trans) continue
+
+    // 跳过源语言==目标语言的条目（不需要翻译，如同语言校对场景）
+    const srcLang = detectSingleTextLanguage(src)
+    if (srcLang === targetLang) continue
+
+    // 归一化后完全相同 → 漏翻
+    if (normalize(src) === normalize(trans)) {
+      untranslatedIndices.add(i)
+    }
+  }
+
+  return untranslatedIndices
 }

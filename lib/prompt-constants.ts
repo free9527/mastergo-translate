@@ -13,7 +13,7 @@
 /** Core mission statement per target language — activates the target semantic space */
 export const IDENTITY_MISSION: Record<string, string> = {
   'zh-CN': `核心使命：将源文本精准、地道地翻译为简体中文。严格忠实于原文信息边界——通过调整词汇色彩、句式结构来适配产品线与受众。绝对禁止：自由创作、脑补参数、夸大宣传、改变原文语义。`,
-  'zh-TW': `核心使命：將簡體中文精準轉換為台灣繁體並完成用語在地化。嚴格忠實於原文信息邊界——透過調整詞彙色彩、句式結構來適配產品線與受眾。絕對禁止：自由創作、腦補參數、誇大宣傳、擴寫補充。`,
+  'zh-TW': `核心使命：將源文本精準翻譯為台灣繁體中文並完成用語在地化。嚴格忠實於原文信息邊界——透過調整詞彙色彩、句式結構來適配產品線與受眾。絕對禁止：自由創作、腦補參數、誇大宣傳、擴寫補充。`,
   'ja': `コアミッション：原文を正確かつ自然な日本語に翻訳してください。原文の情報範囲を厳守し、語彙や文体を製品ラインと読者に合わせて調整します。創作、スペックの捏造、誇大表現は一切禁止です。`,
   'ko': `핵심 미션: 원문을 정확하고 자연스러운 한국어로 번역하세요. 원문의 정보 범위를 엄격히 준수하고, 어휘와 문체를 제품 라인과 독자에 맞게 조정하세요. 창작, 스펙 조작, 과장 표현은 절대 금지입니다.`,
   'fr': `Mission : Traduisez le texte source de manière précise et naturelle en français. Respectez strictement les limites d'information du texte original. Adaptez le vocabulaire, la structure des phrases et le registre à la gamme de produits et au public cible. Interdiction absolue : création libre, invention de spécifications, exagération marketing.`,
@@ -39,6 +39,16 @@ export const IDENTITY_MISSION: Record<string, string> = {
 // LLM follows English logic instructions with highest fidelity.
 // Each rule appears exactly once — no cross-module duplication.
 // ============================================================
+
+// ═══════════════════════════════════════════════════════════════
+// 模块: IRON_RULES — 全局铁则
+// ═══════════════════════════════════════════════════════════════
+// 职责: 跨语言通用约束，所有语种翻译都必须遵守
+// 注入: 翻译 system prompt，始终注入，英语
+// 边界: ⛔ 不含任何语言专属内容（那是 LANG_SPECIFIC 的职责）
+//       ⛔ 不注入校对 prompt（校对有独立的 CHECKLIST）
+//       ⛔ 不写"检查是否..."（那是校对的职责，这里是"你必须..."）
+// ═══════════════════════════════════════════════════════════════
 
 export const IRON_RULES = `[IRON RULES]
 1. PRESERVE PRODUCT NAMES & TECH SPECS (ALL LANGUAGES):
@@ -212,42 +222,219 @@ export function getStyleGuide(style: string, targetLang: string): string {
   return guides[targetLang] || guides['default'] || guides['zh-CN'] || ''
 }
 
-// ============================================================
-// Module 3: CONSTRAINTS — Language-specific rules
-// (kept from v6.1, content largely unchanged)
-// ============================================================
+// ═══════════════════════════════════════════════════════════════
+// 模块: LANG_SPECIFIC — 目标语言专属提示词
+// ═══════════════════════════════════════════════════════════════
+// 职责: 该语言一切专属内容。翻译和校对都通过此模块注入。
+// 注入: 目标语言匹配时，翻译和校对各自渲染不同视角。
+// 边界: ⛔ 不含跨语言通用规则（那是 IRON_RULES 的职责）
+//       ⛔ 不含产品线策略（那是 PRODUCT_LINE_TONE_GUIDES 的职责）
+//       ⛔ 不含翻译示例（那是 FEWSHOT_STORE 的职责）
+// ───────────────────────────────────────────────────────────────
+// 结构: 每个语言 4 个字段
+//   rules       — 排版/语法/用字/术语规范（翻译+校对都注入）
+//   compliance  — 广告法/文化禁忌（翻译+校对都注入）
+//   quality     — 母语者语感品质要求（仅校对注入）
+//   terminology — 品类词术语对照（由 renderer 从 CATEGORY_WORDS
+//                  动态生成，不手动维护）
+// ═══════════════════════════════════════════════════════════════
 
-export const LANG_SPECIFIC: Record<string, string> = {
-  'zh-CN': `[zh-CN Guidelines] 术语强制统一：存储卡、固态硬盘、读卡器、读写速度、移动固态硬盘。禁止港台用语混入：禁用「記憶卡、固態硬碟、讀卡機、行動硬碟、相機、影片」等繁体词汇。广告合规：严格遵守中国大陆广告法，禁用「最佳、第一、顶级、秒杀、极致、碾压」等极限词。禁止将英文营销俚语直译成中文网络梗，保持专业数码产品文案调性。禁止自行增加原文没有的夸张修饰。`,
-  'zh-TW': `[zh-TW Guidelines] 不是简体转繁体，而是台湾本土术语本地化：記憶卡（非存儲卡）、固態硬碟（非固態硬盤）、讀卡機（非讀卡器）、行動硬碟（非移動硬盤）、相機、影片、軟體、程式、螢幕、隨身碟。用字严格遵循台湾正体规范：身分、週、裡、後，避免简体异体字混入。一对多繁简必须准确：只→隻/衹、干→乾/幹/干、复→復/複，禁止机械一对一转换。禁用大陆特有政策词汇与网络用语，文案符合台湾3C产品市场表达习惯。`,
-  'ja': `[ja Guidelines] ブランド初出時に「レクサー」と注記、以降は Lexar で統一。文体：商品詳細ページはです・ます敬体で統一。技術用語：技術記号は英文保持、一般用語は業界標準の和製漢語（SDカード、読み込み速度、書き込み速度、プロフェッショナル）。禁止：中式日本語の直訳。「安定」「安心」「長寿命」「高耐久」など日本市場が好む表現を使用。過度な誇張表現は日本の広告規制に抵触するため禁止。カタカナ外来語は業界標準の転写を使用し、独自の音訳は禁止。`,
-  'ko': `[ko Guidelines] 브랜드 첫 언급 시 렉사르로 표기, 본문은 Lexar 유지. 기술 용어는 업계 표준 영어 외래어 우선 사용(SD 카드, SSD, 읽기 속도, 쓰기 속도, 휴대용 SSD, 카드 리더기). 생소한 한자어 강제 사용 금지. 문체는 하십시오체(습니다/ㅂ니다) 통일, 반말 금지. 띄어쓰기 엄수(모든 단어 사이 공백 정확히). 일본어 유래 한자어 사용 금지. 극단적 수식어 제한, 한국 광고 법규 준수.`,
-  'fr': `[fr Guidelines] Use Metropolitan French (France), NOT Quebec French. All nouns must have correct gender, adjectives must agree in gender and number. Non-breaking space before : ; ! ? « ». Decimal separator: comma (7,5 Mo/s). Terminology: carte SD, vitesse de lecture, vitesse d'écriture, SSD portable, clé USB. Formal "vous" not "tu". Minimize English loanwords; prefer native French technical terms (e.g. micrologiciel NOT firmware). Keep UI copy concise to avoid text overflow.`,
-  'de': `[de Guidelines] Lexar ≠ Lexware — never confuse the brand. ALL nouns MUST be capitalized. Compound nouns must be one word: Speicherkarte, Lesegeschwindigkeit, Schreibgeschwindigkeit, Kartenleser, USB-Stick. Keep UI copy short to avoid text overflow. Formal "Sie" not "du". Copy must be factual and evidence-based — even marketing should avoid unsupported superlatives. Do NOT calque English word order into German (verb-final in subordinate clauses).`,
-  'es': `[es Guidelines] Use International Castilian Spanish — do NOT mix in Latin American regional slang. "ordenador" NOT "computadora", "tarjeta de memoria" NOT "memoria". All nouns must have correct gender and number agreement. Formal "Usted" for customer-facing copy. Terminology: tarjeta microSD/SD, SSD portátil, lector de tarjetas, velocidad de lectura/escritura. Marketing copy can be warm and direct while maintaining professionalism.`,
-  'pt': `[pt Guidelines] Use Portugal mainland formal Portuguese. ⛔ Pen USB (NOT Pen Drive), Portátil (NOT Notebook), Caixa (NOT Case). Do NOT mix in Brazilian Portuguese vocabulary or grammar. Terminology: cartão de memória, SSD portátil, leitor de cartões, velocidade de leitura/gravação. Adjective-noun gender/number agreement. Pronouns and clitics follow European Portuguese rules (post-position).`,
-  'pt-BR': `[pt-BR Guidelines] Use Brazilian Portuguese throughout. ⛔ Pen Drive (NOT Pen USB), Notebook (NOT Portátil), Case (NOT Caixa). Do NOT mix in European Portuguese vocabulary. Terminology: cartão de memória, SSD portátil, leitor de cartões, pendrive, velocidade de leitura/gravação. Use "você". Watch for false friends: atualmente = currently (NOT actually). Marketing copy should be more engaging, matching Brazilian e-commerce style. Strictly distinguish pt-BR from pt — never mix the two variants.`,
-  'it': `[it Guidelines] All nouns and adjectives must agree in gender and number. Terminology: scheda SD, velocità di lettura, velocità di scrittura. Photography-related copy can be slightly softer and more elegant, matching Italian photography culture. Keep UI copy concise — avoid long subordinate clauses.`,
-  'nl': `[nl Guidelines] Compound nouns must be correctly joined, no spacing errors. Terminology: geheugenkaart, leessnelheid, schrijfsnelheid. Copy should be factual and objective, suitable for professional product descriptions. Expect text expansion of ~20% — keep short copy concise.`,
-  'pl': `[pl Guidelines] ALL special diacritic characters must be preserved: ą ę ł ń ó ś ź ż — never omit or replace with plain letters. Nouns and adjectives must be correctly declined for case. Terminology: karta pamięci, prędkość odczytu, prędkość zapisu. Allow extra space for text expansion in UI — prefer short forms.`,
-  'sv': `[sv Guidelines] Preserve special characters: å ä ö. Copy should be minimal and restrained — Nordic aesthetic. Avoid verbose phrasing. Terminology: microSD-kort, bärbar SSD, kortläsare, USB-minne, läshastighet, skrivhastighet. Retain English IT terms (SSD, NVMe, PCIe, gaming). Compound nouns must be correctly spelled — do not split them.`,
-  'tr': `[tr Guidelines] ALL special characters must be preserved: ı İ ö ü ç ş ğ. Strictly distinguish i/ı and I/İ — never confuse them. Terminology: SD kart, okuma hızı, yazma hızı. Use standard formal written Turkish, suitable for both professional users and consumers. Maintain cultural neutrality — avoid religiously sensitive expressions.`,
-  'ru': `[ru Guidelines] Use Cyrillic throughout; Lexar and technical symbols remain in Latin script, embedded LTR within the text. Terminology: скорость чтения, скорость записи, карта памяти. All nouns and adjectives must be correctly declined (6 cases). Emphasize cold-weather durability and ruggedness where relevant to the Russian market.`,
-  'vi': `[vi Guidelines] ALL tone marks and special characters must be preserved: đ ư ơ ă â — missing tones change word meaning entirely. Never truncate text at byte boundaries that break combined tone marks; every syllable's tone must be complete. Use Northern standard Vietnamese (Hanoi official accent), NOT Southern dialect. Terminology: thẻ nhớ, tốc độ đọc, tốc độ ghi. Use correct classifiers (measure words) for product categories — do not calque from English. E-commerce copy should be lively and direct, matching Vietnamese market style.`,
-  'th': `[th Guidelines] All superscript/subscript vowels and tone marks must display completely — no character overlap, loss, or distortion. Use standard common register, NOT royal/high honorifics, and NOT overly casual speech. Brand annotation: เล็กซาร์; technical parameters remain in English. Avoid Buddhist-sensitive vocabulary and imagery. Default left-aligned layout; reserve sufficient line height to prevent character clipping. Word breaking must follow Thai writing conventions — never break mid-word.`,
-  'id': `[id Guidelines] Use official standard Indonesian (Bahasa Indonesia) — do NOT mix in Malay vocabulary. Formal "Anda", avoid colloquial "kamu"/"lu"/"gue". Terminology: kartu memori, SSD portabel, pembaca kartu, flashdisk, kecepatan baca/tulis. Prefix system (me-, di-, ter-, pe-) must be correctly applied. Language should be accessible and direct — avoid overly formal bureaucratic expressions; match Indonesian 3C product copy style.`,
-  'ar': `[ar Guidelines] Use Modern Standard Arabic (MSA/fusha) — do NOT mix in any national dialect. Full text RTL; embedded Lexar, English terms, numbers, and symbols remain LTR — bidirectional text logic must be correct. Terminology: بطاقة ذاكرة, سرعة القراءة, قرص صلب SSD. Cultural compliance: gender-neutral phrasing; avoid sensitive imagery and religious references. Avoid exaggerated marketing language unsuitable for Middle Eastern markets.`,
-  'en': `[en Guidelines] Use American English spelling consistently: color, center, fiber, license — do NOT mix in British spelling. Fixed terminology: Read speed / Write speed, Professional filmmaker, Content creator, Rugged design. Technical copy should be concise and objective; marketing copy should use short sentences, avoid complex clauses. Distinguish consumer vs. professional product line tone — do not mix them. Do NOT literally translate Chinese four-character marketing slogans into awkward English; use native digital industry expressions.`,
+interface LangBlock {
+  /** 排版/语法/用字/术语规范 — 翻译+校对都注入 */
+  rules: string
+  /** 广告法/文化禁忌 — 翻译+校对都注入 */
+  compliance: string
+  /** 母语者语感品质 — 仅校对注入 */
+  quality: string
 }
 
+export const LANG_SPECIFIC: Record<string, LangBlock> = {
+  'zh-CN': {
+    rules: `术语强制统一：存储卡、固态硬盘、读卡器、读写速度、移动固态硬盘。禁止港台用语混入：禁用「記憶卡、固態硬碟、讀卡機、行動硬碟、相機、影片」等繁体词汇。禁止将英文营销俚语直译成中文网络梗，保持专业数码产品文案调性。禁止自行增加原文没有的夸张修饰。`,
+    compliance: `严格遵守中国大陆广告法，禁用「最佳、第一、顶级、秒杀、极致、碾压」等极限词。`,
+    quality: `以简体中文母语者的语感审视译文——是否自然流畅、符合中国大陆的行业表达习惯？`,
+  },
+  'zh-TW': {
+    rules: `使用台湾本土术语：記憶卡（非存儲卡）、固態硬碟（非固態硬盤）、讀卡機（非讀卡器）、行動硬碟（非移動硬盤）、相機、影片、軟體、程式、螢幕、隨身碟。若源文为简体中文：用字严格遵循台湾正体规范（身分、週、裡、後），一对多繁简必须准确（只→隻/衹、干→乾/幹/干、复→復/複），禁止机械一对一转换。`,
+    compliance: `禁用大陆特有政策词汇与网络用语，文案符合台湾3C产品市场表达习惯。`,
+    quality: `以台灣繁體中文母語者的語感審視譯文——是否自然流暢、符合台灣的產業用語習慣？`,
+  },
+  'ja': {
+    rules: `ブランド初出時に「レクサー」と注記、以降は Lexar で統一。文体：商品詳細ページはです・ます敬体で統一。技術用語：技術記号は英文保持、一般用語は業界標準の和製漢語（SDカード、読み込み速度、書き込み速度、プロフェッショナル）。禁止：中式日本語の直訳。「安定」「安心」「長寿命」「高耐久」など日本市場が好む表現を使用。カタカナ外来語は業界標準の転写を使用し、独自の音訳は禁止。`,
+    compliance: `過度な誇張表現は日本の広告規制に抵触するため禁止。`,
+    quality: `日本語ネイティブとして訳文を吟味してください——自然で業界標準の表現になっていますか？`,
+  },
+  'ko': {
+    rules: `브랜드 첫 언급 시 렉사르로 표기, 본문은 Lexar 유지. 기술 용어는 업계 표준 영어 외래어 우선 사용(SD 카드, SSD, 읽기 속도, 쓰기 속도, 휴대용 SSD, 카드 리더기). 생소한 한자어 강제 사용 금지. 문체는 하십시오체(습니다/ㅂ니다) 통일, 반말 금지. 띄어쓰기 엄수(모든 단어 사이 공백 정확히). 일본어 유래 한자어 사용 금지.`,
+    compliance: `극단적 수식어 제한, 한국 광고 법규 준수.`,
+    quality: `한국어 원어민의 감각으로 번역문을 검토하세요 — 자연스럽고 업계 표준 표현에 맞습니까?`,
+  },
+  'fr': {
+    rules: `Use Metropolitan French (France), NOT Quebec French. All nouns must have correct gender, adjectives must agree in gender and number. Non-breaking space before : ; ! ? « ». Decimal separator: comma (7,5 Mo/s). Terminology: carte SD, vitesse de lecture, vitesse d'écriture, SSD portable, clé USB. Formal "vous" not "tu". Minimize English loanwords; prefer native French technical terms (e.g. micrologiciel NOT firmware). Keep UI copy concise to avoid text overflow.`,
+    compliance: ``,
+    quality: `Évaluez en français natif : la traduction est-elle naturelle et adaptée au public français ?`,
+  },
+  'de': {
+    rules: `Lexar ≠ Lexware — never confuse the brand. ALL nouns MUST be capitalized. Compound nouns must be one word: Speicherkarte, Lesegeschwindigkeit, Schreibgeschwindigkeit, Kartenleser, USB-Stick. Keep UI copy short to avoid text overflow. Formal "Sie" not "du". Copy must be factual and evidence-based. Do NOT calque English word order into German (verb-final in subordinate clauses).`,
+    compliance: `Even marketing copy should avoid unsupported superlatives.`,
+    quality: `Prüfen Sie als deutscher Muttersprachler: klingt die Übersetzung natürlich und zielgruppengerecht?`,
+  },
+  'es': {
+    rules: `Use International Castilian Spanish — do NOT mix in Latin American regional slang. "ordenador" NOT "computadora", "tarjeta de memoria" NOT "memoria". All nouns must have correct gender and number agreement. Formal "Usted" for customer-facing copy. Terminology: tarjeta microSD/SD, SSD portátil, lector de tarjetas, velocidad de lectura/escritura. Marketing copy can be warm and direct while maintaining professionalism.`,
+    compliance: ``,
+    quality: `Evalúe como hispanohablante nativo: ¿suena natural y adecuada para el público español?`,
+  },
+  'pt': {
+    rules: `Use Portugal mainland formal Portuguese. ⛔ Pen USB (NOT Pen Drive), Portátil (NOT Notebook), Caixa (NOT Case). Do NOT mix in Brazilian Portuguese vocabulary or grammar. Terminology: cartão de memória, SSD portátil, leitor de cartões, velocidade de leitura/gravação. Adjective-noun gender/number agreement. Pronouns and clitics follow European Portuguese rules (post-position).`,
+    compliance: ``,
+    quality: `Avalie como falante nativo de português europeu: a tradução soa natural?`,
+  },
+  'pt-BR': {
+    rules: `Use Brazilian Portuguese throughout. ⛔ Pen Drive (NOT Pen USB), Notebook (NOT Portátil), Case (NOT Caixa). Do NOT mix in European Portuguese vocabulary. Terminology: cartão de memória, SSD portátil, leitor de cartões, pendrive, velocidade de leitura/gravação. Use "você". Watch for false friends: atualmente = currently (NOT actually). Strictly distinguish pt-BR from pt — never mix the two variants.`,
+    compliance: ``,
+    quality: `Avalie como falante nativo de português brasileiro: a tradução soa natural?`,
+  },
+  'it': {
+    rules: `All nouns and adjectives must agree in gender and number. Terminology: scheda SD, velocità di lettura, velocità di scrittura. Photography-related copy can be slightly softer and more elegant, matching Italian photography culture. Keep UI copy concise — avoid long subordinate clauses.`,
+    compliance: ``,
+    quality: `Valuti come madrelingua italiano: la traduzione suona naturale e adatta al pubblico?`,
+  },
+  'nl': {
+    rules: `Compound nouns must be correctly joined, no spacing errors. Terminology: geheugenkaart, leessnelheid, schrijfsnelheid. Copy should be factual and objective, suitable for professional product descriptions. Expect text expansion of ~20% — keep short copy concise.`,
+    compliance: ``,
+    quality: `Beoordeel als Nederlandse moedertaalspreker: klinkt de vertaling natuurlijk?`,
+  },
+  'pl': {
+    rules: `ALL special diacritic characters must be preserved: ą ę ł ń ó ś ź ż — never omit or replace with plain letters. Nouns and adjectives must be correctly declined for case. Terminology: karta pamięci, prędkość odczytu, prędkość zapisu. Allow extra space for text expansion in UI — prefer short forms.`,
+    compliance: ``,
+    quality: `Oceń jako rodzimy użytkownik polskiego: czy tłumaczenie brzmi naturalnie?`,
+  },
+  'sv': {
+    rules: `Preserve special characters: å ä ö. Copy should be minimal and restrained — Nordic aesthetic. Avoid verbose phrasing. Terminology: microSD-kort, bärbar SSD, kortläsare, USB-minne, läshastighet, skrivhastighet. Retain English IT terms (SSD, NVMe, PCIe, gaming). Compound nouns must be correctly spelled — do not split them.`,
+    compliance: ``,
+    quality: `Bedöm som svensk modersmålstalare: låter översättningen naturlig?`,
+  },
+  'tr': {
+    rules: `ALL special characters must be preserved: ı İ ö ü ç ş ğ. Strictly distinguish i/ı and I/İ — never confuse them. Terminology: SD kart, okuma hızı, yazma hızı. Use standard formal written Turkish, suitable for both professional users and consumers.`,
+    compliance: `Maintain cultural neutrality — avoid religiously sensitive expressions.`,
+    quality: `Ana dili Türkçe olan biri olarak değerlendirin: çeviri doğal geliyor mu?`,
+  },
+  'ru': {
+    rules: `Use Cyrillic throughout; Lexar and technical symbols remain in Latin script, embedded LTR within the text. Terminology: скорость чтения, скорость записи, карта памяти. All nouns and adjectives must be correctly declined (6 cases). Emphasize cold-weather durability and ruggedness where relevant to the Russian market.`,
+    compliance: ``,
+    quality: `Оцените как носитель русского языка: звучит ли перевод естественно?`,
+  },
+  'vi': {
+    rules: `ALL tone marks and special characters must be preserved: đ ư ơ ă â — missing tones change word meaning entirely. Never truncate text at byte boundaries that break combined tone marks; every syllable's tone must be complete. Use Northern standard Vietnamese (Hanoi official accent), NOT Southern dialect. Terminology: thẻ nhớ, tốc độ đọc, tốc độ ghi. Use correct classifiers (measure words) for product categories — do not calque from English. E-commerce copy should be lively and direct, matching Vietnamese market style.`,
+    compliance: ``,
+    quality: `Đánh giá với tư cách người bản ngữ tiếng Việt: bản dịch có tự nhiên không?`,
+  },
+  'th': {
+    rules: `All superscript/subscript vowels and tone marks must display completely — no character overlap, loss, or distortion. Use standard common register, NOT royal/high honorifics, and NOT overly casual speech. Brand annotation: เล็กซาร์; technical parameters remain in English. Default left-aligned layout; reserve sufficient line height to prevent character clipping. Word breaking must follow Thai writing conventions — never break mid-word.`,
+    compliance: `Avoid Buddhist-sensitive vocabulary and imagery.`,
+    quality: `ประเมินในฐานะเจ้าของภาษาไทย: งานแปลฟังดูเป็นธรรมชาติหรือไม่?`,
+  },
+  'id': {
+    rules: `Use official standard Indonesian (Bahasa Indonesia) — do NOT mix in Malay vocabulary. Formal "Anda", avoid colloquial "kamu"/"lu"/"gue". Terminology: kartu memori, SSD portabel, pembaca kartu, flashdisk, kecepatan baca/tulis. Prefix system (me-, di-, ter-, pe-) must be correctly applied. Language should be accessible and direct — avoid overly formal bureaucratic expressions; match Indonesian 3C product copy style.`,
+    compliance: ``,
+    quality: `Nilai sebagai penutur asli bahasa Indonesia: apakah terjemahan terdengar alami?`,
+  },
+  'ar': {
+    rules: `Use Modern Standard Arabic (MSA/fusha) — do NOT mix in any national dialect. Full text RTL; embedded Lexar, English terms, numbers, and symbols remain LTR — bidirectional text logic must be correct. Terminology: بطاقة ذاكرة, سرعة القراءة, قرص صلب SSD. Gender-neutral phrasing; avoid sensitive imagery and religious references.`,
+    compliance: `Avoid exaggerated marketing language unsuitable for Middle Eastern markets.`,
+    quality: `قيّم بصفتك متحدثًا أصليًا للعربية: هل الترجمة طبيعية ومناسبة للجمهور المستهدف؟`,
+  },
+  'en': {
+    rules: `Use American English spelling consistently: color, center, fiber, license — do NOT mix in British spelling. Fixed terminology: Read speed / Write speed, Professional filmmaker, Content creator, Rugged design. Technical copy should be concise and objective; marketing copy should use short sentences, avoid complex clauses. Distinguish consumer vs. professional product line tone — do not mix them. Do NOT literally translate Chinese four-character marketing slogans into awkward English; use native digital industry expressions.`,
+    compliance: ``,
+    quality: `Evaluate as a native English speaker: does the translation sound natural for the target audience?`,
+  },
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LANG_SPECIFIC 渲染函数
+// ═══════════════════════════════════════════════════════════════
+// 同一份数据源，翻译和校对各自渲染不同视角
+// 翻译: 指令式 — "你必须用 X，禁止 Y"
+// 校对: 检查式 — "检查是否用了 X 而非 Y"
+// 术语部分从 CATEGORY_WORDS 动态读取，不重复维护
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * 渲染翻译视角的语言专属提示词。
+ * 包含: 品类词术语 + rules + compliance
+ * 不包含: quality（校对专属）
+ */
+export function renderLangForTranslate(targetLang: string, productLine?: string | null): string {
+  const block = LANG_SPECIFIC[targetLang]
+  if (!block) return ''
+
+  const categoryBlock = buildCategoryTerminology(targetLang, productLine)
+
+  const parts = [categoryBlock, block.rules, block.compliance].filter(Boolean)
+  if (parts.length === 0) return ''
+
+  return `\n[${targetLang} Guidelines]\n${parts.join('\n')}`
+}
+
+/**
+ * 渲染校对视角的语言专属校验标准。
+ * 包含: 品类词术语 + rules + compliance + quality
+ * 同一份数据，但渲染为校验语境
+ */
+export function renderLangForProofread(targetLang: string, productLine?: string | null): string {
+  const block = LANG_SPECIFIC[targetLang]
+  if (!block) return ''
+
+  const categoryBlock = buildCategoryTerminology(targetLang, productLine)
+
+  const parts = [categoryBlock, block.rules, block.compliance, block.quality].filter(Boolean)
+  if (parts.length === 0) return ''
+
+  return `\n[VALIDATION: ${targetLang}]\n${parts.join('\n')}`
+}
+
+/** 从 CATEGORY_WORDS 数据源按语言和产品线动态生成品类词对照表 */
+function buildCategoryTerminology(targetLang: string, productLine?: string | null): string {
+  const allowedWords = productLine
+    ? (PRODUCT_LINE_CATEGORY_MAP[productLine] || FALLBACK_CATEGORY_WORDS)
+    : FALLBACK_CATEGORY_WORDS
+
+  const lines: string[] = []
+  for (const [en, map] of Object.entries(CATEGORY_WORDS)) {
+    if (!allowedWords.includes(en)) continue
+    const translated = map[targetLang]
+    if (translated && translated !== en) {
+      lines.push(`  ${en} → ${translated}`)
+    }
+  }
+  if (lines.length === 0) return ''
+  return `品类词对照：\n${lines.join('\n')}`
+}
+
+/** @deprecated 使用 renderLangForTranslate 替代 */
 export function getLangSpecificPrompt(targetLang: string): string {
-  const rules = LANG_SPECIFIC[targetLang]
-  return rules ? `\n${rules}` : ''
+  return renderLangForTranslate(targetLang)
+}
+
+/** @deprecated 使用 renderLangForProofread 替代，品质指令已合并到 LANG_SPECIFIC[lang].quality */
+export function getProofreadQualityInstruction(targetLang: string): string {
+  const block = LANG_SPECIFIC[targetLang]
+  return block?.quality || ''
 }
 
 // ============================================================
 // Module 3 continued: CATEGORY WORDS (10 categories × 20 languages)
 // ============================================================
+
+// ═══════════════════════════════════════════════════════════════
+// 数据源: CATEGORY_WORDS — 品类词多语言对照表
+// ═══════════════════════════════════════════════════════════════
+// 职责: 纯数据，10品类词×20语言的对照表
+// 注入: ⛔ 不直接注入 prompt。由 LANG_SPECIFIC 渲染时按需读取
+// 边界: ⛔ 不是独立注入模块，只是数据源
+//       ⛔ 不写规则，只存对照数据
+// ═══════════════════════════════════════════════════════════════
 
 export const CATEGORY_WORDS: Record<string, Record<string, string>> = {
   'SSD': {
@@ -717,69 +904,54 @@ Check passed → output in format: "[N] translated text" — one line per item.
 No markdown, no code blocks. Each [N] is ONE complete text.
 → Output translations now:`
 
-// ============================================================
-// Proofread: QA Checklist (NEW — not "re-translate")
-// ============================================================
+// ═══════════════════════════════════════════════════════════════
+// 模块: PROOFREAD_SYSTEM_PROMPT — AI校对指令
+// ═══════════════════════════════════════════════════════════════
+// 职责: 校对 LLM 的检查清单。聚焦代码做不到的事（查漏补缺）。
+// 注入: 校对 system prompt，始终注入，英语
+// 边界: ⛔ 不注入 IRON_RULES（那是翻译规则，校对用独立的 CHECKLIST）
+//       ⛔ 不检查代码已处理的问题（术语替换/占位符/品牌注入/单位格式）
+//       ⛔ 不写"你必须..."（那是翻译的职责，校对是"是否..."）
+// ───────────────────────────────────────────────────────────────
+// 代码已兜底的事项（校对不需要重复检查）:
+//   - 术语替换   → enforceGlossaryTerms (post-process.ts)
+//   - 占位符还原 → unmaskEntities (entity-masker.ts)
+//   - 品牌注入   → detectBrandInjection (post-process.ts)
+//   - 商标符号   → restoreTrademarkSymbols (post-process.ts)
+//   - 单位格式   → restoreStorageUnitFormatting (post-process.ts)
+//   - 译文扩展   → detectTranslationExpansion (post-process.ts)
+//   - 漏翻检测   → detectUntranslatedText (llm-api.ts)
+// ═══════════════════════════════════════════════════════════════
 
-export const PROOFREAD_SYSTEM_PROMPT = `[PROOFREADING DIRECTIVES]
-You are a localization QA reviewer. Review translations against source texts.
-Do NOT re-translate. Only fix specific, identifiable issues.
+export const PROOFREAD_SYSTEM_PROMPT = `[ROLE]
+You are a localization QA reviewer for Lexar (雷克沙). Review translations
+against source texts. Do NOT re-translate — only identify and fix issues.
 
-[CHECKLIST]
-1. GLOSSARY: Are all mandatory glossary terms used correctly?
-2. PLACEHOLDERS: Are all __XXX_N__, ZZ[N]ZZ, and ↵ (line break) markers intact and correctly positioned?
-3. ACCURACY: The translation must contain ONLY information present in the source —
-   nothing more, nothing less. Check for omissions, additions, or meaning shifts.
-4. TONE: Does the translation match the product line's tone guide?
-5. NATURALNESS: Any "translationese" or unnatural phrasing in the target language?
+[CHECKLIST — code handles glossary/placeholders/brand-injection/formatting;
+your job is what code CANNOT do:]
+1. UNTRANSLATED: Is each item actually translated into the target language,
+   not a verbatim copy of the source? Product names like "Lexar® PLAY SSD" may
+   stay English across all languages, but category words and descriptive text
+   MUST be localized.
+2. MEANING: Does the translation match the source's meaning exactly? No
+   omissions, no additions, no meaning drift.
+3. NATURALNESS: Does the translation read naturally to a native speaker? Flag
+   awkward phrasing, translationese, or calqued syntax.
    ⛔ TECH LABEL EXEMPTION: If the source is a product name, hardware spec, or
    tech parameter chain (nouns only, no predicate), it is NOT a complete sentence.
    Short output for non-sentence source is EXPECTED and CORRECT — do NOT expand
    or "make it flow". Only flag naturalness for actual sentences with predicates.
-6. CJK SPACING: For CJK text, are intentional spaces between phrases preserved (not merged or deleted)?
-7. BRAND/SPEC INJECTION: Does the translation add brand names (Lexar®, pexar), form
-   factors (M.2, 2230, 2280), protocols (NVMe), or fabricated speed/capacity numbers
-   (5200MB/s, 128GB) NOT in the source? Source "PLAY X PCIe 4.0 SSD" MUST NOT become
-   "Lexar PLAY X M.2 PCIe 4.0 NVMe SSD". Source "read speed up to" MUST NOT become
-   "Lesegeschwindigkeit bis zu 5200MB/s". Strip any added identifiers or numbers.
-8. CATEGORY PRECISION: Is the category word translated correctly? Desktop Memory ≠
-   Laptop Memory; SSD ≠ Portable SSD; Flash Drive ≠ Dual Drive; Card ≠ Reader;
-   Enclosure ≠ Hub. If the wrong category term is used, correct it.
-9. SHORT LABEL: Labels and param names under 15 characters must stay concise. If the
-   source is a short label but the translation is a full sentence, shorten it to
-   match the source's brevity.
+4. CATEGORY: Is each category word used correctly per the reference table?
+   Desktop Memory ≠ Laptop Memory; SSD ≠ Portable SSD; Card ≠ Reader; etc.
+5. TONE: Does the style match the expected tone (formal/marketing/neutral)?
+6. SHORT LABEL: Labels under 15 characters must stay concise. If the source is
+   a short label but the translation is a full sentence, shorten it.
+7. CJK SPACING: For CJK text, are phrase-level spaces preserved correctly?
 
 [ACTION]
-- PASS: If all 9 checks pass, output the translation exactly as-is.
+- PASS: If all 7 checks pass, output the translation exactly as-is.
 - FIX: If any check fails, output ONLY the corrected text. Keep fixes minimal.
 
 [OUTPUT]
 JSON array: [{"i":1,"text":"corrected or original","reason":"short reason"}]
 "reason" 用中文，最多8个字。通过的用"通过"。`
-
-/** Proofread quality instruction — native speaker lens in target language */
-export function getProofreadQualityInstruction(targetLang: string): string {
-  const map: Record<string, string> = {
-    'zh-CN': `\n[质量要求] 以简体中文母语者的语感审视译文——是否自然流畅、符合中国大陆的行业表达习惯？`,
-    'zh-TW': `\n[品質要求] 以台灣繁體中文母語者的語感審視譯文——是否自然流暢、符合台灣的產業用語習慣？`,
-    'ja': `\n[品質チェック] 日本語ネイティブとして訳文を吟味してください——自然で業界標準の表現になっていますか？`,
-    'ko': `\n[품질 확인] 한국어 원어민의 감각으로 번역문을 검토하세요 — 자연스럽고 업계 표준 표현에 맞습니까?`,
-    'fr': `\n[Qualité] Évaluez en français natif : la traduction est-elle naturelle et adaptée au public français ?`,
-    'de': `\n[Qualität] Prüfen Sie als deutscher Muttersprachler: klingt die Übersetzung natürlich und zielgruppengerecht?`,
-    'es': `\n[Calidad] Evalúe como hispanohablante nativo: ¿suena natural y adecuada para el público español?`,
-    'pt': `\n[Qualidade] Avalie como falante nativo de português europeu: a tradução soa natural?`,
-    'pt-BR': `\n[Qualidade] Avalie como falante nativo de português brasileiro: a tradução soa natural?`,
-    'it': `\n[Qualità] Valuti come madrelingua italiano: la traduzione suona naturale e adatta al pubblico?`,
-    'nl': `\n[Kwaliteit] Beoordeel als Nederlandse moedertaalspreker: klinkt de vertaling natuurlijk?`,
-    'pl': `\n[Jakość] Oceń jako rodzimy użytkownik polskiego: czy tłumaczenie brzmi naturalnie?`,
-    'sv': `\n[Kvalitet] Bedöm som svensk modersmålstalare: låter översättningen naturlig?`,
-    'tr': `\n[Kalite] Ana dili Türkçe olan biri olarak değerlendirin: çeviri doğal geliyor mu?`,
-    'ru': `\n[Качество] Оцените как носитель русского языка: звучит ли перевод естественно?`,
-    'vi': `\n[Chất lượng] Đánh giá với tư cách người bản ngữ tiếng Việt: bản dịch có tự nhiên không?`,
-    'th': `\n[คุณภาพ] ประเมินในฐานะเจ้าของภาษาไทย: งานแปลฟังดูเป็นธรรมชาติหรือไม่?`,
-    'id': `\n[Kualitas] Nilai sebagai penutur asli bahasa Indonesia: apakah terjemahan terdengar alami?`,
-    'ar': `\n[الجودة] قيّم بصفتك متحدثًا أصليًا للعربية: هل الترجمة طبيعية ومناسبة للجمهور المستهدف؟`,
-    'en': `\n[Quality] Evaluate as a native English speaker: does the translation sound natural for the target audience?`,
-  }
-  return map[targetLang] || ''
-}
