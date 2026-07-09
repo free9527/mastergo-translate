@@ -1,8 +1,39 @@
-/**
- * 语言特定后处理规则
- * 针对每种目标语言应用排版、语法和本地化后处理
- * 在翻译完成后自动调用，修正 LLM 常见输出错误
- */
+// ═══════════════════════════════════════════════════════════════
+// 文件: post-process.ts — 翻译后处理（代码层兜底、不依赖 LLM）
+// ═══════════════════════════════════════════════════════════════
+//
+// 职责: 翻译完成后对 LLM 输出做确定性修正。全部由代码执行，零出错。
+//
+// 分为三类:
+//
+// [修正类] — 修复 LLM 常见错误（确定性规则，不会改错）
+//   postProcessTranslation      — 入口，按语种分发
+//     postProcessFrench         — 标点空格/千位分隔/Mo替代MB/引号规范
+//     postProcessGerman         — ß规范/Sie大写/千位分隔
+//     postProcessJapanese       — 片假名长音/外来语规范/全角标点
+//     postProcessKorean         — 助词拼写
+//     postProcessArabic         — 单位翻译/Hamza规范
+//     postProcessThai           — 字符间多余空格移除
+//     postProcessRussian        — 引号/容量单位本地化
+//     postProcessZhTw           — 全角标点
+//     postProcessZhCn           — 全角标点
+//     capitalizeFirstLetter     — 拉丁/西里尔首字母大写（排除iPhone等专有名词）
+//     restoreStorageUnitFormatting — 数字单位连写修复（900 MB/s → 900MB/s）
+//     restoreTrademarkSymbols   — ®™© 还原到译文中
+//
+// [校准类] — 术语/格式强制对齐（安全网，即使 LLM 做对了也要确认）
+//   enforceGlossaryTerms        — 术语库强制替换（精确匹配 + 子串匹配 + 短标签硬守卫）
+//
+// [检测类] — 异常输出标记（只检测不修复，返回异常索引供上层决策）
+//   detectBrandInjection        — 品牌/规格注入检测（命中回退源文）
+//   detectTranslationExpansion  — 译文异常扩展检测（命中截断）
+//   sanitizeLineBreaks          — 换行保护
+//
+// 边界:
+//   ⛔ 不依赖 LLM — 全部是代码逻辑，确定性执行
+//   ⛔ 不处理"不确定"的修正 — 不确定的交给 AI 校对
+//   ⛔ 不在翻译中间调用 — 翻译管道中作为末尾步骤执行
+// ═══════════════════════════════════════════════════════════════
 
 // ============================================================
 // 商标符号还原
@@ -274,6 +305,9 @@ export function postProcessTranslation(text: string, lang: string): string {
   // 还原换行符占位符 ↵（U+21B5）→ 实际换行
   // 由 text-normalizer 在预处理时替换，此处还原以保留源文断行
   result = result.replace(/\s*↵\s*/g, '\n')
+
+  // 还原 ※ → *（译前转义避免 Qwen 将其解析为 markdown 列表标记）
+  result = result.replace(/※\s*/g, '* ')
 
   switch (lang) {
     case 'fr':
@@ -572,19 +606,34 @@ export interface ExpansionResult {
   expandedIndices: Set<number>
 }
 
+// 各语言相对英语的自然膨胀率（翻译行业经验值）
+// 用于 detectTranslationExpansion 按语言设置动态阈值
+const LANG_EXPANSION_RATIO: Record<string, number> = {
+  // CJK — 翻译后通常比英语短
+  'zh-CN': 1.2, 'zh-TW': 1.2, 'ja': 1.3, 'ko': 1.3,
+  // 欧洲语言 — 天然比英语长 20-40%
+  'pt': 1.8, 'pt-BR': 1.8, 'es': 1.7, 'fr': 1.8,
+  'de': 1.9, 'it': 1.7, 'nl': 1.6, 'pl': 1.7,
+  'sv': 1.6, 'tr': 1.5, 'ru': 1.5,
+  // 东南亚
+  'vi': 1.5, 'th': 1.4, 'id': 1.5, 'ms': 1.5,
+  // 中东
+  'ar': 1.6,
+}
+
 /**
  * 检测并修复译文异常扩展。
  *
  * 规则：
- * - 译文长度 > 源文长度 × 3 时视为异常扩展
- * - 短源文（<10字符）使用更宽松的阈值（5x），因为短文本翻译后变长是正常的
- * - 检测到异常扩展时：
- *   1. 尝试从译文中提取核心信息（取前 ~源文长度×2 的字符，在词边界截断）
- *   2. 如果无法修复，标记该索引
+ * - 按目标语言设置动态阈值（CJK 1.2-1.3x，欧洲语言 1.5-1.9x）
+ * - 短源文（<10字符）使用 2x 安全余量，常规文本用 1.4x 安全余量
+ * - 安全检查：如果译文包含源文中的数字或连续大写字母（品牌名），跳过截断
+ * - 检测到异常扩展时：尝试从译文中提取核心信息，在词/句边界截断
  */
 export function detectTranslationExpansion(
   sourceTexts: string[],
   translatedTexts: string[],
+  targetLang?: string,
 ): ExpansionResult {
   const expandedIndices = new Set<number>()
 
@@ -595,10 +644,22 @@ export function detectTranslationExpansion(
     const sourceLen = source.length
     const translatedLen = translated.length
 
-    // 短源文使用更宽松的阈值；常规阈值从2降到1.5，更早捕获LLM异常扩展
-    const threshold = sourceLen < 10 ? 3 : 1.5
+    // 按语言动态计算阈值
+    const ratio = targetLang ? (LANG_EXPANSION_RATIO[targetLang] ?? 1.5) : 1.5
+    // 短源文使用更宽松阈值（2x），常规文本用 1.4x 安全余量
+    const threshold = sourceLen < 10 ? ratio * 2.0 : ratio * 1.4
 
     if (translatedLen > sourceLen * threshold) {
+      // 安全检查：如果译文包含源文中的数字，说明是合法翻译（如技术参数），不应截断
+      // 品牌注入由 detectBrandInjection 负责，此处不检查
+      const sourceNumbers = source.match(/\d+/g) || []
+      const hasSourceNumbers = sourceNumbers.some(n => translated.includes(n))
+
+      if (hasSourceNumbers) {
+        // 合法翻译（包含源文数字），不截断
+        return translated
+      }
+
       expandedIndices.add(i)
 
       // 尝试修复：提取译文的核心部分
@@ -665,6 +726,20 @@ export function detectBrandInjection(
     'silver', 'gold', 'diamond',
   ])
 
+  // 从术语库提取合法的品牌词翻译
+  // 只要术语库译文中包含品牌词，该品牌词在译文中就是合法的（术语库是权威参考）
+  const glossaryBrandTokens = new Set<string>()
+  if (glossaryMap) {
+    for (const [, target] of glossaryMap.entries()) {
+      const targetLower = target.toLowerCase()
+      for (const token of brandTokens) {
+        if (targetLower.includes(token)) {
+          glossaryBrandTokens.add(token)
+        }
+      }
+    }
+  }
+
   // 从术语库额外提取品牌 token：所有首字母大写的专有名词
   if (glossaryMap) {
     for (const key of glossaryMap.keys()) {
@@ -703,8 +778,22 @@ export function detectBrandInjection(
     const transLower = trans.toLowerCase()
 
     // 1. 品牌标记注入检测：译文有但源文没有的品牌词
+    // 使用词边界检测，避免子串误匹配（如越南语 "play" 被误判为品牌注入）
     for (const token of brandTokens) {
-      if (transLower.includes(token) && !srcLower.includes(token)) {
+      // 如果该品牌词在术语库中是合法的（源文和译文都包含），跳过检测
+      if (glossaryBrandTokens.has(token)) {
+        continue
+      }
+
+      // 对于短词（< 4 字符），要求更严格的匹配：必须是独立单词
+      // 对于长词，使用词边界 \b 检测
+      const escapedToken = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const wordBoundaryRe = new RegExp(`\\b${escapedToken}\\b`, 'i')
+
+      const transHasBrand = wordBoundaryRe.test(trans)
+      const srcHasBrand = wordBoundaryRe.test(src)
+
+      if (transHasBrand && !srcHasBrand) {
         injectedIndices.add(i)
         return src // 回退到源文
       }

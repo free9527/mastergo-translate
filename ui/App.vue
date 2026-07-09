@@ -216,6 +216,9 @@
               <span class="csv-badge" v-if="csvChangedIds.has(item.nodeIds[0])">导入变更</span>
               <span class="applied-badge" v-if="appliedNodeIds.has(item.nodeIds[0])">已应用</span>
               <button class="btn-apply-single" v-if="item.translatedText && !appliedNodeIds.has(item.nodeIds[0])" @click.stop="applySingle(item)">应用</button>
+              <button class="btn-retranslate" v-if="item.translatedText && !translateErrors.has(item.nodeIds[0])" :disabled="retranslatingIds.has(item.nodeIds[0])" @click.stop="retranslateSingle(item)" title="重新翻译">
+                <svg width="12" height="12" viewBox="0 0 16 16"><path d="M2 8a6 6 0 0 1 10.47-4M14 8a6 6 0 0 1-10.47 4M2 4v3h3M14 12v-3h-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
             </div>
             <textarea
               class="trans-input"
@@ -458,8 +461,8 @@ import { sendMsgToPlugin } from '@messages/ui-sender'
 import { parseCSVRow, csvEncodeCell } from '@lib/parse-csv'
 import { formatCJKSpace } from '@lib/format-text'
 import { postProcessTranslation, restoreTrademarkSymbols, restoreStorageUnitFormatting, enforceGlossaryTerms, detectTranslationExpansion, sanitizeLineBreaks, cleanKey } from '@lib/post-process'
-import { translateBatch, proofreadBatch, fetchWithRetry, isProofreadScriptMismatch, STYLE_PRESETS, SCENE_PRESETS, detectProductLine, buildTaskGlossaryHint } from '@lib/llm-api'
-import { DEFAULT_GLOSSARY_PRODUCTS_CSV, DEFAULT_GLOSSARY_EXCLUSIVE_CSV } from '@lib/default-glossary'
+import { translateBatch, proofreadBatch, fetchWithRetry, isProofreadScriptMismatch, detectTruncatedTexts, STYLE_PRESETS, SCENE_PRESETS, detectProductLine, buildTaskGlossaryHint } from '@lib/llm-api'
+import { DEFAULT_GLOSSARY_PRODUCTS_CSV } from '@lib/default-glossary'
 import { TRANSLATE_BATCH_SIZE, PROOFREAD_BATCH_SIZE, TOAST_DURATION_MS, CORRECTION_THRESHOLD, makeFontKey, parseFontKey, normalizeText } from '@lib/constants'
 import { convertStorageUnit } from '@lib/unit-convert'
 import { getAutoFontMapping } from '@lib/font-mapper'
@@ -475,7 +478,7 @@ const glossaryProducts = ref<GlossaryEntry[]>([])
 const glossaryExclusive = ref<GlossaryEntry[]>([])
 const glossary = computed(() => [...glossaryProducts.value, ...glossaryExclusive.value])
 const translationCache = ref<Record<string, string>>({})
-const llmConfig = ref<LLMConfig>({ apiKey: '', apiUrl: '', model: 'gpt-4o', translationStyle: 'standard', translationStyleCustom: '', scenePreset: 'ecommerce', enableProofread: false, proofreadApiKey: '', proofreadApiUrl: '', proofreadModel: 'qwen3.7-plus' })
+const llmConfig = ref<LLMConfig>({ apiKey: '', apiUrl: '', model: '', translationStyle: 'standard', translationStyleCustom: '', scenePreset: 'ecommerce', enableProofread: false, proofreadApiKey: '', proofreadApiUrl: '', proofreadModel: '' })
 
 const scanning = ref(false)
 const lastScanMode = ref<'all' | 'selection' | null>(null)
@@ -489,8 +492,12 @@ const undoing = ref(false)
 const cancelFlag = ref(false)
 const failedNodeIds = ref<string[]>([])
 const translateErrors = ref<Set<string>>(new Set())
+/** AI 校对标记的歧义词汇 — 应加入术语库 source 列，用户后续补充翻译 */
+const suggestedGlossaryTerms = ref<string[]>([])
 /** 已被手动应用过的 nodeId 集合，批量应用时自动跳过 */
 const appliedNodeIds = ref<Set<string>>(new Set())
+/** 正在单条重翻中的 nodeId 集合，用于禁用按钮防止重复提交 */
+const retranslatingIds = ref<Set<string>>(new Set())
 
 const translateProgress = ref({ current: 0, total: 0 })
 const translateProgressPercent = computed(() =>
@@ -909,6 +916,28 @@ function unifyTerminologyAcrossBatches(
 }
 
 // ============================================================
+/** 构建术语库映射表（EN key → 目标语言译文），供翻译和重翻复用 */
+function buildGlossaryMap(): Map<string, string> {
+  const map = new Map<string, string>()
+  for (const g of glossary.value) {
+    const t = g.translations[targetLang.value]
+    if (t) map.set(g.source, t)
+  }
+  // 解决非EN源语言（如 zh-CN "无人机"）无法匹配术语库 key "Drones"（EN）的问题
+  if (sourceLang.value !== 'auto' && sourceLang.value !== 'en') {
+    const srcCol = sourceLang.value
+    for (const g of glossary.value) {
+      const srcVal = g.translations[srcCol]
+      const tgtVal = g.translations[targetLang.value]
+      if (srcVal && tgtVal && !map.has(srcVal)) {
+        map.set(srcVal, tgtVal)
+      }
+    }
+  }
+  return map
+}
+
+// ============================================================
 async function startTranslate() {
   if (!settingsReady || !glossaryReady) {
     showToast('插件正在初始化，请稍后再试...', 'warning')
@@ -925,23 +954,16 @@ async function startTranslate() {
   translateErrors.value = new Set()
   translateProgress.value = { current: 0, total: 0 }
 
+  // 目标语言切换后需要重新翻译：清空所有旧译文和校对状态
+  for (const item of items.value) {
+    item.translatedText = ''
+    item.proofreadText = ''
+    item.proofreadReason = ''
+    item.corrected = false
+  }
+
   try {
-    const glossaryMap = new Map<string, string>()
-    for (const g of glossary.value) {
-      const t = g.translations[targetLang.value]
-      if (t) glossaryMap.set(g.source, t)
-    }
-    // 解决 "无人机"（zh-CN）无法匹配术语库 key "Drones"（EN）的问题
-    if (sourceLang.value !== 'auto' && sourceLang.value !== 'en') {
-      const srcCol = sourceLang.value
-      for (const g of glossary.value) {
-        const srcVal = g.translations[srcCol]
-        const tgtVal = g.translations[targetLang.value]
-        if (srcVal && tgtVal && !glossaryMap.has(srcVal)) {
-          glossaryMap.set(srcVal, tgtVal)
-        }
-      }
-    }
+    const glossaryMap = buildGlossaryMap()
 
     // 构建归一化术语查找表（去®™© + 空白归一化），用于译前精确匹配跳过LLM
     const normalizedGlossaryMap = new Map<string, string>()
@@ -1192,11 +1214,7 @@ async function startProofread() {
   }
 
   // 提前构建 glossaryMap，供校对后 enforceGlossaryTerms 兜底使用
-  const glossaryMap = new Map<string, string>()
-  for (const g of glossary.value) {
-    const t = g.translations[targetLang.value]
-    if (t) glossaryMap.set(g.source, t)
-  }
+  const glossaryMap = buildGlossaryMap()
 
   // 任务级术语预计算：用全部源文本一次性过滤 → 校对各批次 system prompt 100% 一致 → 缓存命中
   const proofreadGlossaryHint = buildTaskGlossaryHint(
@@ -1236,6 +1254,14 @@ async function startProofread() {
             )
             for (let j = 0; j < batch.length; j++) {
               const proofed = batchResults[j]
+              // 收集校对 LLM 标记的歧义词（应加入术语库 source 列）
+              if (proofed.ambiguous && proofed.ambiguous.length > 0) {
+                for (const term of proofed.ambiguous) {
+                  if (term && term.trim()) {
+                    suggestedGlossaryTerms.value.push(term.trim())
+                  }
+                }
+              }
               if (proofed.text && proofed.text !== 'OK' && proofed.text !== batch[j].translatedText) {
                 if (isProofreadScriptMismatch(proofed.text, targetLang.value)) {
                   console.warn('[translate] proofread script mismatch, rejected:', proofed.text)
@@ -1338,6 +1364,24 @@ async function startProofread() {
     allTranslatedTexts = restoreStorageUnitFormatting(allSourceTexts, allTranslatedTexts)
     allTranslatedTexts = restoreTrademarkSymbols(allSourceTexts, allTranslatedTexts)
     allTranslatedTexts = sanitizeLineBreaks(allSourceTexts, allTranslatedTexts)
+    // 截断兜底：校对后仍截断的条目 → 译文字符数仍远小于源文 → 标记为翻译失败
+    const truncAfterProofread = detectTruncatedTexts(allSourceTexts, allTranslatedTexts)
+    if (truncAfterProofread.size > 0) {
+      console.warn('[proofread] 校对后检测到 ' + truncAfterProofread.size + ' 条译文仍截断，标记为翻译失败',
+        [...truncAfterProofread].map(j => ({
+          source: allSourceTexts[j].slice(0, 80),
+          srcLen: allSourceTexts[j].length,
+          tgtLen: allTranslatedTexts[j].length,
+        })),
+      )
+      for (const idx of truncAfterProofread) {
+        allTranslatedTexts[idx] = ''
+        items.value[idx].proofreadText = ''
+        items.value[idx].proofreadReason = ''
+        items.value[idx].corrected = false
+        translateErrors.value.add(items.value[idx].nodeIds[0])
+      }
+    }
     for (let i = 0; i < items.value.length; i++) {
       if (allTranslatedTexts[i] !== items.value[i].translatedText) {
         items.value[i].translatedText = allTranslatedTexts[i]
@@ -1362,6 +1406,32 @@ async function startProofread() {
       const failMsg = failedBatches > 0 ? `，${failedBatches} 批次校对失败` : ''
       const skipMsg = skipped > 0 ? `，${skipped} 条无需校对` : ''
       showToast('校对完成: ' + correctedCount + ' 处被修正' + failMsg + skipMsg, correctedCount > 0 ? 'success' : 'info')
+    }
+
+    // 校对完成后，歧义词自动写入专属术语库 source 列
+    if (suggestedGlossaryTerms.value.length > 0) {
+      const unique = [...new Set(suggestedGlossaryTerms.value)]
+      let addedCount = 0
+      for (const term of unique) {
+        // 检查是否已存在于产品术语库或专属术语库
+        const alreadyExists = glossaryExclusive.value.some(g => g.source === term) ||
+          glossaryProducts.value.some(g => g.source === term)
+        if (!alreadyExists) {
+          glossaryExclusive.value.push({ source: term, translations: {} })
+          addedCount++
+        }
+      }
+      if (addedCount > 0) {
+        saveGlossaryExclusive()
+        setTimeout(() => {
+          showToast(
+            '已将 ' + addedCount + ' 个歧义词加入专属术语库（待补全翻译）: ' +
+            unique.slice(0, 5).join(', ') + (unique.length > 5 ? ' ...' : ''),
+            'success'
+          )
+        }, 1000)
+      }
+      suggestedGlossaryTerms.value = []
     }
   } catch (e) {
     proofreading.value = false
@@ -1546,11 +1616,7 @@ async function retryFailedTranslations() {
   }
 
   // 构建术语库并调用翻译
-  const glossaryMap = new Map<string, string>()
-  for (const g of glossary.value) {
-    const t = g.translations[targetLang.value]
-    if (t) glossaryMap.set(g.source, t)
-  }
+  const glossaryMap = buildGlossaryMap()
 
   const crossBatchTerms = findHighFreqGlossaryTerms(
     items.value.map(it => it.sourceText), glossaryMap,
@@ -1710,7 +1776,25 @@ function handleGlossaryProductsUpload(e: Event) {
 
 // ---- 专属术语术语库 ----
 function downloadGlossaryExclusive() {
-  triggerDownload(DEFAULT_GLOSSARY_EXCLUSIVE_CSV, 'Lexar术语库_专属.csv')
+  // 从当前 glossaryExclusive 数据生成 CSV，用户下载后可补全翻译再上传
+  const langCodes = LANGUAGES.map(l => l.code)
+  const header = ['source', ...langCodes].join(',')
+  const rows = glossaryExclusive.value.map(g => {
+    const cells = [escapeCSVCell(g.source)]
+    for (const code of langCodes) {
+      cells.push(escapeCSVCell(g.translations[code] || ''))
+    }
+    return cells.join(',')
+  })
+  const csv = [header, ...rows].join('\n')
+  triggerDownload(csv, 'Lexar术语库_专属.csv')
+}
+
+function escapeCSVCell(val: string): string {
+  if (val.includes(',') || val.includes('"') || val.includes('\n')) {
+    return '"' + val.replace(/"/g, '""') + '"'
+  }
+  return val
 }
 
 const glossaryExclusiveInput = ref<HTMLInputElement | null>(null)
@@ -1894,6 +1978,45 @@ async function applySingle(item: TextItem) {
   showToast('已应用到画布', 'success')
 }
 
+/** 单条重翻：对翻译错误的条目单独重新调用 LLM 翻译 */
+async function retranslateSingle(item: TextItem) {
+  if (!item.sourceText.trim()) return
+  const id = item.nodeIds[0]
+  retranslatingIds.value.add(id)
+
+  try {
+    const glossaryMap = buildGlossaryMap()
+    const results = await translateBatch(
+      [item.sourceText],
+      targetLang.value,
+      glossaryMap,
+      llmConfig.value,
+      sourceLang.value === 'auto' ? undefined : sourceLang.value,
+      pageName.value || undefined,
+      fileName.value || undefined,
+    )
+    if (results[0]) {
+      item.translatedText = formatCJKSpace(results[0], targetLang.value)
+      // 清空旧校对状态（重翻后旧校对结论已无效）
+      item.proofreadText = ''
+      item.proofreadReason = ''
+      item.corrected = false
+      // 移除已应用标记，强制用户重翻后重新确认
+      for (const nid of item.nodeIds) {
+        appliedNodeIds.value.delete(nid)
+      }
+      showToast('已重新翻译', 'success')
+    } else {
+      showToast('重翻失败：返回结果为空', 'error')
+    }
+  } catch (e) {
+    console.error('[translate] retranslateSingle failed', e)
+    showToast('重翻失败: ' + (e instanceof Error ? e.message : String(e)), 'error')
+  } finally {
+    retranslatingIds.value.delete(id)
+  }
+}
+
 // ============================================================
 // 设置
 // ============================================================
@@ -1902,7 +2025,7 @@ function useDefaultConfig() {
   llmConfig.value.apiUrl = 'https://aigo.lexar.com/v1/chat/completions'
   llmConfig.value.model = 'qwen3.7-max'
   llmConfig.value.enableProofread = true
-  llmConfig.value.proofreadModel = 'qwen3.7-plus'
+  llmConfig.value.proofreadModel = 'qwen3.7-max'
   showToast('已填入默认团队配置，可修改后保存', 'success')
 }
 
@@ -2753,6 +2876,15 @@ body {
   transition: all var(--transition);
 }
 .btn-apply-single:hover { background: var(--green); color: #fff; }
+
+.btn-retranslate {
+  padding: 2px 5px; border: 1px solid var(--blue); border-radius: 4px;
+  background: transparent; color: var(--blue); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: all var(--transition); margin-left: 4px;
+}
+.btn-retranslate:hover { background: var(--blue); color: #fff; }
+.btn-retranslate:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* 已应用标签 */
 .applied-badge {

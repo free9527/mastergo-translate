@@ -2,7 +2,7 @@ import { LLMConfig, LANGUAGES, MARKETING_ONLY_TERMS, COMPLIANCE_TERMS, isMarketi
 import { API_MAX_RETRIES, API_RETRY_DELAY_MS, API_TIMEOUT_MS } from '@lib/constants'
 import { filterRelevantGlossary } from '@lib/glossary-filter'
 import { normalizeTextForLLM, protectCjkSpaces } from '@lib/text-normalizer'
-import { maskEntities, unmaskEntities, maskEntitiesForProofread, maskGlossaryTerms, unmaskGlossaryTerms } from '@lib/entity-masker'
+import { maskEntities, unmaskEntities, maskEntitiesForProofread } from '@lib/entity-masker'
 import { postProcessTranslation, restoreTrademarkSymbols, restoreStorageUnitFormatting, enforceGlossaryTerms, capitalizeFirstLetter, detectTranslationExpansion, detectBrandInjection } from '@lib/post-process'
 import {
   IRON_RULES,
@@ -397,6 +397,51 @@ function restoreHtmlTags(texts: string[], tags: Map<string, string>): string[] {
   })
 }
 
+// ═══════════════════════════════════════════════════════════════
+// 文件: llm-api.ts — 翻译与校对 API 调用
+// ═══════════════════════════════════════════════════════════════
+//
+// 翻译管道（translateBatch）:
+//   输入 → 遮蔽 → LLM 翻译 → 还原 → 后处理 → 检测 → retry → 输出
+//
+//   各步骤职责:
+//     protectHtmlTags          — HTML 标签暂时替换，翻译后还原
+//     normalizeTextForLLM      — NFC/全角→半角/零宽字符移除（text-normalizer.ts）
+//     maskEntities             — 遮蔽在产品型号/URL/Email/纯技术缩略语（entity-masker.ts）
+//     maskGlossaryTerms        — 术语库遮蔽（entity-masker.ts，ZZ{N}ZZ → 目标语译文）
+//     protectCjkSpaces         — CJK 空格保护（text-normalizer.ts）
+//     buildSystemPrompt        — 组装 system prompt（prompt-constants.ts）
+//     LLM API 调用
+//
+//   译后管道（按顺序，不能乱）:
+//     1. unmaskEntities           — 还原实体占位符（先还原原样）
+//     2. unmaskGlossaryTerms      — 还原术语占位符（替换为目标语）
+//     3. restoreHtmlTags
+//     4. postProcessTranslation   — 各语种后处理（de/fr/ja/ar...）
+//     5. detectBrandInjection     — 品牌注入检测（校验，命中回退源文）
+//     6. enforceGlossaryTerms     — 术语库强制校准（安全网，二次确认）
+//     7. restoreTrademarkSymbols  — ®™© 还原
+//     8. restoreStorageUnitFormatting — 单位格式修复
+//     9. capitalizeFirstLetter    — 首字母大写
+//    10. detectTranslationExpansion   — 扩展检测（校验）
+//    11. 批次内交叉污染检测
+//    12. detectUntranslatedText   — 漏翻检测（校验，命中触发 retry）
+//    13. detectTruncatedTexts     — 截断检测（校验，命中触发 retry）
+//
+//   漏翻 retry: _isRetry=false 且有漏翻时，最多重试 2 次（独立小批次）
+//   截断 retry: _isRetry=false 且有截断时，最多重试 2 次（独立小批次）
+//
+// 校对管道（proofreadBatch）:
+//   翻译结果 → 遮蔽 → 校对 LLM → 还原 → 后处理 → 检测 → 输出
+//
+// 检测函数（独立于管道，可被调用方自行使用）:
+//   detectSourceLanguage      — 批次级源语言检测
+//   detectSingleTextLanguage  — 单条文本源语言检测
+//   detectUntranslatedText    — 漏翻检测（译文==源文）
+//   detectTruncatedTexts      — 截断检测（译文长度 < 源文 15%）
+//   isProofreadScriptMismatch — 校对脚本不匹配检测（拉丁语出现汉字）
+// ═══════════════════════════════════════════════════════════════
+
 // ============================================================
 // v7.0: 5-Module Mixed Architecture
 // Logic & Rules → English | Tone & Style → Target Language | Dynamic Pruning
@@ -440,53 +485,32 @@ export const SCENE_PRESETS: Record<string, string> = {
  */
 export function buildSystemPrompt(params: {
   targetLang: string
-  sourceName: string
-  targetDisplayName: string
-  productLine: string | null
-  scenePreset: string
-  style: string
-  glossaryHint: string
   langBlock: string
-  fewShot: string
-  useEnInstruction: boolean
+  glossaryHint?: string
 }): string {
-  const { targetLang, sourceName, targetDisplayName, productLine, scenePreset, style,
-    glossaryHint, langBlock, fewShot, useEnInstruction } = params
+  const { targetLang, langBlock, glossaryHint } = params
 
   // ── IDENTITY + MISSION (target language, always) ──
   const mission = IDENTITY_MISSION[targetLang] || IDENTITY_MISSION['en'] || ''
   const role = `[IDENTITY]\nYou are the Chief Localization Expert for Lexar (雷克沙), specializing in storage, gaming, imaging, and consumer electronics.\n\n[MISSION]\n${mission}`
 
-  // ── CONSTRAINTS: Iron Rules + Glossary + Context (English, always) ──
-  const glossaryLabel = '\n\n[GLOSSARY]\nUse the translations below for exact matches (case-insensitive).'
-  const glossaryBlock = glossaryHint ? `${glossaryLabel}${glossaryHint}` : ''
-
+  // ── CONSTRAINTS: Iron Rules + Context (English, always) ──
   const contextHint = '\n\n[CONTEXT] Independent UI strings from the same design file. Translate each entry independently. When the same source term appears across entries, use the same target term.'
 
-  const constraintsBlock = `${IRON_RULES}${glossaryBlock}${contextHint}`
+  const constraintsBlock = `${IRON_RULES}${contextHint}`
 
-  // ── LANG_SPECIFIC: language-specific rules + category words (target language, always) ──
+  // ── TERMINOLOGY: Glossary hint (if provided) ──
+  const glossaryBlock = glossaryHint ? `\n\n${glossaryHint}` : ''
+
+  // ── LANG_SPECIFIC: language-specific grammar/typography/terminology rules (target language, always) ──
   const langBlock_str = langBlock ? `\n\n${langBlock}` : ''
 
-  // ── M2: TONE & STYLE (target language, ecommerce only) ──
-  const isEcommerce = scenePreset === 'ecommerce'
-  let toneBlock = ''
-  if (isEcommerce) {
-    const productTone = getProductLineTone(productLine, targetLang)
-    const styleGuide = getStyleGuide(style, targetLang)
-    const toneParts = [productTone, styleGuide].filter(Boolean)
-    if (toneParts.length > 0) {
-      toneBlock = '\n\n' + toneParts.join('\n')
-    }
-  }
+  // ⛔ TONE & STYLE removed — moved to proofread only.
+  //    Translation LLM focuses on accuracy + completeness + terminology.
+  // ⛔ FEW-SHOT removed — adds prompt length without improving quality.
 
-  // ── M4: FEW-SHOT (target language, ecommerce only) ──
-  const fewShotBlock = (isEcommerce && fewShot)
-    ? `\n\n[REFERENCE]\n${fewShot}`
-    : ''
-
-  // ── Assembly: M1 → M3 → LANG_SPECIFIC → M2 → M4 → M5 ──
-  return `${role}\n\n${constraintsBlock}${langBlock_str}${toneBlock}${fewShotBlock}\n\n${OUTPUT_ANCHOR}`
+  // ── Assembly: IDENTITY → IRON_RULES → TERMINOLOGY → LANG_SPECIFIC → OUTPUT ──
+  return `${role}\n\n${constraintsBlock}${glossaryBlock}${langBlock_str}\n\n${OUTPUT_ANCHOR}`
 }
 
 export async function translateBatch(
@@ -499,6 +523,7 @@ export async function translateBatch(
   fileName?: string,
   crossBatchTerms?: string[],
   taskGlossaryHint?: string,
+  _isRetry = false,
 ): Promise<string[]> {
   const targetName = LANGUAGES.find(l => l.code === targetLang)?.name || targetLang
 
@@ -522,13 +547,8 @@ export async function translateBatch(
   // 仅遮蔽正则匹配的实体（产品型号/URL/Email/测量值），不遮蔽术语。
   const { texts: maskedTexts, entityMap } = maskEntities(normalizedTexts)
 
-  // ⚠️ 术语遮蔽（译前）：将文本中的术语替换为 ZZ{N}ZZ 占位符。
-  // LLM 只看到占位符无法扩展为营销文案，译后还原为术语库译文。
-  // 使用 ZZ{N}ZZ 而非历史 __TRM_N__ 格式，避免双下划线类似 markdown 导致 Qwen 截断。
-  const { texts: glossMaskedTexts, termMap: glossTermMap } = maskGlossaryTerms(maskedTexts, glossaryMap)
-
   // CJK 空格保护：直接删除 CJK 主导文本中的空格，防止 LLM 误判为条目分隔符
-  const spaceProtectedTexts = protectCjkSpaces(glossMaskedTexts)
+  const spaceProtectedTexts = protectCjkSpaces(maskedTexts)
 
   // 产品线检测（提前到术语过滤之前）
   const productLine = getEffectiveProductLine(config, texts, pageName, fileName)
@@ -542,7 +562,8 @@ export async function translateBatch(
     let glossaryObj: Record<string, string> = {}
     for (const [k, v] of glossaryMap.entries()) { glossaryObj[k] = v }
     glossaryObj = filterGlossaryByScene(glossaryObj, config.scenePreset)
-    const filtered = filterRelevantGlossary(glossaryObj, texts, 100)
+    // 注入精简术语表（最多 20 条），让 LLM 直接看到术语对照表
+    const filtered = filterRelevantGlossary(glossaryObj, texts, 20)
     glossaryHint = filtered.glossaryHint
 
     // 跨批次术语注入：将其他批次中也会出现的术语及其标准译法提前注入本批次
@@ -570,32 +591,20 @@ export async function translateBatch(
   const quotedIndices = new Set<number>()
   const textList = spaceProtectedTexts.map((t, i) => {
     const srcLang = detectSingleTextLanguage(t)
-    if (/\s/.test(t)) {
+    // 行首 * 替换为 ※，避免 Qwen 将其解析为 markdown 列表标记导致漏翻
+    const escaped = t.replace(/^\*\s*/, '※ ')
+    if (/\s/.test(escaped)) {
       quotedIndices.add(i)
-      return `[${i + 1}] (${srcLang}→${targetLang}) "${t}"`
+      return `[${i + 1}] (${srcLang}→${targetLang}) "${escaped}"`
     }
-    return `[${i + 1}] (${srcLang}→${targetLang}) ${t}`
+    return `[${i + 1}] (${srcLang}→${targetLang}) ${escaped}`
   }).join('\n')
 
-  // few-shot 示例
-  const fewShot = getFewShotExamplesV2(detectedSource, targetLang, productLine, config.translationStyle, 2)
-
-  // 语言专属提示词（含品类词+规则+合规，统一由 LANG_SPECIFIC 渲染）
+  // 语言专属提示词（含品类词+规则，统一由 LANG_SPECIFIC 渲染）
   const langBlock = renderLangForTranslate(targetLang, productLine)
 
-  // 5-Module System Prompt Assembly
-  const systemPrompt = buildSystemPrompt({
-    targetLang,
-    sourceName,
-    targetDisplayName,
-    productLine,
-    scenePreset: config.scenePreset,
-    style: config.translationStyle,
-    glossaryHint,
-    langBlock,
-    fewShot,
-    useEnInstruction,
-  })
+  // System Prompt: IDENTITY + IRON_RULES + TERMINOLOGY + LANG_SPECIFIC + OUTPUT
+  const systemPrompt = buildSystemPrompt({ targetLang, langBlock, glossaryHint })
   const temperature = 0.2
 
   const res = await fetchWithRetry(config.apiUrl, {
@@ -696,24 +705,6 @@ export async function translateBatch(
     result = unmaskEntities(result, entityMap)
   }
 
-  // 还原术语占位符 ZZ{N}ZZ → glossaryTarget（在实体还原之后，避免混淆）
-  if (glossTermMap.size > 0) {
-    const unmasked = unmaskGlossaryTerms(result, glossTermMap)
-    if (unmasked.missingIndices.size > 0) {
-      console.warn(
-        '[translateBatch] glossary unmask: placeholder missing for',
-        unmasked.missingIndices.size,
-        'indices, keeping source text as fallback',
-        [...unmasked.missingIndices].map(j => ({ idx: j, src: texts[j]?.slice(0, 50) })),
-      )
-      // 缺少占位符的条目回退到源文
-      for (const idx of unmasked.missingIndices) {
-        unmasked.texts[idx] = texts[idx]
-      }
-    }
-    result = unmasked.texts
-  }
-
   // 恢复 HTML 标签
   if (htmlTags.size > 0) {
     result = restoreHtmlTags(result, htmlTags)
@@ -751,7 +742,7 @@ export async function translateBatch(
   result = result.map(t => capitalizeFirstLetter(t))
 
   // 译文扩展检测：检测 LLM 是否异常扩展了译文（最后一道防线）
-  const expansionResult = detectTranslationExpansion(texts, result)
+  const expansionResult = detectTranslationExpansion(texts, result, targetLang)
   if (expansionResult.expandedIndices.size > 0) {
     console.warn(
       `[translateBatch] 检测到 ${expansionResult.expandedIndices.size} 条异常扩展译文，已自动截断`,
@@ -788,13 +779,82 @@ export async function translateBatch(
     }
   }
 
-  // 漏翻检测：译文与源文实质相同且应被翻译 → 记录 warn 日志
-  const untranslatedIndices = detectUntranslatedText(texts, result, targetLang)
-  if (untranslatedIndices.size > 0) {
-    console.warn(
-      `[translateBatch] 检测到 ${untranslatedIndices.size} 条漏翻（译文==源文），建议检查批次内混合语种问题`,
-      [...untranslatedIndices].map(j => ({ idx: j, text: texts[j].slice(0, 80) })),
-    )
+  // 漏翻检测 + 自动重试：译文与源文实质相同 → LLM 未翻译
+  // 截断检测 + 自动重试：译文长度远小于源文 → LLM 输出被截断
+  // 两个检测共享同一个 _isRetry 守卫，防止无限递归
+  if (!_isRetry) {
+    const MAX_RETRY = 2
+
+    // ── 截断重试 ──
+    let retryCount = 0
+    let truncatedIndices = detectTruncatedTexts(texts, result)
+    while (truncatedIndices.size > 0 && retryCount < MAX_RETRY) {
+      retryCount++
+      const truncatedList = [...truncatedIndices]
+      console.warn(
+        `[translateBatch] 检测到 ${truncatedIndices.size} 条译文截断（第 ${retryCount}/${MAX_RETRY} 次重试）`,
+        truncatedList.map(j => ({
+          idx: j,
+          source: texts[j].slice(0, 80),
+          sourceLen: texts[j].length,
+          transLen: result[j].length,
+          ratio: (result[j].length / texts[j].length).toFixed(2),
+        })),
+      )
+      const retryTexts = truncatedList.map(j => texts[j])
+      const retryResults = await translateBatch(
+        retryTexts, targetLang, glossaryMap, config,
+        sourceLang, pageName, fileName,
+        crossBatchTerms, taskGlossaryHint, true,
+      )
+      for (let k = 0; k < truncatedList.length; k++) {
+        result[truncatedList[k]] = retryResults[k] || ''
+      }
+      truncatedIndices = detectTruncatedTexts(texts, result)
+    }
+    // 重试耗尽后仍截断的条目 → 清空译文，交由上层处理
+    if (truncatedIndices.size > 0) {
+      console.warn(
+        `[translateBatch] ${truncatedIndices.size} 条译文重试 ${MAX_RETRY} 次后仍截断，标记为翻译失败`,
+        [...truncatedIndices].map(j => ({ idx: j, source: texts[j].slice(0, 80) })),
+      )
+      for (const j of truncatedIndices) {
+        result[j] = ''
+      }
+    }
+
+    // ── 漏翻重试 ──
+    // 重试时追加显式指令，打破"同样 prompt → 同样结果"的死循环
+    let untranslatedRetryCount = 0
+    let untranslatedIndices = detectUntranslatedText(texts, result, targetLang)
+    while (untranslatedIndices.size > 0 && untranslatedRetryCount < MAX_RETRY) {
+      untranslatedRetryCount++
+      const untranslatedList = [...untranslatedIndices]
+      console.warn(
+        `[translateBatch] 检测到 ${untranslatedIndices.size} 条漏翻（译文==源文），第 ${untranslatedRetryCount}/${MAX_RETRY} 次重试`,
+        untranslatedList.map(j => ({ idx: j, text: texts[j].slice(0, 80) })),
+      )
+      // 给漏翻条目追加显式翻译指令
+      const retryTexts = untranslatedList.map(j => {
+        const original = texts[j]
+        return `⛔ TRANSLATE to ${targetDisplayName}: ${original}`
+      })
+      const retryResults = await translateBatch(
+        retryTexts, targetLang, glossaryMap, config,
+        sourceLang, pageName, fileName,
+        crossBatchTerms, taskGlossaryHint, true,
+      )
+      for (let k = 0; k < untranslatedList.length; k++) {
+        result[untranslatedList[k]] = retryResults[k] || ''
+      }
+      untranslatedIndices = detectUntranslatedText(texts, result, targetLang)
+    }
+    if (untranslatedIndices.size > 0) {
+      console.warn(
+        `[translateBatch] ${untranslatedIndices.size} 条漏翻重试 ${MAX_RETRY} 次后仍未翻译，保留源文作为兜底`,
+        [...untranslatedIndices].map(j => ({ idx: j, text: texts[j].slice(0, 80) })),
+      )
+    }
   }
 
   return result
@@ -808,6 +868,8 @@ interface ProofreadInput {
 interface ProofreadResult {
   text: string
   reason: string
+  /** 源文中应加入术语库固定译法的词汇（校对 LLM 标记的歧义词） */
+  ambiguous: string[]
 }
 
 export async function proofreadBatch(
@@ -818,6 +880,7 @@ export async function proofreadBatch(
   pageName?: string,
   fileName?: string,
   taskGlossaryHint?: string,
+  _isRetry = false,
 ): Promise<ProofreadResult[]> {
   const targetName = LANGUAGES.find(l => l.code === targetLang)?.name || targetLang
 
@@ -860,7 +923,9 @@ export async function proofreadBatch(
   // v7.1: 逐条标注源语言，校对 LLM 需检查每条是否确实翻译到了目标语言
   const textList = items.map((it, i) => {
     const srcLang = detectSingleTextLanguage(it.sourceText)
-    return `[${i + 1}] (${srcLang}→${targetLang}) ${proofreadSpaceProtected[i]}\n${transLabel}：${maskedTranslations[i]}`
+    // 行首 * 替换为 ※，避免 Qwen 将其解析为 markdown 列表标记
+    const escapedSource = proofreadSpaceProtected[i].replace(/^\*\s*/, '※ ')
+    return `[${i + 1}] (${srcLang}→${targetLang}) ${escapedSource}\n${transLabel}：${maskedTranslations[i]}`
   }).join('\n\n')
 
   // ⛔ 校对环节术语反补全闭环：术语 hint 的 label 不含反补全指令，
@@ -881,7 +946,7 @@ export async function proofreadBatch(
   // ⛔ 不注入 IRON_RULES — 校对用独立的 CHECKLIST，不共享翻译规则
   // ⛔ 不注入 TONE/STYLE/FEW-SHOT — 校对不需要这些
   // ═══════════════════════════════════════════════════════════
-  const langBlock = renderLangForProofread(targetLang, productLine)
+  const langBlock = renderLangForProofread(targetLang, productLine, config.translationStyle)
   const systemPrompt = PROOFREAD_SYSTEM_PROMPT + glossaryHint + langBlock
 
   const apiKey = config.proofreadApiKey || config.apiKey
@@ -911,14 +976,14 @@ export async function proofreadBatch(
   const data = res.json as Record<string, unknown>
   const content: string = (data.choices as Array<{ message?: { content?: string } }>)?.[0]?.message?.content || ''
 
-  const results: ProofreadResult[] = items.map(() => ({ text: '', reason: '' }))
+  const results: ProofreadResult[] = items.map(() => ({ text: '', reason: '', ambiguous: [] }))
   let jsonParsed = false
 
   // 尝试 JSON 解析
   const jsonMatch = content.match(/\[[\s\S]*\]/)
   if (jsonMatch) {
     try {
-      const parsed = JSON.parse(jsonMatch[0]) as Array<{ i: number; text?: string; reason?: string }>
+      const parsed = JSON.parse(jsonMatch[0]) as Array<{ i: number; text?: string; reason?: string; ambiguous?: string[] }>
       for (const entry of parsed) {
         if (entry.i >= 1 && entry.i <= results.length) {
           // 清洗 [N] 前缀（LLM 可能在 text 字段中带入了索引标记）
@@ -926,8 +991,9 @@ export async function proofreadBatch(
           entryText = entryText.replace(/^\[\d+\]\s*/, '')
           const isOK = /^OK[。.]?\s*$/i.test(entryText)
           results[entry.i - 1] = {
-            text: isOK ? '' : entryText,
+            text: isOK ? items[entry.i - 1].translatedText : entryText,
             reason: (entry.reason || '').trim(),
+            ambiguous: Array.isArray(entry.ambiguous) ? entry.ambiguous.filter(a => a && a.trim()) : [],
           }
         }
       }
@@ -945,11 +1011,10 @@ export async function proofreadBatch(
         const idx = parseInt(match[1], 10) - 1
         if (idx >= 0 && idx < results.length) {
           const parts = match[2].split(' ||| ')
-          if (parts[0] !== 'OK') {
-            results[idx] = {
-              text: parts[0].trim(),
-              reason: (parts[1] || '').trim(),
-            }
+          const isOK = /^OK[。.]?\s*$/i.test(parts[0])
+          results[idx] = {
+            text: isOK ? items[idx].translatedText : parts[0].trim(),
+            reason: (parts[1] || '').trim(),
           }
         }
       }
@@ -968,7 +1033,8 @@ export async function proofreadBatch(
     if (t && t !== items[i].translatedText) {
       return postProcessTranslation(t, targetLang)
     }
-    return t
+    // 防御性兜底：如果 text 为空（"OK" 或解析失败），保留原译文
+    return t || items[i].translatedText
   })
 
   // 校对后代码级品牌注入检测（校对 LLM 在校正过程中可能引入新错误）
@@ -992,6 +1058,7 @@ export async function proofreadBatch(
   const proofExpansionResult = detectTranslationExpansion(
     items.map(it => it.sourceText),
     resultTexts,
+    targetLang,
   )
   if (proofExpansionResult.expandedIndices.size > 0) {
     console.warn(
@@ -1033,17 +1100,55 @@ export async function proofreadBatch(
     results[i].text = resultTexts[i]
   }
 
-  // 漏翻检测：校对后译文仍与源文相同 → 记录 warn 日志
-  const proofreadUntranslated = detectUntranslatedText(
-    items.map(it => it.sourceText),
-    resultTexts,
-    targetLang,
-  )
-  if (proofreadUntranslated.size > 0) {
-    console.warn(
-      `[proofreadBatch] 校对后检测到 ${proofreadUntranslated.size} 条漏翻（译文==源文），校对也未发现`,
-      [...proofreadUntranslated].map(j => ({ idx: j, text: items[j].sourceText.slice(0, 80) })),
+  // 漏翻检测：校对后译文仍与源文相同 → 触发重试（仅在非重试时执行）
+  if (!_isRetry) {
+    const MAX_PROOFREAD_RETRY = 1
+    let proofreadRetryCount = 0
+    let proofreadUntranslated = detectUntranslatedText(
+      items.map(it => it.sourceText),
+      resultTexts,
+      targetLang,
     )
+
+    while (proofreadUntranslated.size > 0 && proofreadRetryCount < MAX_PROOFREAD_RETRY) {
+      proofreadRetryCount++
+      const untranslatedList = [...proofreadUntranslated]
+      console.warn(
+        `[proofreadBatch] 校对后检测到 ${proofreadUntranslated.size} 条漏翻，第 ${proofreadRetryCount}/${MAX_PROOFREAD_RETRY} 次重试`,
+        untranslatedList.map(j => ({ idx: j, text: items[j].sourceText.slice(0, 80) })),
+      )
+
+      // 对漏翻条目重新校对，追加显式指令
+      const retryItems = untranslatedList.map(i => ({
+        sourceText: items[i].sourceText,
+        translatedText: `⛔ UNTRANSLATED! Translate "${items[i].sourceText}" to ${targetDisplayName}`,
+      }))
+
+      const retryResults = await proofreadBatch(
+        retryItems, targetLang, glossaryMap, config,
+        pageName, fileName, taskGlossaryHint,
+        true,  // 传 true，阻止内层再次重试
+      )
+
+      // 替换结果
+      for (let k = 0; k < untranslatedList.length; k++) {
+        resultTexts[untranslatedList[k]] = retryResults[k].text
+      }
+
+      // 重新检测
+      proofreadUntranslated = detectUntranslatedText(
+        items.map(it => it.sourceText),
+        resultTexts,
+        targetLang,
+      )
+    }
+
+    if (proofreadUntranslated.size > 0) {
+      console.warn(
+        `[proofreadBatch] ${proofreadUntranslated.size} 条漏翻重试 ${MAX_PROOFREAD_RETRY} 次后仍未翻译`,
+        [...proofreadUntranslated].map(j => ({ idx: j, text: items[j].sourceText.slice(0, 80) })),
+      )
+    }
   }
 
   return results
@@ -1063,9 +1168,53 @@ export function isProofreadScriptMismatch(text: string, targetLang: string): boo
 }
 
 // ============================================================
+// 截断检测：检查译文长度是否远小于源文（LLM 输出提前终止）
+// 与 detectUntranslatedText 互补：一个检"完全没翻"，一个检"翻了但没翻完"
+// ============================================================
+
+/**
+ * 检测翻译结果是否被截断（LLM 开始翻译但输出过早终止）。
+ * 规则：源文 > 30 字符 && 译文长度 < 源文长度 × 0.15 → 视为截断。
+ * 返回截断条目的索引集合，由调用方决定重试或标记失败。
+ */
+export function detectTruncatedTexts(
+  sourceTexts: string[],
+  translatedTexts: string[],
+): Set<number> {
+  const truncatedIndices = new Set<number>()
+  const MIN_SOURCE_LEN = 30
+  const TRUNC_RATIO = 0.25
+
+  for (let i = 0; i < sourceTexts.length; i++) {
+    const src = sourceTexts[i] || ''
+    const trans = translatedTexts[i] || ''
+    if (!src || !trans) continue
+    if (src.length < MIN_SOURCE_LEN) continue
+    if (trans.length < src.length * TRUNC_RATIO) {
+      truncatedIndices.add(i)
+    }
+  }
+
+  return truncatedIndices
+}
+
+// ============================================================
 // 漏翻检测：检查译文是否与源文实质相同（即 LLM 没翻译）
 // 正常化比较（去 ®™© + 合并空格 + 小写），排除商标/空格差异
 // ============================================================
+
+/**
+ * 检测文本是否不需要翻译（品牌名/技术缩写/存储容量等全球统一表达）。
+ */
+function isUntranslatable(s: string): boolean {
+  // 品牌名（首字母大写 + 可选 ®™© + 空格 + 其他字母）
+  if (/^[A-Z][a-zA-Z\s®™©]*$/.test(s)) return true
+  // 数字 + 单位（128GB, 800MB/s, 1TB 等）— 全球统一格式
+  if (/^[\d,.]+\s*(GB|MB|TB|KB|MB\/s|GB\/s|TB\/s|MHz|GHz)\b/i.test(s)) return true
+  // 纯技术缩写（SSD, USB, NVMe, PCIe 等）— 全球统一
+  if (/^(SSD|USB|NVMe|PCIe|DDR\d*|HDD|SD|SDHC|SDXC|CFexpress|CFe|SATA|DRAM|NAND|LCD|LED|OLED|HDR|RGB|WiFi|BT|NFC|GPS)$/i.test(s)) return true
+  return false
+}
 
 /**
  * 检测翻译/校对后是否存在漏翻（译文==源文但应被翻译）。
@@ -1090,6 +1239,9 @@ export function detectUntranslatedText(
     // 跳过源语言==目标语言的条目（不需要翻译，如同语言校对场景）
     const srcLang = detectSingleTextLanguage(src)
     if (srcLang === targetLang) continue
+
+    // 跳过不需要翻译的文本（品牌名/技术缩写/存储容量）
+    if (isUntranslatable(src)) continue
 
     // 归一化后完全相同 → 漏翻
     if (normalize(src) === normalize(trans)) {

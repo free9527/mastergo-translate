@@ -1,19 +1,110 @@
-/**
- * 翻译前实体遮蔽
- *
- * 将不应被 LLM 翻译或修改的实体（产品型号、URL、Email、术语库中不应翻译的
- * 软件名/品牌名）替换为 __XXX_N__ 占位符，翻译完成后还原。
- *
- * 占位符格式：
- *   PRD (产品型号): __PRD_N__
- *   URL: __URL_N__
- *   EML (Email): __EML_N__
- *   TRM (术语/软件名): __TRM_N__
- */
+// ═══════════════════════════════════════════════════════════════
+// 模块: entity-masker — 翻译前遮蔽 / 翻译后还原
+// ═══════════════════════════════════════════════════════════════
+//
+// 职责边界（一条原则）:
+//   只遮蔽"在所有语种中都不应翻译"的内容。
+//   具有语言依赖性的翻译（品类词、术语库 source→target）不在此模块。
+//
+// 包含:
+//   maskPreservedTerms — 纯技术缩略语兜底（PCIe, NVMe, DDR5...）
+//                       这些词术语库应已收录（source==target），此处兜底防止遗漏
+//   maskTerms           — 软件名等不应翻译的专有名词
+//   maskEntities        — 入口：保留词 + URL + Email + 产品型号正则
+//   unmaskEntities      — 出口：占位符 → 原始文本
+//
+// 不包含:
+//   ⛔ 术语库翻译 — 那是 maskGlossaryTerms 的职责
+//   ⛔ 品类词映射 — 那是 CATEGORY_WORDS + LANG_SPECIFIC 的职责
+//   ⛔ 品牌/生态名 — 那是术语库的职责（Lexar, iPhone 等由术语库固定译法）
+//
+// 占位符体系:
+//   __TRM_N__ = 软件名/专有名词     (maskTerms, 原样还原)
+//   __PRD_N__ = 保留词/产品型号     (maskPreservedTerms + PRODUCT_CODE_RE, 原样还原)
+//   __URL_N__ = URL                 (原样还原)
+//   __EML_N__ = Email               (原样还原)
+//   ZZ{N}ZZ   = 术语库遮蔽           (maskGlossaryTerms, 还原时替换为目标语译文)
+//   YY{N}YY   = 术语库遮蔽（冲突备用）
+// ═══════════════════════════════════════════════════════════════
 
 interface EntityMaskResult {
   texts: string[]
   entityMap: Map<string, string>
+}
+
+// ============================================================
+// 保留词遮蔽 — 翻译前遮蔽纯技术缩略语，消除 LLM "保留偏置"
+// ============================================================
+// 问题：IRON_RULES #1 的保留术语列表已被移除，翻译 LLM 不再收到
+// "保留"指令。但纯技术缩略语（PCIe/NVMe/DDR5 等）在所有语种中都
+// 不应翻译。为保证术语库未覆盖时仍有兜底，翻译前遮蔽为 __PRD_N__。
+// 翻译后 unmaskEntities 还原。
+//
+// ⛔ 品牌/生态词汇（Lexar/iPhone/Live Photos 等）不在此列表 —
+//   这些由 maskGlossaryTerms（术语库）和 LANG_SPECIFIC 处理。
+// ⛔ 品类词（SSD/Card/HDD 等）不在此列表 — 部分语言需要翻译，
+//    由 maskGlossaryTerms + CATEGORY_WORDS 按语言处理。
+
+/** 纯技术缩略语 — 按长度降序（长词优先匹配） */
+const PRESERVED_TERMS: string[] = [
+  // ── 技术标准（含版本号的长形式优先）──
+  'PCIe 5.0', 'PCIe 4.0', 'PCIe 3.0',
+  'XMP 3.0',
+  'USB 3.2', 'USB 3.1', 'USB 3.0', 'USB 2.0',
+  'UHS-II', 'UHS-I',
+  'Type-C', 'USB-C',
+  'DirectStorage',
+  'Thunderbolt',
+  'CFexpress',
+  'NVMe', 'PCIe',
+  'CUDIMM', 'DDR5', 'DDR4',
+  'XMP', 'EXPO',
+  // ── 外形规格 / 速度等级 ──
+  'M.2',
+  'V90', 'V60', 'V30',
+  '2280', '2242', '2230',
+  'A2', 'A1',
+]
+
+/**
+ * 对文本中的保留词做遮蔽，返回遮蔽后的文本 + 占位符映射。
+ * 复用 __PRD_N__ 占位符格式（unmaskEntities 通用还原）。
+ * 按 PRESERVED_TERMS 顺序匹配（长词优先），每个词只替换首次出现，
+ * 且跳过已遮蔽的 __XXX_N__ 占位符内部。
+ */
+function maskPreservedTerms(
+  texts: string[],
+  entityMap: Map<string, string>,
+  startCounter: number,
+): { texts: string[]; counter: number } {
+  let counter = startCounter
+
+  const masked = texts.map((text) => {
+    if (!text) return text
+    let result = text
+
+    for (const term of PRESERVED_TERMS) {
+      // 转义正则特殊字符（. - / 等）
+      const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      // 用单词边界包装（除非术语本身以非单词字符开头/结尾，如 M.2 的 .）
+      const wrapLeft = /^\w/.test(term) ? '\\b' : ''
+      const wrapRight = /\w$/.test(term) ? '\\b' : ''
+      const regex = new RegExp(`${wrapLeft}${escaped}${wrapRight}`, 'gi')
+
+      result = result.replace(regex, (match) => {
+        // 跳过已遮蔽的占位符内部
+        if (/__[A-Z]+_\d+__/.test(match)) return match
+        const key = `__PRD_${counter}__`
+        entityMap.set(key, match)
+        counter++
+        return key
+      })
+    }
+
+    return result
+  })
+
+  return { texts: masked, counter }
 }
 
 // ============================================================
@@ -105,6 +196,10 @@ export function maskEntities(texts: string[], protectedTerms?: string[]): Entity
       allEntityMap.set(k, v)
     }
   }
+
+  // 0.5. 遮蔽保留词（品牌名/技术缩略语）→ 消除 LLM "保留偏置"
+  const preservedResult = maskPreservedTerms(currentTexts, allEntityMap, allEntityMap.size)
+  currentTexts = preservedResult.texts
 
   let counter = allEntityMap.size
 
@@ -247,14 +342,20 @@ export function maskGlossaryTerms(
 
     // 在原始文本中定位并替换
     // 策略：用原始 source 构建宽松正则（允许 ®™© 和灵活空格），按序替换
+    // 修复：允许商标符号®™©出现在字母/数字后面（不只是空格位置）
+    // 例如：Lexar® PLAY PRO... 中 ® 紧跟 Lexar，无空格
     let result = text
     // 记录每次替换后的偏移量变化
     let offset = 0
 
     for (const m of matches) {
-      // 构建宽松正则：将原始 source 中的空格替换为 [®™©]*\s* 模式
+      // 构建宽松正则：
+      // 1. 每个字母/数字后允许商标符号®™©
+      // 2. 空格变为灵活空白（允许任意空白）
       const escaped = m.source.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-      const flexible = escaped.replace(/ /g, '[®™©]*\\s*')
+      const flexible = escaped
+        .replace(/([a-zA-Z0-9])/g, '$1[®™©]*')  // 字母/数字后允许商标符号
+        .replace(/ /g, '\\s*')                     // 空格变为灵活空白
       const regex = new RegExp(flexible, 'gi')
 
       let found = false
