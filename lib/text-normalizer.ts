@@ -59,9 +59,20 @@ function removeZeroWidthChars(text: string): string {
 //
 // 但 NFKC 也会影响某些 CJK 字符，因此只对非 CJK 文本区域使用。
 // 由于我们的源文本主要是拉丁字母 + 数字 + 单位符号，NFKC 是安全的。
+//
+// ⚠️ 重要：™ (U+2122) 会被 NFKC 展开为 "TM" 两个ASCII字符，
+// 这会破坏商标符号的还原。因此在 NFKC 前保护 ™ 符号。
+
+// PUA 字符 U+E000，不会被 NFKC 影响
+const TM_PROTECTION_CHAR = ''
 
 function normalizeCompatibilityChars(text: string): string {
-  return text.normalize('NFKC')
+  // 保护 ™ 符号：NFKC 会将 ™ (U+2122) 展开为 "TM" 两个ASCII字符
+  // 先用 PUA 占位符替换，NFKC 后还原
+  let result = text.replace(/™/g, TM_PROTECTION_CHAR)
+  result = result.normalize('NFKC')
+  result = result.replace(new RegExp(TM_PROTECTION_CHAR, 'g'), '™')
+  return result
 }
 
 // ============================================================

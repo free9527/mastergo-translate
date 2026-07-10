@@ -42,6 +42,36 @@ function stemEnglish(word: string): string {
 }
 
 /**
+ * 判断术语是否为品类词（产品品类名称）
+ * 品类词在产品名文本中不应被翻译，因为产品名整体保留英文
+ */
+function isCategoryWord(term: string): boolean {
+  const CATEGORY_WORDS = new Set([
+    'SSD', 'Portable SSD', 'Flash Drive', 'Dual Drive', 'Card',
+    'SDXC Card', 'microSDXC Card', 'CFexpress Card', 'CompactFlash Card',
+    'Desktop Memory', 'Laptop Memory', 'Reader', 'Card Reader',
+    'Enclosure', 'Hub', 'Solid State Dual Drive',
+    'Solid State Drive', 'Memory Card', 'USB Stick',
+  ])
+  return CATEGORY_WORDS.has(term.trim())
+}
+
+/**
+ * 检测文本是否包含 Lexar 产品型号
+ * 存储卡：速度代号 + 颜色等级（如 2000x GOLD, CFexpress Type A SILVER）
+ * SSD/内存/U盘：字母数字代码 + 可选后缀（如 NM790, D40E, F35 PRO）
+ * 型号属于产品标识符，不触发术语库匹配
+ */
+function containsModelNumber(text: string): boolean {
+  // 存储卡型号：速度代号 + 颜色等级
+  // 2000x GOLD, 633x BLUE, 1066x SILVER, CFexpress Type A GOLD
+  const CARD_MODEL_RE = /\b(?:\d+x\s+(?:GOLD|SILVER|BLUE|DIAMOND|PLATINUM)|CFexpress\s+Type\s+[AB]\s*(?:GOLD|SILVER|BLUE|DIAMOND|PLATINUM)?)\b/i
+  // SSD/内存/U盘型号：NM790, NQ790, D40E, F35 PRO, ARES DDR5, PLAY PRO
+  const SSD_MODEL_RE = /\b(?:(?:NM|NQ|NS|EQ)\d+[A-Z]?(?:\s+PRO)?|[A-Z]\d{2}[A-Z]?(?:\s+PRO)?)\b/i
+  return CARD_MODEL_RE.test(text) || SSD_MODEL_RE.test(text)
+}
+
+/**
  * 检查术语是否在源文本中出现
  * 支持精确匹配、子串匹配和词形还原匹配
  */
@@ -101,12 +131,20 @@ export function filterRelevantGlossary(
 ): { filteredMap: GlossaryMap; glossaryHint: string } {
   const filtered: GlossaryMap = {}
 
+  // 检测当前批次是否包含产品型号（产品名/型号文本）
+  // 如果包含，说明是产品名相关文本，应更保守地注入术语库
+  const hasModelNumber = sourceTexts.some(t => containsModelNumber(t))
+
   for (const [source, target] of Object.entries(glossaryMap)) {
     // 跳过 source === target 的条目：产品名在目标语言中保持英文原样，
     // 注入 prompt 无翻译价值，反而挤占 token、给 LLM 混淆信号。
-    // 后处理 enforceGlossaryTerms 对这类条目本身是 no-op，不影响最终结果。
     // 依据：Lexar 产品命名规则 — 硬件参数/系列名/型号全语种保留英文。
     if (source === target) continue
+
+    // 如果源文本包含产品型号，跳过品类词术语（避免与产品名冲突）
+    // 例如 "NM790 PCIe 4.0 SSD" 是产品名，不应注入 "SSD → 固态硬盘"
+    if (hasModelNumber && isCategoryWord(source)) continue
+
     if (termMatches(source, sourceTexts)) {
       filtered[source] = target
     }
@@ -118,7 +156,9 @@ export function filterRelevantGlossary(
   }
 
   const lines = Object.entries(filtered).map(([k, v]) => `${k} → ${v}`)
-  const glossaryHint = `\n术语库（最高优先级，仅列出当前文本中出现的术语，必须严格使用）：\n${lines.join('\n')}`
+  const glossaryHint = `\n术语库（最高优先级，仅列出当前文本中出现的术语，必须严格使用）：
+⛔ 仅当源文与左列完全一致（含大小写、空格）时才执行替换。部分匹配一律不替换，也不得基于术语库模式推断补全。
+${lines.join('\n')}`
 
   return { filteredMap: filtered, glossaryHint }
 }

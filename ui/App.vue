@@ -107,7 +107,6 @@
         <div class="style-field">
           <label class="field-label">翻译风格</label>
           <select class="style-select" v-model="selectedPreset" @change="applyPreset" :disabled="isStyleLocked">
-            <option value="custom">自定义</option>
             <option value="standard">通用标准版</option>
             <option value="professional">{{ isStyleLocked ? '严谨专业版（场景锁定）' : '严谨专业版' }}</option>
             <option value="marketing" v-if="!isStyleLocked">电商营销版</option>
@@ -844,76 +843,6 @@ function findHighFreqGlossaryTerms(
   return result
 }
 
-/** 从多个候选译文中选出最佳译文 */
-function pickBestTranslation(translations: string[], glossaryTarget: string): string {
-  // 1. 与术语库完全匹配的优先
-  const exact = translations.find(t => t === glossaryTarget)
-  if (exact) return exact
-
-  // 2. 排除过短（空/单字）和过长离群值（明显来自不同长度的源文本）
-  const avgLen = translations.reduce((s, t) => s + t.length, 0) / translations.length
-  let reasonable = translations.filter(t => t.length >= avgLen * 0.5 && t.length > 1)
-  if (reasonable.length === 0) return translations[0]
-
-  // 2a. 排除长度离群值：超过最短变体 5 倍的译文，极可能来自长源文本，不应污染短标签
-  if (reasonable.length >= 2) {
-    const minLen = Math.min(...reasonable.map(t => t.length))
-    const nonOutliers = reasonable.filter(t => t.length <= minLen * 5)
-    if (nonOutliers.length > 0) {
-      reasonable = nonOutliers
-    }
-  }
-
-  // 3. 从剩余候选中选最长（信息更完整）
-  reasonable.sort((a, b) => b.length - a.length)
-  return reasonable[0]
-}
-
-/** 跨批次术语统一：同一术语在不同文本中出现多种译法时，统一为最佳译法 */
-function unifyTerminologyAcrossBatches(
-  items: TextItem[],
-  glossaryMap: Map<string, string>,
-): number {
-  // 收集每个术语源文本对应的所有译文变体
-  const termVariants = new Map<string, string[]>()
-  for (const item of items) {
-    if (!item.translatedText) continue
-    const normSource = normalizeText(item.sourceText)
-    for (const [glossSource, glossTarget] of glossaryMap) {
-      const normGloss = normalizeText(glossSource)
-      if (normSource.includes(normGloss) && normGloss.length >= 4) {
-        const existing = termVariants.get(glossSource)
-        if (existing) {
-          if (!existing.includes(item.translatedText)) {
-            existing.push(item.translatedText)
-          }
-        } else {
-          termVariants.set(glossSource, [item.translatedText])
-        }
-      }
-    }
-  }
-
-  // 对每个有多种译法的术语，选出最佳译文并统一
-  let changed = 0
-  for (const [term, variants] of termVariants) {
-    if (variants.length <= 1) continue
-    const best = pickBestTranslation(variants, glossaryMap.get(term) || '')
-    for (const item of items) {
-      if (item.translatedText && variants.includes(item.translatedText) && item.translatedText !== best) {
-        // 守卫：短源文本拒绝长译文覆盖（长译文明显来自不同的长源文本）
-        const sourceLen = item.sourceText.length
-        if (sourceLen < 30 && best.length > sourceLen * 3) continue
-        item.translatedText = best
-        changed++
-      }
-    }
-  }
-  if (changed > 0) {
-    console.log('[translate] 跨批次术语统一: ' + changed + ' 条译文被统一为最佳译法')
-  }
-  return changed
-}
 
 // ============================================================
 /** 构建术语库映射表（EN key → 目标语言译文），供翻译和重翻复用 */
@@ -1068,7 +997,7 @@ async function startTranslate() {
   translateProgress.value = { current: cursor, total }
 
   // 并发批次处理：每次并发 CONCURRENCY 个批次，大幅提速
-  const CONCURRENCY = 3
+  const CONCURRENCY = 4
   for (let i = 0; i < apiTotal; i += TRANSLATE_BATCH_SIZE * CONCURRENCY) {
     if (cancelFlag.value) break
 
@@ -1167,7 +1096,7 @@ async function startTranslate() {
 
   if (llmConfig.value.enableProofread && count > 0) {
     showToast('翻译完成，即将开始校对...', 'info')
-    await new Promise(r => setTimeout(r, 1500))  // 避免翻译 API 调用刚结束立即触发频率限制
+    await new Promise(r => setTimeout(r, 100))  // 短暂间隔，避免连续请求
     try {
       await startProofread()
     } catch (e) {
@@ -1176,8 +1105,6 @@ async function startTranslate() {
     }
   }
 
-  // 跨批次术语统一：从同一术语的多个候选译文中选择最佳译法
-  unifyTerminologyAcrossBatches(items.value, glossaryMap)
   // 同源一致化：无论是否开启校对都执行，确保相同源文本译文一致
   enforceSameSourceConsistency()
   // 换行保护：修复翻译/校对中引入的多余换行
@@ -1229,7 +1156,7 @@ async function startProofread() {
     let proofLastError = ''
 
     // 并发校对：大幅提速
-    const P_CONCURRENCY = 3
+    const P_CONCURRENCY = 4
     for (let i = 0; i < total; i += PROOFREAD_BATCH_SIZE * P_CONCURRENCY) {
       if (cancelFlag.value) break
 
@@ -1828,7 +1755,7 @@ function saveGlossaryExclusive() {
 // ============================================================
 // 翻译风格预设
 // ============================================================
-const selectedPreset = ref('standard')
+const selectedPreset = ref('professional')
 
 // 场景锁定：非电商场景强制严谨专业版
 const isStyleLocked = computed(() => llmConfig.value.scenePreset !== 'ecommerce')
@@ -2026,7 +1953,8 @@ function useDefaultConfig() {
   llmConfig.value.model = 'qwen3.7-max'
   llmConfig.value.enableProofread = true
   llmConfig.value.proofreadModel = 'qwen3.7-max'
-  showToast('已填入默认团队配置，可修改后保存', 'success')
+  saveSettings()
+  showToast('已恢复默认团队配置并保存', 'success')
 }
 
 function saveSettings() {

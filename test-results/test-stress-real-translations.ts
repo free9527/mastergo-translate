@@ -195,11 +195,11 @@ function compareTranslation(
     return { match: false, issues, score: 0 }
   }
 
-  // 2. 提取关键信息
-  const srcNumbers = source.match(/\d+/g) || []
-  const aiNumbers = ai.match(/\d+/g) || []
+  // 2. 提取关键信息（去除空格，兼容法语等数字格式 3 700）
+  const srcNumbers = (source.match(/\d[\d\s]*\d/g) || source.match(/\d+/g) || []).map(n => n.replace(/\s/g, ''))
+  const aiNumbers = (ai.match(/\d[\d\s]*\d/g) || ai.match(/\d+/g) || []).map(n => n.replace(/\s/g, ''))
 
-  // 3. 检查数字保留（允许格式差异，如 900MB/s → 900 MB/s）
+  // 3. 检查数字保留（允许格式差异，如 900MB/s → 900 MB/s，或 3700 → 3 700）
   const missingNumbers = srcNumbers.filter(n => !aiNumbers.includes(n))
   if (missingNumbers.length > 0) {
     issues.push(`丢失数字: ${missingNumbers.join(', ')}`)

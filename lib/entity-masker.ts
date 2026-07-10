@@ -298,9 +298,23 @@ export function maskGlossaryTerms(
   let counter = 0
 
   // 构建排序术语列表：cleanKey 版本用于匹配，保留原始 source 用于在原文中定位
+  // ⚠️ 品牌前缀变体：对以 "Lexar " 开头的术语，生成不带前缀的变体
+  // 例如：术语库有 "Lexar PLAY PRO microSDXC Express Card"
+  // 源文可能省略 Lexar 前缀，写成 "PLAY PRO microSDXC Express Card"
+  // 生成变体后，两种写法都能匹配
   const terms = [...glossaryMap.entries()]
     .filter(([source]) => source.length >= 3)
-    .map(([source, target]) => ({ ck: cleanKeyForMask(source), source, target }))
+    .flatMap(([source, target]) => {
+      const entries = [{ ck: cleanKeyForMask(source), source, target }]
+      // 如果术语以 "Lexar " 开头，生成不带前缀的变体
+      if (source.startsWith('Lexar ')) {
+        const withoutBrand = source.slice(6) // 去掉 "Lexar "
+        if (withoutBrand.length >= 3) {
+          entries.push({ ck: cleanKeyForMask(withoutBrand), source: withoutBrand, target })
+        }
+      }
+      return entries
+    })
     .filter(t => t.ck.length >= 3)
     .sort((a, b) => b.ck.length - a.ck.length)
 

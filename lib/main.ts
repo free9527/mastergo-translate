@@ -171,7 +171,7 @@ async function applyTranslations(items: TextItem[]): Promise<void> {
       if (f) await mg.loadFontAsync(f.fontName)
     }
   } else {
-    const candidates = ['Inter', 'Sarasa Gothic', 'Roboto', 'Arial', 'PingFang SC']
+    const candidates = ['Avenir', 'Inter', 'Sarasa Gothic', 'Roboto', 'Arial', 'PingFang SC']
     for (const name of candidates) {
       const match = fontMap.get(makeFontKey(name, 'Regular'))
       if (match) { fallbackFont = { family: name, style: 'Regular' }; break }
@@ -335,18 +335,16 @@ async function applyFontsOnly(payloads: FontPayload[]): Promise<void> {
             family: p.targetFontFamily,
             style: p.targetFontStyle || 'Regular',
           })
-          // Avenir ® 符号修复
-          if (p.targetFontFamily === 'Avenir') {
-            const text = node.characters
-            let idx = -1
-            while ((idx = text.indexOf('®', idx + 1)) !== -1) {
-              try {
-                node.setRangeFontName(idx, idx + 1, {
-                  family: 'HarmonyOS Sans SC',
-                  style: p.targetFontStyle || p.fontStyle || 'Regular',
-                })
-              } catch (_) {}
-            }
+          // ® 符号修复：所有字体替换后都执行，防止 ® 渲染异常（过大/非上标）
+          const text = node.characters
+          let idx = -1
+          while ((idx = text.indexOf('®', idx + 1)) !== -1) {
+            try {
+              node.setRangeFontName(idx, idx + 1, {
+                family: 'HarmonyOS Sans SC',
+                style: p.targetFontStyle || p.fontStyle || 'Regular',
+              })
+            } catch (_) {}
           }
         }
         if (p.targetFontSize > 0) {

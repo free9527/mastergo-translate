@@ -2,9 +2,9 @@
 // 全局常量
 // ============================================================
 
-// 翻译批次大小
-export const TRANSLATE_BATCH_SIZE = 15
-export const PROOFREAD_BATCH_SIZE = 20
+// 翻译批次大小（增大批次减少 API 调用次数）
+export const TRANSLATE_BATCH_SIZE = 20
+export const PROOFREAD_BATCH_SIZE = 12
 
 // API 超时（毫秒）— 15条批次模型处理可能需60s+，留足余量
 export const API_TIMEOUT_MS = 120000

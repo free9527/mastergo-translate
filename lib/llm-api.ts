@@ -3,7 +3,7 @@ import { API_MAX_RETRIES, API_RETRY_DELAY_MS, API_TIMEOUT_MS } from '@lib/consta
 import { filterRelevantGlossary } from '@lib/glossary-filter'
 import { normalizeTextForLLM, protectCjkSpaces } from '@lib/text-normalizer'
 import { maskEntities, unmaskEntities, maskEntitiesForProofread } from '@lib/entity-masker'
-import { postProcessTranslation, restoreTrademarkSymbols, restoreStorageUnitFormatting, enforceGlossaryTerms, capitalizeFirstLetter, detectTranslationExpansion, detectBrandInjection } from '@lib/post-process'
+import { postProcessTranslation, restoreTrademarkSymbols, restoreStorageUnitFormatting, enforceGlossaryTerms, capitalizeFirstLetter, detectTranslationExpansion, detectBrandInjection, validateNumbers } from '@lib/post-process'
 import {
   IRON_RULES,
   IDENTITY_MISSION,
@@ -327,6 +327,19 @@ function getEffectiveProductLine(config: LLMConfig, texts: string[], pageName?: 
   return detectProductLine(texts, pageName, fileName)
 }
 
+// 产品线 → 风格自动映射
+// 用户手动指定优先，否则根据产品线自动选择
+const PRODUCT_LINE_STYLE_MAP: Record<string, string> = {
+  'gaming_dimm': 'marketing',        // 热血、冲击力、年轻化
+  'gaming_ssd': 'marketing',         // 爽快直白、年轻潮流
+  'gaming_card': 'marketing',        // 活泼轻松、玩家向
+  'professional_imaging': 'professional',  // 沉稳克制、高级质感
+  'pc_productivity': 'standard',     // 务实温和、简约中性
+  'consumer_cards': 'standard',      // 亲民通俗、简单易懂
+  'portable_storage': 'standard',    // 轻便现代、安心可靠
+  'innovation_lifestyle': 'marketing',  // 潮流年轻化、有设计感
+}
+
 // ============================================================
 // 术语库按场景过滤（仅保留两处硬编码规则：营销过滤 + 合规强制）
 // ============================================================
@@ -550,8 +563,18 @@ export async function translateBatch(
   // CJK 空格保护：直接删除 CJK 主导文本中的空格，防止 LLM 误判为条目分隔符
   const spaceProtectedTexts = protectCjkSpaces(maskedTexts)
 
+  // ™®©符号保护：翻译前移除源文中的商标符号，防止 LLM 乱加符号到其他位置
+  // restoreTrademarkSymbols 会在翻译后用原始源文（texts）把符号加回来
+  const tmStrippedTexts = spaceProtectedTexts.map(t => t.replace(/[™®©]/g, ''))
+
   // 产品线检测（提前到术语过滤之前）
   const productLine = getEffectiveProductLine(config, texts, pageName, fileName)
+
+  // 自动风格：用户手动指定优先，否则根据产品线自动选择
+  let effectiveStyle = config.translationStyle
+  if (!effectiveStyle && productLine) {
+    effectiveStyle = PRODUCT_LINE_STYLE_MAP[productLine] || 'standard'
+  }
 
   // 术语注入：优先使用任务级预计算提示词（跨批次 system prompt 一致 → API 缓存命中）
   // 无预计算时回退到逐批次术语过滤（兼容旧调用路径）
@@ -589,7 +612,7 @@ export async function translateBatch(
   // 含空格的文本加引号包裹，LLM 识别为单个实体
   // v7.1: 逐条标注 (源语言→目标语言)，解决批次内混合语种导致漏翻的问题
   const quotedIndices = new Set<number>()
-  const textList = spaceProtectedTexts.map((t, i) => {
+  const textList = tmStrippedTexts.map((t, i) => {
     const srcLang = detectSingleTextLanguage(t)
     // 行首 * 替换为 ※，避免 Qwen 将其解析为 markdown 列表标记导致漏翻
     const escaped = t.replace(/^\*\s*/, '※ ')
@@ -600,8 +623,8 @@ export async function translateBatch(
     return `[${i + 1}] (${srcLang}→${targetLang}) ${escaped}`
   }).join('\n')
 
-  // 语言专属提示词（含品类词+规则，统一由 LANG_SPECIFIC 渲染）
-  const langBlock = renderLangForTranslate(targetLang, productLine)
+  // 语言专属提示词（含品类词+规则+场景约束+语气风格，统一由 LANG_SPECIFIC 渲染）
+  const langBlock = renderLangForTranslate(targetLang, productLine, config.scenePreset, effectiveStyle)
 
   // System Prompt: IDENTITY + IRON_RULES + TERMINOLOGY + LANG_SPECIFIC + OUTPUT
   const systemPrompt = buildSystemPrompt({ targetLang, langBlock, glossaryHint })
@@ -734,6 +757,20 @@ export async function translateBatch(
   // 商标符号还原（兜底：原文有则译文必有，原文无则不添加）
   result = restoreTrademarkSymbols(texts, result)
 
+  // 数字校验：检测译文中数字是否与源文一致（防止 LLM 幻觉，如 4TB→8TB）
+  const numberValidation = validateNumbers(texts, result)
+  if (numberValidation.mismatchedIndices.size > 0) {
+    console.warn(
+      `[translateBatch] 检测到 ${numberValidation.mismatchedIndices.size} 条数字错误，已回退到源文`,
+      [...numberValidation.mismatchedIndices].map(j => ({
+        idx: j,
+        source: texts[j].slice(0, 50),
+        translated: result[j].slice(0, 50),
+      })),
+    )
+    result = numberValidation.texts
+  }
+
   // 存储单位格式还原：原文数字和单位连写时，恢复译文的连写格式
   // 修复 AI 常见错误：900MB/s → 900 MB/s 还原为 900MB/s
   result = restoreStorageUnitFormatting(texts, result)
@@ -779,81 +816,72 @@ export async function translateBatch(
     }
   }
 
-  // 漏翻检测 + 自动重试：译文与源文实质相同 → LLM 未翻译
-  // 截断检测 + 自动重试：译文长度远小于源文 → LLM 输出被截断
-  // 两个检测共享同一个 _isRetry 守卫，防止无限递归
+  // 异常检测 + 统一重试：截断 + 漏翻合并为一次重试
+  // 优化：从最多4次额外API调用降为1次
   if (!_isRetry) {
-    const MAX_RETRY = 2
-
-    // ── 截断重试 ──
-    let retryCount = 0
+    // 首次检测：收集所有异常条目
     let truncatedIndices = detectTruncatedTexts(texts, result)
-    while (truncatedIndices.size > 0 && retryCount < MAX_RETRY) {
-      retryCount++
-      const truncatedList = [...truncatedIndices]
+    let untranslatedIndices = detectUntranslatedText(texts, result, targetLang)
+    const hasAnomaly = truncatedIndices.size > 0 || untranslatedIndices.size > 0
+
+    if (hasAnomaly) {
+      // 合并异常条目（去重）
+      const anomalyIndices = new Set<number>()
+      for (const idx of truncatedIndices) anomalyIndices.add(idx)
+      for (const idx of untranslatedIndices) anomalyIndices.add(idx)
+
       console.warn(
-        `[translateBatch] 检测到 ${truncatedIndices.size} 条译文截断（第 ${retryCount}/${MAX_RETRY} 次重试）`,
-        truncatedList.map(j => ({
+        `[translateBatch] 检测到 ${anomalyIndices.size} 条异常（截断${truncatedIndices.size}条，漏翻${untranslatedIndices.size}条），执行统一重试`,
+        [...anomalyIndices].map(j => ({
           idx: j,
+          type: truncatedIndices.has(j) ? '截断' : '漏翻',
           source: texts[j].slice(0, 80),
-          sourceLen: texts[j].length,
-          transLen: result[j].length,
-          ratio: (result[j].length / texts[j].length).toFixed(2),
         })),
       )
-      const retryTexts = truncatedList.map(j => texts[j])
-      const retryResults = await translateBatch(
-        retryTexts, targetLang, glossaryMap, config,
-        sourceLang, pageName, fileName,
-        crossBatchTerms, taskGlossaryHint, true,
-      )
-      for (let k = 0; k < truncatedList.length; k++) {
-        result[truncatedList[k]] = retryResults[k] || ''
-      }
-      truncatedIndices = detectTruncatedTexts(texts, result)
-    }
-    // 重试耗尽后仍截断的条目 → 清空译文，交由上层处理
-    if (truncatedIndices.size > 0) {
-      console.warn(
-        `[translateBatch] ${truncatedIndices.size} 条译文重试 ${MAX_RETRY} 次后仍截断，标记为翻译失败`,
-        [...truncatedIndices].map(j => ({ idx: j, source: texts[j].slice(0, 80) })),
-      )
-      for (const j of truncatedIndices) {
-        result[j] = ''
-      }
-    }
 
-    // ── 漏翻重试 ──
-    // 重试时追加显式指令，打破"同样 prompt → 同样结果"的死循环
-    let untranslatedRetryCount = 0
-    let untranslatedIndices = detectUntranslatedText(texts, result, targetLang)
-    while (untranslatedIndices.size > 0 && untranslatedRetryCount < MAX_RETRY) {
-      untranslatedRetryCount++
-      const untranslatedList = [...untranslatedIndices]
-      console.warn(
-        `[translateBatch] 检测到 ${untranslatedIndices.size} 条漏翻（译文==源文），第 ${untranslatedRetryCount}/${MAX_RETRY} 次重试`,
-        untranslatedList.map(j => ({ idx: j, text: texts[j].slice(0, 80) })),
-      )
-      // 给漏翻条目追加显式翻译指令
-      const retryTexts = untranslatedList.map(j => {
+      // 一次API调用处理所有异常条目
+      const retryTexts = [...anomalyIndices].map(j => {
         const original = texts[j]
-        return `⛔ TRANSLATE to ${targetDisplayName}: ${original}`
+        // 对漏翻条目追加显式翻译指令
+        if (untranslatedIndices.has(j) && !truncatedIndices.has(j)) {
+          return `[TRANSLATE REQUIRED] The following text must be translated to ${targetDisplayName}. Do NOT keep it in English:\n\n${original}`
+        }
+        return original
       })
+
       const retryResults = await translateBatch(
         retryTexts, targetLang, glossaryMap, config,
         sourceLang, pageName, fileName,
         crossBatchTerms, taskGlossaryHint, true,
       )
-      for (let k = 0; k < untranslatedList.length; k++) {
-        result[untranslatedList[k]] = retryResults[k] || ''
+
+      // 更新结果
+      let k = 0
+      for (const j of anomalyIndices) {
+        result[j] = retryResults[k] || ''
+        k++
       }
+
+      // 重试后再次检测，标记仍失败的条目
+      truncatedIndices = detectTruncatedTexts(texts, result)
       untranslatedIndices = detectUntranslatedText(texts, result, targetLang)
-    }
-    if (untranslatedIndices.size > 0) {
-      console.warn(
-        `[translateBatch] ${untranslatedIndices.size} 条漏翻重试 ${MAX_RETRY} 次后仍未翻译，保留源文作为兜底`,
-        [...untranslatedIndices].map(j => ({ idx: j, text: texts[j].slice(0, 80) })),
-      )
+
+      if (truncatedIndices.size > 0) {
+        console.warn(
+          `[translateBatch] ${truncatedIndices.size} 条译文重试后仍截断，标记为翻译失败`,
+          [...truncatedIndices].map(j => ({ idx: j, source: texts[j].slice(0, 80) })),
+        )
+        for (const j of truncatedIndices) {
+          result[j] = ''
+        }
+      }
+
+      if (untranslatedIndices.size > 0) {
+        console.warn(
+          `[translateBatch] ${untranslatedIndices.size} 条漏翻重试后仍未翻译，保留源文作为兜底`,
+          [...untranslatedIndices].map(j => ({ idx: j, text: texts[j].slice(0, 80) })),
+        )
+      }
     }
   }
 
@@ -919,12 +947,16 @@ export async function proofreadBatch(
   // 校对时对源文本做 CJK 空格保护
   const proofreadSpaceProtected = protectCjkSpaces(maskedSources)
 
+  // ™®©符号保护：校对前移除源文中的商标符号，防止校对 LLM 乱加符号
+  // restoreTrademarkSymbols 会在校对后用原始源文把符号加回来
+  const proofTmStrippedSources = proofreadSpaceProtected.map(t => t.replace(/[™®©]/g, ''))
+
   const transLabel = useEnInstruction ? 'Trans' : '译'
   // v7.1: 逐条标注源语言，校对 LLM 需检查每条是否确实翻译到了目标语言
   const textList = items.map((it, i) => {
     const srcLang = detectSingleTextLanguage(it.sourceText)
     // 行首 * 替换为 ※，避免 Qwen 将其解析为 markdown 列表标记
-    const escapedSource = proofreadSpaceProtected[i].replace(/^\*\s*/, '※ ')
+    const escapedSource = proofTmStrippedSources[i].replace(/^\*\s*/, '※ ')
     return `[${i + 1}] (${srcLang}→${targetLang}) ${escapedSource}\n${transLabel}：${maskedTranslations[i]}`
   }).join('\n\n')
 
@@ -941,12 +973,13 @@ export async function proofreadBatch(
   // ═══════════════════════════════════════════════════════════
   // ROLE+CHECKLIST (PROOFREAD_SYSTEM_PROMPT) — 独立 QA 视角
   // GLOSSARY (glossaryHint)                 — 术语参照
-  // LANG_SPECIFIC (renderLangForProofread)  — 校验标准+品类词+品质
+  // LANG_SPECIFIC (renderLangForProofread)  — 品类词+rules（硬性检查）
   //
   // ⛔ 不注入 IRON_RULES — 校对用独立的 CHECKLIST，不共享翻译规则
   // ⛔ 不注入 TONE/STYLE/FEW-SHOT — 校对不需要这些
+  // ⛔ 不注入 quality/scene — 主观检查已移除，避免过度润色
   // ═══════════════════════════════════════════════════════════
-  const langBlock = renderLangForProofread(targetLang, productLine, config.translationStyle)
+  const langBlock = renderLangForProofread(targetLang, productLine)
   const systemPrompt = PROOFREAD_SYSTEM_PROMPT + glossaryHint + langBlock
 
   const apiKey = config.proofreadApiKey || config.apiKey
@@ -989,9 +1022,10 @@ export async function proofreadBatch(
           // 清洗 [N] 前缀（LLM 可能在 text 字段中带入了索引标记）
           let entryText = (entry.text || '').trim()
           entryText = entryText.replace(/^\[\d+\]\s*/, '')
-          const isOK = /^OK[。.]?\s*$/i.test(entryText)
+          // 新格式：只输出有修改的条目，不再输出 "OK"
+          // 空字符串表示无需修改，保留原译文
           results[entry.i - 1] = {
-            text: isOK ? items[entry.i - 1].translatedText : entryText,
+            text: entryText,
             reason: (entry.reason || '').trim(),
             ambiguous: Array.isArray(entry.ambiguous) ? entry.ambiguous.filter(a => a && a.trim()) : [],
           }
@@ -1011,9 +1045,8 @@ export async function proofreadBatch(
         const idx = parseInt(match[1], 10) - 1
         if (idx >= 0 && idx < results.length) {
           const parts = match[2].split(' ||| ')
-          const isOK = /^OK[。.]?\s*$/i.test(parts[0])
           results[idx] = {
-            text: isOK ? items[idx].translatedText : parts[0].trim(),
+            text: parts[0].trim(),
             reason: (parts[1] || '').trim(),
           }
         }
@@ -1096,6 +1129,22 @@ export async function proofreadBatch(
     }
   }
 
+  // 校对后数字校验：检测译文中数字是否与源文一致
+  const proofNumberValidation = validateNumbers(
+    items.map(it => it.sourceText),
+    resultTexts,
+  )
+  if (proofNumberValidation.mismatchedIndices.size > 0) {
+    console.warn(
+      `[proofreadBatch] 校对后检测到 ${proofNumberValidation.mismatchedIndices.size} 条数字错误，已回退`,
+      [...proofNumberValidation.mismatchedIndices].map(j => ({
+        source: items[j].sourceText.slice(0, 50),
+        proofread: resultTexts[j].slice(0, 80),
+      })),
+    )
+    resultTexts = proofNumberValidation.texts
+  }
+
   for (let i = 0; i < results.length; i++) {
     results[i].text = resultTexts[i]
   }
@@ -1173,8 +1222,8 @@ export function isProofreadScriptMismatch(text: string, targetLang: string): boo
 // ============================================================
 
 /**
- * 检测翻译结果是否被截断（LLM 开始翻译但输出过早终止）。
- * 规则：源文 > 30 字符 && 译文长度 < 源文长度 × 0.15 → 视为截断。
+ * 检测翻译结果是否被截断（LLM 开始翻译但输出过早终止）或为空（LLM 未输出）。
+ * 规则：源文 > 30 字符 && (译文为空 || 译文长度 < 源文长度 × 0.25) → 视为截断。
  * 返回截断条目的索引集合，由调用方决定重试或标记失败。
  */
 export function detectTruncatedTexts(
@@ -1188,9 +1237,10 @@ export function detectTruncatedTexts(
   for (let i = 0; i < sourceTexts.length; i++) {
     const src = sourceTexts[i] || ''
     const trans = translatedTexts[i] || ''
-    if (!src || !trans) continue
+    if (!src) continue
     if (src.length < MIN_SOURCE_LEN) continue
-    if (trans.length < src.length * TRUNC_RATIO) {
+    // 译文为空或译文过短 → 视为截断
+    if (!trans || trans.length < src.length * TRUNC_RATIO) {
       truncatedIndices.add(i)
     }
   }
@@ -1213,6 +1263,21 @@ function isUntranslatable(s: string): boolean {
   if (/^[\d,.]+\s*(GB|MB|TB|KB|MB\/s|GB\/s|TB\/s|MHz|GHz)\b/i.test(s)) return true
   // 纯技术缩写（SSD, USB, NVMe, PCIe 等）— 全球统一
   if (/^(SSD|USB|NVMe|PCIe|DDR\d*|HDD|SD|SDHC|SDXC|CFexpress|CFe|SATA|DRAM|NAND|LCD|LED|OLED|HDR|RGB|WiFi|BT|NFC|GPS)$/i.test(s)) return true
+
+  // 产品名组合：包含 ≥2 个品牌/产品关键词的文本不应判为漏翻
+  // 例如 "Lexar® ARMOR GOLD SDXC™ UHS-II Card"
+  const BRAND_KEYWORDS = [
+    'Lexar', 'ARMOR', 'GOLD', 'DIAMOND', 'PLAY', 'PRO', 'ARES', 'THOR',
+    'SILVER', 'BLUE', 'NM\\d+', 'NQ\\d+', 'NS\\d+', 'EQ\\d+',
+    'PSSD', 'CFexpress', 'microSD', 'SDXC', 'SDHC', 'UHS', 'VPG',
+  ]
+  const brandPattern = new RegExp(`\\b(${BRAND_KEYWORDS.join('|')})\\b`, 'i')
+  const brandMatches = s.match(new RegExp(`\\b(${BRAND_KEYWORDS.join('|')})\\b`, 'gi'))
+  if (brandMatches && brandMatches.length >= 2) {
+    // 包含多个品牌关键词 → 视为产品名，不判为漏翻
+    return true
+  }
+
   return false
 }
 

@@ -92,8 +92,10 @@ export function restoreTrademarkSymbols(sourceTexts: string[], translatedTexts: 
         const punctLen = punctMatch ? punctMatch[0].length : 0
         result = result.slice(0, insertPos + punctLen) + symbol + result.slice(insertPos + punctLen)
       } else {
-        // 找不到该词，追加到译文末尾
-        result = result + symbol
+        // 找不到该词，跳过（不插入）。
+        // 原因：原文词汇可能在译文中被重组/复合（如德语 Water+Resistance→Wasserfestigkeit），
+        // 此时不应追加符号到末尾——会导致 ™ 堆积，触发校对 LLM 逐字符复制，产生乱码。
+        // 符号丢失的风险远小于全文 ™ 泛滥。
       }
     }
 
@@ -861,4 +863,66 @@ export function sanitizeLineBreaks(
 
     return translated
   })
+}
+
+// ============================================================
+// 数字校验：检测译文中数字是否与源文一致
+// 提取源文和译文中的"数字+单位"组合，如果不一致则标记
+// ============================================================
+
+/**
+ * 检测译文中数字是否与源文一致
+ * 规则：提取源文和译文中的"数字+存储单位"组合，如果不一致则标记
+ * 支持所有20种语言的存储单位格式
+ * 返回：修复后的译文数组 + 异常索引集合
+ */
+export function validateNumbers(
+  sourceTexts: string[],
+  translatedTexts: string[],
+): { texts: string[]; mismatchedIndices: Set<number> } {
+  const mismatchedIndices = new Set<number>()
+
+  // 提取"数字+存储单位"组合（支持所有语言的存储单位格式）
+  const extractStorageNumbers = (text: string): number[] => {
+    // 匹配所有语言的存储单位：
+    // - 英文/大多数语言: TB, GB, MB, KB, PB (及其带/s的形式)
+    // - 法语: To, Go, Mo, Ko, Po
+    // - 俄语: ТБ, ГБ, МБ, КБ
+    // - 日语/韩语/中文: 太字节, 吉字节, etc. (但通常用英文缩写)
+    const pattern = /(\d+(?:[.,]\d+)?)\s*(TB|GB|MB|KB|PB|To|Go|Mo|Ko|Po|ТБ|ГБ|МБ|КБ)(?:\/s)?/gi
+    const matches = text.match(pattern) || []
+    // 提取数字部分（去除千位分隔符）
+    return matches.map(m => {
+      const numMatch = m.match(/^(\d+(?:[.,]\d+)?)/)
+      if (!numMatch) return 0
+      // 去除千位分隔符（逗号或点）
+      return parseFloat(numMatch[1].replace(/[.,]/g, ''))
+    })
+  }
+
+  const result = translatedTexts.map((translated, i) => {
+    const source = sourceTexts[i] || ''
+    if (!source || !translated) return translated
+
+    const sourceNumbers = extractStorageNumbers(source)
+    const transNumbers = extractStorageNumbers(translated)
+
+    // 如果数量不一致 → 数字错误
+    if (sourceNumbers.length !== transNumbers.length) {
+      mismatchedIndices.add(i)
+      return source // 回退到源文
+    }
+
+    // 如果数值不一致 → 数字错误
+    for (let j = 0; j < sourceNumbers.length; j++) {
+      if (Math.abs(sourceNumbers[j] - transNumbers[j]) > 0.01) {
+        mismatchedIndices.add(i)
+        return source // 回退到源文
+      }
+    }
+
+    return translated
+  })
+
+  return { texts: result, mismatchedIndices }
 }
