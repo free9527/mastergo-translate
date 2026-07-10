@@ -13,7 +13,6 @@ import {
   getStyleGuide,
   getLangSpecificPrompt,
   getCategoryWordGuide,
-  getFewShotExamplesV2,
   OUTPUT_ANCHOR,
   PROOFREAD_SYSTEM_PROMPT,
   getProofreadQualityInstruction,
@@ -211,7 +210,6 @@ for (const s of scenarios) {
 
   const categoryWordGuide = getCategoryWordGuide(s.targetLang, s.productLine)
   const langBlock = getLangSpecificPrompt(s.targetLang)
-  const fewShot = getFewShotExamplesV2('en', s.targetLang, s.productLine, s.style, 2)
 
   // Mock glossary
   const glossaryHint = '[GLOSSARY]\n"Lexar" → "Lexar"\n"THOR" → "THOR"\n"SSD" → "SSD"'
@@ -226,7 +224,6 @@ for (const s of scenarios) {
     glossaryHint,
     categoryWordGuide,
     langBlock,
-    fewShot,
     useEnInstruction,
   })
 
@@ -283,7 +280,6 @@ const p1 = buildSystemPrompt({
   glossaryHint: 'Use: "Lexar" → "Lexar"\n  "THOR" → "THOR"\n  "SSD" → "SSD"',
   categoryWordGuide: getCategoryWordGuide(s1.targetLang, s1.productLine),
   langBlock: getLangSpecificPrompt(s1.targetLang),
-  fewShot: getFewShotExamplesV2('en', s1.targetLang, s1.productLine, s1.style, 2),
   useEnInstruction: false, // CJK → Chinese instruction
 })
 console.log(p1)

@@ -32,25 +32,44 @@
 
 /** Core mission statement per target language — activates the target semantic space */
 export const IDENTITY_MISSION: Record<string, string> = {
+  // CJK 语言：使用母语指令（与 [IDENTITY] 英文一致）
   'zh-CN': `核心使命：将源文本精准、地道地翻译为简体中文。通过调整词汇色彩、句式结构来适配产品线与受众。`,
   'zh-TW': `核心使命：將源文本精準翻譯為台灣繁體中文並完成用語在地化。透過調整詞彙色彩、句式結構來適配產品線與受眾。`,
   'ja': `コアミッション：原文を正確かつ自然な日本語に翻訳してください。語彙や文体を製品ラインと読者に合わせて調整します。`,
   'ko': `핵심 미션: 원문을 정확하고 자연스러운 한국어로 번역하세요. 어휘와 문체를 제품 라인과 독자에 맞게 조정하세요.`,
-  'fr': `Mission : Traduisez le texte source de manière précise et naturelle en français. Adaptez le vocabulaire, la structure des phrases et le registre à la gamme de produits et au public cible.`,
-  'de': `Kernauftrag: Übersetzen Sie den Ausgangstext präzise und idiomatisch ins Deutsche. Passen Sie Wortwahl, Satzbau und Register an Produktlinie und Zielgruppe an.`,
-  'es': `Misión principal: Traduzca el texto fuente de manera precisa y natural al español. Adapte el vocabulario, la estructura de las frases y el registro a la línea de productos y al público objetivo.`,
-  'pt': `Missão principal: Traduza o texto fonte de forma precisa e natural para português europeu. Adapte o vocabulário, a estrutura frásica e o registo à linha de produtos e ao público-alvo.`,
-  'pt-BR': `Missão principal: Traduza o texto fonte de forma precisa e natural para português brasileiro. Adapte o vocabulário, a estrutura frásica e o registro à linha de produtos e ao público-alvo.`,
-  'it': `Missione principale: Traduca il testo sorgente in modo accurato e naturale in italiano. Adatti vocabolario, struttura delle frasi e registro alla linea di prodotti e al pubblico target.`,
-  'nl': `Kernmissie: Vertaal de brontekst nauwkeurig en natuurlijk naar het Nederlands. Pas woordkeuze, zinsbouw en register aan op de productlijn en doelgroep.`,
-  'pl': `Misja główna: Przetłumacz tekst źródłowy dokładnie i naturalnie na język polski. Dostosuj słownictwo, strukturę zdań i rejestr do linii produktów i grupy docelowej.`,
-  'sv': `Huvuduppdrag: Översätt källtexten exakt och naturligt till svenska. Anpassa ordförråd, meningsbyggnad och ton till produktlinjen och målgruppen.`,
-  'tr': `Temel Misyon: Kaynak metni Türkçeye doğru ve doğal bir şekilde çevirin. Kelime seçimini, cümle yapısını ve üslubu ürün grubuna ve hedef kitleye göre uyarlayın.`,
-  'ru': `Основная миссия: Переведите исходный текст точно и естественно на русский язык. Адаптируйте лексику, структуру предложений и стиль под линейку продуктов и целевую аудиторию.`,
-  'vi': `Sứ mệnh cốt lõi: Dịch văn bản nguồn chính xác và tự nhiên sang tiếng Việt. Điều chỉnh từ vựng, cấu trúc câu và giọng điệu phù hợp với dòng sản phẩm và đối tượng mục tiêu.`,
-  'th': `พันธกิจหลัก: แปลข้อความต้นฉบับอย่างถูกต้องและเป็นธรรมชาติเป็นภาษาไทย ปรับคำศัพท์ โครงสร้างประโยค และโทนเสียงให้เข้ากับกลุ่มผลิตภัณฑ์และกลุ่มเป้าหมาย`,
-  'id': `Misi utama: Terjemahkan teks sumber secara akurat dan alami ke dalam bahasa Indonesia. Sesuaikan kosakata, struktur kalimat, dan gaya bahasa dengan lini produk dan audiens target.`,
-  'ar': `المهمة الأساسية: ترجمة النص المصدر بدقة وبشكل طبيعي إلى اللغة العربية. تكييف المفردات وبنية الجمل والأسلوب بما يتناسب مع خط الإنتاج والجمهور المستهدف.`,
+
+  // 非 CJK 语言：双语使命宣言（英文 + 目标语言）
+  // 英文部分确保 LLM 理解翻译任务，目标语言部分激活目标语义空间
+  'fr': `Core mission: Translate the source text accurately and naturally into French. Adapt vocabulary, sentence structure, and register to fit the product line and target audience.
+Mission : Traduisez le texte source de manière précise et naturelle en français. Adaptez le vocabulaire, la structure des phrases et le registre à la gamme de produits et au public cible.`,
+  'de': `Core mission: Translate the source text accurately and naturally into German. Adapt vocabulary, sentence structure, and register to fit the product line and target audience.
+Kernauftrag: Übersetzen Sie den Ausgangstext präzise und idiomatisch ins Deutsche. Passen Sie Wortwahl, Satzbau und Register an Produktlinie und Zielgruppe an.`,
+  'es': `Core mission: Translate the source text accurately and naturally into Spanish. Adapt vocabulary, sentence structure, and register to fit the product line and target audience.
+Misión principal: Traduzca el texto fuente de manera precisa y natural al español. Adapte el vocabulario, la estructura de las frases y el registro a la línea de productos y al público objetivo.`,
+  'pt': `Core mission: Translate the source text accurately and naturally into European Portuguese. Adapt vocabulary, sentence structure, and register to fit the product line and target audience.
+Missão principal: Traduza o texto fonte de forma precisa e natural para português europeu. Adapte o vocabulário, a estrutura frásica e o registo à linha de produtos e ao público-alvo.`,
+  'pt-BR': `Core mission: Translate the source text accurately and naturally into Brazilian Portuguese. Adapt vocabulary, sentence structure, and register to fit the product line and target audience.
+Missão principal: Traduza o texto fonte de forma precisa e natural para português brasileiro. Adapte o vocabulário, a estrutura frásica e o registro à linha de produtos e ao público-alvo.`,
+  'it': `Core mission: Translate the source text accurately and naturally into Italian. Adapt vocabulary, sentence structure, and register to fit the product line and target audience.
+Missione principale: Traduca il testo sorgente in modo accurato e naturale in italiano. Adatti vocabolario, struttura delle frasi e registro alla linea di prodotti e al pubblico target.`,
+  'nl': `Core mission: Translate the source text accurately and naturally into Dutch. Adapt vocabulary, sentence structure, and register to fit the product line and target audience.
+Kernmissie: Vertaal de brontekst nauwkeurig en natuurlijk naar het Nederlands. Pas woordkeuze, zinsbouw en register aan op de productlijn en doelgroep.`,
+  'pl': `Core mission: Translate the source text accurately and naturally into Polish. Adapt vocabulary, sentence structure, and register to fit the product line and target audience.
+Misja główna: Przetłumacz tekst źródłowy dokładnie i naturalnie na język polski. Dostosuj słownictwo, strukturę zdań i rejestr do linii produktów i grupy docelowej.`,
+  'sv': `Core mission: Translate the source text accurately and naturally into Swedish. Adapt vocabulary, sentence structure, and tone to fit the product line and target audience.
+Huvuduppdrag: Översätt källtexten exakt och naturligt till svenska. Anpassa ordförråd, meningsbyggnad och ton till produktlinjen och målgruppen.`,
+  'tr': `Core mission: Translate the source text accurately and naturally into Turkish. Adapt vocabulary, sentence structure, and register to fit the product line and target audience.
+Temel Misyon: Kaynak metni Türkçeye doğru ve doğal bir şekilde çevirin. Kelime seçimini, cümle yapısını ve üslubu ürün grubuna ve hedef kitleye göre uyarlayın.`,
+  'ru': `Core mission: Translate the source text accurately and naturally into Russian. Adapt vocabulary, sentence structure, and style to fit the product line and target audience.
+Основная миссия: Переведите исходный текст точно и естественно на русский язык. Адаптируйте лексику, структуру предложений и стиль под линейку продуктов и целевую аудиторию.`,
+  'vi': `Core mission: Translate the source text accurately and naturally into Vietnamese. Adapt vocabulary, sentence structure, and tone to fit the product line and target audience.
+Sứ mệnh cốt lõi: Dịch văn bản nguồn chính xác và tự nhiên sang tiếng Việt. Điều chỉnh từ vựng, cấu trúc câu và giọng điệu phù hợp với dòng sản phẩm và đối tượng mục tiêu.`,
+  'th': `Core mission: Translate the source text accurately and naturally into Thai. Adapt vocabulary, sentence structure, and tone to fit the product line and target audience.
+พันธกิจหลัก: แปลข้อความต้นฉบับอย่างถูกต้องและเป็นธรรมชาติเป็นภาษาไทย ปรับคำศัพท์ โครงสร้างประโยค และโทนเสียงให้เข้ากับกลุ่มผลิตภัณฑ์และกลุ่มเป้าหมาย`,
+  'id': `Core mission: Translate the source text accurately and naturally into Indonesian. Adapt vocabulary, sentence structure, and style to fit the product line and target audience.
+Misi utama: Terjemahkan teks sumber secara akurat dan alami ke dalam bahasa Indonesia. Sesuaikan kosakata, struktur kalimat, dan gaya bahasa dengan lini produk dan audiens target.`,
+  'ar': `Core mission: Translate the source text accurately and naturally into Arabic. Adapt vocabulary, sentence structure, and style to fit the product line and target audience.
+المهمة الأساسية: ترجمة النص المصدر بدقة وبشكل طبيعي إلى اللغة العربية. تكييف المفردات وبنية الجمل والأسلوب بما يتناسب مع خط الإنتاج والجمهور المستهدف.`,
   'en': `Core mission: Translate the source text accurately and idiomatically into English. Adapt vocabulary, sentence structure, and register to fit the product line and target audience.`,
 }
 
@@ -61,43 +80,50 @@ export const IDENTITY_MISSION: Record<string, string> = {
 // ============================================================
 
 // ═══════════════════════════════════════════════════════════════
+// 共享常量: BRAND_ASSET_RULES — 品牌资产白名单（翻译+校对共用）
+// ═══════════════════════════════════════════════════════════════
+// 职责: 定义品牌/产品名保留规则，翻译用它"保护"，校对用它"放行"
+// 注入: 翻译 IRON_RULES Rule #2 引用 + 校对 PROOFREAD_SYSTEM_PROMPT 引用
+// ═══════════════════════════════════════════════════════════════
+
+export const BRAND_ASSET_RULES = `[BRAND & PRODUCT NAME RULES]
+✅ Keep in English (do NOT translate):
+- Complete product names: "Lexar PLAY PRO microSDXC Express Card"
+- Pure brand names / model numbers: "Lexar", "NM790", "ARES DDR5"
+
+Model number patterns:
+- Memory cards: speed code + grade color (e.g., "2000x GOLD", "633x BLUE", "CFexpress Type A SILVER")
+- SSD/Memory/USB: alphanumeric code + optional suffix (e.g., "NM790", "D40E", "F35 PRO")
+- ⛔ Color words (GOLD/SILVER/BLUE/DIAMOND) in model names are grade identifiers, NOT colors — keep as-is
+
+❌ MUST translate (even if containing brand words):
+- Descriptive phrases: "high-speed memory card"
+- Slogans, taglines, headlines, footnotes
+- Sentences with brand names: "Paired with AMD and Intel CPUs" → translate sentence, keep "AMD"/"Intel" English
+
+⚠️ CRITICAL DISTINCTION:
+- Product name = standalone identifier → KEEP English: "Lexar NM790 PCIe 4.0 SSD"
+- Descriptive sentence = contains verbs/prepositions → TRANSLATE: "Paired with AMD and Intel CPUs" → translate "Paired with" and "CPUs", keep "AMD"/"Intel" English`
+
+// ═══════════════════════════════════════════════════════════════
 // 模块: IRON_RULES — 全局铁则（翻译 LLM 的轻量行为约束）
 // ═══════════════════════════════════════════════════════════════
-// 职责: 约束 LLM 行为边界。品牌/型号由 LLM 自行识别（#2），
-//       不列具体术语列表避免保留偏置。具体译法由术语库固定。
+// 职责: 约束 LLM 行为边界。品牌/型号规则由 BRAND_ASSET_RULES 共享。
 // 注入: 翻译 system prompt，始终注入，英语。全语种通用。
 // 边界: ⛔ 不含具体保留词列表（LLM 凭常识识别品牌/型号）
 //       ⛔ 不含"always in English"等绝对化表述
 //       ⛔ 不注入校对 prompt（校对有独立的 CHECKLIST）
 // ═══════════════════════════════════════════════════════════════
 
-export const IRON_RULES = `[IRON RULES]
-1. FAITHFUL TO SOURCE: No omissions. No additions. No parentheticals.
-   No fabricated selling points, feature descriptions, or usage scenarios.
-   Suppress all background knowledge; translate ONLY what the source says.
-   Numbers, capacities, and speed values must be preserved verbatim.
-   ⛔ NEVER complete partial product names — "PLAY X PCIe 4.0 SSD" stays
-   "PLAY X PCIe 4.0 SSD". Never add brand prefixes, form factors, or specs.
-   ✅ You MAY adapt phrasing, word choice, and sentence structure freely
-      to sound natural — that's localization, not fabrication.
+export const IRON_RULES = `${BRAND_ASSET_RULES}
 
-2. PRESERVE BRANDS & MODEL NUMBERS:
-   ✅ Keep in English (do NOT translate):
-   - Complete product names: "Lexar PLAY PRO microSDXC Express Card"
-   - Pure brand names / model numbers: "Lexar", "NM790", "ARES DDR5"
+[IRON RULES]
+1. FAITHFUL TO SOURCE: Translate ONLY source content — no omission, addition, fabrication,
+   or external knowledge injection. Numbers, capacities, and speed values preserved verbatim.
+   ⛔ NEVER complete partial product names.
+   ✅ You MAY adapt phrasing, word choice, and sentence structure to sound natural.
 
-   Model number patterns:
-   - Memory cards: speed code + grade color (e.g., "2000x GOLD", "633x BLUE", "CFexpress Type A SILVER")
-   - SSD/Memory/USB: alphanumeric code + optional suffix (e.g., "NM790", "D40E", "F35 PRO")
-   - ⛔ Color words (GOLD/SILVER/BLUE/DIAMOND) in model names are grade identifiers, NOT colors — keep as-is
-
-   ❌ MUST translate:
-   - Descriptive phrases: "high-speed memory card"
-   - Titles, slogans, footnotes, notes: "BIT Running for 30 Minutes..."
-   - Technical descriptions: "*Due to different measurement methods..."
-
-   Rule: If the text is descriptive/explanatory (even if it contains brand words),
-   it MUST be translated. Only pure brand names / product model numbers stay English.
+2. PRESERVE BRANDS & MODEL NUMBERS: Follow [BRAND & PRODUCT NAME RULES] above.
 
 3. CATEGORY PRECISION: Use the category word table. "Read speed" and "Write speed" are distinct — never interchange them.
 
@@ -608,7 +634,7 @@ export const LANG_SPECIFIC: Record<string, LangBlock> = {
     quality: `Prüfen Sie als deutscher Muttersprachler: klingt die Übersetzung natürlich und zielgruppengerecht?`,
   },
   'es': {
-    rules: `Use International Castilian Spanish — do NOT mix in Latin American regional slang. "ordenador" NOT "computadora", "tarjeta de memoria" NOT "memoria". All nouns must have correct gender and number agreement. Formal "Usted" for customer-facing copy. Terminology: tarjeta microSD/SD, SSD portátil, lector de tarjetas, velocidad de lectura/escritura. Marketing copy can be warm and direct while maintaining professionalism.`,
+    rules: `Use International Castilian Spanish — do NOT mix in Latin American regional slang. "ordenador" NOT "computadora", "tarjeta de memoria" NOT "memoria". All nouns must have correct gender and number agreement. Formal "Usted" for customer-facing copy. Terminology: tarjeta microSD/SD, SSD portátil, lector de tarjetas, velocidad de lectura/escritura.`,
     compliance: `Cumplir con la Ley General de Publicidad de España: evitar superlativos absolutos (el mejor, el más rápido) sin evidencia. No usar afirmaciones engañosas.`,
     quality: `Evalúe como hispanohablante nativo: ¿suena natural y adecuada para el público español?`,
   },
@@ -618,7 +644,7 @@ export const LANG_SPECIFIC: Record<string, LangBlock> = {
     quality: `Avalie como falante nativo de português europeu: a tradução soa natural?`,
   },
   'pt-BR': {
-    rules: `Use Brazilian Portuguese throughout. ⛔ Pen Drive (NOT Pen USB), Notebook (NOT Portátil), Case (NOT Caixa). Do NOT mix in European Portuguese vocabulary. Terminology: cartão de memória, SSD portátil, leitor de cartões, pendrive, velocidade de leitura/gravação. Use "você". Watch for false friends: atualmente = currently (NOT actually). Strictly distinguish pt-BR from pt — never mix the two variants.`,
+    rules: `Use Brazilian Portuguese throughout. ⛔ Pen Drive (NOT Pen USB), Notebook (NOT Portátil), Case (NOT Caixa). Do NOT mix in European Portuguese vocabulary. Terminology: cartão de memória, SSD portátil, leitor de cartões, pendrive, velocidade de leitura/gravação. Use "você". Watch for false friends: atualmente = currently (NOT actually).`,
     compliance: `Cumprir o Código de Defesa do Consumidor (CDC) do Brasil: evitar superlativos absolutos sem comprovação. Não usar afirmações enganosas ou abusivas.`,
     quality: `Avalie como falante nativo de português brasileiro: a tradução soa natural?`,
   },
@@ -648,22 +674,22 @@ export const LANG_SPECIFIC: Record<string, LangBlock> = {
     quality: `Ana dili Türkçe olan biri olarak değerlendirin: çeviri doğal geliyor mu?`,
   },
   'ru': {
-    rules: `Use Cyrillic throughout; Lexar and technical symbols remain in Latin script, embedded LTR within the text. Terminology: скорость чтения, скорость записи, карта памяти. All nouns and adjectives must be correctly declined (6 cases). Emphasize cold-weather durability and ruggedness where relevant to the Russian market.`,
+    rules: `Use Cyrillic throughout; Lexar and technical symbols remain in Latin script, embedded LTR within the text. Terminology: скорость чтения, скорость записи, карта памяти. All nouns and adjectives must be correctly declined (6 cases).`,
     compliance: `Соблюдайте закон о рекламе РФ: избегайте абсолютных превосходных степеней (лучший, самый быстрый) без доказательств. Не используйте вводящие в заблуждение утверждения.`,
     quality: `Оцените как носитель русского языка: звучит ли перевод естественно?`,
   },
   'vi': {
-    rules: `ALL tone marks and special characters must be preserved: đ ư ơ ă â — missing tones change word meaning entirely. When generating Vietnamese text, ensure each syllable and its tone marks are generated as a complete unit. Do not insert line breaks, spaces, or punctuation in the middle of a syllable. Use Northern standard Vietnamese (Hanoi official accent), NOT Southern dialect. Terminology: thẻ nhớ, tốc độ đọc, tốc độ ghi. Use correct classifiers (measure words) for product categories — do not calque from English. E-commerce copy should be lively and direct, matching Vietnamese market style. Note: This e-commerce style applies to consumer/portable products only. For professional-grade product lines, follow [Style·Professional] tone rules instead.`,
+    rules: `ALL tone marks and special characters must be preserved: đ ư ơ ă â — missing tones change meaning. Use Northern standard Vietnamese (Hanoi accent), NOT Southern dialect. Verify no broken syllables in output. Terminology: thẻ nhớ, tốc độ đọc, tốc độ ghi. Use correct classifiers (measure words) for product categories — do not calque from English. E-commerce copy should be lively and direct, matching Vietnamese market style.`,
     compliance: `Tuân thủ Luật Quảng cáo Việt Nam: tránh các từ tuyệt đối hóa (tốt nhất, nhanh nhất) khi không có bằng chứng. Không sử dụng tuyên bố gây hiểu lầm.`,
     quality: `Đánh giá với tư cách người bản ngữ tiếng Việt: bản dịch có tự nhiên không?`,
   },
   'th': {
-    rules: `All superscript/subscript vowels and tone marks must display completely — no character overlap, loss, or distortion. Use standard common register, NOT royal/high honorifics, and NOT overly casual speech. Brand annotation: เล็กซาร์; technical parameters remain in English. Default left-aligned layout; reserve sufficient line height to prevent character clipping. Word breaking must follow Thai writing conventions — never break mid-word.`,
+    rules: `All superscript/subscript vowels and tone marks must display completely — no character overlap, loss, or distortion. Use standard common register, NOT royal/high honorifics, and NOT overly casual speech. Brand annotation: เล็กซาร์; technical parameters remain in English. Word breaking must follow Thai writing conventions — never break mid-word.`,
     compliance: `ปฏิบัติตามกฎหมายโฆษณาไทย: หลีกเลี่ยงคำกล่าวอ้างที่เกินจริง (ดีที่สุด เร็วที่สุด) โดยไม่มีหลักฐาน ระวังเนื้อหาที่อ่อนไหวต่อพุทธศาสนา`,
     quality: `ประเมินในฐานะเจ้าของภาษาไทย: งานแปลฟังดูเป็นธรรมชาติหรือไม่?`,
   },
   'id': {
-    rules: `Use official standard Indonesian (Bahasa Indonesia) — do NOT mix in Malay vocabulary. Formal "Anda", avoid colloquial "kamu"/"lu"/"gue". Terminology: kartu memori, SSD portabel, pembaca kartu, flashdisk, kecepatan baca/tulis. Prefix system (me-, di-, ter-, pe-) must be correctly applied. Language should be accessible and direct — avoid overly formal bureaucratic expressions; match Indonesian 3C product copy style. Note: This style applies to consumer products only. For professional-grade product lines, follow [Style·Professional] tone rules instead.`,
+    rules: `Use official standard Indonesian (Bahasa Indonesia) — do NOT mix in Malay vocabulary. Formal "Anda", avoid colloquial "kamu"/"lu"/"gue". Terminology: kartu memori, SSD portabel, pembaca kartu, flashdisk, kecepatan baca/tulis. Prefix system (me-, di-, ter-, pe-) must be correctly applied. Language should be accessible and direct — avoid overly formal bureaucratic expressions; match Indonesian 3C product copy style.`,
     compliance: `Patuhi peraturan periklanan Indonesia: hindari kata-kata absolut (terbaik, tercepat) tanpa bukti. Jangan gunakan klaim yang menyesatkan.`,
     quality: `Nilai sebagai penutur asli bahasa Indonesia: apakah terjemahan terdengar alami?`,
   },
@@ -673,7 +699,7 @@ export const LANG_SPECIFIC: Record<string, LangBlock> = {
     quality: `قيّم بصفتك متحدثًا أصليًا للعربية: هل الترجمة طبيعية ومناسبة للجمهور المستهدف؟`,
   },
   'en': {
-    rules: `Use American English spelling consistently: color, center, fiber, license — do NOT mix in British spelling. Fixed terminology: Read speed / Write speed, Professional filmmaker, Content creator, Rugged design. Technical copy should be concise and objective; marketing copy should use short sentences, avoid complex clauses. Distinguish consumer vs. professional product line tone — do not mix them. Do NOT literally translate Chinese four-character marketing slogans into awkward English; use native digital industry expressions.`,
+    rules: `Use American English spelling consistently: color, center, fiber, license — do NOT mix in British spelling. Fixed terminology: Read speed / Write speed, Professional filmmaker, Content creator, Rugged design. Technical copy should be concise and objective; marketing copy should use short sentences, avoid complex clauses. Do NOT literally translate Chinese four-character marketing slogans into awkward English; use native digital industry expressions.`,
     compliance: `Follow FTC advertising guidelines: avoid absolute superlatives (best, fastest) without evidence. No deceptive claims or unsubstantiated performance assertions.`,
     quality: `Evaluate as a native English speaker: does the translation sound natural for the target audience?`,
   },
@@ -716,12 +742,14 @@ export function renderLangForTranslate(
 
 /**
  * 渲染校对视角的语言专属校验标准。
- * 包含: 品类词术语 + rules（品类词是硬性对错，AI比代码更准）+ quality（母语者语感）+ compliance（广告法/合规）
- * 不包含: tone/style（主观风格检查已移除，避免过度润色）
+ * 包含: 品类词术语 + rules + quality + compliance + sceneChecklist + productTone + styleGuide
+ * 校对需要知道翻译遵循了什么规则，才能正确判断。
  */
 export function renderLangForProofread(
   targetLang: string,
   productLine?: string | null,
+  scenePreset?: string,
+  style?: string,
 ): string {
   const block = LANG_SPECIFIC[targetLang]
   if (!block) return ''
@@ -732,6 +760,18 @@ export function renderLangForProofread(
   // quality 让校对 LLM 以母语者视角检查译文自然度
   // compliance 让校对 LLM 知道广告法/合规要求，避免误判翻译的合规性调整
   const parts = [categoryBlock, block.rules, block.quality, block.compliance].filter(Boolean)
+
+  // 注入场景检查清单（校对需要知道翻译遵循的场景规则）
+  const sceneChecklist = scenePreset ? getSceneChecklist(scenePreset) : ''
+  if (sceneChecklist) parts.push(sceneChecklist)
+
+  // 注入产品线调性指南（校对 CHECK 4 需要引用）
+  const productTone = getProductLineTone(productLine || null, targetLang)
+  if (productTone) parts.push(productTone)
+
+  // 注入风格指南（校对需要知道翻译遵循的风格）
+  const styleGuide = style ? getStyleGuide(style, targetLang) : ''
+  if (styleGuide) parts.push(styleGuide)
 
   if (parts.length === 0) return ''
 
@@ -913,365 +953,6 @@ export function getCategoryWordGuide(targetLang: string, productLine?: string | 
 }
 
 // ============================================================
-// Module 4: IN-CONTEXT LEARNING — Few-Shot Examples
-// ============================================================
-
-export interface FewShotExample {
-  source: string
-  target: string
-}
-
-export interface FewShotEntry {
-  examples: FewShotExample[]
-}
-
-type FewShotStore = Record<string, FewShotEntry>
-
-export const FEWSHOT_STORE_V2: FewShotStore = {
-  // ── Gaming SSD × marketing examples ──
-  'en_ja_gaming_ssd_marketing': {
-    examples: [
-      { source: 'Unleash the ultimate power of PCIe Gen5. Dominate the leaderboard.',
-        target: 'PCIe Gen5の究極のパワーを解き放て。リーダーボードを制覇せよ。' },
-      { source: 'Load your favorite AAA titles in seconds, not minutes.',
-        target: 'お気に入りのAAAタイトルを数秒でロード。数分の待ち時間とはおさらば。' },
-    ],
-  },
-  'en_de_gaming_ssd_marketing': {
-    examples: [
-      { source: 'Unleash the ultimate power of PCIe Gen5. Dominate the leaderboard.',
-        target: 'Entfessle die ultimative Power von PCIe Gen5. Dominiere die Rangliste.' },
-      { source: 'Load your favorite AAA titles in seconds, not minutes.',
-        target: 'Lade deine AAA-Lieblingstitel in Sekunden, nicht in Minuten.' },
-    ],
-  },
-
-  // ── Gaming SSD × professional examples ──
-  'en_ja_gaming_ssd_professional': {
-    examples: [
-      { source: 'Equipped with a high-performance heatsink to maintain stable speeds under sustained load.',
-        target: '高負荷時でも安定した速度を維持する高性能ヒートシンクを搭載。' },
-      { source: 'PCIe Gen5 x4 interface delivers sequential read speeds up to 14,000MB/s.',
-        target: 'PCIe Gen5 x4インターフェースにより、最大14,000MB/sのシーケンシャル読み取り速度を実現。' },
-    ],
-  },
-
-  // ── PC Productivity × professional ──
-  'en_ja_pc_productivity_professional': {
-    examples: [
-      { source: 'Ideal for heavy multitasking and large media file workflows.',
-        target: '高負荷なマルチタスクや大容量メディアファイルのワークフローに最適。' },
-      { source: 'Accelerate local LLM inference with DRAM cache and high I/O throughput.',
-        target: 'DRAMキャッシュと高いI/Oスループットにより、ローカルLLM推論を高速化。' },
-    ],
-  },
-  'en_de_pc_productivity_professional': {
-    examples: [
-      { source: 'Ideal for heavy multitasking and large media file workflows.',
-        target: 'Ideal für intensives Multitasking und umfangreiche Mediendatei-Workflows.' },
-      { source: 'Accelerate local LLM inference with DRAM cache and high I/O throughput.',
-        target: 'Beschleunigen Sie lokale LLM-Inferenz mit DRAM-Cache und hohem I/O-Durchsatz.' },
-    ],
-  },
-
-  // ── Professional Imaging × professional ──
-  'en_ja_professional_imaging_professional': {
-    examples: [
-      { source: 'Capture cinema-quality 8K RAW video without dropped frames.',
-        target: 'コマ落ちのないシネマ品質の8K RAW動画をキャプチャ。' },
-      { source: 'Built to withstand extreme temperatures, water, shock, and vibration.',
-        target: '極端な温度、水、衝撃、振動に耐える設計。' },
-    ],
-  },
-  'en_de_professional_imaging_professional': {
-    examples: [
-      { source: 'Capture cinema-quality 8K RAW video without dropped frames.',
-        target: 'Nehmen Sie 8K-RAW-Videos in Kinoqualität ohne Bildausfälle auf.' },
-      { source: 'Built to withstand extreme temperatures, water, shock, and vibration.',
-        target: 'Konzipiert für extreme Temperaturen, Wasser, Stöße und Vibrationen.' },
-    ],
-  },
-
-  // ── Consumer Cards × standard ──
-  'en_ja_consumer_cards_standard': {
-    examples: [
-      { source: 'Reliable storage for your everyday photos, videos, and files.',
-        target: '日常の写真、動画、ファイルのための信頼性の高いストレージ。' },
-      { source: 'Plug-and-play — just insert and start capturing.',
-        target: 'プラグアンドプレイ——挿入するだけですぐに撮影を開始。' },
-    ],
-  },
-
-  // ── Portable Storage × standard ──
-  'en_ja_portable_storage_standard': {
-    examples: [
-      { source: 'Pocket-sized design meets rugged durability. Take your data anywhere.',
-        target: 'ポケットサイズのデザインと堅牢な耐久性を両立。データをどこへでも持ち運べます。' },
-      { source: 'Transfer large video files directly from your smartphone.',
-        target: '大容量の動画ファイルをスマートフォンから直接転送。' },
-    ],
-  },
-  'en_de_portable_storage_standard': {
-    examples: [
-      { source: 'Pocket-sized design meets rugged durability. Take your data anywhere.',
-        target: 'Taschenformat trifft auf robuste Haltbarkeit. Nehmen Sie Ihre Daten überallhin mit.' },
-    ],
-  },
-
-  // ── Innovation Lifestyle × marketing ──
-  'en_ja_innovation_lifestyle_marketing': {
-    examples: [
-      { source: 'pexar Smart Frame brings your memories to life. Share instantly with family anywhere.',
-        target: 'pexarスマートフォトフレームが思い出に命を吹き込みます。離れて暮らす家族とも瞬間を共有。' },
-    ],
-  },
-
-  // ── General fallback per language ──
-  'en_ja_general': {
-    examples: [
-      { source: 'High-speed performance for demanding applications.',
-        target: '要求の厳しいアプリケーションに高速パフォーマンスを。' },
-      { source: 'Compatible with a wide range of devices.',
-        target: '幅広いデバイスに対応。' },
-      { source: 'The Lexar Professional CFexpress Type A Card delivers sustained write speeds up to 1300MB/s for uninterrupted cinema-quality 8K RAW video recording.',
-        target: 'Lexar Professional CFexpress Type Aカードは、最大1300MB/sの持続書き込み速度を実現し、シネマ品質の8K RAWビデオを途切れることなく記録します。' },
-    ],
-  },
-  'en_de_general': {
-    examples: [
-      { source: 'High-speed performance for demanding applications.',
-        target: 'Hochgeschwindigkeitsleistung für anspruchsvolle Anwendungen.' },
-      { source: 'Compatible with a wide range of devices.',
-        target: 'Kompatibel mit einer Vielzahl von Geräten.' },
-      { source: 'The Lexar Professional CFexpress Type A Card delivers sustained write speeds up to 1300MB/s for uninterrupted cinema-quality 8K RAW video recording.',
-        target: 'Die Lexar Professional CFexpress Type A Karte liefert anhaltende Schreibgeschwindigkeiten von bis zu 1300 MB/s für unterbrechungsfreie 8K-RAW-Videoaufnahmen in Kinoqualität.' },
-    ],
-  },
-  'en_fr_general': {
-    examples: [
-      { source: 'High-speed performance for demanding applications.',
-        target: 'Performances haute vitesse pour les applications exigeantes.' },
-      { source: 'Compatible with a wide range of devices.',
-        target: 'Compatible avec une large gamme d\'appareils.' },
-      { source: 'The Lexar Professional CFexpress Type A Card delivers sustained write speeds up to 1300MB/s for uninterrupted cinema-quality 8K RAW video recording.',
-        target: 'La carte Lexar Professional CFexpress Type A offre des vitesses d\'écriture soutenues jusqu\'à 1300 Mo/s pour un enregistrement vidéo 8K RAW ininterrompu de qualité cinéma.' },
-    ],
-  },
-  'en_ko_general': {
-    examples: [
-      { source: 'High-speed performance for demanding applications.',
-        target: '까다로운 애플리케이션을 위한 고속 성능.' },
-      { source: 'Compatible with a wide range of devices.',
-        target: '다양한 기기와 호환됩니다.' },
-      { source: 'The Lexar Professional CFexpress Type A Card delivers sustained write speeds up to 1300MB/s for uninterrupted cinema-quality 8K RAW video recording.',
-        target: 'Lexar Professional CFexpress Type A 카드는 최대 1300MB/s의 지속 쓰기 속도를 제공하여 시네마급 8K RAW 영상을 끊김 없이 녹화합니다.' },
-    ],
-  },
-  'en_ar_general': {
-    examples: [
-      { source: 'High-speed performance for demanding applications.',
-        target: 'أداء عالي السرعة للتطبيقات المتطلبة.' },
-      { source: 'Compatible with a wide range of devices.',
-        target: 'متوافق مع مجموعة واسعة من الأجهزة.' },
-      { source: 'The Lexar Professional CFexpress Type A Card delivers sustained write speeds up to 1300MB/s for uninterrupted cinema-quality 8K RAW video recording.',
-        target: 'توفر بطاقة Lexar Professional CFexpress Type A سرعات كتابة مستدامة تصل إلى 1300 ميجابايت/ثانية لتسجيل فيديو 8K RAW متواصل بجودة سينمائية.' },
-    ],
-  },
-  'en_es_general': {
-    examples: [
-      { source: 'High-speed performance for demanding applications.',
-        target: 'Rendimiento de alta velocidad para aplicaciones exigentes.' },
-      { source: 'Compatible with a wide range of devices.',
-        target: 'Compatible con una amplia gama de dispositivos.' },
-      { source: 'The Lexar Professional CFexpress Type A Card delivers sustained write speeds up to 1300MB/s for uninterrupted cinema-quality 8K RAW video recording.',
-        target: 'La tarjeta Lexar Professional CFexpress Type A ofrece velocidades de escritura sostenidas de hasta 1300 MB/s para grabación ininterrumpida de video 8K RAW con calidad cinematográfica.' },
-    ],
-  },
-  'en_it_general': {
-    examples: [
-      { source: 'High-speed performance for demanding applications.',
-        target: 'Prestazioni ad alta velocità per applicazioni impegnative.' },
-      { source: 'Compatible with a wide range of devices.',
-        target: 'Compatibile con un\'ampia gamma di dispositivi.' },
-      { source: 'The Lexar Professional CFexpress Type A Card delivers sustained write speeds up to 1300MB/s for uninterrupted cinema-quality 8K RAW video recording.',
-        target: 'La scheda Lexar Professional CFexpress Type A offre velocità di scrittura sostenute fino a 1300 MB/s per una registrazione video 8K RAW ininterrotta di qualità cinematografica.' },
-    ],
-  },
-  'en_pt-BR_general': {
-    examples: [
-      { source: 'High-speed performance for demanding applications.',
-        target: 'Desempenho de alta velocidade para aplicações exigentes.' },
-      { source: 'Compatible with a wide range of devices.',
-        target: 'Compatível com uma ampla variedade de dispositivos.' },
-      { source: 'The Lexar Professional CFexpress Type A Card delivers sustained write speeds up to 1300MB/s for uninterrupted cinema-quality 8K RAW video recording.',
-        target: 'O cartão Lexar Professional CFexpress Type A oferece velocidades de gravação sustentadas de até 1300 MB/s para gravação de vídeo 8K RAW ininterrupta com qualidade cinematográfica.' },
-    ],
-  },
-  'en_nl_general': {
-    examples: [
-      { source: 'High-speed performance for demanding applications.',
-        target: 'Hogesnelheidsprestaties voor veeleisende toepassingen.' },
-      { source: 'Compatible with a wide range of devices.',
-        target: 'Compatibel met een breed scala aan apparaten.' },
-      { source: 'The Lexar Professional CFexpress Type A Card delivers sustained write speeds up to 1300MB/s for uninterrupted cinema-quality 8K RAW video recording.',
-        target: 'De Lexar Professional CFexpress Type A kaart levert aanhoudende schrijfsnelheden tot 1300 MB/s voor ononderbroken 8K RAW-video-opnamen in cinema-kwaliteit.' },
-    ],
-  },
-  'en_pl_general': {
-    examples: [
-      { source: 'High-speed performance for demanding applications.',
-        target: 'Wysoka wydajność do wymagających zastosowań.' },
-      { source: 'Compatible with a wide range of devices.',
-        target: 'Kompatybilny z szeroką gamą urządzeń.' },
-      { source: 'The Lexar Professional CFexpress Type A Card delivers sustained write speeds up to 1300MB/s for uninterrupted cinema-quality 8K RAW video recording.',
-        target: 'Karta Lexar Professional CFexpress Type A zapewnia trwałe prędkości zapisu do 1300 MB/s dla nieprzerwanej kinowej jakości nagrywania wideo 8K RAW.' },
-    ],
-  },
-  'en_sv_general': {
-    examples: [
-      { source: 'High-speed performance for demanding applications.',
-        target: 'Höghastighetsprestanda för krävande tillämpningar.' },
-      { source: 'Compatible with a wide range of devices.',
-        target: 'Kompatibel med ett brett utbud av enheter.' },
-      { source: 'The Lexar Professional CFexpress Type A Card delivers sustained write speeds up to 1300MB/s for uninterrupted cinema-quality 8K RAW video recording.',
-        target: 'Lexar Professional CFexpress Type A-kortet levererar ihållande skrivhastigheter på upp till 1300 MB/s för oavbruten 8K RAW-videoinspelning i biokvalitet.' },
-    ],
-  },
-  'en_ru_general': {
-    examples: [
-      { source: 'High-speed performance for demanding applications.',
-        target: 'Высокоскоростная производительность для ресурсоёмких приложений.' },
-      { source: 'Compatible with a wide range of devices.',
-        target: 'Совместимо с широким спектром устройств.' },
-      { source: 'The Lexar Professional CFexpress Type A Card delivers sustained write speeds up to 1300MB/s for uninterrupted cinema-quality 8K RAW video recording.',
-        target: 'Карта Lexar Professional CFexpress Type A обеспечивает устойчивую скорость записи до 1300 МБ/с для непрерывной видеозаписи 8K RAW кинематографического качества.' },
-    ],
-  },
-  'en_vi_general': {
-    examples: [
-      { source: 'High-speed performance for demanding applications.',
-        target: 'Hiệu suất tốc độ cao cho các ứng dụng yêu cầu cao.' },
-      { source: 'Compatible with a wide range of devices.',
-        target: 'Tương thích với nhiều loại thiết bị.' },
-      { source: 'The Lexar Professional CFexpress Type A Card delivers sustained write speeds up to 1300MB/s for uninterrupted cinema-quality 8K RAW video recording.',
-        target: 'Thẻ Lexar Professional CFexpress Type A cung cấp tốc độ ghi liên tục lên đến 1300 MB/s để quay video 8K RAW chất lượng điện ảnh không bị gián đoạn.' },
-    ],
-  },
-  'en_th_general': {
-    examples: [
-      { source: 'High-speed performance for demanding applications.',
-        target: 'ประสิทธิภาพความเร็วสูงสำหรับแอปพลิเคชันที่มีความต้องการสูง' },
-      { source: 'Compatible with a wide range of devices.',
-        target: 'เข้ากันได้กับอุปกรณ์หลากหลายประเภท' },
-      { source: 'The Lexar Professional CFexpress Type A Card delivers sustained write speeds up to 1300MB/s for uninterrupted cinema-quality 8K RAW video recording.',
-        target: 'การ์ด Lexar Professional CFexpress Type A มอบความเร็วในการเขียนต่อเนื่องสูงสุด 1300 MB/s สำหรับการบันทึกวิดีโอ 8K RAW คุณภาพระดับภาพยนตร์อย่างต่อเนื่อง' },
-    ],
-  },
-  'en_id_general': {
-    examples: [
-      { source: 'High-speed performance for demanding applications.',
-        target: 'Performa kecepatan tinggi untuk aplikasi yang menuntut.' },
-      { source: 'Compatible with a wide range of devices.',
-        target: 'Kompatibel dengan berbagai perangkat.' },
-      { source: 'The Lexar Professional CFexpress Type A Card delivers sustained write speeds up to 1300MB/s for uninterrupted cinema-quality 8K RAW video recording.',
-        target: 'Kartu Lexar Professional CFexpress Type A memberikan kecepatan tulis berkelanjutan hingga 1300 MB/s untuk perekaman video 8K RAW berkualitas sinema tanpa gangguan.' },
-    ],
-  },
-  'en_tr_general': {
-    examples: [
-      { source: 'High-speed performance for demanding applications.',
-        target: 'Zorlu uygulamalar için yüksek hızlı performans.' },
-      { source: 'Compatible with a wide range of devices.',
-        target: 'Çok çeşitli cihazlarla uyumludur.' },
-      { source: 'The Lexar Professional CFexpress Type A Card delivers sustained write speeds up to 1300MB/s for uninterrupted cinema-quality 8K RAW video recording.',
-        target: 'Lexar Professional CFexpress Type A Kart, sinema kalitesinde kesintisiz 8K RAW video kaydı için 1300 MB/s\'ye kadar sürekli yazma hızları sunar.' },
-    ],
-  },
-  'en_zh-CN_general': {
-    examples: [
-      { source: 'High-speed performance for demanding applications.',
-        target: '为高要求应用提供高速性能。' },
-      { source: 'Compatible with a wide range of devices.',
-        target: '兼容多种设备。' },
-      { source: 'The Lexar Professional CFexpress Type A Card delivers sustained write speeds up to 1300MB/s for uninterrupted cinema-quality 8K RAW video recording.',
-        target: 'Lexar Professional CFexpress Type A 存储卡提供高达 1300MB/s 的持续写入速度，实现影院级 8K RAW 视频不间断录制。' },
-    ],
-  },
-  'en_zh-TW_general': {
-    examples: [
-      { source: 'High-speed performance for demanding applications.',
-        target: '為高要求應用提供高速效能。' },
-      { source: 'Compatible with a wide range of devices.',
-        target: '相容多種裝置。' },
-      { source: 'The Lexar Professional CFexpress Type A Card delivers sustained write speeds up to 1300MB/s for uninterrupted cinema-quality 8K RAW video recording.',
-        target: 'Lexar Professional CFexpress Type A 記憶卡提供高達 1300MB/s 的持續寫入速度，實現影院級 8K RAW 影片不間斷錄製。' },
-    ],
-  },
-}
-
-function formatExamples(examples: FewShotExample[], sourceLang: string, targetLang: string): string {
-  if (!examples || examples.length === 0) return ''
-  const labels = (targetLang === 'zh-CN' || targetLang === 'zh-TW' || targetLang === 'ja' || targetLang === 'ko')
-    ? { example: '示例', source: '原文', target: '译文' }
-    : { example: 'Example', source: 'Source', target: 'Target' }
-  return examples.map((ex, i) =>
-    `\n${labels.example} ${i + 1}:\n${labels.source}: ${ex.source}\n${labels.target}: ${ex.target}`
-  ).join('')
-}
-
-/**
- * Few-shot example retrieval with safe fallback chain.
- * NEVER falls back to zh→zh or zh-TW→zh-CN (prevents cross-language pollution).
- */
-export function getFewShotExamplesV2(
-  sourceLang: string,
-  targetLang: string,
-  productLine: string | null,
-  style: string,
-  maxExamples = 2,
-): string {
-  // Normalize source for lookup
-  const src = sourceLang === 'zh-CN' ? 'zh' : sourceLang
-
-  if (!targetLang) return ''
-
-  // 1. Exact match: product line × style × language pair
-  if (productLine) {
-    const key = `${src}_${targetLang}_${productLine}_${style}`
-    const entry = FEWSHOT_STORE_V2[key]
-    if (entry && entry.examples.length > 0) {
-      return formatExamples(entry.examples.slice(0, maxExamples), sourceLang, targetLang)
-    }
-  }
-
-  // 2. Product line × language pair (style agnostic)
-  if (productLine) {
-    // Try professional as fallback style (most common)
-    const keyProf = `${src}_${targetLang}_${productLine}_professional`
-    const entryProf = FEWSHOT_STORE_V2[keyProf]
-    if (entryProf && entryProf.examples.length > 0) {
-      return formatExamples(entryProf.examples.slice(0, maxExamples), sourceLang, targetLang)
-    }
-    // Try standard
-    const keyStd = `${src}_${targetLang}_${productLine}_standard`
-    const entryStd = FEWSHOT_STORE_V2[keyStd]
-    if (entryStd && entryStd.examples.length > 0) {
-      return formatExamples(entryStd.examples.slice(0, maxExamples), sourceLang, targetLang)
-    }
-  }
-
-  // 3. en → targetLang general fallback
-  const keyEn = `en_${targetLang}_general`
-  const entryEn = FEWSHOT_STORE_V2[keyEn]
-  if (entryEn && entryEn.examples.length > 0) {
-    return formatExamples(entryEn.examples.slice(0, maxExamples), sourceLang, targetLang)
-  }
-
-  // 4. Zero-shot — NEVER fall back to zh→zh or other mismatched language pairs
-  return ''
-}
-
-// ============================================================
 // Module 5: OUTPUT ANCHOR (English only, unified)
 // ============================================================
 
@@ -1279,8 +960,7 @@ export const OUTPUT_ANCHOR = `[OUTPUT]
 Self-check before output (do NOT output the check process):
 1. __XXX_N__ markers, HTML tags, and ↵ line break markers preserved
 2. No fabricated specs, brand names, or claims not in the source
-3. ALL text is translated to target language (not left in English)
-4. No trademark symbols (®™©) added that are not in the source
+3. No trademark symbols (®™©) added that are not in the source
 Check passed → output in format: "[N] translated text" — one line per item.
 No markdown, no code blocks. Each [N] is ONE complete text.
 → Output translations now:`
@@ -1327,92 +1007,59 @@ No markdown, no code blocks. Each [N] is ONE complete text.
 // ═══════════════════════════════════════════════════════════════
 
 export const PROOFREAD_SYSTEM_PROMPT = `[ROLE]
-You are a localization QA reviewer for Lexar. Check translations for THREE things.
+You are a localization QA reviewer for Lexar. Check translations for FIVE things.
 
-[CHECK 0: PLACEHOLDER INTEGRITY] (Highest priority)
-Before checking meaning, verify placeholder integrity:
-- Count __XXX_N__ markers in source vs translation → must match exactly
-- Count HTML tags (<b>, <br>, etc.) → must match exactly
-- Count ↵ symbols → must match exactly
-- If mismatch → fix placeholder count first, then continue other checks
+[CHECK 0: LANGUAGE CHECK] (Highest priority)
+Translation MUST be in the target language — not English, not mixed.
+⛔ System markers like "[TRANSLATE REQUIRED]" or "⛔ UNTRANSLATED!" are NOT valid translations → remove and provide actual translation.
 
-[CHECK 1: COMPLETENESS]
+[CHECK 1: PLACEHOLDER INTEGRITY]
+Ensure all placeholders (__XXX_N__, HTML tags, ↵) match source EXACTLY in type, count, and position. Fix mismatches before other checks.
+
+[CHECK 2: COMPLETENESS]
 Does the translation contain ALL the information from the source?
-- Source has 3 sentences but translation has 1 → INCOMPLETE → fix it
-- Source mentions a feature but translation omits it → INCOMPLETE → fix it
 - ⛔ Do NOT add information not in the source
 - ⛔ Do NOT remove information from the source
 
-[CHECK 2: MEANING ACCURACY]
+[CHECK 3: MEANING ACCURACY]
 Does the translation match the source meaning exactly?
 - Wrong number? Wrong spec? Wrong product feature? → fix it
 - Category word wrong? (SSD≠Card, Reader≠SSD) → fix it per the reference table
-- ⛔ Do NOT change phrasing for "better style" or "more natural tone" UNLESS it's
-  adapting to target language conventions (see ✅ below)
-- ⛔ Do NOT rewrite just because you prefer different wording
+- ⚠️ PRIORITY: Glossary exact-match rule OVERRIDES category-word correction
 - ⛔ Do NOT change symbols/formatting (2x2≠2×2, keep source format as-is)
-- ✅ Natural localization adaptations are NOT errors if meaning is preserved:
-  - Word order changes for fluency
-  - Synonym substitutions for natural expression
-  - Tone adjustments matching target language e-commerce conventions
-    (e.g., making copy more lively/direct for Vietnamese/Thai e-commerce)
-  - Sentence restructuring for selling point front-loading (ecommerce scene)
-  - These are CORRECT localization, do NOT flag them
+- ✅ Natural localization (word reordering, synonym substitution, tone adaptation) is NOT an error if meaning is preserved. Do NOT flag or rewrite.
 
-[CHECK 3: TONE MATCH]
-Does the translation match the product line's tone?
-- Gaming products: energetic, casual, young audience
-- Professional imaging: hardcore, reliable, technical
-- Consumer products: friendly, accessible
-- ⛔ Only flag if tone is COMPLETELY WRONG. Do NOT flag minor tone variations.
+[CHECK 4: TONE MATCH]
+Match the product line's tone guide (provided below). Only flag if tone is COMPLETELY WRONG.
+⛔ Do NOT flag minor tone variations or natural localization adaptations.
+
+[ALLOWED ADAPTATIONS]
+The following are CORRECT localization, NOT errors:
+- Word order changes for fluency or selling point front-loading
+- Synonym substitutions for natural expression
+- Tone adjustments matching target language e-commerce conventions
+- Sentence restructuring per scene constraints
+⛔ Do NOT flag these as errors.
 
 [ACTION]
 - Review EACH item INDEPENDENTLY. Never use content from other items.
-- If translation is complete and accurate → output "OK"
 - If translation has errors → fix ONLY the specific errors
 - ⛔ NEVER rewrite the entire translation. Fix only what's wrong.
 
-[PRODUCT NAME EXAMPLES]
-Rule: If the text is descriptive/explanatory (even if it contains brand words),
-it MUST be translated. Only pure brand names / product model numbers stay English.
-
-✅ Complete product names (keep in English, do NOT split):
-- "Lexar PLAY PRO microSDXC Express Card" → keep as-is
-- "Lexar NM790 PRO PCIe 4.0 SSD" → keep as-is
-- "Lexar 2000x GOLD CFexpress Type A Card" → keep as-is (2000x GOLD = model)
-- "Lexar 633x BLUE SDXC UHS-II Card" → keep as-is (633x BLUE = model)
-
-Model number patterns:
-- Memory cards: speed code + grade color (e.g., "2000x GOLD", "633x BLUE", "1066x SILVER")
-- SSD/Memory/USB: alphanumeric code + optional suffix (e.g., "NM790", "D40E", "F35 PRO")
-- ⛔ Color words (GOLD/SILVER/BLUE/DIAMOND) in model names are grade identifiers, NOT colors
-
-❌ NOT product names (MUST translate):
-- "high-speed memory card" → generic description → translate
-- "gaming SSD with RGB lighting" → descriptive phrase → translate
-- Slogans, taglines, headlines, footnotes → MUST translate
+${BRAND_ASSET_RULES}
 
 [OUTPUT]
-JSON format: [{"i":1,"text":"corrected text","reason":"中文,≤20字","ambiguous":[]}]
+JSON format: [{"i":1,"text":"corrected text","reason":"label","ambiguous":[]}]
 
-Rules:
-- ⛔ Only output items that NEED CORRECTION. Items with "OK" translation should NOT appear.
-- ✅ If ALL items are correct → output ONLY: []
-- ⛔ Do NOT output null, "OK", or any explanation text when all items pass.
-- ⛔ Do NOT wrap output in markdown code blocks or add any formatting.
-- Output raw JSON only, nothing else.
+reason must be ONE of: 语言错误 | 占位符缺失 | 漏翻 | 多翻 | 语义错误 | 术语错误 | 语气不当
+
+Examples:
+- All correct → []
+- Item 3 wrong term → [{"i":3,"text":"corrected","reason":"术语错误","ambiguous":[]}]
+
+⛔ Only output items needing correction. Raw JSON only, no markdown.
 
 [AMBIGUOUS]
-仅标记真正需要人工确认的术语。
-
-✅ 标记：
-- 一词多义，上下文无法判断
-- 新产品/新概念，术语库无
-
-⛔ 不标记：
-- 技术缩略语（PCIe, NVMe, UHS-I...）
-- 产品型号（PLAY PRO, NM790...）
-- 普通描述词（wearproof, lag-free...）
-- 术语库已有内容
-
-大多数情况返回空数组 []。`
+Only flag: genuinely ambiguous terms (context cannot determine) or new concepts not in glossary.
+Do NOT flag: tech abbreviations, model numbers, common descriptors, glossary-covered terms.
+Default: []`

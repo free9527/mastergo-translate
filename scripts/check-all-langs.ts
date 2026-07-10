@@ -6,7 +6,6 @@ import { buildSystemPrompt } from '../lib/llm-api'
 import {
   getLangSpecificPrompt,
   getCategoryWordGuide,
-  getFewShotExamplesV2,
 } from '../lib/prompt-constants'
 
 const ALL_LANGS = [
@@ -73,7 +72,6 @@ for (const l of ALL_LANGS) {
     productLine: 'gaming_ssd', scenePreset: 'ecommerce', style: 'standard',
     glossaryHint: '', categoryWordGuide: getCategoryWordGuide(l, 'gaming_ssd'),
     langBlock: getLangSpecificPrompt(l),
-    fewShot: getFewShotExamplesV2('en', l, 'gaming_ssd', 'standard', 2),
     useEnInstruction,
   })
 

@@ -1178,6 +1178,9 @@ async function startProofread() {
               pageName.value || undefined,
               fileName.value || undefined,
               proofreadGlossaryHint,
+              false, // _isRetry
+              llmConfig.value.translationStyle,
+              llmConfig.value.scenePreset,
             )
             for (let j = 0; j < batch.length; j++) {
               const proofed = batchResults[j]

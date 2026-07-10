@@ -11,7 +11,6 @@ import {
   getStyleGuide,
   renderLangForTranslate,
   renderLangForProofread,
-  getFewShotExamplesV2,
   OUTPUT_ANCHOR,
   PROOFREAD_SYSTEM_PROMPT,
 } from '@lib/prompt-constants'
@@ -537,6 +536,7 @@ export async function translateBatch(
   crossBatchTerms?: string[],
   taskGlossaryHint?: string,
   _isRetry = false,
+  forceTranslate = false,
 ): Promise<string[]> {
   const targetName = LANGUAGES.find(l => l.code === targetLang)?.name || targetLang
 
@@ -627,7 +627,19 @@ export async function translateBatch(
   const langBlock = renderLangForTranslate(targetLang, productLine, config.scenePreset, effectiveStyle)
 
   // System Prompt: IDENTITY + IRON_RULES + TERMINOLOGY + LANG_SPECIFIC + OUTPUT
-  const systemPrompt = buildSystemPrompt({ targetLang, langBlock, glossaryHint })
+  let systemPrompt = buildSystemPrompt({ targetLang, langBlock, glossaryHint })
+
+  // 重试时追加强制翻译规则（解决根因#1：不在源文中拼指令，而是在system prompt中强调）
+  if (forceTranslate) {
+    const forceRule = `\n\n[CRITICAL RETRY INSTRUCTION]
+The following items were NOT translated in the previous attempt.
+You MUST translate ALL text to ${targetDisplayName}.
+Brand names (AMD, Intel, PCIe, Lexar, etc.) and model numbers stay in English,
+but ALL descriptive parts, verbs, adjectives, and sentences MUST be translated.
+This is a HARD REQUIREMENT — do NOT output English text when the target is ${targetDisplayName}.`
+    systemPrompt += forceRule
+  }
+
   const temperature = 0.2
 
   const res = await fetchWithRetry(config.apiUrl, {
@@ -840,25 +852,23 @@ export async function translateBatch(
       )
 
       // 一次API调用处理所有异常条目
-      const retryTexts = [...anomalyIndices].map(j => {
-        const original = texts[j]
-        // 对漏翻条目追加显式翻译指令
-        if (untranslatedIndices.has(j) && !truncatedIndices.has(j)) {
-          return `[TRANSLATE REQUIRED] The following text must be translated to ${targetDisplayName}. Do NOT keep it in English:\n\n${original}`
-        }
-        return original
-      })
+      // 修复根因#1：不再在源文中拼指令前缀，而是通过 forceTranslate 参数在 system prompt 中强调
+      const retryTexts = [...anomalyIndices].map(j => texts[j])
 
       const retryResults = await translateBatch(
         retryTexts, targetLang, glossaryMap, config,
         sourceLang, pageName, fileName,
-        crossBatchTerms, taskGlossaryHint, true,
+        crossBatchTerms, taskGlossaryHint, true,  // _isRetry = true
+        true,  // forceTranslate = true，在 system prompt 中追加强制翻译规则
       )
 
       // 更新结果
       let k = 0
       for (const j of anomalyIndices) {
         result[j] = retryResults[k] || ''
+        // 清理可能残留的强制翻译指令前缀（防止指令污染最终译文）
+        // 匹配所有实际使用的指令前缀：[MANDATORY TRANSLATION]、[PARTIAL TRANSLATION DETECTED]、[TRANSLATE REQUIRED]
+        result[j] = result[j].replace(/\[(MANDATORY TRANSLATION|PARTIAL TRANSLATION DETECTED|TRANSLATE REQUIRED)\][\s\S]*?\n\n/g, '').trim()
         k++
       }
 
@@ -909,6 +919,8 @@ export async function proofreadBatch(
   fileName?: string,
   taskGlossaryHint?: string,
   _isRetry = false,
+  style?: string,
+  scenePreset?: string,
 ): Promise<ProofreadResult[]> {
   const targetName = LANGUAGES.find(l => l.code === targetLang)?.name || targetLang
 
@@ -973,13 +985,12 @@ export async function proofreadBatch(
   // ═══════════════════════════════════════════════════════════
   // ROLE+CHECKLIST (PROOFREAD_SYSTEM_PROMPT) — 独立 QA 视角
   // GLOSSARY (glossaryHint)                 — 术语参照
-  // LANG_SPECIFIC (renderLangForProofread)  — 品类词+rules（硬性检查）
+  // LANG_SPECIFIC (renderLangForProofread)  — 品类词+rules+quality+compliance+scene+tone+style
   //
   // ⛔ 不注入 IRON_RULES — 校对用独立的 CHECKLIST，不共享翻译规则
-  // ⛔ 不注入 TONE/STYLE/FEW-SHOT — 校对不需要这些
-  // ⛔ 不注入 quality/scene — 主观检查已移除，避免过度润色
+  // ✅ 注入 scene/tone/style — 校对需要知道翻译遵循了什么规则
   // ═══════════════════════════════════════════════════════════
-  const langBlock = renderLangForProofread(targetLang, productLine)
+  const langBlock = renderLangForProofread(targetLang, productLine, scenePreset, style)
   const systemPrompt = PROOFREAD_SYSTEM_PROMPT + glossaryHint + langBlock
 
   const apiKey = config.proofreadApiKey || config.apiKey
@@ -1167,21 +1178,20 @@ export async function proofreadBatch(
         untranslatedList.map(j => ({ idx: j, text: items[j].sourceText.slice(0, 80) })),
       )
 
-      // 对漏翻条目重新校对，追加显式指令
-      const retryItems = untranslatedList.map(i => ({
-        sourceText: items[i].sourceText,
-        translatedText: `⛔ UNTRANSLATED! Translate "${items[i].sourceText}" to ${targetDisplayName}`,
-      }))
+      // 对漏翻条目直接调用翻译函数（单一职责：翻译 LLM 负责翻译，校对 LLM 负责检查）
+      const retryTexts = untranslatedList.map(i => items[i].sourceText)
 
-      const retryResults = await proofreadBatch(
-        retryItems, targetLang, glossaryMap, config,
-        pageName, fileName, taskGlossaryHint,
-        true,  // 传 true，阻止内层再次重试
+      const retryResults = await translateBatch(
+        retryTexts, targetLang, glossaryMap, config,
+        undefined, pageName, fileName,
+        undefined, taskGlossaryHint,
+        true,  // _isRetry = true，阻止内层再次重试
+        true,  // forceTranslate = true，在 system prompt 中追加强制翻译规则
       )
 
       // 替换结果
       for (let k = 0; k < untranslatedList.length; k++) {
-        resultTexts[untranslatedList[k]] = retryResults[k].text
+        resultTexts[untranslatedList[k]] = retryResults[k]
       }
 
       // 重新检测
@@ -1255,30 +1265,181 @@ export function detectTruncatedTexts(
 
 /**
  * 检测文本是否不需要翻译（品牌名/技术缩写/存储容量等全球统一表达）。
+ * 核心原则：纯产品名（无上下文）→ 不翻译是正确的；有上下文（动词、介词、描述性文本）→ 必须翻译
  */
 function isUntranslatable(s: string): boolean {
-  // 品牌名（首字母大写 + 可选 ®™© + 空格 + 其他字母）
+  // 1. 纯品牌名（首字母大写 + 可选 ®™© + 空格 + 其他字母）
   if (/^[A-Z][a-zA-Z\s®™©]*$/.test(s)) return true
-  // 数字 + 单位（128GB, 800MB/s, 1TB 等）— 全球统一格式
+
+  // 2. 数字 + 单位（128GB, 800MB/s, 1TB 等）— 全球统一格式
   if (/^[\d,.]+\s*(GB|MB|TB|KB|MB\/s|GB\/s|TB\/s|MHz|GHz)\b/i.test(s)) return true
-  // 纯技术缩写（SSD, USB, NVMe, PCIe 等）— 全球统一
+
+  // 3. 纯技术缩写（SSD, USB, NVMe, PCIe 等）— 全球统一
   if (/^(SSD|USB|NVMe|PCIe|DDR\d*|HDD|SD|SDHC|SDXC|CFexpress|CFe|SATA|DRAM|NAND|LCD|LED|OLED|HDR|RGB|WiFi|BT|NFC|GPS)$/i.test(s)) return true
 
-  // 产品名组合：包含 ≥2 个品牌/产品关键词的文本不应判为漏翻
-  // 例如 "Lexar® ARMOR GOLD SDXC™ UHS-II Card"
+  // 4. 产品名组合：必须同时满足两个条件
+  //    a) 包含 ≥2 个品牌关键词
+  //    b) 不包含任何"上下文"（动词、介词、描述性词汇）
   const BRAND_KEYWORDS = [
     'Lexar', 'ARMOR', 'GOLD', 'DIAMOND', 'PLAY', 'PRO', 'ARES', 'THOR',
     'SILVER', 'BLUE', 'NM\\d+', 'NQ\\d+', 'NS\\d+', 'EQ\\d+',
     'PSSD', 'CFexpress', 'microSD', 'SDXC', 'SDHC', 'UHS', 'VPG',
   ]
-  const brandPattern = new RegExp(`\\b(${BRAND_KEYWORDS.join('|')})\\b`, 'i')
   const brandMatches = s.match(new RegExp(`\\b(${BRAND_KEYWORDS.join('|')})\\b`, 'gi'))
+
   if (brandMatches && brandMatches.length >= 2) {
-    // 包含多个品牌关键词 → 视为产品名，不判为漏翻
+    // 检查是否包含"上下文"（动词、介词、描述性词汇）
+    const CONTEXT_PATTERNS = [
+      // 动词（常见动作词）
+      /\b(paired|compatible|achieve|ensure|support|work|connect|use|design|build|run|operate|perform|deliver|provide|offer|feature|include|contain|come|base|make|create|develop|manufacture|produce|supply|present|introduce|launch|release|announce|reveal|showcase|demonstrate|display|exhibit|compare|test|measure|check|verify|validate|optimize|enhance|improve|upgrade|install|configure|setup|manage|control|monitor|protect|secure|backup|restore|recover|transfer|sync|share|access|read|write|store|save|load|open|close|delete|remove|add|edit|modify|change|update|refresh|reload|restart|reset|format|partition|clone|image|burn|erase|wipe|clean|scan|detect|identify|recognize|analyze|evaluate|assess|review|audit|inspect|examine|investigate|explore|search|find|locate|track|trace|follow|observe|watch|view|see|look|show|represent|illustrate|depict|describe|explain|clarify|define|specify|indicate|state|declare|proclaim|assert|affirm|confirm|prove|highlight|emphasize|stress|underline|underscore|point|note|mention|remark|comment)\b/i,
+      // 介词（表示关系）
+      /\b(with|for|to|from|by|in|on|at|of|and|or|but|if|when|while|because|since|although|though|unless|until|before|after|during|through|throughout|across|against|among|around|about|above|below|between|beside|beyond|except|into|onto|out|over|past|toward|towards|under|up|upon|within|without|along|amid|aside|barring|besides|circa|despite|down|ere|excepting|excluding|failing|following|given|granted|including|inside|lest|mid|midst|minus|modulo|near|next|notwithstanding|off|onto|outside|pending|per|plus|pro|qua|re|round|sans|save|sub|than|thru|till|times|touching|underneath|unlike|unto|versus|via|vice)\b/i,
+      // 描述性形容词（表示特征）
+      /\b(high|low|fast|slow|large|small|big|tiny|huge|massive|compact|light|heavy|thin|thick|wide|narrow|long|short|tall|deep|shallow|bright|dark|clear|opaque|smooth|rough|soft|hard|firm|flexible|rigid|stiff|elastic|plastic|ductile|brittle|strong|weak|durable|reliable|stable|unstable|consistent|variable|uniform|diverse|varied|complex|simple|easy|difficult|challenging|demanding|efficient|effective|optimal|ideal|perfect|excellent|superior|inferior|advanced|basic|fundamental|essential|critical|crucial|vital|important|significant|notable|remarkable|outstanding|exceptional|extraordinary|impressive|striking|noteworthy|memorable|unforgettable|distinctive|unique|special|particular|specific|general|common|ordinary|typical|usual|normal|regular|standard|conventional|traditional|classic|modern|contemporary|current|recent|latest|new|old|ancient|historical|future|upcoming|forthcoming|pending|imminent|impending|approaching|looming|delayed|postponed|deferred|suspended|paused|interrupted|discontinued|terminated|ended|finished|completed|done|over|gone|lost|missing|absent|present|available|accessible|ready|prepared|set|active|inactive|enabled|disabled|closed|locked|unlocked|secured|unsecured|protected|unprotected|safe|dangerous|risky|hazardous|perilous|treacherous)\b/i,
+    ]
+
+    const hasContext = CONTEXT_PATTERNS.some(pattern => pattern.test(s))
+
+    if (hasContext) {
+      // 有上下文 → 不是纯产品名 → 必须翻译
+      return false
+    }
+
+    // 无上下文 → 纯产品名 → 不判为漏翻
     return true
   }
 
   return false
+}
+
+/**
+ * 检测译文是否包含目标语言的特征字符。
+ * 用于判断译文是否真正被翻译成了目标语言（而非保留英文原文）。
+ *
+ * 返回 { hasFeatures: boolean, featureRatio: number, details: string }
+ * - hasFeatures: 是否包含目标语言特征字符
+ * - featureRatio: 特征字符占比
+ * - details: 检测详情（用于日志）
+ */
+export function detectTargetLanguageFeatures(
+  text: string,
+  targetLang: string
+): { hasFeatures: boolean; featureRatio: number; details: string } {
+  if (!text) return { hasFeatures: false, featureRatio: 0, details: 'empty text' }
+
+  // 各语言的特征字符正则
+  const LANG_FEATURES: Record<string, { pattern: RegExp; name: string }> = {
+    'vi': {
+      // 越南语特征：ă, â, ê, ô, ơ, ư, đ + 声调符号
+      pattern: /[ăâêôơưđÀÁẢÃẠàáảãạĂĂẢÃẠăăảãạÂÂẢÃẠââảãạÈÉẺẼẸèéẻẽẹÊÊẨẪẬêêẩẫậÌÍỈĨỊìíỉĩịÒÓỎÕỌòóỏõọÔÔỔỖỘôôổỗộƠƠỞỠỢơơởỡợÙÚỦŨỤùúủũụƯƯỬỮỰưưửữựỲÝỶỸỴỳýỷỹỵĐđ]/,
+      name: 'Vietnamese diacritics'
+    },
+    'th': {
+      // 泰文字符范围
+      pattern: /[฀-๿]/,
+      name: 'Thai characters'
+    },
+    'ar': {
+      // 阿拉伯文字符范围
+      pattern: /[؀-ۿ]/,
+      name: 'Arabic characters'
+    },
+    'ru': {
+      // 西里尔字符范围
+      pattern: /[Ѐ-ӿ]/,
+      name: 'Cyrillic characters'
+    },
+    'zh-CN': {
+      // CJK统一汉字
+      pattern: /[一-鿿]/,
+      name: 'CJK characters'
+    },
+    'zh-TW': {
+      // CJK统一汉字
+      pattern: /[一-鿿]/,
+      name: 'CJK characters'
+    },
+    'ja': {
+      // 平假名 + 片假名
+      pattern: /[぀-ゟ゠-ヿ]/,
+      name: 'Japanese Hiragana/Katakana'
+    },
+    'ko': {
+      // 韩文谚文音节
+      pattern: /[가-힯]/,
+      name: 'Korean Hangul'
+    },
+    'de': {
+      // 德语变音符号
+      pattern: /[äöüßÄÖÜ]/,
+      name: 'German umlauts'
+    },
+    'fr': {
+      // 法语特殊字符
+      pattern: /[éèêëàâôùûçïîÉÈÊËÀÂÔÙÛÇÏÎ]/,
+      name: 'French diacritics'
+    },
+    'es': {
+      // 西班牙语特殊字符
+      pattern: /[áéíóúñüÁÉÍÓÚÑÜ]/,
+      name: 'Spanish diacritics'
+    },
+    'pt': {
+      // 葡萄牙语特殊字符
+      pattern: /[áàâãéêíóôõúçÁÀÂÃÉÊÍÓÔÕÚÇ]/,
+      name: 'Portuguese diacritics'
+    },
+    'pt-BR': {
+      // 巴西葡萄牙语特殊字符
+      pattern: /[áàâãéêíóôõúçÁÀÂÃÉÊÍÓÔÕÚÇ]/,
+      name: 'Brazilian Portuguese diacritics'
+    },
+    'it': {
+      // 意大利语特殊字符
+      pattern: /[àèéìòóùÀÈÉÌÒÓÙ]/,
+      name: 'Italian diacritics'
+    },
+    'nl': {
+      // 荷兰语变音符号
+      pattern: /[äëïöüÄËÏÖÜ]/,
+      name: 'Dutch diacritics'
+    },
+    'pl': {
+      // 波兰语特殊字符
+      pattern: /[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/,
+      name: 'Polish diacritics'
+    },
+    'sv': {
+      // 瑞典语特殊字符
+      pattern: /[åäöÅÄÖ]/,
+      name: 'Swedish diacritics'
+    },
+    'tr': {
+      // 土耳其语特殊字符
+      pattern: /[çğıİöşüÇĞIÖŞÜ]/,
+      name: 'Turkish diacritics'
+    },
+    'id': {
+      // 印尼语特殊字符
+      pattern: /[àáâãèéêìíòóôõùúÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚ]/,
+      name: 'Indonesian diacritics'
+    },
+  }
+
+  const feature = LANG_FEATURES[targetLang]
+  if (!feature) {
+    // 英文目标：无法通过特征字符判断（英文没有特殊字符）
+    return { hasFeatures: true, featureRatio: 1.0, details: 'English has no special features' }
+  }
+
+  const matches = text.match(new RegExp(feature.pattern, 'g')) || []
+  const featureRatio = matches.length / text.length
+
+  return {
+    hasFeatures: matches.length > 0,
+    featureRatio,
+    details: `${matches.length} ${feature.name} found (${(featureRatio * 100).toFixed(2)}%)`
+  }
 }
 
 /**
@@ -1296,10 +1457,25 @@ export function detectUntranslatedText(
     return s.replace(/[®™©]/g, '').replace(/\s+/g, ' ').trim().toLowerCase()
   }
 
+  // 检测指令文本的正则（防止重试指令污染最终译文）
+  const INSTRUCTION_PATTERNS = [
+    /\[TRANSLATE REQUIRED\]/i,
+    /\[MANDATORY TRANSLATION\]/i,
+    /\[PARTIAL TRANSLATION DETECTED\]/i,
+    /⛔\s*UNTRANSLATED!/i,
+    /Translate\s+".*?"\s+to/i,
+  ]
+
   for (let i = 0; i < sourceTexts.length; i++) {
     const src = sourceTexts[i] || ''
     const trans = translatedTexts[i] || ''
     if (!src || !trans) continue
+
+    // 如果译文包含指令文本，视为漏翻
+    if (INSTRUCTION_PATTERNS.some(pattern => pattern.test(trans))) {
+      untranslatedIndices.add(i)
+      continue
+    }
 
     // 跳过源语言==目标语言的条目（不需要翻译，如同语言校对场景）
     const srcLang = detectSingleTextLanguage(src)
@@ -1308,10 +1484,50 @@ export function detectUntranslatedText(
     // 跳过不需要翻译的文本（品牌名/技术缩写/存储容量）
     if (isUntranslatable(src)) continue
 
-    // 归一化后完全相同 → 漏翻
+    // 维度1：归一化后完全相同 → 漏翻
     if (normalize(src) === normalize(trans)) {
       untranslatedIndices.add(i)
+      continue
     }
+
+    // 维度2：目标语言特征检测（针对非英文目标语言）
+    // 如果译文完全没有目标语言特征，且源文是英文 → 高度怀疑漏翻
+    // 修复根因#3：先剥离可能残留的指令文本，再做特征分析
+    // 防止指令中的目标语言名称（如 "Vietnamese" 含 à）干扰特征检测
+    if (targetLang !== 'en' && srcLang === 'en') {
+      // 剥离已知指令前缀，得到"纯译文"用于特征分析
+      let cleanTrans = trans
+      for (const pattern of INSTRUCTION_PATTERNS) {
+        cleanTrans = cleanTrans.replace(pattern, '')
+      }
+      // 剥离指令中常见的英文描述片段（如 "The following text MUST be translated to..."）
+      cleanTrans = cleanTrans.replace(/The following text.*?translated to\s+\w+/gi, '')
+      cleanTrans = cleanTrans.replace(/Do NOT keep it in English\.?/gi, '')
+      cleanTrans = cleanTrans.replace(/Even if it contains brand names.*?MUST be translated:?/gi, '')
+      cleanTrans = cleanTrans.trim()
+
+      const featureCheck = detectTargetLanguageFeatures(cleanTrans, targetLang)
+
+      if (!featureCheck.hasFeatures) {
+        // 进一步检查：译文中英文单词占比
+        const englishWords = cleanTrans.match(/\b[a-zA-Z]+\b/g) || []
+        const totalWords = cleanTrans.split(/\s+/).filter(w => w.length > 0)
+        const englishRatio = totalWords.length > 0 ? englishWords.length / totalWords.length : 0
+
+        // 如果英文单词占比 > 80%，且没有目标语言特征 → 判定为漏翻
+        if (englishRatio > 0.8) {
+          console.warn(
+            `[detectUntranslatedText] 维度2检测到漏翻：译文无${targetLang}特征，英文占比${(englishRatio * 100).toFixed(1)}%`,
+            { idx: i, source: src.slice(0, 80), translation: trans.slice(0, 80) }
+          )
+          untranslatedIndices.add(i)
+          continue
+        }
+      }
+    }
+
+    // 维度3：部分翻译检测（针对多句子文本）
+    // TODO: 可以后续实现句子级别的漏翻检测
   }
 
   return untranslatedIndices
