@@ -70,6 +70,7 @@ export interface TextItem {
   proofreadText: string
   proofreadReason: string
   corrected: boolean
+  isUntranslated: boolean  // 标记是否漏翻
   // 源属性
   fontSize: number
   fontFamily: string

@@ -197,7 +197,13 @@
           <p>点击"当前页扫描"采集文本</p>
           <p class="empty-sub">或先选中图层后点击"选中对象扫描"</p>
         </div>
-        <div class="text-item" :class="{ corrected: item.corrected, 'csv-changed': csvChangedIds.has(item.nodeIds[0]), 'trans-error': translateErrors.has(item.nodeIds[0]), 'applied-manually': appliedNodeIds.has(item.nodeIds[0]) }" v-for="(item, idx) in items" :key="item.nodeIds[0] || idx" @dblclick="navigateToNode(item)">
+        <div class="text-item" :class="{
+          corrected: item.corrected,
+          'csv-changed': csvChangedIds.has(item.nodeIds[0]),
+          'trans-error': translateErrors.has(item.nodeIds[0]),
+          'applied-manually': appliedNodeIds.has(item.nodeIds[0]),
+          'untranslated': item.sourceText === item.translatedText
+        }" v-for="(item, idx) in items" :key="item.nodeIds[0] || idx" @dblclick="navigateToNode(item)">
           <!-- 原文 — 上方全宽 -->
           <div class="item-source">
             <div class="item-label">
@@ -211,6 +217,7 @@
             <div class="item-label">
               译文
               <span class="error-badge" v-if="translateErrors.has(item.nodeIds[0])">翻译失败</span>
+              <span class="untranslated-badge" v-if="item.sourceText === item.translatedText">⚠️ 漏翻</span>
               <span class="proof-badge" v-if="item.corrected">校正</span>
               <span class="csv-badge" v-if="csvChangedIds.has(item.nodeIds[0])">导入变更</span>
               <span class="applied-badge" v-if="appliedNodeIds.has(item.nodeIds[0])">已应用</span>
@@ -996,6 +1003,23 @@ async function startTranslate() {
   let cursor = autoSkipped
   translateProgress.value = { current: cursor, total }
 
+  // ═══ 流水线化：预计算校对参数（翻译开始前就准备好，翻译完一波立即校对） ═══
+  const proofreadEnabled = llmConfig.value.enableProofread
+  let proofreadGlossaryHint: string | undefined
+  let proofreadGlossaryMap: Map<string, string> | undefined
+  if (proofreadEnabled) {
+    proofreadGlossaryMap = buildGlossaryMap()
+    proofreadGlossaryHint = buildTaskGlossaryHint(
+      proofreadGlossaryMap,
+      llmConfig.value.scenePreset,
+      items.value.map(it => it.sourceText),
+    )
+  }
+  // 流水线校对状态
+  const proofreadWavePromises: Promise<void>[] = []
+  const proofreadCoveredIndices = new Set<number>()
+  const proofreadStats = { correctedCount: 0, failedBatches: 0, lastError: '' }
+
   // 并发批次处理：每次并发 CONCURRENCY 个批次，大幅提速
   const CONCURRENCY = 4
   for (let i = 0; i < apiTotal; i += TRANSLATE_BATCH_SIZE * CONCURRENCY) {
@@ -1066,6 +1090,93 @@ async function startTranslate() {
     // 每轮并发结束后更新进度
     const processedSoFar = toTranslate.filter(it => it.translatedText || translateErrors.value.has(it.nodeIds[0])).length
     translateProgress.value = { current: processedSoFar, total }
+
+    // ═══ 流水线校对：本波翻译完成立即校对，不等下一波 ═══
+    if (proofreadEnabled && proofreadGlossaryMap && !cancelFlag.value) {
+      // 收集本波翻译完成的所有条目（去重）
+      const waveItems: typeof items.value[0][] = []
+      const waveIndices: number[] = []
+      const waveEnd = Math.min(i + TRANSLATE_BATCH_SIZE * CONCURRENCY, apiTotal)
+      for (let w = i; w < waveEnd; w++) {
+        const item = needApi[w]
+        if (item && item.translatedText && item.sourceText.trim() !== item.translatedText.trim()) {
+          // 去重：同一源文只校对一次
+          const srcKey = item.sourceText.trim()
+          if (!proofreadCoveredIndices.has(needApi.indexOf(item))) {
+            waveItems.push(item)
+            waveIndices.push(needApi.indexOf(item))
+            proofreadCoveredIndices.add(needApi.indexOf(item))
+          }
+        }
+      }
+
+      if (waveItems.length > 0) {
+        // 立即启动本波校对（异步，不阻塞下一波翻译）
+        proofreadWavePromises.push((async () => {
+          try {
+            const P_CONCURRENCY = 4
+            for (let p = 0; p < waveItems.length; p += PROOFREAD_BATCH_SIZE * P_CONCURRENCY) {
+              if (cancelFlag.value) break
+              const proofPromises: Promise<void>[] = []
+              for (let pk = 0; pk < P_CONCURRENCY; pk++) {
+                const pStart = p + pk * PROOFREAD_BATCH_SIZE
+                if (pStart >= waveItems.length) break
+                const pBatch = waveItems.slice(pStart, pStart + PROOFREAD_BATCH_SIZE)
+                proofPromises.push((async () => {
+                  try {
+                    const batchResults = await proofreadBatch(
+                      pBatch.map(it => ({ sourceText: it.sourceText, translatedText: it.translatedText })),
+                      targetLang.value,
+                      proofreadGlossaryMap!,
+                      llmConfig.value,
+                      pageName.value || undefined,
+                      fileName.value || undefined,
+                      proofreadGlossaryHint,
+                    )
+                    for (let j = 0; j < pBatch.length; j++) {
+                      const proofed = batchResults[j]
+                      if (proofed.ambiguous && proofed.ambiguous.length > 0) {
+                        for (const term of proofed.ambiguous) {
+                          if (term && term.trim()) suggestedGlossaryTerms.value.push(term.trim())
+                        }
+                      }
+                      if (proofed.text && proofed.text !== 'OK' && proofed.text !== pBatch[j].translatedText) {
+                        if (isProofreadScriptMismatch(proofed.text, targetLang.value)) continue
+                        if (pBatch[j].sourceText.length >= 15 && proofed.text.length > pBatch[j].translatedText.length * 2) continue
+                        if (pBatch[j].sourceText.length >= 15 && proofed.text.length < pBatch[j].translatedText.length * 0.2) continue
+                        let fixed = postProcessTranslation(proofed.text, targetLang.value)
+                        if (!/[\n\r]/.test(pBatch[j].sourceText)) fixed = fixed.replace(/[\n\r]+/g, ' ')
+                        fixed = formatCJKSpace(fixed, targetLang.value)
+                        if (fixed === pBatch[j].translatedText) continue
+                        pBatch[j].proofreadText = pBatch[j].translatedText
+                        pBatch[j].translatedText = fixed
+                        pBatch[j].proofreadReason = (proofed.reason || '').slice(0, 40)
+                        pBatch[j].corrected = true
+                        proofreadStats.correctedCount++
+                        sendMsgToPlugin(UIMessage.SAVE_CORRECTION, {
+                          source: pBatch[j].sourceText,
+                          targetLang: targetLang.value,
+                          originalTranslation: pBatch[j].proofreadText,
+                          correctedTranslation: fixed,
+                          correctedAt: Date.now(),
+                        })
+                      }
+                    }
+                  } catch (e) {
+                    proofreadStats.failedBatches++
+                    proofreadStats.lastError = e instanceof Error ? e.message : String(e)
+                  }
+                })())
+              }
+              await Promise.allSettled(proofPromises)
+            }
+          } catch (e) {
+            proofreadStats.failedBatches++
+            proofreadStats.lastError = e instanceof Error ? e.message : String(e)
+          }
+        })())
+      }
+    }
   }
 
   translating.value = false
@@ -1094,9 +1205,15 @@ async function startTranslate() {
     showToast('翻译完成: ' + count + ' 条' + cacheMsg + skipMsg + failMsg, failedBatches > 0 ? 'warning' : 'success')
   }
 
-  if (llmConfig.value.enableProofread && count > 0) {
+  // ═══ 流水线校对：等待所有校对波次完成 ═══
+  if (proofreadEnabled && proofreadWavePromises.length > 0) {
+    showToast('校对进行中...', 'info')
+    await Promise.allSettled(proofreadWavePromises)
+    const proofFailMsg = proofreadStats.failedBatches > 0 ? `，${proofreadStats.failedBatches} 批次校对失败` : ''
+    showToast('校对完成: ' + proofreadStats.correctedCount + ' 处被修正' + proofFailMsg, proofreadStats.correctedCount > 0 ? 'success' : 'info')
+  } else if (proofreadEnabled && count > 0) {
+    // 没有触发流水线校对（可能全部缓存命中或源文=译文），回退到传统校对
     showToast('翻译完成，即将开始校对...', 'info')
-    await new Promise(r => setTimeout(r, 100))  // 短暂间隔，避免连续请求
     try {
       await startProofread()
     } catch (e) {
@@ -1178,9 +1295,6 @@ async function startProofread() {
               pageName.value || undefined,
               fileName.value || undefined,
               proofreadGlossaryHint,
-              false, // _isRetry
-              llmConfig.value.translationStyle,
-              llmConfig.value.scenePreset,
             )
             for (let j = 0; j < batch.length; j++) {
               const proofed = batchResults[j]
@@ -1277,44 +1391,89 @@ async function startProofread() {
       proofreadProgress.value = { current: processedSoFar, total }
     }
 
-    // 校对后兜底：扩写检测 → 术语库强制校准 → 语言后处理 → CJK格式 → 商标符号还原
-    // 注意：首字母大写翻译管道已处理，校对后不重复执行
-    // 注意：proofreading 必须保持 true 直到后处理完成，否则进度条提前消失
-    const allSourceTexts = items.value.map(it => it.sourceText)
-    let allTranslatedTexts = items.value.map(it => it.translatedText)
-    // 扩写检测：校对模型可能将被截断的译文重新扩写为营销文案
-    const expansionResult = detectTranslationExpansion(allSourceTexts, allTranslatedTexts)
-    if (expansionResult.expandedIndices.size > 0) {
-      console.warn('[proofread] 检测到 ' + expansionResult.expandedIndices.size + ' 条扩写，已截断')
-      allTranslatedTexts = expansionResult.texts
-    }
-    allTranslatedTexts = enforceGlossaryTerms(allSourceTexts, allTranslatedTexts, glossaryMap)
-    allTranslatedTexts = allTranslatedTexts.map(t => postProcessTranslation(t, targetLang.value))
-    allTranslatedTexts = allTranslatedTexts.map(t => formatCJKSpace(t, targetLang.value))
-    allTranslatedTexts = restoreStorageUnitFormatting(allSourceTexts, allTranslatedTexts)
-    allTranslatedTexts = restoreTrademarkSymbols(allSourceTexts, allTranslatedTexts)
-    allTranslatedTexts = sanitizeLineBreaks(allSourceTexts, allTranslatedTexts)
-    // 截断兜底：校对后仍截断的条目 → 译文字符数仍远小于源文 → 标记为翻译失败
-    const truncAfterProofread = detectTruncatedTexts(allSourceTexts, allTranslatedTexts)
-    if (truncAfterProofread.size > 0) {
-      console.warn('[proofread] 校对后检测到 ' + truncAfterProofread.size + ' 条译文仍截断，标记为翻译失败',
-        [...truncAfterProofread].map(j => ({
-          source: allSourceTexts[j].slice(0, 80),
-          srcLen: allSourceTexts[j].length,
-          tgtLen: allTranslatedTexts[j].length,
-        })),
-      )
-      for (const idx of truncAfterProofread) {
-        allTranslatedTexts[idx] = ''
-        items.value[idx].proofreadText = ''
-        items.value[idx].proofreadReason = ''
-        items.value[idx].corrected = false
-        translateErrors.value.add(items.value[idx].nodeIds[0])
+    // 校对后兜底：只处理校对实际修改过的文本（消除三重后处理）
+    // 收集所有被校对修改的索引
+    const correctedIndices = new Set<number>()
+    for (let i = 0; i < items.value.length; i++) {
+      if (items.value[i].corrected) {
+        correctedIndices.add(i)
       }
     }
-    for (let i = 0; i < items.value.length; i++) {
-      if (allTranslatedTexts[i] !== items.value[i].translatedText) {
-        items.value[i].translatedText = allTranslatedTexts[i]
+
+    // 只对修改过的文本执行后处理（未修改的跳过）
+    if (correctedIndices.size > 0) {
+      const allSourceTexts = items.value.map(it => it.sourceText)
+      let allTranslatedTexts = items.value.map(it => it.translatedText)
+
+      // 扩写检测：只检查修改过的文本
+      const correctedSources = [...correctedIndices].map(i => allSourceTexts[i])
+      const correctedTranslations = [...correctedIndices].map(i => allTranslatedTexts[i])
+      const expansionResult = detectTranslationExpansion(correctedSources, correctedTranslations)
+      if (expansionResult.expandedIndices.size > 0) {
+        console.warn('[proofread] 检测到 ' + expansionResult.expandedIndices.size + ' 条扩写，已截断')
+        // 将截断结果写回原位置
+        let k = 0
+        for (const i of correctedIndices) {
+          if (expansionResult.expandedIndices.has(k)) {
+            allTranslatedTexts[i] = expansionResult.texts[k]
+          }
+          k++
+        }
+      }
+
+      // 术语库强制校准：只处理修改过的
+      for (const i of correctedIndices) {
+        const singleResult = enforceGlossaryTerms([allSourceTexts[i]], [allTranslatedTexts[i]], glossaryMap)
+        allTranslatedTexts[i] = singleResult[0]
+      }
+
+      // 语言后处理 + CJK格式：只处理修改过的
+      for (const i of correctedIndices) {
+        allTranslatedTexts[i] = postProcessTranslation(allTranslatedTexts[i], targetLang.value)
+        allTranslatedTexts[i] = formatCJKSpace(allTranslatedTexts[i], targetLang.value)
+      }
+
+      // 存储单位格式还原 + 商标符号还原：只处理修改过的
+      const correctedSourcesArr = [...correctedIndices].map(i => allSourceTexts[i])
+      const correctedTranslationsArr = [...correctedIndices].map(i => allTranslatedTexts[i])
+      const restoredStorage = restoreStorageUnitFormatting(correctedSourcesArr, correctedTranslationsArr)
+      const restoredTrademarks = restoreTrademarkSymbols(correctedSourcesArr, restoredStorage)
+      let k = 0
+      for (const i of correctedIndices) {
+        allTranslatedTexts[i] = restoredTrademarks[k]
+        k++
+      }
+
+      // 换行保护：只处理修改过的
+      const sanitizedBreaks = sanitizeLineBreaks(correctedSourcesArr, restoredTrademarks)
+      k = 0
+      for (const i of correctedIndices) {
+        allTranslatedTexts[i] = sanitizedBreaks[k]
+        k++
+      }
+
+      // 截断兜底：只检查修改过的
+      const truncAfterProofread = detectTruncatedTexts(correctedSourcesArr, sanitizedBreaks)
+      if (truncAfterProofread.size > 0) {
+        console.warn('[proofread] 校对后检测到 ' + truncAfterProofread.size + ' 条译文仍截断，标记为翻译失败')
+        k = 0
+        for (const i of correctedIndices) {
+          if (truncAfterProofread.has(k)) {
+            allTranslatedTexts[i] = ''
+            items.value[i].proofreadText = ''
+            items.value[i].proofreadReason = ''
+            items.value[i].corrected = false
+            translateErrors.value.add(items.value[i].nodeIds[0])
+          }
+          k++
+        }
+      }
+
+      // 写回 items
+      for (let i = 0; i < items.value.length; i++) {
+        if (allTranslatedTexts[i] !== items.value[i].translatedText) {
+          items.value[i].translatedText = allTranslatedTexts[i]
+        }
       }
     }
 
@@ -2177,10 +2336,10 @@ onMounted(() => {
           if (raw.scenePreset === undefined) {
             raw.scenePreset = 'ecommerce'
           }
-          llmConfig.value = { translationStyle: 'standard', translationStyleCustom: '', scenePreset: 'ecommerce', enableProofread: false, proofreadApiKey: '', proofreadApiUrl: '', proofreadModel: 'qwen3.7-plus', ...(raw as LLMConfig) }
+          llmConfig.value = { translationStyle: 'standard', translationStyleCustom: '', scenePreset: 'ecommerce', enableProofread: false, proofreadApiKey: '', proofreadApiUrl: '', proofreadModel: 'qwen3.7-max', ...(raw as LLMConfig) }
           // 兜底：旧版配置可能没有 proofreadModel / 为空 / 等于翻译模型（冗余配置）
           if (!llmConfig.value.proofreadModel || llmConfig.value.proofreadModel === llmConfig.value.model) {
-            llmConfig.value.proofreadModel = 'qwen3.7-plus'
+            llmConfig.value.proofreadModel = 'qwen3.7-max'
           }
         }
         selectedPreset.value = detectPreset()
@@ -2709,7 +2868,16 @@ body {
   gap: 8px;
 }
 .text-item:hover { border-color: var(--gray-200); box-shadow: var(--shadow-sm); }
+.text-item.untranslated {
+  border-color: #ffa500;
+  background: #fff8e6;
+  box-shadow: 0 0 0 1px rgba(255, 165, 0, 0.2);
+}
 .app.dark .text-item { border-color: var(--gray-200); background: transparent; }
+.app.dark .text-item.untranslated {
+  border-color: #ff9500;
+  background: rgba(255, 149, 0, 0.1);
+}
 
 .item-source, .item-target {
   width: 100%;
@@ -2777,6 +2945,12 @@ body {
 .app.dark .text-item.trans-error { background: rgba(255,59,48,0.08); }
 .error-badge {
   font-size: 10px; background: var(--red); color: #fff;
+  padding: 1px 5px; border-radius: 4px; font-weight: 600;
+  text-transform: none; letter-spacing: 0;
+}
+
+.untranslated-badge {
+  font-size: 10px; background: #ffa500; color: #fff;
   padding: 1px 5px; border-radius: 4px; font-weight: 600;
   text-transform: none; letter-spacing: 0;
 }

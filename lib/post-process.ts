@@ -35,6 +35,11 @@
 //   ⛔ 不在翻译中间调用 — 翻译管道中作为末尾步骤执行
 // ═══════════════════════════════════════════════════════════════
 
+import { DEBUG_MODE } from '@lib/constants'
+
+// DEBUG 日志辅助函数
+const debugWarn = (...args: unknown[]) => DEBUG_MODE && console.warn(...args)
+
 // ============================================================
 // 商标符号还原
 // 将原文中的 ® ™ © 符号还原到译文中
@@ -164,6 +169,7 @@ export function enforceGlossaryTerms(
   sourceTexts: string[],
   translatedTexts: string[],
   glossaryMap: Map<string, string>,
+  skipIndices?: Set<number>,
 ): string[] {
   // 构建去商标符号 + 空白归一化的查找表
   // 空白归一化解决 CSV 数据中可能存在的多余空格（如 "CFexpress  4.0" → "CFexpress 4.0"）
@@ -194,6 +200,8 @@ export function enforceGlossaryTerms(
   return translatedTexts.map((translated, i) => {
     const source = sourceTexts[i] || ''
     if (!source) return translated
+    // 跳过被标记为"需要重翻"的索引（避免在回退源文上做术语校准）
+    if (skipIndices?.has(i)) return translated
 
     const normalizedSource = cleanKey(source)
     let result = translated
@@ -202,21 +210,21 @@ export function enforceGlossaryTerms(
     if (glossaryMap.has(source)) {
       const target = glossaryMap.get(source)!
       if (target !== result) {
-        console.info('[enforceGlossaryTerms] exact match (raw):', source.slice(0, 60), '→', target.slice(0, 60))
+        debugLog('[enforceGlossaryTerms] exact match (raw):', source.slice(0, 60), '→', target.slice(0, 60))
         result = target
       }
     }
     if (glossaryMap.has(normalizedSource)) {
       const target = glossaryMap.get(normalizedSource)!
       if (target !== result) {
-        console.info('[enforceGlossaryTerms] exact match (cleanKey):', normalizedSource.slice(0, 60), '→', target.slice(0, 60))
+        debugLog('[enforceGlossaryTerms] exact match (cleanKey):', normalizedSource.slice(0, 60), '→', target.slice(0, 60))
         result = target
       }
     }
     if (normalizedGlossaryMap.has(normalizedSource)) {
       const target = normalizedGlossaryMap.get(normalizedSource)!
       if (target !== result) {
-        console.info('[enforceGlossaryTerms] exact match (normalizedMap):', normalizedSource.slice(0, 60), '→', target.slice(0, 60))
+        debugLog('[enforceGlossaryTerms] exact match (normalizedMap):', normalizedSource.slice(0, 60), '→', target.slice(0, 60))
         result = target
       }
     }
@@ -310,6 +318,10 @@ export function postProcessTranslation(text: string, lang: string): string {
 
   // 还原 ※ → *（译前转义避免 Qwen 将其解析为 markdown 列表标记）
   result = result.replace(/※\s*/g, '* ')
+
+  // 清理 LLM 偶尔输出的 $N 伪引用标记（如 3.725GB$3 → 3.725GB）
+  // 这些标记通常出现在数字/单位后面，是 LLM 的幻觉输出
+  result = result.replace(/(\d)\$\d+/g, '$1')
 
   switch (lang) {
     case 'fr':
@@ -872,9 +884,15 @@ export function sanitizeLineBreaks(
 
 /**
  * 检测译文中数字是否与源文一致
- * 规则：提取源文和译文中的"数字+存储单位"组合，如果不一致则标记
- * 支持所有20种语言的存储单位格式
- * 返回：修复后的译文数组 + 异常索引集合
+ * 规则：提取源文和译文中的"数字+单位"组合，如果不一致则警告
+ * 检查范围：存储容量(TB/GB/MB/KB) + 速度(MB/s, GB/s) + 频率(MHz, GHz)
+ * 支持所有20种语言的单位格式
+ *
+ * ⚠️ v7.3 修复：数字不一致时只警告不回退。
+ *   回退到源文会导致用户看到英文原文（比数字错误更严重）。
+ *   数字合并（如"3.0 and 4.0"→"3.0和4.0"）是LLM的合理简化。
+ *
+ * 返回：原文数组（不修改）+ 异常索引集合（仅用于日志）
  */
 export function validateNumbers(
   sourceTexts: string[],
@@ -882,14 +900,14 @@ export function validateNumbers(
 ): { texts: string[]; mismatchedIndices: Set<number> } {
   const mismatchedIndices = new Set<number>()
 
-  // 提取"数字+存储单位"组合（支持所有语言的存储单位格式）
-  const extractStorageNumbers = (text: string): number[] => {
-    // 匹配所有语言的存储单位：
-    // - 英文/大多数语言: TB, GB, MB, KB, PB (及其带/s的形式)
-    // - 法语: To, Go, Mo, Ko, Po
-    // - 俄语: ТБ, ГБ, МБ, КБ
-    // - 日语/韩语/中文: 太字节, 吉字节, etc. (但通常用英文缩写)
-    const pattern = /(\d+(?:[.,]\d+)?)\s*(TB|GB|MB|KB|PB|To|Go|Mo|Ko|Po|ТБ|ГБ|МБ|КБ)(?:\/s)?/gi
+  // 提取"数字+单位"组合（支持存储/速度/频率单位）
+  const extractNumbers = (text: string): number[] => {
+    // 匹配所有语言的单位：
+    // - 存储容量: TB, GB, MB, KB, PB (及其带/s的形式)
+    // - 速度: MB/s, GB/s, TB/s, MBps, GBps
+    // - 频率: MHz, GHz
+    // - 多语言单位: 法语(To,Go,Mo), 俄语(ТБ,ГБ,МБ) 等
+    const pattern = /(\d+(?:[.,]\d+)?)\s*(TB|GB|MB|KB|PB|To|Go|Mo|Ko|Po|ТБ|ГБ|МБ|КБ|MB\/s|GB\/s|TB\/s|MBps|GBps|MHz|GHz)/gi
     const matches = text.match(pattern) || []
     // 提取数字部分（去除千位分隔符）
     return matches.map(m => {
@@ -900,29 +918,44 @@ export function validateNumbers(
     })
   }
 
-  const result = translatedTexts.map((translated, i) => {
+  for (let i = 0; i < translatedTexts.length; i++) {
     const source = sourceTexts[i] || ''
-    if (!source || !translated) return translated
+    const translated = translatedTexts[i] || ''
+    if (!source || !translated) continue
 
-    const sourceNumbers = extractStorageNumbers(source)
-    const transNumbers = extractStorageNumbers(translated)
+    const sourceNumbers = extractNumbers(source)
+    const transNumbers = extractNumbers(translated)
 
-    // 如果数量不一致 → 数字错误
+    // 如果没有数字，跳过
+    if (sourceNumbers.length === 0) continue
+
+    // 如果数量不一致 → 警告（不回退）
     if (sourceNumbers.length !== transNumbers.length) {
       mismatchedIndices.add(i)
-      return source // 回退到源文
+      debugWarn(
+        `[validateNumbers] 数字数量不一致（保留译文）：源文${sourceNumbers.length}个 [${sourceNumbers.join(', ')}]，译文${transNumbers.length}个 [${transNumbers.join(', ')}]`,
+        { idx: i, source: source.slice(0, 80), translated: translated.slice(0, 80) },
+      )
+      continue
     }
 
-    // 如果数值不一致 → 数字错误
+    // 如果数值不一致 → 警告（不回退）
+    let hasValueMismatch = false
     for (let j = 0; j < sourceNumbers.length; j++) {
       if (Math.abs(sourceNumbers[j] - transNumbers[j]) > 0.01) {
-        mismatchedIndices.add(i)
-        return source // 回退到源文
+        hasValueMismatch = true
+        break
       }
     }
+    if (hasValueMismatch) {
+      mismatchedIndices.add(i)
+      debugWarn(
+        `[validateNumbers] 数值不一致（保留译文）：源文 [${sourceNumbers.join(', ')}]，译文 [${transNumbers.join(', ')}]`,
+        { idx: i, source: source.slice(0, 80), translated: translated.slice(0, 80) },
+      )
+    }
+  }
 
-    return translated
-  })
-
-  return { texts: result, mismatchedIndices }
+  // ✅ 始终返回原始译文，不回退
+  return { texts: [...translatedTexts], mismatchedIndices }
 }

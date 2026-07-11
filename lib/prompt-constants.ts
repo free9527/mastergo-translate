@@ -38,38 +38,23 @@ export const IDENTITY_MISSION: Record<string, string> = {
   'ja': `コアミッション：原文を正確かつ自然な日本語に翻訳してください。語彙や文体を製品ラインと読者に合わせて調整します。`,
   'ko': `핵심 미션: 원문을 정확하고 자연스러운 한국어로 번역하세요. 어휘와 문체를 제품 라인과 독자에 맞게 조정하세요.`,
 
-  // 非 CJK 语言：双语使命宣言（英文 + 目标语言）
-  // 英文部分确保 LLM 理解翻译任务，目标语言部分激活目标语义空间
-  'fr': `Core mission: Translate the source text accurately and naturally into French. Adapt vocabulary, sentence structure, and register to fit the product line and target audience.
-Mission : Traduisez le texte source de manière précise et naturelle en français. Adaptez le vocabulaire, la structure des phrases et le registre à la gamme de produits et au public cible.`,
-  'de': `Core mission: Translate the source text accurately and naturally into German. Adapt vocabulary, sentence structure, and register to fit the product line and target audience.
-Kernauftrag: Übersetzen Sie den Ausgangstext präzise und idiomatisch ins Deutsche. Passen Sie Wortwahl, Satzbau und Register an Produktlinie und Zielgruppe an.`,
-  'es': `Core mission: Translate the source text accurately and naturally into Spanish. Adapt vocabulary, sentence structure, and register to fit the product line and target audience.
-Misión principal: Traduzca el texto fuente de manera precisa y natural al español. Adapte el vocabulario, la estructura de las frases y el registro a la línea de productos y al público objetivo.`,
-  'pt': `Core mission: Translate the source text accurately and naturally into European Portuguese. Adapt vocabulary, sentence structure, and register to fit the product line and target audience.
-Missão principal: Traduza o texto fonte de forma precisa e natural para português europeu. Adapte o vocabulário, a estrutura frásica e o registo à linha de produtos e ao público-alvo.`,
-  'pt-BR': `Core mission: Translate the source text accurately and naturally into Brazilian Portuguese. Adapt vocabulary, sentence structure, and register to fit the product line and target audience.
-Missão principal: Traduza o texto fonte de forma precisa e natural para português brasileiro. Adapte o vocabulário, a estrutura frásica e o registro à linha de produtos e ao público-alvo.`,
-  'it': `Core mission: Translate the source text accurately and naturally into Italian. Adapt vocabulary, sentence structure, and register to fit the product line and target audience.
-Missione principale: Traduca il testo sorgente in modo accurato e naturale in italiano. Adatti vocabolario, struttura delle frasi e registro alla linea di prodotti e al pubblico target.`,
-  'nl': `Core mission: Translate the source text accurately and naturally into Dutch. Adapt vocabulary, sentence structure, and register to fit the product line and target audience.
-Kernmissie: Vertaal de brontekst nauwkeurig en natuurlijk naar het Nederlands. Pas woordkeuze, zinsbouw en register aan op de productlijn en doelgroep.`,
-  'pl': `Core mission: Translate the source text accurately and naturally into Polish. Adapt vocabulary, sentence structure, and register to fit the product line and target audience.
-Misja główna: Przetłumacz tekst źródłowy dokładnie i naturalnie na język polski. Dostosuj słownictwo, strukturę zdań i rejestr do linii produktów i grupy docelowej.`,
-  'sv': `Core mission: Translate the source text accurately and naturally into Swedish. Adapt vocabulary, sentence structure, and tone to fit the product line and target audience.
-Huvuduppdrag: Översätt källtexten exakt och naturligt till svenska. Anpassa ordförråd, meningsbyggnad och ton till produktlinjen och målgruppen.`,
-  'tr': `Core mission: Translate the source text accurately and naturally into Turkish. Adapt vocabulary, sentence structure, and register to fit the product line and target audience.
-Temel Misyon: Kaynak metni Türkçeye doğru ve doğal bir şekilde çevirin. Kelime seçimini, cümle yapısını ve üslubu ürün grubuna ve hedef kitleye göre uyarlayın.`,
-  'ru': `Core mission: Translate the source text accurately and naturally into Russian. Adapt vocabulary, sentence structure, and style to fit the product line and target audience.
-Основная миссия: Переведите исходный текст точно и естественно на русский язык. Адаптируйте лексику, структуру предложений и стиль под линейку продуктов и целевую аудиторию.`,
-  'vi': `Core mission: Translate the source text accurately and naturally into Vietnamese. Adapt vocabulary, sentence structure, and tone to fit the product line and target audience.
-Sứ mệnh cốt lõi: Dịch văn bản nguồn chính xác và tự nhiên sang tiếng Việt. Điều chỉnh từ vựng, cấu trúc câu và giọng điệu phù hợp với dòng sản phẩm và đối tượng mục tiêu.`,
-  'th': `Core mission: Translate the source text accurately and naturally into Thai. Adapt vocabulary, sentence structure, and tone to fit the product line and target audience.
-พันธกิจหลัก: แปลข้อความต้นฉบับอย่างถูกต้องและเป็นธรรมชาติเป็นภาษาไทย ปรับคำศัพท์ โครงสร้างประโยค และโทนเสียงให้เข้ากับกลุ่มผลิตภัณฑ์และกลุ่มเป้าหมาย`,
-  'id': `Core mission: Translate the source text accurately and naturally into Indonesian. Adapt vocabulary, sentence structure, and style to fit the product line and target audience.
-Misi utama: Terjemahkan teks sumber secara akurat dan alami ke dalam bahasa Indonesia. Sesuaikan kosakata, struktur kalimat, dan gaya bahasa dengan lini produk dan audiens target.`,
-  'ar': `Core mission: Translate the source text accurately and naturally into Arabic. Adapt vocabulary, sentence structure, and style to fit the product line and target audience.
-المهمة الأساسية: ترجمة النص المصدر بدقة وبشكل طبيعي إلى اللغة العربية. تكييف المفردات وبنية الجمل والأسلوب بما يتناسب مع خط الإنتاج والجمهور المستهدف.`,
+  // 非 CJK 语言：仅目标语言使命宣言（英文上下文已由 IRON_RULES/CONSTRAINTS 提供）
+  // 目标语言文本激活目标语义空间，无需冗余英文前言
+  'fr': `Mission : Traduisez le texte source de manière précise et naturelle en français. Adaptez le vocabulaire, la structure des phrases et le registre à la gamme de produits et au public cible.`,
+  'de': `Kernauftrag: Übersetzen Sie den Ausgangstext präzise und idiomatisch ins Deutsche. Passen Sie Wortwahl, Satzbau und Register an Produktlinie und Zielgruppe an.`,
+  'es': `Misión principal: Traduzca el texto fuente de manera precisa y natural al español. Adapte el vocabulario, la estructura de las frases y el registro a la línea de productos y al público objetivo.`,
+  'pt': `Missão principal: Traduza o texto fonte de forma precisa e natural para português europeu. Adapte o vocabulário, a estrutura frásica e o registo à linha de produtos e ao público-alvo.`,
+  'pt-BR': `Missão principal: Traduza o texto fonte de forma precisa e natural para português brasileiro. Adapte o vocabulário, a estrutura frásica e o registro à linha de produtos e ao público-alvo.`,
+  'it': `Missione principale: Traduca il testo sorgente in modo accurato e naturale in italiano. Adatti vocabolario, struttura delle frasi e registro alla linea di prodotti e al pubblico target.`,
+  'nl': `Kernmissie: Vertaal de brontekst nauwkeurig en natuurlijk naar het Nederlands. Pas woordkeuze, zinsbouw en register aan op de productlijn en doelgroep.`,
+  'pl': `Misja główna: Przetłumacz tekst źródłowy dokładnie i naturalnie na język polski. Dostosuj słownictwo, strukturę zdań i rejestr do linii produktów i grupy docelowej.`,
+  'sv': `Huvuduppdrag: Översätt källtexten exakt och naturligt till svenska. Anpassa ordförråd, meningsbyggnad och ton till produktlinjen och målgruppen.`,
+  'tr': `Temel Misyon: Kaynak metni Türkçeye doğru ve doğal bir şekilde çevirin. Kelime seçimini, cümle yapısını ve üslubu ürün grubuna ve hedef kitleye göre uyarlayın.`,
+  'ru': `Основная миссия: Переведите исходный текст точно и естественно на русский язык. Адаптируйте лексику, структуру предложений и стиль под линейку продуктов и целевую аудиторию.`,
+  'vi': `Sứ mệnh cốt lõi: Dịch văn bản nguồn chính xác và tự nhiên sang tiếng Việt. Điều chỉnh từ vựng, cấu trúc câu và giọng điệu phù hợp với dòng sản phẩm và đối tượng mục tiêu.`,
+  'th': `พันธกิจหลัก: แปลข้อความต้นฉบับอย่างถูกต้องและเป็นธรรมชาติเป็นภาษาไทย ปรับคำศัพท์ โครงสร้างประโยค และโทนเสียงให้เข้ากับกลุ่มผลิตภัณฑ์และกลุ่มเป้าหมาย`,
+  'id': `Misi utama: Terjemahkan teks sumber secara akurat dan alami ke dalam bahasa Indonesia. Sesuaikan kosakata, struktur kalimat, dan gaya bahasa dengan lini produk dan audiens target.`,
+  'ar': `المهمة الأساسية: ترجمة النص المصدر بدقة وبشكل طبيعي إلى اللغة العربية. تكييف المفردات وبنية الجمل والأسلوب بما يتناسب مع خط الإنتاج والجمهور المستهدف.`,
   'en': `Core mission: Translate the source text accurately and idiomatically into English. Adapt vocabulary, sentence structure, and register to fit the product line and target audience.`,
 }
 
@@ -85,6 +70,13 @@ Misi utama: Terjemahkan teks sumber secara akurat dan alami ke dalam bahasa Indo
 // 职责: 定义品牌/产品名保留规则，翻译用它"保护"，校对用它"放行"
 // 注入: 翻译 IRON_RULES Rule #2 引用 + 校对 PROOFREAD_SYSTEM_PROMPT 引用
 // ═══════════════════════════════════════════════════════════════
+
+// 校对精简版品牌规则（~500 chars，替代完整 BRAND_ASSET_RULES 的 1,578 chars）
+// 校对只需判断"产品名保留 vs 描述性文本翻译"，不需要完整的决策树和示例
+export const BRAND_ASSET_RULES_PROOFREAD = `[BRAND NAME RULES — QA REFERENCE]
+✅ Keep in English: product names (Lexar NM790), brand names (Lexar, AMD), model numbers.
+❌ Must translate: descriptive sentences containing brand words.
+Rule: No verbs/prepositions = product name → keep English. Has verbs/adjectives = description → translate.`
 
 export const BRAND_ASSET_RULES = `[BRAND & PRODUCT NAME RULES]
 ✅ Keep in English (do NOT translate):
@@ -102,8 +94,21 @@ Model number patterns:
 - Sentences with brand names: "Paired with AMD and Intel CPUs" → translate sentence, keep "AMD"/"Intel" English
 
 ⚠️ CRITICAL DISTINCTION:
-- Product name = standalone identifier → KEEP English: "Lexar NM790 PCIe 4.0 SSD"
-- Descriptive sentence = contains verbs/prepositions → TRANSLATE: "Paired with AMD and Intel CPUs" → translate "Paired with" and "CPUs", keep "AMD"/"Intel" English`
+- Product name = standalone identifier (no verbs, no prepositions) → KEEP English
+- Descriptive sentence = contains verbs/prepositions/adjectives → TRANSLATE
+
+🔍 HOW TO DECIDE:
+Ask yourself: "Does this text describe something (action/feature/benefit)?"
+- YES → It's descriptive → TRANSLATE (keep only brand names in English)
+- NO → It's a label/identifier → KEEP English
+
+Examples:
+- "BIT Running for 30 Minutes Later Temperature Comparison with Other Gen 5 SSDs"
+  → Contains "Running", "Comparison", "with" → DESCRIPTIVE → TRANSLATE
+- "Paired with the latest AMD and Intel CPUs"
+  → Contains "Paired with" → DESCRIPTIVE → TRANSLATE
+- "*Due to different measurement methods..."
+  → Contains "Due to", "measurement methods" → DESCRIPTIVE → TRANSLATE`
 
 // ═══════════════════════════════════════════════════════════════
 // 模块: IRON_RULES — 全局铁则（翻译 LLM 的轻量行为约束）
@@ -139,7 +144,22 @@ export const IRON_RULES = `${BRAND_ASSET_RULES}
 6. TRADEMARK SYMBOLS: ⛔ Do NOT manually add trademark symbols (®™©).
    Trademark symbols are handled automatically by code: if source has them,
    they will be added to translation; if source doesn't have them, they won't appear.
-   You do NOT need to add any ®™© symbols in your translation.`
+   You do NOT need to add any ®™© symbols in your translation.
+
+7. ⛔ TRANSLATE EVERYTHING — CRITICAL RULE:
+   - ALL text must be translated, including: titles, headlines, marketing copy,
+     technical descriptions, footnotes, disclaimers, and legal notes.
+   - Even if text contains brand names (AMD, Intel, PCIe, etc.), the descriptive
+     parts MUST be translated. Only keep the brand names themselves in English.
+   - If you're unsure whether to translate, TRANSLATE IT.
+   - It's better to over-translate than to leave text untranslated.
+   - Examples:
+     ✅ "BIT Running for 30 Minutes Later Temperature Comparison with Other Gen 5 SSDs"
+        → "So sánh nhiệt độ sau 30 phút chạy BIT với các SSD Gen 5 khác"
+     ✅ "Paired with the latest AMD and Intel CPUs"
+        → "Kết hợp với CPU AMD và Intel mới nhất"
+     ✅ "*Due to different measurement methods..."
+        → "*Do phương pháp đo khác nhau giữa các nhà sản xuất..."`
 
 // ============================================================
 // Module 2 continued: PRODUCT LINE TONE GUIDES
@@ -475,40 +495,6 @@ export const SCENE_CONSTRAINTS: Record<string, {
   },
 }
 
-// 场景检查清单 - 校对阶段注入
-export const SCENE_CHECKLISTS: Record<string, string> = {
-  ecommerce: `
-## 电商场景专项检查清单
-1. 卖点突出：核心卖点是否前置？
-2. 短句为主：是否使用简洁有力的短句？
-3. 本地化：是否找到目标语言的等效表达（非直译）？`,
-
-  technical_doc: `
-## 技术文档专项检查清单
-1. 脚注格式：数字脚注是否使用※前缀（※1, ※2, ※3）？位置是否正确？
-2. 表格格式：表格行列是否1:1对应？标记是否保留？
-3. 术语一致性：同一文档内术语是否统一？
-4. 场景适配：表达是否符合技术文档惯例？`,
-
-  operation_guide: `
-## 操作指引专项检查清单
-1. 步骤完整性：操作步骤是否1:1对应？
-2. 警告层级：WARNING/CAUTION/NOTE 是否保留原文层级？
-3. 操作指引：是否清晰说明"怎么做"？`,
-
-  compliance_doc: `
-## 合规文档专项检查清单
-1. 格式保留：认证标志/保修期限/联系方式格式是否保持原文？
-2. 占位符：__XXX_N__ 标记、HTML标签是否完整保留？
-3. 法律术语：保修条款是否准确翻译？`,
-
-  software_ui: `
-## UI文本专项检查清单
-1. 长度控制：短标签是否保持简洁？
-2. 占位符：__XXX_N__ 标记、变量占位符是否完整保留？
-3. 一致性：同一功能在不同界面的译文是否一致？`,
-}
-
 // 获取场景约束（翻译阶段）
 export function getSceneConstraints(scenePreset: string, targetLang: string): string {
   const groupId = SCENE_GROUP_MAP[scenePreset]
@@ -527,13 +513,6 @@ export function getSceneConstraints(scenePreset: string, targetLang: string): st
   if (lines.length === 0) return ''
 
   return `\n\n【${groupId} 场景约束】\n${lines.map(l => `- ${l}`).join('\n')}`
-}
-
-// 获取场景检查清单（校对阶段）
-export function getSceneChecklist(scenePreset: string): string {
-  const groupId = SCENE_GROUP_MAP[scenePreset]
-  if (!groupId) return ''
-  return SCENE_CHECKLISTS[groupId] || ''
 }
 
 // ============================================================
@@ -573,7 +552,7 @@ Rules:
 
 export function getStyleGuide(style: string, targetLang: string): string {
   const guides = STYLE_GUIDES[style] || STYLE_GUIDES['standard']
-  return guides[targetLang] || guides['default'] || guides['zh-CN'] || ''
+  return guides[targetLang] || guides['default'] || ''
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -742,14 +721,12 @@ export function renderLangForTranslate(
 
 /**
  * 渲染校对视角的语言专属校验标准。
- * 包含: 品类词术语 + rules + quality + compliance + sceneChecklist + productTone + styleGuide
- * 校对需要知道翻译遵循了什么规则，才能正确判断。
+ * 包含: 品类词术语 + rules + quality + compliance
+ * ⛔ 不注入 sceneChecklist/productTone/styleGuide — 翻译已负责风格，校对不重复
  */
 export function renderLangForProofread(
   targetLang: string,
   productLine?: string | null,
-  scenePreset?: string,
-  style?: string,
 ): string {
   const block = LANG_SPECIFIC[targetLang]
   if (!block) return ''
@@ -760,18 +737,6 @@ export function renderLangForProofread(
   // quality 让校对 LLM 以母语者视角检查译文自然度
   // compliance 让校对 LLM 知道广告法/合规要求，避免误判翻译的合规性调整
   const parts = [categoryBlock, block.rules, block.quality, block.compliance].filter(Boolean)
-
-  // 注入场景检查清单（校对需要知道翻译遵循的场景规则）
-  const sceneChecklist = scenePreset ? getSceneChecklist(scenePreset) : ''
-  if (sceneChecklist) parts.push(sceneChecklist)
-
-  // 注入产品线调性指南（校对 CHECK 4 需要引用）
-  const productTone = getProductLineTone(productLine || null, targetLang)
-  if (productTone) parts.push(productTone)
-
-  // 注入风格指南（校对需要知道翻译遵循的风格）
-  const styleGuide = style ? getStyleGuide(style, targetLang) : ''
-  if (styleGuide) parts.push(styleGuide)
 
   if (parts.length === 0) return ''
 
@@ -796,16 +761,6 @@ function buildCategoryTerminology(targetLang: string, productLine?: string | nul
   return `品类词对照：\n${lines.join('\n')}`
 }
 
-/** @deprecated 使用 renderLangForTranslate 替代 */
-export function getLangSpecificPrompt(targetLang: string): string {
-  return renderLangForTranslate(targetLang)
-}
-
-/** @deprecated 使用 renderLangForProofread 替代，品质指令已合并到 LANG_SPECIFIC[lang].quality */
-export function getProofreadQualityInstruction(targetLang: string): string {
-  const block = LANG_SPECIFIC[targetLang]
-  return block?.quality || ''
-}
 
 // ============================================================
 // Module 3 continued: CATEGORY WORDS (10 categories × 20 languages)
@@ -929,28 +884,6 @@ export const PRODUCT_LINE_CATEGORY_MAP: Record<string, string[]> = {
 
 const FALLBACK_CATEGORY_WORDS = ['SSD', 'Card', 'Flash Drive']
 
-/**
- * Category word guide — injected for ALL languages (not just ar/th/vi anymore).
- * However, for CJK and major European languages, the guide is minimal (3-5 categories
- * relevant to the product line). For ar/th/vi, it remains more comprehensive as these
- * languages need more guidance on technical terms.
- */
-export function getCategoryWordGuide(targetLang: string, productLine?: string | null): string {
-  const allowedWords = productLine
-    ? (PRODUCT_LINE_CATEGORY_MAP[productLine] || FALLBACK_CATEGORY_WORDS)
-    : FALLBACK_CATEGORY_WORDS
-
-  const lines: string[] = []
-  for (const [en, map] of Object.entries(CATEGORY_WORDS)) {
-    if (!allowedWords.includes(en)) continue
-    const translated = map[targetLang]
-    if (translated) {
-      lines.push(`  ${en} → ${translated}`)
-    }
-  }
-  if (lines.length === 0) return ''
-  return `\n[CATEGORY WORDS]\n${lines.join('\n')}`
-}
 
 // ============================================================
 // Module 5: OUTPUT ANCHOR (English only, unified)
@@ -978,7 +911,7 @@ No markdown, no code blocks. Each [N] is ONE complete text.
 // 【为什么这样设计】
 // 历史教训：早期校对prompt包含8项检查（自然度、语气、短标签等），
 // 导致LLM在执行主观检查时"顺手重写"整段译文，引入新错误。
-// 重构后只保留3项硬性检查，避免过度润色。
+// 重构后只保留5项硬性检查（CHECK 0-4），避免过度润色。
 //
 // 【AI校对检查项】
 // 1. 完整性：译文是否包含源文的所有信息？有无漏译/截断？
@@ -995,10 +928,10 @@ No markdown, no code blocks. Each [N] is ONE complete text.
 // ⛔ 未翻译检测 — 代码 detectUntranslatedText 已处理
 //
 // 【校对闭环】
-// 翻译LLM → 代码兜底（11项检测）→ AI校对（3项检查）→ 代码兜底 → 用户
+// 翻译LLM → 代码兜底（11项检测）→ AI校对（5项检查）→ 代码兜底 → 用户
 //
 // 【注入方式】
-// PROOFREAD_SYSTEM_PROMPT（3项检查）+ glossaryHint（术语参照）+ langBlock（品类词+rules）
+// PROOFREAD_SYSTEM_PROMPT（5项检查）+ glossaryHint（术语参照）+ langBlock（品类词+rules）
 // 始终用英语，全语种通用
 //
 // 【输出格式】
@@ -1007,59 +940,35 @@ No markdown, no code blocks. Each [N] is ONE complete text.
 // ═══════════════════════════════════════════════════════════════
 
 export const PROOFREAD_SYSTEM_PROMPT = `[ROLE]
-You are a localization QA reviewer for Lexar. Check translations for FIVE things.
+You are a localization QA reviewer for Lexar. Check translations for FOUR things.
 
 [CHECK 0: LANGUAGE CHECK] (Highest priority)
-Translation MUST be in the target language — not English, not mixed.
-⛔ System markers like "[TRANSLATE REQUIRED]" or "⛔ UNTRANSLATED!" are NOT valid translations → remove and provide actual translation.
+Translation MUST be in the target language. Brand names stay English, but ALL descriptive parts (verbs, adjectives, prepositions) MUST be translated.
+⛔ If >30% of non-brand words are English → INCOMPLETE → fix it.
+⛔ Markers like "[TRANSLATE REQUIRED]" are NOT valid → provide actual translation.
 
 [CHECK 1: PLACEHOLDER INTEGRITY]
-Ensure all placeholders (__XXX_N__, HTML tags, ↵) match source EXACTLY in type, count, and position. Fix mismatches before other checks.
+Ensure all placeholders (__XXX_N__, HTML tags, ↵) match source EXACTLY in type, count, and position.
 
 [CHECK 2: COMPLETENESS]
-Does the translation contain ALL the information from the source?
-- ⛔ Do NOT add information not in the source
-- ⛔ Do NOT remove information from the source
+⛔ Do NOT add information not in the source. ⛔ Do NOT remove information from the source.
 
 [CHECK 3: MEANING ACCURACY]
-Does the translation match the source meaning exactly?
-- Wrong number? Wrong spec? Wrong product feature? → fix it
-- Category word wrong? (SSD≠Card, Reader≠SSD) → fix it per the reference table
-- ⚠️ PRIORITY: Glossary exact-match rule OVERRIDES category-word correction
-- ⛔ Do NOT change symbols/formatting (2x2≠2×2, keep source format as-is)
-- ✅ Natural localization (word reordering, synonym substitution, tone adaptation) is NOT an error if meaning is preserved. Do NOT flag or rewrite.
-
-[CHECK 4: TONE MATCH]
-Match the product line's tone guide (provided below). Only flag if tone is COMPLETELY WRONG.
-⛔ Do NOT flag minor tone variations or natural localization adaptations.
-
-[ALLOWED ADAPTATIONS]
-The following are CORRECT localization, NOT errors:
-- Word order changes for fluency or selling point front-loading
-- Synonym substitutions for natural expression
-- Tone adjustments matching target language e-commerce conventions
-- Sentence restructuring per scene constraints
-⛔ Do NOT flag these as errors.
+- Wrong number/spec/feature? → fix it
+- Category word wrong? (SSD≠Card, Reader≠SSD) → fix it per reference table
+- ⚠️ Glossary exact-match OVERRIDES category-word correction
+- ⛔ Do NOT change symbols/formatting (2x2≠2×2, keep source format)
+- ✅ Natural localization (word reordering, synonyms, tone) is OK if meaning preserved — do NOT flag.
 
 [ACTION]
-- Review EACH item INDEPENDENTLY. Never use content from other items.
-- If translation has errors → fix ONLY the specific errors
-- ⛔ NEVER rewrite the entire translation. Fix only what's wrong.
+- Review EACH item INDEPENDENTLY. Fix ONLY specific errors, never rewrite entire translation.
 
-${BRAND_ASSET_RULES}
+${BRAND_ASSET_RULES_PROOFREAD}
 
 [OUTPUT]
-JSON format: [{"i":1,"text":"corrected text","reason":"label","ambiguous":[]}]
-
-reason must be ONE of: 语言错误 | 占位符缺失 | 漏翻 | 多翻 | 语义错误 | 术语错误 | 语气不当
-
-Examples:
-- All correct → []
-- Item 3 wrong term → [{"i":3,"text":"corrected","reason":"术语错误","ambiguous":[]}]
-
-⛔ Only output items needing correction. Raw JSON only, no markdown.
+JSON: [{"i":1,"text":"corrected text","reason":"label","ambiguous":[]}]
+reason: 语言错误 | 占位符缺失 | 漏翻 | 多翻 | 语义错误 | 术语错误
+All correct → []. Only output items needing correction. Raw JSON only.
 
 [AMBIGUOUS]
-Only flag: genuinely ambiguous terms (context cannot determine) or new concepts not in glossary.
-Do NOT flag: tech abbreviations, model numbers, common descriptors, glossary-covered terms.
-Default: []`
+Only flag: genuinely ambiguous terms or new concepts not in glossary. Default: []`

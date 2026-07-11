@@ -2,15 +2,18 @@
 // 全局常量
 // ============================================================
 
-// 翻译批次大小（增大批次减少 API 调用次数）
-export const TRANSLATE_BATCH_SIZE = 20
-export const PROOFREAD_BATCH_SIZE = 12
+// DEBUG 模式：生产环境设为 false，关闭诊断日志以提升性能
+export const DEBUG_MODE = false
 
-// API 超时（毫秒）— 15条批次模型处理可能需60s+，留足余量
-export const API_TIMEOUT_MS = 120000
+// 翻译批次大小（减小批次减少木桶效应，单批更快）
+export const TRANSLATE_BATCH_SIZE = 15
+export const PROOFREAD_BATCH_SIZE = 8
 
-// API 重试
-export const API_MAX_RETRIES = 3
+// API 超时（毫秒）— 正常LLM响应5-30s，复杂批次可能需60s+，90s留足余量避免误超时
+export const API_TIMEOUT_MS = 90000
+
+// API 重试（减少重试次数，避免长时间等待）
+export const API_MAX_RETRIES = 2
 export const API_RETRY_DELAY_MS = 1000
 
 // 翻译缓存上限（超出后删旧留新）

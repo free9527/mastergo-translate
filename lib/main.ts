@@ -1,10 +1,13 @@
 import { PluginMessage, UIMessage, TextItem, LLMConfig, GlossaryEntry, TranslationCorrection } from '@messages/types'
 import { sendMsgToUI } from '@messages/main-sender'
-import { STORAGE_KEY_GLOSSARY_VERSION, STORAGE_KEY_GLOSSARY_PRODUCTS, STORAGE_KEY_GLOSSARY_EXCLUSIVE, STORAGE_KEY_SETTINGS, STORAGE_KEY_ORIGINALS, STORAGE_KEY_TRANSLATION_CACHE, STORAGE_KEY_CORRECTIONS, CORRECTION_THRESHOLD, UI_WIDTH, UI_HEIGHT, MAX_CACHE_SIZE, GLOSSARY_VERSION, makeFontKey } from '@lib/constants'
+import { STORAGE_KEY_GLOSSARY_VERSION, STORAGE_KEY_GLOSSARY_PRODUCTS, STORAGE_KEY_GLOSSARY_EXCLUSIVE, STORAGE_KEY_SETTINGS, STORAGE_KEY_ORIGINALS, STORAGE_KEY_TRANSLATION_CACHE, STORAGE_KEY_CORRECTIONS, CORRECTION_THRESHOLD, UI_WIDTH, UI_HEIGHT, MAX_CACHE_SIZE, GLOSSARY_VERSION, makeFontKey, DEBUG_MODE } from '@lib/constants'
 import { collectTextNodes, mergeDuplicates, TraversableNode } from '@lib/text-collector'
 import { exportCSV, importCSV } from '@lib/csv-handler'
 import { DEFAULT_GLOSSARY_PRODUCTS_CSV, DEFAULT_GLOSSARY_EXCLUSIVE_CSV } from '@lib/default-glossary'
 import { parseCSVRow } from '@lib/parse-csv'
+
+// DEBUG 日志辅助函数
+const debugLog = (...args: unknown[]) => DEBUG_MODE && console.log(...args)
 
 const originalTexts = new Map<string, string>()
 
@@ -15,14 +18,14 @@ mg.showUI(__html__, { width: UI_WIDTH, height: UI_HEIGHT })
 // ============================================================
 function scanAllTextNodes(): void {
   const page = mg.document.currentPage
-  console.log('[translate] scanAllTextNodes, page:', page.name, 'page.type:', page.type)
+  debugLog('[translate] scanAllTextNodes, page:', page.name, 'page.type:', page.type)
 
   let textNodes = collectTextNodes(page)
 
   if (textNodes.length === 0) {
-    console.log('[translate] page scan returned 0, trying mg.document...')
+    debugLog('[translate] page scan returned 0, trying mg.document...')
     const docNodes = collectTextNodes(mg.document)
-    console.log('[translate] mg.document scan returned', docNodes.length, 'nodes')
+    debugLog('[translate] mg.document scan returned', docNodes.length, 'nodes')
     if (docNodes.length > 0) {
       textNodes = docNodes
     }
@@ -31,9 +34,9 @@ function scanAllTextNodes(): void {
   if (textNodes.length === 0) {
     const pageChildren = page.children
     if (pageChildren) {
-      console.log('[translate] page has', pageChildren.length, 'direct children')
+      debugLog('[translate] page has', pageChildren.length, 'direct children')
       for (let i = 0; i < Math.min(pageChildren.length, 10); i++) {
-        console.log('[translate]   child[' + i + '] type=' + pageChildren[i].type, 'name=' + pageChildren[i].name)
+        debugLog('[translate]   child[' + i + '] type=' + pageChildren[i].type, 'name=' + pageChildren[i].name)
       }
     } else {
       console.error('[translate] page.children is undefined! page keys:', Object.keys(page))
@@ -51,7 +54,7 @@ function scanAllTextNodes(): void {
 
   const items = mergeDuplicates(textNodes)
   pruneStaleOriginals(items)
-  console.log('[translate] final merged items:', items.length)
+  debugLog('[translate] final merged items:', items.length)
   sendMsgToUI(PluginMessage.SCAN_RESULT, { items, pageName: page.name, fileName: mg.document.name })
 }
 
@@ -419,7 +422,7 @@ function pruneStaleOriginals(items: TextItem[]): void {
     }
   }
   if (pruned > 0) {
-    console.log('[translate] pruned', pruned, 'stale original entries')
+    debugLog('[translate] pruned', pruned, 'stale original entries')
     persistOriginals()
   }
 }
@@ -646,17 +649,17 @@ async function saveCorrection(correction: TranslationCorrection): Promise<void> 
 type UIMessageEvent = { type?: UIMessage; data?: unknown; pluginMessage?: { type: UIMessage; data: unknown } }
 
 mg.ui.onmessage = async function (msg: UIMessageEvent) {
-  console.log('[translate] onmessage raw msg:', JSON.stringify(msg))
+  debugLog('[translate] onmessage raw msg:', JSON.stringify(msg))
 
   let type = msg.type
   let data: unknown = msg.data
   if (!type && msg.pluginMessage) {
-    console.log('[translate] trying pluginMessage wrapper')
+    debugLog('[translate] trying pluginMessage wrapper')
     type = msg.pluginMessage.type
     data = msg.pluginMessage.data
   }
 
-  console.log('[translate] onmessage type:', type)
+  debugLog('[translate] onmessage type:', type)
 
   switch (type) {
     case UIMessage.SCAN_ALL:
