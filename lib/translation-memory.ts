@@ -162,29 +162,38 @@ export function compressBatch(texts: string[]): {
     for (const idx of g.indices) templatedIndices.add(idx)
   }
 
-  const uniqueTexts: string[] = []
-
-  // 模板组：取第一个索引作为代表（用原始文本，LLM 翻译质量最好）
+  // 标记每个模板组的代表索引（第一个成员）
+  const groupRepMap = new Map<number, TemplateGroup>()
   for (const g of groups) {
-    const repIdx = uniqueTexts.length
-    const repOrigIdx = g.indices[0]
-    uniqueTexts.push(texts[repOrigIdx])
-    const repValues = g.valueMaps.get(repOrigIdx) || []
-    for (const idx of g.indices) {
-      expandData.set(idx, {
-        repIndex: repIdx,
-        repValues,
-        targetValues: g.valueMaps.get(idx) || [],
-      })
-    }
+    groupRepMap.set(g.indices[0], g)
   }
 
-  // 非模板文本
+  const uniqueTexts: string[] = []
+
+  // v7.5.5: 按原始顺序遍历，保持 Figma 图层扫描顺序
+  // 模板组代表放在其原始位置，非模板文本直接追加
   for (let i = 0; i < texts.length; i++) {
-    if (templatedIndices.has(i) || !texts[i]) continue
-    const repIdx = uniqueTexts.length
-    uniqueTexts.push(texts[i])
-    expandData.set(i, { repIndex: repIdx, repValues: [], targetValues: [] })
+    if (!texts[i]) continue
+    const group = groupRepMap.get(i)
+    if (group) {
+      // 模板组的代表（第一个成员），插入代表文本
+      const repIdx = uniqueTexts.length
+      uniqueTexts.push(texts[i])
+      const repValues = group.valueMaps.get(i) || []
+      for (const idx of group.indices) {
+        expandData.set(idx, {
+          repIndex: repIdx,
+          repValues,
+          targetValues: group.valueMaps.get(idx) || [],
+        })
+      }
+    } else if (!templatedIndices.has(i)) {
+      // 非模板文本，直接追加
+      const repIdx = uniqueTexts.length
+      uniqueTexts.push(texts[i])
+      expandData.set(i, { repIndex: repIdx, repValues: [], targetValues: [] })
+    }
+    // 模板组的非代表成员：跳过（expandData 展开时会指向代表位置）
   }
 
   return { uniqueTexts, expandData }

@@ -4,14 +4,18 @@
     <div class="statusbar">
       <div class="sb-left">
         <span class="sb-dot" :class="statusClass"></span>
-        <span class="sb-title">翻译</span>
+        <span class="sb-title">{{ debugTraces.length > 0 ? '🔍' + debugTraces.length : '翻译' }}</span>
       </div>
       <div class="sb-right">
+        <span class="sb-badge debug-badge" v-if="debugTraces.length > 0" @click="copyDebugTraces" style="cursor:pointer;background:#f59e0b;color:#000;" title="点击复制调试信息">📋复制</span>
         <span class="sb-badge" v-if="items.length" :class="{ active: hasTranslation }">
           {{ items.length }} 条{{ hasTranslation ? ' · 已翻译' : '' }}
         </span>
       </div>
     </div>
+
+    <!-- 调试区 -->
+    <textarea readonly class="debug-ta" :value="debugTraces.join('')" placeholder="翻译后此处显示调试信息..."></textarea>
 
     <!-- 主操作区 -->
     <div class="toolbar">
@@ -86,6 +90,17 @@
         <button v-else class="btn btn-ghost flex-1" @click="undoAll" :disabled="undoing || applying || !hasTranslation">
           撤销
         </button>
+      </div>
+
+      <!-- 调试面板：始终可见 -->
+      <div class="debug-panel">
+        <div class="debug-header">
+          <span class="debug-title">🔍 调试追踪 ({{ debugTraces.length }}条)</span>
+          <button class="btn btn-sm btn-ghost" @click="copyDebugTraces">📋 复制</button>
+          <button class="btn btn-sm btn-ghost" @click="debugTraces = []">✕ 清除</button>
+        </div>
+        <pre class="debug-log" v-if="debugTraces.length > 0">{{ debugTraces.join('') }}</pre>
+        <div class="debug-empty" v-else>翻译后此处显示调试信息</div>
       </div>
 
       <!-- 重翻 / 重试 -->
@@ -202,7 +217,7 @@
           'csv-changed': csvChangedIds.has(item.nodeIds[0]),
           'trans-error': translateErrors.has(item.nodeIds[0]),
           'applied-manually': appliedNodeIds.has(item.nodeIds[0]),
-          'untranslated': item.sourceText === item.translatedText
+          'untranslated': showUntranslatedBadge(item)
         }" v-for="(item, idx) in items" :key="item.nodeIds[0] || idx" @dblclick="navigateToNode(item)">
           <!-- 原文 — 上方全宽 -->
           <div class="item-source">
@@ -217,7 +232,7 @@
             <div class="item-label">
               译文
               <span class="error-badge" v-if="translateErrors.has(item.nodeIds[0])">翻译失败</span>
-              <span class="untranslated-badge" v-if="item.sourceText === item.translatedText">⚠️ 漏翻</span>
+              <span class="untranslated-badge" v-if="showUntranslatedBadge(item)">⚠️ 漏翻</span>
               <span class="proof-badge" v-if="item.corrected">校正</span>
               <span class="csv-badge" v-if="csvChangedIds.has(item.nodeIds[0])">导入变更</span>
               <span class="applied-badge" v-if="appliedNodeIds.has(item.nodeIds[0])">已应用</span>
@@ -467,7 +482,7 @@ import { sendMsgToPlugin } from '@messages/ui-sender'
 import { parseCSVRow, csvEncodeCell } from '@lib/parse-csv'
 import { formatCJKSpace } from '@lib/format-text'
 import { postProcessTranslation, restoreTrademarkSymbols, restoreStorageUnitFormatting, enforceGlossaryTerms, detectTranslationExpansion, sanitizeLineBreaks, cleanKey } from '@lib/post-process'
-import { translateBatch, proofreadBatch, fetchWithRetry, isProofreadScriptMismatch, detectTruncatedTexts, STYLE_PRESETS, SCENE_PRESETS, detectProductLine, buildTaskGlossaryHint } from '@lib/llm-api'
+import { translateBatch, proofreadBatch, fetchWithRetry, isProofreadScriptMismatch, detectTruncatedTexts, STYLE_PRESETS, SCENE_PRESETS, detectProductLine, buildTaskGlossaryHint, isUntranslatable } from '@lib/llm-api'
 import { DEFAULT_GLOSSARY_PRODUCTS_CSV } from '@lib/default-glossary'
 import { TRANSLATE_BATCH_SIZE, PROOFREAD_BATCH_SIZE, TOAST_DURATION_MS, CORRECTION_THRESHOLD, makeFontKey, parseFontKey, normalizeText } from '@lib/constants'
 import { convertStorageUnit } from '@lib/unit-convert'
@@ -483,6 +498,13 @@ const sourceLang = ref('auto')
 const glossaryProducts = ref<GlossaryEntry[]>([])
 const glossaryExclusive = ref<GlossaryEntry[]>([])
 const glossary = computed(() => [...glossaryProducts.value, ...glossaryExclusive.value])
+/** 术语库映射（响应式），供 UI 层漏翻检测复用，避免重复构建 */
+const glossaryMapForUi = computed(() => buildGlossaryMap())
+/** 判断条目是否应显示漏翻标记（兼容术语库中 source==target 的全球统一英文术语） */
+function showUntranslatedBadge(item: { sourceText: string; translatedText: string }): boolean {
+  if (item.sourceText !== item.translatedText) return false
+  return !isUntranslatable(item.sourceText, glossaryMapForUi.value)
+}
 const translationCache = ref<Record<string, string>>({})
 const llmConfig = ref<LLMConfig>({ apiKey: '', apiUrl: '', model: '', translationStyle: 'standard', translationStyleCustom: '', scenePreset: 'ecommerce', enableProofread: false, proofreadApiKey: '', proofreadApiUrl: '', proofreadModel: '' })
 
@@ -505,6 +527,8 @@ const appliedNodeIds = ref<Set<string>>(new Set())
 /** 正在单条重翻中的 nodeId 集合，用于禁用按钮防止重复提交 */
 const retranslatingIds = ref<Set<string>>(new Set())
 
+/** 调试追踪：收集含®文本的翻译结果，用户可一键复制 */
+const debugTraces = ref<string[]>(['[init] debug active\n'])
 const translateProgress = ref({ current: 0, total: 0 })
 const translateProgressPercent = computed(() =>
   translateProgress.value.total > 0 ? (translateProgress.value.current / translateProgress.value.total) * 100 : 0
@@ -781,8 +805,25 @@ function enforceSameSourceConsistency() {
     if (seen.has(key)) {
       const first = seen.get(key)!
       if (item.translatedText !== first) {
-        item.translatedText = first
-        unified++
+        // v7.5.7: 冲突时选择更好的译文，而不是盲目用第一条
+        const better = pickBetterTranslation(item.sourceText, first, item.translatedText)
+        seen.set(key, better)
+        if (item.translatedText !== better) {
+          item.translatedText = better
+          unified++
+        } else if (first !== better) {
+          // 回溯更新已处理过的同源条目
+          seen.set(key, better)
+          // 重新遍历：将之前用旧值覆盖的条目改回更好的值
+          for (const prev of items.value) {
+            if (prev === item) break
+            const prevKey = normalizeText(prev.sourceText)
+            if (prevKey === key && prev.translatedText === first) {
+              prev.translatedText = better
+              unified++
+            }
+          }
+        }
       }
     } else {
       seen.set(key, item.translatedText)
@@ -793,8 +834,37 @@ function enforceSameSourceConsistency() {
   }
 }
 
+/** 从两个译文中选择更好的：优先实际翻译过的，其次有®的 */
+function pickBetterTranslation(source: string, a: string, b: string): string {
+  // 规则1: 优先选被翻译过的（≠源文）
+  const aTranslated = a !== source
+  const bTranslated = b !== source
+  if (aTranslated && !bTranslated) return a
+  if (!aTranslated && bTranslated) return b
+  // 规则2: 源文有®时，优先选保留®的
+  if (/[®™©]/.test(source)) {
+    const aHasReg = /[®™©]/.test(a)
+    const bHasReg = /[®™©]/.test(b)
+    if (aHasReg && !bHasReg) return a
+    if (!aHasReg && bHasReg) return b
+  }
+  // 规则3: 默认保留第一个（保持原有行为）
+  return a
+}
+
 // 取消操作
 // ============================================================
+/** 复制调试追踪日志到剪贴板 */
+async function copyDebugTraces() {
+  try {
+    const text = debugTraces.value.join('')
+    await navigator.clipboard.writeText(text)
+    toastMessage.value = `已复制 ${debugTraces.value.length} 条追踪日志`
+  } catch {
+    toastMessage.value = '复制失败，请手动选择复制'
+  }
+}
+
 function cancelOperation() {
   cancelFlag.value = true
   showToast('正在取消...', 'warning')
@@ -952,7 +1022,12 @@ async function startTranslate() {
       autoSkipped++
     } else if (normalizedGlossaryMap.has(cleanKey(trimmed))) {
       // 术语库精确匹配（去®™©后）：直接使用术语库译文，不送API
-      item.translatedText = normalizedGlossaryMap.get(cleanKey(trimmed))!
+      let glossTrans = normalizedGlossaryMap.get(cleanKey(trimmed))!
+      // 源文有®™©但术语库译文没有 → 恢复商标符号
+      if (/[®™©]/.test(trimmed)) {
+        glossTrans = restoreTrademarkSymbols([trimmed], [glossTrans])[0]
+      }
+      item.translatedText = glossTrans
       autoSkipped++
     } else {
       // 检测纯存储规格（如 128GB、256MB/s），本地做单位转换
@@ -966,8 +1041,11 @@ async function startTranslate() {
 
   // 分离需要 API 翻译和已自动沿用的
   const needApi = toTranslate.filter(it => !it.translatedText)
-  // 按源文长度排序：短技术标签聚在一起，长营销文案聚在一起，避免批次内交叉污染
-  needApi.sort((a, b) => a.sourceText.length - b.sourceText.length)
+  // v7.5.5: 保持 Figma 图层扫描顺序，不排序
+  // 排序（短前长后）会导致 LLM 先看到短文（产品名→保留英文），
+  // 建立"不翻译"惯性后长描述句也跟着不翻，造成系统性漏翻
+  // v7.5.7: 调试 — 翻译开始时写入标记
+  debugTraces.value = [`=== 翻译开始 targetLang=${targetLang.value} apiTotal=${needApi.length} ===\n`]
   const apiTotal = needApi.length
 
   if (apiTotal === 0) {
@@ -1038,12 +1116,29 @@ async function startTranslate() {
 
         try {
           // 检查缓存：分离已缓存和未缓存的文本
+          // v7.5.6: 脏缓存拒绝 — 防止旧版本bug污染缓存
+          const isDirtyCache = (hit: string, sourceText: string): boolean => {
+            // 1. 含__XXX_N__占位符残留（unmaskEntities失败）
+            if (/__[A-Z]+_\d+__/.test(hit)) return true
+            // 2. "译文"===源文（非en目标语言）= 管道回退英文被误缓存
+            if (targetLang.value !== 'en' && hit.trim().toLowerCase() === sourceText.trim().toLowerCase()) return true
+            // 3. v7.5.7: 源文有®/™/©但缓存结果没有 = 旧版本商标恢复缺陷
+            if (/[®™©]/.test(sourceText) && !/[®™©]/.test(hit)) return true
+            return false
+          }
           const uncachedIndices: number[] = []
           const cachedResult: (string | null)[] = texts.map((t, idx) => {
             const hit = cache[cacheKey(t)]
-            if (hit !== undefined) {
+            if (hit !== undefined && !isDirtyCache(hit, t)) {
               cacheHits++
+              if (t.includes('Lexar') && t.includes('®')) {
+                debugTraces.value.push(`[CACHE-HIT] src="${t.slice(0,60)}..." → hit="${hit.slice(0,60)}..." has®=${/[®™©]/.test(hit)}\n`)
+              }
               return hit
+            }
+            // 脏缓存 → 清除并重新翻译
+            if (hit !== undefined) {
+              delete cache[cacheKey(t)]
             }
             uncachedIndices.push(idx)
             return null
@@ -1057,6 +1152,15 @@ async function startTranslate() {
             const uniqueResult = await translateBatch(uniqueTexts, targetLang.value, glossaryMap, llmConfig.value, sourceLang.value === 'auto' ? undefined : sourceLang.value, pageName.value || undefined, fileName.value || undefined, crossBatchTerms, taskGlossaryHint)
             // 将模板译文展开回原始文本
             const expandedResult = expandBatch(uniqueResult, expandData, uncachedTexts.length)
+            // v7.5.7: 追踪关键文本在各环节的值
+            for (let u = 0; u < uncachedTexts.length; u++) {
+              const src = uncachedTexts[u]
+              const exp = expandedResult[u] || ''
+              if (src.includes('BIT Running') || src.includes('Offers advanced') || src.includes('Lexar®')) {
+                const isReverted = src === exp
+                debugTraces.value.push(`[TRACE] u=${u} expandResult="${exp.slice(0,100)}..." src==exp=${isReverted}\n`)
+              }
+            }
             // 合并缓存+API结果
             translated = texts.map((_, idx) => {
               if (cachedResult[idx] !== null) return cachedResult[idx]!
@@ -1066,14 +1170,33 @@ async function startTranslate() {
             // 更新缓存
             for (let j = 0; j < uncachedIndices.length; j++) {
               const srcIdx = uncachedIndices[j]
-              cache[cacheKey(texts[srcIdx])] = expandedResult[j] || ''
+              // v7.5.6: 不缓存含__XXX_N__占位符的结果（防止unmaskEntities失败污染缓存）
+              const resultText = expandedResult[j] || ''
+              if (!/__[A-Z]+_\d+__/.test(resultText)) {
+                cache[cacheKey(texts[srcIdx])] = resultText
+              }
             }
           } else {
             translated = cachedResult as string[]
           }
 
+          // v7.5.7: 对所有结果统一恢复商标符号
+          // 缓存结果可能来自旧版本（不含®），必须在此兜底
+          translated = restoreTrademarkSymbols(texts, translated)
+
           for (let j = 0; j < batch.length; j++) {
             batch[j].translatedText = formatCJKSpace(translated[j] || '', targetLang.value)
+          }
+          // v7.5.7: 调试追踪 — 收集所有翻译结果，漏翻/掉®特别标注
+          for (let j = 0; j < batch.length; j++) {
+            const src = batch[j].sourceText
+            const tgt = batch[j].translatedText
+            const flags: string[] = []
+            if (src === tgt) flags.push('⚠️漏翻')
+            if (/[®™©]/.test(src) && !/[®™©]/.test(tgt)) flags.push('❌掉®')
+            if (/[®™©]/.test(src) && /[®™©]/.test(tgt)) flags.push('✅®OK')
+            const tag = flags.length > 0 ? ` [${flags.join(' ')}]` : ''
+            debugTraces.value.push(`[${j}]${tag}\n  源: ${src.slice(0, 100)}\n  译: ${tgt.slice(0, 100)}\n`)
           }
         } catch (e) {
           failedBatches++
@@ -2251,9 +2374,28 @@ onMounted(() => {
         break
       }
 
-      case PluginMessage.TRANSLATION_CACHE_LOADED:
-        translationCache.value = (data as Record<string, string>) || {}
+      case PluginMessage.TRANSLATION_CACHE_LOADED: {
+        const rawCache = (data as Record<string, string>) || {}
+        // v7.5.6: 启动时清理脏缓存（旧版本bug残留：__XXX_N__占位符 + 英文=源文）
+        let purged = 0
+        for (const [key, val] of Object.entries(rawCache)) {
+          if (/__[A-Z]+_\d+__/.test(val)) { delete rawCache[key]; purged++; continue }
+          // 解析key获取源文：格式 normalizeText(source) + \x00 + targetLang + \x00 + glossaryHash
+          const srcEnd = key.indexOf('\x00')
+          if (srcEnd > 0) {
+            const sourceText = key.slice(0, srcEnd)
+            if (sourceText && val.trim().toLowerCase() === sourceText.trim().toLowerCase()) {
+              delete rawCache[key]; purged++
+            }
+          }
+        }
+        if (purged > 0) {
+          console.warn(`[translate] 启动清理了 ${purged} 条脏缓存`)
+          sendMsgToPlugin(UIMessage.SAVE_TRANSLATION_CACHE, rawCache)
+        }
+        translationCache.value = rawCache
         break
+      }
 
       case PluginMessage.APPLY_PROGRESS: {
         const p = data as { current: number; total: number }
@@ -2645,6 +2787,59 @@ body {
   align-items: center;
 }
 .toolbar-row { display: flex; gap: 6px; align-items: center; }
+
+/* ---- 调试面板 ---- */
+.debug-ta {
+  display: block !important;
+  width: 100%;
+  min-height: 80px;
+  max-height: 160px;
+  margin: 0;
+  padding: 6px 8px;
+  font-size: 10px;
+  font-family: monospace;
+  line-height: 1.4;
+  color: #333;
+  background: #fffde7;
+  border: 2px solid #f59e0b;
+  border-radius: 0;
+  resize: vertical;
+  box-sizing: border-box;
+}
+.debug-panel {
+  margin-top: 10px;
+  border: 2px solid #f59e0b;
+  border-radius: 6px;
+  background: #fffbeb;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.debug-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: #fef3c7;
+  border-bottom: 1px solid #f59e0b;
+  position: sticky;
+  top: 0;
+}
+.debug-title { font-size: 12px; font-weight: 600; color: #92400e; }
+.debug-log {
+  margin: 0;
+  padding: 8px;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: #333;
+}
+.debug-empty {
+  padding: 8px;
+  font-size: 11px;
+  color: #999;
+  text-align: center;
+}
 
 /* ---- 翻译风格栏 ---- */
 .style-bar {

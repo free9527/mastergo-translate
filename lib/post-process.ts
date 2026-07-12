@@ -98,10 +98,50 @@ export function restoreTrademarkSymbols(sourceTexts: string[], translatedTexts: 
         const punctLen = punctMatch ? punctMatch[0].length : 0
         result = result.slice(0, insertPos + punctLen) + symbol + result.slice(insertPos + punctLen)
       } else {
-        // 找不到该词，跳过（不插入）。
-        // 原因：原文词汇可能在译文中被重组/复合（如德语 Water+Resistance→Wasserfestigkeit），
-        // 此时不应追加符号到末尾——会导致 ™ 堆积，触发校对 LLM 逐字符复制，产生乱码。
-        // 符号丢失的风险远小于全文 ™ 泛滥。
+        // v7.5.5: 词未匹配到 → 多重兜底定位
+        // Layer A: 词首3字符子串匹配（处理被术语库轻微修改的词）
+        if (word.length >= 4) {
+          const prefix = escapedWord.slice(0, Math.max(3, Math.floor(word.length * 0.6)))
+          const prefixRe = new RegExp(prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
+          const prefixMatch = prefixRe.exec(result)
+          if (prefixMatch && prefixMatch.index < Math.min(40, result.length)) {
+            const insertPos = prefixMatch.index + prefixMatch[0].length
+            const after = result.slice(insertPos)
+            const punctMatch = after.match(/^(\s*[.,;:!?)]?)/)
+            const punctLen = punctMatch ? punctMatch[0].length : 0
+            result = result.slice(0, insertPos + punctLen) + symbol + result.slice(insertPos + punctLen)
+            continue
+          }
+        }
+        // Layer B: 源文首词 → 译文首词位置兜底
+        // 品牌名通常在句首，译文中也在前20字符内
+        const srcStartsWithWord = new RegExp(`^\\s*${escapedWord}\\b`, 'i').test(source)
+        if (srcStartsWithWord) {
+          const firstCapitalized = result.match(/^[^A-Za-z]*([A-Z][a-z]{2,})/)
+          if (firstCapitalized && firstCapitalized.index !== undefined && firstCapitalized.index < 20) {
+            const insertPos = firstCapitalized.index! + firstCapitalized[1].length
+            const after = result.slice(insertPos)
+            const punctMatch = after.match(/^(\s*[.,;:!?)]?)/)
+            const punctLen = punctMatch ? punctMatch[0].length : 0
+            result = result.slice(0, insertPos + punctLen) + symbol + result.slice(insertPos + punctLen)
+            continue
+          }
+        }
+        // Layer C: 词形变化匹配（如 Water+Resistance→Wasserfestigkeit 的德语复合词）
+        // 仅在 word >= 5 字符时尝试前 4 字符匹配，限制在前 60 字符内
+        if (word.length >= 5) {
+          const core = escapedWord.slice(0, 4)
+          const coreRe = new RegExp(core.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
+          const coreMatch = coreRe.exec(result)
+          if (coreMatch && coreMatch.index < 60) {
+            const insertPos = coreMatch.index + coreMatch[0].length
+            const after = result.slice(insertPos)
+            const punctMatch = after.match(/^(\s*[.,;:!?)]?)/)
+            const punctLen = punctMatch ? punctMatch[0].length : 0
+            result = result.slice(0, insertPos + punctLen) + symbol + result.slice(insertPos + punctLen)
+          }
+          // 找不到也不追加到末尾 — 符号丢失风险远小于 ™ 泛滥
+        }
       }
     }
 
@@ -321,9 +361,10 @@ export function postProcessTranslation(text: string, lang: string): string {
   // 还原 ※ → *（译前转义避免 Qwen 将其解析为 markdown 列表标记）
   result = result.replace(/※\s*/g, '* ')
 
-  // 清理 LLM 偶尔输出的 $N 伪引用标记（如 3.725GB$3 → 3.725GB）
-  // 这些标记通常出现在数字/单位后面，是 LLM 的幻觉输出
-  result = result.replace(/(\d)\$\d+/g, '$1')
+  // 清理 LLM 偶尔输出的 $N 伪引用标记（如 3.725GB$3 → 3.725GB, 8TB$3 → 8TB）
+  // 必须在早期执行：后续语言特定处理可能会在$N前加空格
+  result = result.replace(/(\d+[A-Za-z]*)\s*\$\d+/g, '$1')
+  result = result.replace(/(\d+\s*[A-Za-z]+)\s*\$\d+/g, '$1')
 
   switch (lang) {
     case 'fr':
@@ -359,6 +400,9 @@ export function postProcessTranslation(text: string, lang: string): string {
   if (['de', 'fr', 'es', 'it', 'pt', 'pt-BR', 'nl', 'pl', 'sv', 'tr'].includes(lang)) {
     result = postProcessEuropeanNumbers(result, lang)
   }
+
+  // v7.5.7: 最终$N清理 — 在所有处理之后执行，确保$N伪引用彻底清除
+  result = result.replace(/(\d+[A-Za-z]*)\s*\$\d+/g, '$1')
 
   return result
 }
@@ -810,7 +854,14 @@ export function detectBrandInjection(
       const wordBoundaryRe = new RegExp(`\\b${escapedToken}\\b`, 'i')
 
       const transHasBrand = wordBoundaryRe.test(trans)
-      const srcHasBrand = wordBoundaryRe.test(src)
+      let srcHasBrand = wordBoundaryRe.test(src)
+      // v7.5.8: 源文可能有词尾变化（如 SSDs vs SSD），导致 \b 不匹配
+      // 例如源文 "Gen 5 SSDs" 中 \bssd\b 不匹配（s 紧跟 d），但译文 "Gen 5 SSD" 中匹配
+      // → 误判为品牌注入。此处对常见英文词尾做宽松匹配。
+      if (!srcHasBrand && transHasBrand) {
+        const suffixRe = new RegExp(`\\b${escapedToken}(?:s|es|'s|ing|ed)\\b`, 'i')
+        srcHasBrand = suffixRe.test(src)
+      }
 
       if (transHasBrand && !srcHasBrand) {
         // v7.5: 常见英文词品牌（play/silver/gold/diamond/armor）仅在伴随
