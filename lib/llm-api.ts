@@ -2,7 +2,7 @@ import { LLMConfig, LANGUAGES, MARKETING_ONLY_TERMS, COMPLIANCE_TERMS, isMarketi
 import { API_MAX_RETRIES, API_RETRY_DELAY_MS, API_TIMEOUT_MS, DEBUG_MODE } from '@lib/constants'
 import { filterRelevantGlossary } from '@lib/glossary-filter'
 import { normalizeTextForLLM, protectCjkSpaces } from '@lib/text-normalizer'
-import { maskEntities, unmaskEntities, maskEntitiesForProofread } from '@lib/entity-masker'
+import { maskEntities, unmaskEntities, maskEntitiesForProofread, maskGlossaryTerms, unmaskGlossaryTerms } from '@lib/entity-masker'
 import { postProcessTranslation, restoreTrademarkSymbols, restoreStorageUnitFormatting, enforceGlossaryTerms, capitalizeFirstLetter, detectTranslationExpansion, detectBrandInjection, validateNumbers } from '@lib/post-process'
 import {
   IRON_RULES,
@@ -557,9 +557,9 @@ export function buildSystemPrompt(params: {
   // ── LANG_SPECIFIC: language-specific grammar/typography/terminology rules (target language, always) ──
   const langBlock_str = langBlock ? `\n\n${langBlock}` : ''
 
-  // ⛔ TONE & STYLE removed — moved to proofread only.
-  //    Translation LLM focuses on accuracy + completeness + terminology.
   // ⛔ FEW-SHOT removed — adds prompt length without improving quality.
+  // ⛔ TONE & STYLE are injected via renderLangForTranslate (productTone + styleGuide).
+  //    Proofread does NOT receive tone/style — it focuses on correctness only.
 
   // ── Assembly: IDENTITY → IRON_RULES → TERMINOLOGY → LANG_SPECIFIC → OUTPUT ──
   return `${role}\n\n${constraintsBlock}${glossaryBlock}${langBlock_str}\n\n${OUTPUT_ANCHOR}`
@@ -636,8 +636,12 @@ export async function translateBatch(
   // 仅遮蔽正则匹配的实体（产品型号/URL/Email/测量值），不遮蔽术语。
   const { texts: maskedTexts, entityMap } = maskEntities(preprocessedTexts)
 
+  // v7.5: 术语遮蔽 — 用 ZZ{N}ZZ 占位符替换术语库中的英文术语
+  // LLM 只看到占位符，消除"保留偏置"。译后 unmaskGlossaryTerms 还原为目标语。
+  const { texts: glossaryMaskedTexts, termMap } = maskGlossaryTerms(maskedTexts, glossaryMap)
+
   // CJK 空格保护：直接删除 CJK 主导文本中的空格，防止 LLM 误判为条目分隔符
-  const spaceProtectedTexts = protectCjkSpaces(maskedTexts)
+  const spaceProtectedTexts = protectCjkSpaces(glossaryMaskedTexts)
 
   // ™®©符号保护：翻译前移除源文中的商标符号，防止 LLM 乱加符号到其他位置
   // restoreTrademarkSymbols 会在翻译后用原始源文（texts）把符号加回来
@@ -825,6 +829,17 @@ This is a HARD REQUIREMENT — failure to translate will result in poor user exp
     result = unmaskEntities(result, entityMap)
   }
 
+  // v7.5: 还原术语占位符 ZZ{N}ZZ → 目标语译文（译前 maskGlossaryTerms 的逆操作）
+  // 必须在 enforceGlossaryTerms 之前执行，确保 LLM 输出的占位符被正确替换
+  if (termMap.size > 0) {
+    const { texts: unmaskedGlossary, missingIndices } = unmaskGlossaryTerms(result, termMap)
+    result = unmaskedGlossary
+    if (missingIndices.size > 0) {
+      debugWarn(`[translateBatch] ${missingIndices.size} 条术语占位符未找到，兜底 enforceGlossaryTerms`,
+        [...missingIndices].map(j => ({ idx: j, text: result[j]?.slice(0, 80) })))
+    }
+  }
+
   // 恢复 HTML 标签
   if (htmlTags.size > 0) {
     result = restoreHtmlTags(result, htmlTags)
@@ -987,12 +1002,98 @@ This is a HARD REQUIREMENT — failure to translate will result in poor user exp
 
       if (retriedUntranslated.size > 0) {
         debugWarn(
-          `[translateBatch] ${retriedUntranslated.size} 条漏翻重试后仍未翻译，回退到源文作为兜底`,
+          `[translateBatch] ${retriedUntranslated.size} 条漏翻重试后仍未翻译，执行激进逐条翻译`,
           [...retriedUntranslated].map(j => ({ idx: j, text: texts[j].slice(0, 80) })),
         )
-        // ✅ 回退到源文：确保用户看到英文原文，而不是未翻译的 LLM 输出
+
+        // ═══════════════════════════════════════════════════════════
+        // v7.4 三层兜底：LLM 重试失败后，不再回退到英文源文
+        // Layer 1: 激进逐条翻译 — 极简 prompt，单条发送，逼 LLM 翻
+        // Layer 2: 术语库组合 — enforceGlossaryTerms 替换已知术语
+        // Layer 3: 标记失败 — ⚠️[UNTRANSLATED] 比显示英文源文更明确
+        // ═══════════════════════════════════════════════════════════
+
+        // Layer 1: 激进逐条翻译
+        const aggressiveTargetDisplayName = getLangDisplayName(targetLang, !['zh-CN', 'zh-TW', 'ja', 'ko'].includes(targetLang))
+        const aggressiveSystemPrompt = `You are a translator. Translate the given text to ${aggressiveTargetDisplayName}.
+Brand names and technical abbreviations (Lexar, AMD, Intel, SSD, PCIe, NVMe, DDR5, etc.) stay in English.
+ALL other words (verbs, adjectives, nouns, prepositions, articles) MUST be translated to ${aggressiveTargetDisplayName}.
+CRITICAL: Title Case or ALL CAPS text is NOT a reason to skip translation — translate it normally.
+Example: "BIT Running for 30 Minutes Temperature Comparison" must become a proper ${aggressiveTargetDisplayName} translation, NOT kept in English.
+Output ONLY the translated text. No explanations, no prefixes, no JSON. Just the translation.`
+
+        const stillUntranslatedAfterAggressive = new Set<number>()
+
         for (const j of retriedUntranslated) {
-          result[j] = texts[j]
+          const srcText = texts[j]
+          if (!srcText) { stillUntranslatedAfterAggressive.add(j); continue }
+
+          try {
+            const agRes = await fetchWithRetry(config.apiUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${config.apiKey}`,
+              },
+              body: JSON.stringify({
+                model: config.model,
+                messages: [
+                  { role: 'system', content: aggressiveSystemPrompt },
+                  { role: 'user', content: `Translate to ${aggressiveTargetDisplayName}:\n"${srcText}"` },
+                ],
+                temperature: 0.3,
+              }),
+            })
+
+            if (agRes.ok) {
+              const agData = agRes.json as Record<string, unknown>
+              const agContent: string = (agData.choices as Array<{ message?: { content?: string } }>)?.[0]?.message?.content || ''
+              const agTranslated = agContent.trim()
+                .replace(/^"+|"+$/g, '')           // 去掉首尾引号
+                .replace(/^\[?\d+\]?\s*\.?\s*/, '') // 去掉 [N] 或 N. 前缀
+                .trim()
+
+              if (agTranslated && agTranslated !== srcText) {
+                // LLM 确实翻译了 → 使用激进翻译结果
+                result[j] = agTranslated
+                debugWarn(`[translateBatch] 激进翻译成功: "${srcText.slice(0, 50)}" → "${agTranslated.slice(0, 50)}"`)
+                continue
+              }
+            }
+          } catch (e) {
+            debugWarn(`[translateBatch] 激进翻译请求失败:`, e)
+          }
+
+          stillUntranslatedAfterAggressive.add(j)
+        }
+
+        // Layer 2 + 3: 术语库组合兜底 + 标记失败
+        if (stillUntranslatedAfterAggressive.size > 0) {
+          debugWarn(
+            `[translateBatch] ${stillUntranslatedAfterAggressive.size} 条激进翻译后仍漏翻，使用术语库组合兜底`,
+            [...stillUntranslatedAfterAggressive].map(j => ({ idx: j, text: texts[j].slice(0, 80) })),
+          )
+
+          const fallbackSources = [...stillUntranslatedAfterAggressive].map(j => texts[j])
+          const fallbackTranslations = [...stillUntranslatedAfterAggressive].map(j => result[j] || texts[j])
+          const composedResults = enforceGlossaryTerms(
+            fallbackSources,
+            fallbackTranslations,
+            glossaryMap,
+            new Set(),
+          )
+          let k = 0
+          for (const j of stillUntranslatedAfterAggressive) {
+            const composed = composedResults[k] || ''
+            k++
+            if (composed && composed !== texts[j]) {
+              result[j] = composed
+              debugWarn(`[translateBatch] 术语库组合兜底: "${texts[j].slice(0, 50)}" → "${composed.slice(0, 50)}"`)
+            } else {
+              // Layer 3: 术语库也无法帮助，标记翻译失败
+              result[j] = `⚠️[UNTRANSLATED] ${texts[j]}`
+            }
+          }
         }
       }
     }
@@ -1181,17 +1282,21 @@ export async function proofreadBatch(
     return t || items[i].translatedText
   })
 
-  // ✅ 商标符号还原：校对 LLM 可能丢失或错放 ™®© 符号
-  const proofreadSourceTexts = items.map(it => it.sourceText)
-  resultTexts = restoreTrademarkSymbols(proofreadSourceTexts, resultTexts)
-
   // ✅ 术语库强制校准：校对 LLM 可能修改了术语
   // 只对校对修改过的文本做校准，避免重复处理
+  // ⚠️ 必须在 restoreTrademarkSymbols 之前执行！
+  // 原因：enforceGlossaryTerms 的精确匹配会用不含 ®™© 的术语库目标值替换译文，
+  // 如果先还原符号再校准，符号会被覆盖丢失。
+  const proofreadSourceTexts = items.map(it => it.sourceText)
   const proofreadGlossaryMap = new Map<string, string>()
   for (const [k, v] of glossaryMap.entries()) {
     proofreadGlossaryMap.set(k, v)
   }
   resultTexts = enforceGlossaryTerms(proofreadSourceTexts, resultTexts, proofreadGlossaryMap, new Set())
+
+  // ✅ 商标符号还原：校对 LLM 可能丢失或错放 ™®© 符号
+  // 必须在 enforceGlossaryTerms 之后执行，确保符号不会被术语库校准覆盖
+  resultTexts = restoreTrademarkSymbols(proofreadSourceTexts, resultTexts)
 
   // ✅ 脚本检测：防止校对 LLM 输出了与目标语言不符的文字
   for (let i = 0; i < resultTexts.length; i++) {
@@ -1238,6 +1343,25 @@ export async function proofreadBatch(
 
   for (let i = 0; i < results.length; i++) {
     results[i].text = resultTexts[i]
+  }
+
+  // v7.5.1: 校对后漏翻检测 — 防止校对 LLM 将译文改回英文
+  const proofreadSources = items.map(it => it.sourceText)
+  const proofreadFinals = resultTexts.map(t => t || '')
+  const proofreadUntranslated = detectUntranslatedText(proofreadSources, proofreadFinals, targetLang, glossaryMap)
+  if (proofreadUntranslated.size > 0) {
+    debugWarn(
+      `[proofreadBatch] 校对后检测到 ${proofreadUntranslated.size} 条漏翻，回退到校对前译文`,
+      [...proofreadUntranslated].map(j => ({
+        idx: j,
+        source: proofreadSources[j].slice(0, 60),
+        proofreadResult: proofreadFinals[j].slice(0, 60),
+        fallback: items[j].translatedText.slice(0, 60),
+      })),
+    )
+    for (const j of proofreadUntranslated) {
+      results[j].text = items[j].translatedText  // 回退到翻译管道的输出
+    }
   }
 
   return results
@@ -1303,9 +1427,9 @@ export function detectTruncatedTexts(
 // ============================================================
 
 const LANG_FUNCTION_WORDS: Record<string, Set<string>> = {
-  'de': new Set(['und', 'oder', 'mit', 'für', 'von', 'zu', 'auf', 'bei', 'der', 'die', 'das', 'ein', 'eine', 'ist', 'sind', 'hat', 'haben', 'wird', 'werden', 'kann', 'muss', 'soll', 'nicht', 'auch', 'nach', 'über', 'unter', 'zwischen', 'durch', 'ohne', 'gegen', 'seit', 'während', 'weil', 'dass', 'wenn', 'als', 'dann', 'noch', 'schon', 'nur', 'mehr', 'sehr', 'hier', 'dort']),
-  'fr': new Set(['et', 'ou', 'mais', 'donc', 'car', 'que', 'qui', 'dans', 'sur', 'sous', 'avec', 'sans', 'pour', 'par', 'entre', 'vers', 'chez', 'contre', 'depuis', 'pendant', 'avant', 'après', 'selon', 'le', 'la', 'les', 'un', 'une', 'des', 'du', 'est', 'sont', 'a', 'ont', 'être', 'avoir']),
-  'nl': new Set(['en', 'of', 'maar', 'dus', 'met', 'voor', 'van', 'tot', 'op', 'bij', 'door', 'over', 'onder', 'tussen', 'zonder', 'tegen', 'sinds', 'tijdens', 'na', 'omdat', 'als', 'wanneer', 'dan', 'nog', 'ook', 'zeer', 'hier', 'daar', 'de', 'het', 'een', 'is', 'zijn', 'heeft', 'hebben']),
+  'de': new Set(['und', 'oder', 'mit', 'für', 'von', 'zu', 'auf', 'bei', 'der', 'die', 'das', 'ein', 'eine', 'ist', 'sind', 'hat', 'haben', 'wird', 'werden', 'kann', 'muss', 'soll', 'nicht', 'auch', 'nach', 'über', 'unter', 'zwischen', 'durch', 'ohne', 'gegen', 'seit', 'während', 'weil', 'dass', 'wenn', 'als', 'dann', 'noch', 'schon', 'nur', 'mehr', 'sehr', 'hier', 'dort', 'in', 'im', 'am', 'zum', 'zur', 'aus', 'ab', 'an', 'um', 'ins', 'vom', 'beim', 'des', 'dem', 'den', 'einen', 'einem', 'einer', 'sich', 'wie', 'so', 'auch', 'aber', 'doch', 'denn', 'vor', 'hinter', 'neben', 'über', 'bis', 'ab', 'seit', 'vor']),
+  'fr': new Set(['et', 'ou', 'mais', 'donc', 'car', 'que', 'qui', 'dans', 'sur', 'sous', 'avec', 'sans', 'pour', 'par', 'entre', 'vers', 'chez', 'contre', 'depuis', 'pendant', 'avant', 'après', 'selon', 'le', 'la', 'les', 'un', 'une', 'des', 'du', 'est', 'sont', 'a', 'ont', 'être', 'avoir', 'en', 'ne', 'pas', 'plus', 'ce', 'cette', 'ces', 'son', 'sa', 'ses', 'leur', 'leurs', 'tout', 'toute', 'tous', 'fait', 'faire', 'peut', 'peuvent', 'doit', 'aussi', 'très', 'bien', 'comme', 'plus', 'moins', 'alors', 'donc', 'si']),
+  'nl': new Set(['en', 'of', 'maar', 'dus', 'met', 'voor', 'van', 'tot', 'op', 'bij', 'door', 'over', 'onder', 'tussen', 'zonder', 'tegen', 'sinds', 'tijdens', 'na', 'omdat', 'als', 'wanneer', 'dan', 'nog', 'ook', 'zeer', 'hier', 'daar', 'de', 'het', 'een', 'is', 'zijn', 'heeft', 'hebben', 'in', 'te', 'niet', 'aan', 'uit', 'om', 'er', 'al', 'wel', 'geen', 'moet', 'kan', 'wordt', 'zou', 'deze', 'dit', 'dat', 'wie', 'wat', 'waar', 'hoe', 'toch', 'eens', 'weer']),
   'sv': new Set(['och', 'eller', 'men', 'så', 'för', 'med', 'till', 'på', 'i', 'av', 'från', 'om', 'vid', 'hos', 'genom', 'mellan', 'utan', 'mot', 'sedan', 'under', 'efter', 'innan', 'eftersom', 'när', 'som', 'då', 'än', 'också', 'mycket', 'här', 'där', 'den', 'det', 'en', 'ett', 'är', 'har', 'blir']),
   'es': new Set(['y', 'o', 'pero', 'que', 'porque', 'con', 'para', 'por', 'desde', 'hasta', 'entre', 'sin', 'sobre', 'según', 'durante', 'antes', 'después', 'mientras', 'cuando', 'como', 'si', 'aunque', 'sino', 'también', 'muy', 'más', 'menos', 'aquí', 'ahí', 'el', 'la', 'los', 'las', 'un', 'una', 'es', 'son', 'tiene', 'tienen']),
   'pt': new Set(['e', 'ou', 'mas', 'que', 'porque', 'com', 'para', 'por', 'desde', 'até', 'entre', 'sem', 'sobre', 'durante', 'antes', 'depois', 'enquanto', 'quando', 'como', 'se', 'embora', 'também', 'muito', 'mais', 'menos', 'aqui', 'aí', 'o', 'a', 'os', 'as', 'um', 'uma', 'é', 'são', 'tem', 'têm']),
@@ -1343,8 +1467,9 @@ function containsLanguageFunctionWords(text: string, targetLang: string): boolea
   for (const w of textWords) {
     if (words.has(w)) matchCount++
   }
-  // 至少2个功能词匹配，且占比 > 10% → 确认是目标语言
-  return matchCount >= 2 && matchCount / textWords.length > 0.1
+  // v7.5.1: 至少1个功能词匹配，且占比 >= 3% → 确认是目标语言
+  // 降低阈值防止短文本漏检（如荷兰语 1/20=5% 恰好被 >0.05 拒绝）
+  return matchCount >= 1 && matchCount / textWords.length >= 0.03
 }
 
 // ============================================================
@@ -1356,19 +1481,50 @@ function containsLanguageFunctionWords(text: string, targetLang: string): boolea
  * 检测文本是否不需要翻译（品牌名/技术缩写/存储容量等全球统一表达）。
  * 核心原则：纯产品名（无上下文）→ 不翻译是正确的；有上下文（动词、介词、描述性文本）→ 必须翻译
  */
-function isUntranslatable(s: string): boolean {
+function isUntranslatable(s: string, glossaryMap?: Map<string, string>): boolean {
+  // 0. 术语库检查：如果源文在术语库中且目标语言与源文相同，不算漏翻
+  if (glossaryMap) {
+    const glossaryValue = glossaryMap.get(s) || glossaryMap.get(s.toLowerCase().replace(/[®™©]/g, '').trim())
+    if (glossaryValue && glossaryValue.toLowerCase() === s.toLowerCase().replace(/[®™©]/g, '').trim()) {
+      return true // 术语库中英文目标语言一致，不算漏翻
+    }
+  }
+
   // 1. 纯品牌名（首字母大写 + 可选 ®™© + 空格 + 其他字母）
-  if (/^[A-Z][a-zA-Z\s®™©]*$/.test(s)) return true
+  // v7.5 修复：原正则 /^[A-Z][a-zA-Z\s®™©]*$/ 会误匹配任何英文句子。
+  // 新增功能词排除：含 for/your/the/with 等常见英文功能词的文本不是品牌名。
+  if (/^[A-Z][a-zA-Z\s®™©]*$/.test(s)) {
+    const FUNCTION_WORDS = /\b(the|a|an|for|your|our|their|this|that|these|those|with|from|have|been|will|would|could|should|may|might|can|must|are|were|was|has|had|its|and|but|or|not|also|very|more|most|some|any|each|every|all|both|few|many|much|such|just|only|than|then|now|when|where|which|who|whom|whose|why|how|about|above|after|again|against|along|among|around|before|behind|below|beside|between|beyond|during|except|inside|into|near|onto|outside|over|past|since|through|toward|under|until|upon|within|without)\b/i
+    if (!FUNCTION_WORDS.test(s)) return true
+  }
 
   // 2. 数字 + 单位（128GB, 800MB/s, 1TB 等）— 全球统一格式
   if (/^[\d,.]+\s*(GB|MB|TB|KB|MB\/s|GB\/s|TB\/s|MHz|GHz)\b/i.test(s)) return true
 
   // 3. 纯技术缩写（SSD, USB, NVMe, PCIe 等）— 全球统一
-  if (/^(SSD|USB|NVMe|PCIe|DDR\d*|HDD|SD|SDHC|SDXC|CFexpress|CFe|SATA|DRAM|NAND|LCD|LED|OLED|HDR|RGB|WiFi|BT|NFC|GPS)$/i.test(s)) return true
+  // v7.4: 扩展技术名词列表，包含 ECC, PMIC, XMP, EXPO 等
+  // v7.4: 支持多个技术缩写的组合（如 "DDR5 ECC PMIC"）
+  const TECH_ABBREVS = new Set([
+    'ssd', 'usb', 'nvme', 'pcie', 'ddr', 'ddr2', 'ddr3', 'ddr4', 'ddr5',
+    'hdd', 'sd', 'sdhc', 'sdxc', 'cfexpress', 'cfe', 'sata', 'dram', 'nand',
+    'lcd', 'led', 'oled', 'hdr', 'rgb', 'wifi', 'bt', 'nfc', 'gps',
+    'ecc', 'pmic', 'xmp', 'expo', 'dimm', 'sodimm', 'uhs', 'vpg',
+    'm.2', '2230', '2242', '2280',
+    'mtbf', 'tbw', 'dw pd', 'iops', 'ncq', 'trim', 'smart', 'raid', 'ahci',
+    'sas', 'scsi', 'fc', 'san', 'nas', 'das', 'jbod', 'zns', 'mriov', 'sriov',
+    'vmd', 'vroc', 'rst', 'oprom', 'uefi', 'bios', 'post', 'pxe', 'wol',
+    'wowlan', 'wi-fi', 'wigig', 'thunderbolt', 'usb-c', 'usb4', 'pd', 'qc',
+    'afc', 'pe', 'pps',
+  ])
+  // 检查是否所有单词都是技术缩写
+  const words = s.toLowerCase().replace(/[®™©]/g, '').trim().split(/\s+/)
+  if (words.length > 0 && words.every(w => TECH_ABBREVS.has(w) || /^\d/.test(w))) {
+    return true
+  }
 
   // 4. 产品名组合：必须同时满足两个条件
   //    a) 包含 ≥2 个品牌关键词
-  //    b) 不包含任何"上下文"（动词、介词、描述性词汇）
+  //    b) 不包含任何"上下文"（动词、介词、描述性文本）
   const BRAND_KEYWORDS = [
     'Lexar', 'ARMOR', 'GOLD', 'DIAMOND', 'PLAY', 'PRO', 'ARES', 'THOR',
     'SILVER', 'BLUE', 'NM\\d+', 'NQ\\d+', 'NS\\d+', 'EQ\\d+',
@@ -1580,8 +1736,8 @@ export function detectUntranslatedText(
     const srcLang = detectSingleTextLanguage(src)
     if (srcLang === targetLang) continue
 
-    // 跳过不需要翻译的文本（品牌名/技术缩写/存储容量）
-    if (isUntranslatable(src)) continue
+    // 跳过不需要翻译的文本（品牌名/技术缩写/存储容量/术语库一致项）
+    if (isUntranslatable(src, glossaryMap)) continue
 
     // 维度1：归一化后完全相同 → 漏翻
     if (normalize(src) === normalize(trans)) {
@@ -1623,8 +1779,15 @@ export function detectUntranslatedText(
           const totalWords = cleanTrans.split(/\s+/).filter(w => w.length > 0)
           const englishRatio = totalWords.length > 0 ? nonGlossaryWords.length / totalWords.length : 0
 
-          // 如果非术语库英文单词占比 > 80%，且没有目标语言特征 → 判定为漏翻
-          if (englishRatio > 0.8) {
+          // v7.4: 如果所有英文单词都在术语库中，不算漏翻（产品名保留英文是正确的）
+          if (englishWords.length > 0 && nonGlossaryWords.length === 0) {
+            // 所有英文单词都在术语库中 → 不算漏翻
+            continue
+          }
+
+          // v7.5: 非术语库英文单词占比 > 60% → 判定为漏翻
+          // 从 80% 降低，防止 "79% 英文 + 21% 翻译" 的漏翻漏检
+          if (englishRatio > 0.6) {
             debugWarn(
               `[detectUntranslatedText] 维度2检测到漏翻：译文无${targetLang}特征，英文占比${(englishRatio * 100).toFixed(1)}%`,
               { idx: i, source: src.slice(0, 80), translation: trans.slice(0, 80) }
@@ -1633,6 +1796,10 @@ export function detectUntranslatedText(
             continue
           }
         }
+      } else {
+        // v7.4 修复：如果检测到目标语言特征字符，直接认定为已翻译
+        // 拉丁语系语言（es/it/fr/de等）与英文共用字母表，特征字符是最可靠的翻译证据
+        // 例如：西班牙语 "Rendimiento" 包含 á → 已翻译，不应检查英文占比
       }
     }
 

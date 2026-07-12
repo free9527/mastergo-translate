@@ -38,6 +38,7 @@
 import { DEBUG_MODE } from '@lib/constants'
 
 // DEBUG 日志辅助函数
+const debugLog = (...args: unknown[]) => DEBUG_MODE && console.log(...args)
 const debugWarn = (...args: unknown[]) => DEBUG_MODE && console.warn(...args)
 
 // ============================================================
@@ -281,8 +282,9 @@ export function enforceGlossaryTerms(
       }
     }
 
-    // 3. 短标签硬守卫：源文<15字符 且 译文长度>3x源文长度 时硬截断
-    if (source.length < 15 && result.length > source.length * 3) {
+    // 3. 短标签硬守卫：源文<10字符 且 译文长度>5x源文长度 时硬截断
+    // v7.5: 阈值从 <15/3x 调整为 <10/5x，防止德语等膨胀率高的语言被误截
+    if (source.length < 10 && result.length > source.length * 5) {
       // 再次尝试术语匹配（更低阈值）
       let bestMatch: { target: string; len: number } | null = null
       for (const [gs, gt] of normalizedGlossaryMap.entries()) {
@@ -739,6 +741,9 @@ export function detectBrandInjection(
     'ares', 'thor', 'armor', 'play',
     'silver', 'gold', 'diamond',
   ])
+  // v7.5: 与常见英文词重叠的品牌 token，仅在伴随其他品牌特征时才判定注入
+  // 防止 "play"/"silver"/"gold"/"diamond"/"armor" 等常见词被误判
+  const COMMON_WORD_BRANDS = new Set(['play', 'silver', 'gold', 'diamond', 'armor'])
 
   // 从术语库提取合法的品牌词翻译
   // 只要术语库译文中包含品牌词，该品牌词在译文中就是合法的（术语库是权威参考）
@@ -808,6 +813,13 @@ export function detectBrandInjection(
       const srcHasBrand = wordBoundaryRe.test(src)
 
       if (transHasBrand && !srcHasBrand) {
+        // v7.5: 常见英文词品牌（play/silver/gold/diamond/armor）仅在伴随
+        // 其他品牌特征（如全大写、后跟 PRO/PLUS/MAX）时才判定注入
+        if (COMMON_WORD_BRANDS.has(token)) {
+          const isUpperCase = /[A-Z]{2,}/.test(trans.match(wordBoundaryRe)![0])
+          const hasBrandContext = /\b(PRO|PLUS|MAX|SERIES|DDR\d|SSD|PCIe)\b/i.test(trans)
+          if (!isUpperCase && !hasBrandContext) continue  // 常见词，无品牌语境 → 跳过
+        }
         injectedIndices.add(i)
         return src // 回退到源文
       }

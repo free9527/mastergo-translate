@@ -396,7 +396,13 @@ export function maskGlossaryTerms(
       }
 
       if (!found) {
-        console.warn('[maskGlossaryTerms] could not locate term in original text:', m.source.slice(0, 50))
+        // v7.5.1: 术语可能已被 maskPreservedTerms 遮蔽为 __PRD_N__ 或 __TRM_N__，
+        // 导致 cleanKey 匹配到但原始文本中已被替换。此时 enforceGlossaryTerms 兜底即可，无需报警。
+        // 仅当术语确实仍存在于 result 中时才报警（说明是真正的匹配失败）。
+        const stillExists = new RegExp(m.source.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(result)
+        if (stillExists) {
+          console.warn('[maskGlossaryTerms] term found but regex failed:', m.source.slice(0, 50))
+        }
       }
     }
 

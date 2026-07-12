@@ -102,13 +102,24 @@ Ask yourself: "Does this text describe something (action/feature/benefit)?"
 - YES → It's descriptive → TRANSLATE (keep only brand names in English)
 - NO → It's a label/identifier → KEEP English
 
-Examples:
-- "BIT Running for 30 Minutes Later Temperature Comparison with Other Gen 5 SSDs"
-  → Contains "Running", "Comparison", "with" → DESCRIPTIVE → TRANSLATE
-- "Paired with the latest AMD and Intel CPUs"
-  → Contains "Paired with" → DESCRIPTIVE → TRANSLATE
-- "*Due to different measurement methods..."
-  → Contains "Due to", "measurement methods" → DESCRIPTIVE → TRANSLATE`
+Examples (real Lexar copy — patterns apply to ALL target languages):
+
+[KEEP ENGLISH] Pure product name — no verbs, no prepositions:
+  "Lexar ARMOR GOLD SDXC UHS-II Card" → "Lexar ARMOR GOLD SDXC UHS-II Card" (unchanged in all languages)
+
+[TRANSLATE] Title Case headline — Title Case is NOT a product name:
+  "Steel-Armored, Unstoppable Performance"
+  → CN: "这卡, 够钢！"  DE: "Stahlgepanzerte, unerschütterliche Leistung"  ES: "Blindada de acero, rendimiento imparable"
+
+[TRANSLATE] Descriptive sentence — keep only brand names (Lexar/AMD/Intel) in English:
+  "Equipped with an IP68 rating, the Lexar ARMOR GOLD SDXC UHS-II Card safeguards your card against damage"
+  → CN: "IP68 防水防尘等级，Lexar ARMOR GOLD SDXC UHS-II 存储卡可保护您的存储卡免受损坏"
+  → DE: "Mit IP68-Schutzklasse schützt die Lexar ARMOR GOLD SDXC UHS-II Karte Ihre Karte vor Beschädigungen"
+
+[TRANSLATE] With placeholders — preserve __XXX_N__ and line breaks exactly as-is:
+  "Up to __PRD_0__ MB/s Read Speed↵Suitable for professional creators"
+  → CN: "高达 __PRD_0__ MB/s 读取速度↵适合专业创作者"
+  → DE: "Lesegeschwindigkeit bis zu __PRD_0__ MB/s↵Geeignet für professionelle Kreative"`
 
 // ═══════════════════════════════════════════════════════════════
 // 模块: IRON_RULES — 全局铁则（翻译 LLM 的轻量行为约束）
@@ -140,6 +151,8 @@ export const IRON_RULES = `${BRAND_ASSET_RULES}
 5. COMPLIANCE & PLACEHOLDERS: Warranty terms, certification marks (CE/FCC),
    and legal disclaimers must be translated word-for-word. Preserve ALL
    __XXX_N__ markers, HTML tags, and ↵ symbols exactly as-is in position.
+   ⛔ NEVER add spaces or characters inside __XXX_N__ markers —
+      __XXX_ 1__ or __XXX _1__ are FORBIDDEN. Keep them exactly as given.
 
 6. TRADEMARK SYMBOLS: ⛔ Do NOT manually add trademark symbols (®™©).
    Trademark symbols are handled automatically by code: if source has them,
@@ -153,13 +166,8 @@ export const IRON_RULES = `${BRAND_ASSET_RULES}
      parts MUST be translated. Only keep the brand names themselves in English.
    - If you're unsure whether to translate, TRANSLATE IT.
    - It's better to over-translate than to leave text untranslated.
-   - Examples:
-     ✅ "BIT Running for 30 Minutes Later Temperature Comparison with Other Gen 5 SSDs"
-        → "So sánh nhiệt độ sau 30 phút chạy BIT với các SSD Gen 5 khác"
-     ✅ "Paired with the latest AMD and Intel CPUs"
-        → "Kết hợp với CPU AMD và Intel mới nhất"
-     ✅ "*Due to different measurement methods..."
-        → "*Do phương pháp đo khác nhau giữa các nhà sản xuất..."`
+   - Use the decision process in [BRAND & PRODUCT NAME RULES] above:
+     contains verbs/prepositions/descriptive words → DESCRIPTIVE → TRANSLATE.`
 
 // ============================================================
 // Module 2 continued: PRODUCT LINE TONE GUIDES
@@ -496,14 +504,21 @@ export const SCENE_CONSTRAINTS: Record<string, {
 }
 
 // 获取场景约束（翻译阶段）
-export function getSceneConstraints(scenePreset: string, targetLang: string): string {
+// suppressExpression: 当 style 已明确设定时，抑制场景约束中的"表达/语调"行，
+//   避免与 Style Guide 的语调指令冲突（如 ecommerce "使用广告语" vs Standard "无夸大宣传"）
+export function getSceneConstraints(scenePreset: string, targetLang: string, suppressExpression?: boolean): string {
   const groupId = SCENE_GROUP_MAP[scenePreset]
   if (!groupId) return ''
 
   const config = SCENE_CONSTRAINTS[groupId]
   if (!config) return ''
 
-  const lines = [...config.universal]
+  // 当 style 已设定时，只保留格式/术语类约束，抑制语调/表达类约束
+  // Expression: 前缀 = 语调类 → 与 Style Guide 职责重叠 → 抑制
+  // Format:/Terminology: 前缀 = 格式/术语类 → 始终注入
+  const lines = suppressExpression
+    ? config.universal.filter(l => !l.startsWith('Expression:'))
+    : [...config.universal]
 
   // 添加语种特定惯例
   if (config.langOverrides?.[targetLang]) {
@@ -707,7 +722,9 @@ export function renderLangForTranslate(
   if (!block) return ''
 
   const categoryBlock = buildCategoryTerminology(targetLang, productLine)
-  const sceneConstraints = scenePreset ? getSceneConstraints(scenePreset, targetLang) : ''
+  // v7.5.2: 当 style 明确设定时，抑制场景约束中的 Expression 行，
+  // 避免与 Style Guide 的语调指令冲突
+  const sceneConstraints = scenePreset ? getSceneConstraints(scenePreset, targetLang, !!style) : ''
 
   // 语气风格：从校对移入翻译，让翻译LLM一次到位
   const productTone = getProductLineTone(productLine || null, targetLang)
@@ -895,30 +912,33 @@ Self-check before output (do NOT output the check process):
 2. No fabricated specs, brand names, or claims not in the source
 3. No trademark symbols (®™©) added that are not in the source
 Check passed → output in format: "[N] translated text" — one line per item.
-No markdown, no code blocks. Each [N] is ONE complete text.
+⛔ Absolutely NO markdown — no \`\`\`, no **bold**, no \`code\`, no HTML.
+⛔ Each [N] is exactly ONE line. Do NOT wrap or split across lines.
+⛔ Output plain text only — no explanations, no prefixes, no JSON.
 → Output translations now:`
 
 // ═══════════════════════════════════════════════════════════════
 // 模块: PROOFREAD_SYSTEM_PROMPT — AI 校对指令（校对 LLM 的 System Prompt）
 // ═══════════════════════════════════════════════════════════════
 //
-// AI校对功能说明（2026-07-09 重构）
+// AI校对功能说明（2026-07-12 v7.4 精简）
 //
 // 【核心职责】
-// AI校对只做代码做不到的事：检查完整性、含义准确性、语气匹配。
-// 代码已处理的问题（符号、术语、换行、格式等）AI校对不重复检查。
+// AI校对只做代码做不到的事：检查完整性、含义准确性。
+// 代码已处理的问题（符号、术语、换行、格式、漏翻等）AI校对不重复检查。
 //
 // 【为什么这样设计】
-// 历史教训：早期校对prompt包含8项检查（自然度、语气、短标签等），
-// 导致LLM在执行主观检查时"顺手重写"整段译文，引入新错误。
-// 重构后只保留5项硬性检查（CHECK 0-4），避免过度润色。
+// 历史教训：早期校对prompt包含多项检查（语言检查、占位符、自然度等），
+// 导致LLM执行重复检查时浪费token，甚至"顺手重写"整段译文引入新错误。
+// v7.4精简为2项核心检查，让校对更单纯、更高效。
 //
-// 【AI校对检查项】
-// 1. 完整性：译文是否包含源文的所有信息？有无漏译/截断？
+// 【AI校对检查项（v7.4精简后）】
+// 1. 完整性：译文是否包含源文的所有信息？有无漏译/截断/加戏？
 // 2. 含义准确：译文含义是否与源文一致？有无错译/品类词错误？
-// 3. 语气匹配：译文是否符合产品线调性？（仅标记完全错误的情况）
 //
-// 【AI校对边界 — 不检查这些】
+// 【AI校对边界 — 不检查这些（代码已处理）】
+// ⛔ 语言检查 — 代码 detectUntranslatedText 已处理
+// ⛔ 占位符完整性 — 代码 restoreTrademarkSymbols/sanitizeLineBreaks 已处理
 // ⛔ 自然度/语感 — 主观判断，会导致LLM重写译文
 // ⛔ 符号保留（®™©） — 代码 restoreTrademarkSymbols 已处理
 // ⛔ 术语一致性 — 代码 enforceGlossaryTerms 已处理
@@ -928,10 +948,10 @@ No markdown, no code blocks. Each [N] is ONE complete text.
 // ⛔ 未翻译检测 — 代码 detectUntranslatedText 已处理
 //
 // 【校对闭环】
-// 翻译LLM → 代码兜底（11项检测）→ AI校对（5项检查）→ 代码兜底 → 用户
+// 翻译LLM → 代码兜底（11项检测）→ AI校对（2项检查）→ 代码兜底 → 用户
 //
 // 【注入方式】
-// PROOFREAD_SYSTEM_PROMPT（5项检查）+ glossaryHint（术语参照）+ langBlock（品类词+rules）
+// PROOFREAD_SYSTEM_PROMPT（2项检查）+ glossaryHint（术语参照）+ langBlock（品类词+rules）
 // 始终用英语，全语种通用
 //
 // 【输出格式】
@@ -940,25 +960,18 @@ No markdown, no code blocks. Each [N] is ONE complete text.
 // ═══════════════════════════════════════════════════════════════
 
 export const PROOFREAD_SYSTEM_PROMPT = `[ROLE]
-You are a localization QA reviewer for Lexar. Check translations for FOUR things.
+You are a localization QA reviewer for Lexar. Check translations for TWO things only.
 
-[CHECK 0: LANGUAGE CHECK] (Highest priority)
-Translation MUST be in the target language. Brand names stay English, but ALL descriptive parts (verbs, adjectives, prepositions) MUST be translated.
-⛔ If >30% of non-brand words are English → INCOMPLETE → fix it.
-⛔ Markers like "[TRANSLATE REQUIRED]" are NOT valid → provide actual translation.
-
-[CHECK 1: PLACEHOLDER INTEGRITY]
-Ensure all placeholders (__XXX_N__, HTML tags, ↵) match source EXACTLY in type, count, and position.
-
-[CHECK 2: COMPLETENESS]
+[CHECK 1: COMPLETENESS]
 ⛔ Do NOT add information not in the source. ⛔ Do NOT remove information from the source.
+⛔ Do NOT "improve" or "enhance" the translation — only fix actual errors.
 
-[CHECK 3: MEANING ACCURACY]
+[CHECK 2: MEANING ACCURACY]
 - Wrong number/spec/feature? → fix it
 - Category word wrong? (SSD≠Card, Reader≠SSD) → fix it per reference table
 - ⚠️ Glossary exact-match OVERRIDES category-word correction
 - ⛔ Do NOT change symbols/formatting (2x2≠2×2, keep source format)
-- ✅ Natural localization (word reordering, synonyms, tone) is OK if meaning preserved — do NOT flag.
+- ✅ Natural localization (word reordering, synonyms, tone) is the GOAL — only flag if meaning-preserving changes introduce errors. Literal/word-for-word translations that sound unnatural SHOULD be flagged.
 
 [ACTION]
 - Review EACH item INDEPENDENTLY. Fix ONLY specific errors, never rewrite entire translation.
@@ -967,7 +980,7 @@ ${BRAND_ASSET_RULES_PROOFREAD}
 
 [OUTPUT]
 JSON: [{"i":1,"text":"corrected text","reason":"label","ambiguous":[]}]
-reason: 语言错误 | 占位符缺失 | 漏翻 | 多翻 | 语义错误 | 术语错误
+reason: 漏翻 | 多翻 | 语义错误 | 术语错误
 All correct → []. Only output items needing correction. Raw JSON only.
 
 [AMBIGUOUS]
