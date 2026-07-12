@@ -9,6 +9,15 @@ import { parseCSVRow } from '@lib/parse-csv'
 // DEBUG 日志辅助函数
 const debugLog = (...args: unknown[]) => DEBUG_MODE && console.log(...args)
 
+// Avenir → HarmonyOS 样式名映射（Avenir 用 "Roman"/"Heavy" 等，HarmonyOS 用 "Regular"/"Bold"）
+const AVENIR_TO_HARMONYOS_STYLE: Record<string, string> = {
+  'Roman': 'Regular',
+  'Extra Light': 'Light',
+  'Extra Light Italic': 'Light Italic',
+  'Heavy': 'Bold',
+  'Heavy Italic': 'Bold Italic',
+}
+
 const originalTexts = new Map<string, string>()
 
 mg.showUI(__html__, { width: UI_WIDTH, height: UI_HEIGHT })
@@ -111,7 +120,8 @@ async function applyTranslations(items: TextItem[]): Promise<void> {
     const text = item.translatedText
     const symbol = '®'
     let idx = -1
-    const effectiveStyle = item.targetFontStyle || item.fontStyle || 'Regular'
+    const rawStyle = item.targetFontStyle || item.fontStyle || 'Regular'
+    const effectiveStyle = AVENIR_TO_HARMONYOS_STYLE[rawStyle] || rawStyle
     while ((idx = text.indexOf(symbol, idx + 1)) !== -1) {
       try {
         node.setRangeFontName(idx, idx + 1, {
@@ -341,11 +351,13 @@ async function applyFontsOnly(payloads: FontPayload[]): Promise<void> {
           // ® 符号修复：所有字体替换后都执行，防止 ® 渲染异常（过大/非上标）
           const text = node.characters
           let idx = -1
+          const rawFixStyle = p.targetFontStyle || p.fontStyle || 'Regular'
+          const fixStyle = AVENIR_TO_HARMONYOS_STYLE[rawFixStyle] || rawFixStyle
           while ((idx = text.indexOf('®', idx + 1)) !== -1) {
             try {
               node.setRangeFontName(idx, idx + 1, {
                 family: 'HarmonyOS Sans SC',
-                style: p.targetFontStyle || p.fontStyle || 'Regular',
+                style: fixStyle,
               })
             } catch (_) {}
           }

@@ -162,9 +162,9 @@ export function restoreTrademarkSymbols(sourceTexts: string[], translatedTexts: 
 export function restoreStorageUnitFormatting(sourceTexts: string[], translatedTexts: string[]): string[] {
   // 常见存储单位模式 - 这些单位在技术规格中通常保持连写
   // 匹配: 数字 + (可选空格) + 单位
-  const unitPatterns = [
-    /(\d+)\s+(MB|GB|TB|KB|GByte|MByte|TByte|KByte)(\/s)\b/gi,    // 900 MB/s → 900MB/s
-    /(\d+)\s+(MB|GB|TB|KB|GByte|MByte|TByte|KByte)\b(?!\/)/gi,  // 900 GB → 900GB (但仅当原文连写时)
+  const unitPatterns: Array<{ re: RegExp; replacement: string }> = [
+    { re: /(\d+)\s+(MB|GB|TB|KB|GByte|MByte|TByte|KByte)(\/s)\b/gi, replacement: '$1$2$3' },
+    { re: /(\d+)\s+(MB|GB|TB|KB|GByte|MByte|TByte|KByte)\b(?!\/)/gi, replacement: '$1$2' },
   ]
 
   return translatedTexts.map((translated, i) => {
@@ -179,8 +179,11 @@ export function restoreStorageUnitFormatting(sourceTexts: string[], translatedTe
 
     if (hasConnectedUnits) {
       for (const pattern of unitPatterns) {
-        result = result.replace(pattern, '$1$2$3')
+        result = result.replace(pattern.re, pattern.replacement)
       }
+      // v7.5.9: 清理 pattern 2 ($1$2$3 只有2组) 可能引入的字面量 $N 残留
+      result = result.replace(/(\d+[A-Za-z]*)\s*\$\d+/g, '$1')
+      result = result.replace(/(\d+\s*[A-Za-z]+)\s*\$\d+/g, '$1')
     }
 
     // 特殊处理星号后缀：900MB/s* → 保持 900MB/s* 不要变成 900 MB/s*
@@ -803,12 +806,18 @@ export function detectBrandInjection(
     }
   }
 
-  // 从术语库额外提取品牌 token：所有首字母大写的专有名词
+  // v8.0: 从术语库只提取已知 Lexar 品牌/系列名作为 brandTokens
+  // 旧逻辑将所有首字母大写的首词都加入（包括 "Read", "Water", "High" 等普通词）
+  // 导致 detectBrandInjection 误判 → 正确译文被回退为英文
+  const KNOWN_LEXAR_BRANDS = new Set([
+    'lexar', 'ares', 'thor', 'armor', 'play', 'pexar',
+    'silver', 'gold', 'diamond', 'blue',
+  ])
   if (glossaryMap) {
     for (const key of glossaryMap.keys()) {
-      const firstWord = key.split(/\s+/)[0]
-      if (firstWord && /^[A-Z][a-zA-Z]{2,}$/.test(firstWord)) {
-        brandTokens.add(firstWord.toLowerCase())
+      const firstWord = key.split(/\s+/)[0].toLowerCase()
+      if (KNOWN_LEXAR_BRANDS.has(firstWord)) {
+        brandTokens.add(firstWord)
       }
     }
   }

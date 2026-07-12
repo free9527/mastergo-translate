@@ -4,18 +4,14 @@
     <div class="statusbar">
       <div class="sb-left">
         <span class="sb-dot" :class="statusClass"></span>
-        <span class="sb-title">{{ debugTraces.length > 0 ? '🔍' + debugTraces.length : '翻译' }}</span>
+        <span class="sb-title">翻译</span>
       </div>
       <div class="sb-right">
-        <span class="sb-badge debug-badge" v-if="debugTraces.length > 0" @click="copyDebugTraces" style="cursor:pointer;background:#f59e0b;color:#000;" title="点击复制调试信息">📋复制</span>
         <span class="sb-badge" v-if="items.length" :class="{ active: hasTranslation }">
           {{ items.length }} 条{{ hasTranslation ? ' · 已翻译' : '' }}
         </span>
       </div>
     </div>
-
-    <!-- 调试区 -->
-    <textarea readonly class="debug-ta" :value="debugTraces.join('')" placeholder="翻译后此处显示调试信息..."></textarea>
 
     <!-- 主操作区 -->
     <div class="toolbar">
@@ -90,17 +86,6 @@
         <button v-else class="btn btn-ghost flex-1" @click="undoAll" :disabled="undoing || applying || !hasTranslation">
           撤销
         </button>
-      </div>
-
-      <!-- 调试面板：始终可见 -->
-      <div class="debug-panel">
-        <div class="debug-header">
-          <span class="debug-title">🔍 调试追踪 ({{ debugTraces.length }}条)</span>
-          <button class="btn btn-sm btn-ghost" @click="copyDebugTraces">📋 复制</button>
-          <button class="btn btn-sm btn-ghost" @click="debugTraces = []">✕ 清除</button>
-        </div>
-        <pre class="debug-log" v-if="debugTraces.length > 0">{{ debugTraces.join('') }}</pre>
-        <div class="debug-empty" v-else>翻译后此处显示调试信息</div>
       </div>
 
       <!-- 重翻 / 重试 -->
@@ -527,8 +512,7 @@ const appliedNodeIds = ref<Set<string>>(new Set())
 /** 正在单条重翻中的 nodeId 集合，用于禁用按钮防止重复提交 */
 const retranslatingIds = ref<Set<string>>(new Set())
 
-/** 调试追踪：收集含®文本的翻译结果，用户可一键复制 */
-const debugTraces = ref<string[]>(['[init] debug active\n'])
+
 const translateProgress = ref({ current: 0, total: 0 })
 const translateProgressPercent = computed(() =>
   translateProgress.value.total > 0 ? (translateProgress.value.current / translateProgress.value.total) * 100 : 0
@@ -658,8 +642,13 @@ function onFontSelected(f: FontMapping) {
     f.targetFamily = parsed.family
     f.targetStyle = parsed.style
   } else {
+    // "继承原字体"：清除所有目标字体属性，避免字号/行距/字距残留
     f.targetFamily = ''
     f.targetStyle = ''
+    f.targetFontSize = 0
+    f.targetLineHeight = null
+    f.targetLetterSpacing = null
+    f.targetTextAlign = ''
     f.selectedFont = ''
   }
 }
@@ -854,16 +843,7 @@ function pickBetterTranslation(source: string, a: string, b: string): string {
 
 // 取消操作
 // ============================================================
-/** 复制调试追踪日志到剪贴板 */
-async function copyDebugTraces() {
-  try {
-    const text = debugTraces.value.join('')
-    await navigator.clipboard.writeText(text)
-    toastMessage.value = `已复制 ${debugTraces.value.length} 条追踪日志`
-  } catch {
-    toastMessage.value = '复制失败，请手动选择复制'
-  }
-}
+
 
 function cancelOperation() {
   cancelFlag.value = true
@@ -1044,8 +1024,6 @@ async function startTranslate() {
   // v7.5.5: 保持 Figma 图层扫描顺序，不排序
   // 排序（短前长后）会导致 LLM 先看到短文（产品名→保留英文），
   // 建立"不翻译"惯性后长描述句也跟着不翻，造成系统性漏翻
-  // v7.5.7: 调试 — 翻译开始时写入标记
-  debugTraces.value = [`=== 翻译开始 targetLang=${targetLang.value} apiTotal=${needApi.length} ===\n`]
   const apiTotal = needApi.length
 
   if (apiTotal === 0) {
@@ -1097,6 +1075,8 @@ async function startTranslate() {
   const proofreadWavePromises: Promise<void>[] = []
   const proofreadCoveredIndices = new Set<number>()
   const proofreadStats = { correctedCount: 0, failedBatches: 0, lastError: '' }
+  let proofreadDoneCount = 0
+  let proofreadTotalEstimate = 0
 
   // 并发批次处理：每次并发 CONCURRENCY 个批次，大幅提速
   const CONCURRENCY = 4
@@ -1131,9 +1111,6 @@ async function startTranslate() {
             const hit = cache[cacheKey(t)]
             if (hit !== undefined && !isDirtyCache(hit, t)) {
               cacheHits++
-              if (t.includes('Lexar') && t.includes('®')) {
-                debugTraces.value.push(`[CACHE-HIT] src="${t.slice(0,60)}..." → hit="${hit.slice(0,60)}..." has®=${/[®™©]/.test(hit)}\n`)
-              }
               return hit
             }
             // 脏缓存 → 清除并重新翻译
@@ -1153,14 +1130,6 @@ async function startTranslate() {
             // 将模板译文展开回原始文本
             const expandedResult = expandBatch(uniqueResult, expandData, uncachedTexts.length)
             // v7.5.7: 追踪关键文本在各环节的值
-            for (let u = 0; u < uncachedTexts.length; u++) {
-              const src = uncachedTexts[u]
-              const exp = expandedResult[u] || ''
-              if (src.includes('BIT Running') || src.includes('Offers advanced') || src.includes('Lexar®')) {
-                const isReverted = src === exp
-                debugTraces.value.push(`[TRACE] u=${u} expandResult="${exp.slice(0,100)}..." src==exp=${isReverted}\n`)
-              }
-            }
             // 合并缓存+API结果
             translated = texts.map((_, idx) => {
               if (cachedResult[idx] !== null) return cachedResult[idx]!
@@ -1186,17 +1155,6 @@ async function startTranslate() {
 
           for (let j = 0; j < batch.length; j++) {
             batch[j].translatedText = formatCJKSpace(translated[j] || '', targetLang.value)
-          }
-          // v7.5.7: 调试追踪 — 收集所有翻译结果，漏翻/掉®特别标注
-          for (let j = 0; j < batch.length; j++) {
-            const src = batch[j].sourceText
-            const tgt = batch[j].translatedText
-            const flags: string[] = []
-            if (src === tgt) flags.push('⚠️漏翻')
-            if (/[®™©]/.test(src) && !/[®™©]/.test(tgt)) flags.push('❌掉®')
-            if (/[®™©]/.test(src) && /[®™©]/.test(tgt)) flags.push('✅®OK')
-            const tag = flags.length > 0 ? ` [${flags.join(' ')}]` : ''
-            debugTraces.value.push(`[${j}]${tag}\n  源: ${src.slice(0, 100)}\n  译: ${tgt.slice(0, 100)}\n`)
           }
         } catch (e) {
           failedBatches++
@@ -1292,6 +1250,10 @@ async function startTranslate() {
                 })())
               }
               await Promise.allSettled(proofPromises)
+              proofreadDoneCount += proofPromises.length * PROOFREAD_BATCH_SIZE
+              if (proofreadTotalEstimate > 0) {
+                proofreadProgress.value = { current: Math.min(proofreadDoneCount, proofreadTotalEstimate), total: proofreadTotalEstimate }
+              }
             }
           } catch (e) {
             proofreadStats.failedBatches++
@@ -1302,7 +1264,6 @@ async function startTranslate() {
     }
   }
 
-  translating.value = false
   resizeAllTextareas()
 
   // 翻译结束后统一持久化缓存
@@ -1312,6 +1273,7 @@ async function startTranslate() {
   }
 
   if (cancelFlag.value) {
+    translating.value = false
     const count = toTranslate.filter(it => it.translatedText).length
     showToast(`翻译已取消，已完成 ${count} 条`, 'warning')
     return
@@ -1322,16 +1284,22 @@ async function startTranslate() {
   const failMsg = failedBatches > 0 ? `，${failedBatches} 个批次失败` : ''
   const skipMsg = autoSkipped > 0 ? `，${autoSkipped} 条沿用原文` : ''
   if (count === 0 && failedBatches > 0) {
+    translating.value = false
     const errDetail = lastErrors.length > 0 ? ' — ' + lastErrors[lastErrors.length - 1].slice(0, 80) : ''
     showToast('翻译失败：所有批次请求失败' + errDetail, 'error')
+    return
   } else {
     showToast('翻译完成: ' + count + ' 条' + cacheMsg + skipMsg + failMsg, failedBatches > 0 ? 'warning' : 'success')
   }
 
   // ═══ 流水线校对：等待所有校对波次完成 ═══
   if (proofreadEnabled && proofreadWavePromises.length > 0) {
+    proofreading.value = true
+    proofreadTotalEstimate = count
+    proofreadProgress.value = { current: proofreadDoneCount, total: proofreadTotalEstimate }
     showToast('校对进行中...', 'info')
     await Promise.allSettled(proofreadWavePromises)
+    proofreading.value = false
     const proofFailMsg = proofreadStats.failedBatches > 0 ? `，${proofreadStats.failedBatches} 批次校对失败` : ''
     showToast('校对完成: ' + proofreadStats.correctedCount + ' 处被修正' + proofFailMsg, proofreadStats.correctedCount > 0 ? 'success' : 'info')
   } else if (proofreadEnabled && count > 0) {
@@ -1344,6 +1312,8 @@ async function startTranslate() {
       showToast('校对异常: ' + (e instanceof Error ? e.message : String(e)), 'error')
     }
   }
+
+  translating.value = false
 
   // 同源一致化：无论是否开启校对都执行，确保相同源文本译文一致
   enforceSameSourceConsistency()
@@ -1358,6 +1328,7 @@ async function startTranslate() {
   autoMapFonts()
   } catch (e) {
     translating.value = false
+    proofreading.value = false
     console.error('[translate] fatal error', e)
     showToast('翻译异常: ' + (e instanceof Error ? e.message : String(e)), 'error')
   }
@@ -1743,6 +1714,29 @@ function syncFontMappings() {
 // 自动字体映射：根据目标语言自动替换字体，字重/间距/行距全部继承原文
 // 每次目标语言切换或扫描后重新计算，确保字体替换模块始终预填正确
 // ============================================================
+
+/** Avenir → HarmonyOS Sans SC 字重名称映射（两族字体 style name 不一致） */
+const AVENIR_TO_HARMONYOS_STYLE: Record<string, string> = {
+  'Roman': 'Regular',
+  'Extra Light': 'Light',
+  'Extra Light Italic': 'Light Italic',
+  'Heavy': 'Bold',
+  'Heavy Italic': 'Bold Italic',
+}
+
+/** 将源字体 style name 映射为目标字体族支持的 style name */
+function normalizeFontStyle(sourceFamily: string, sourceStyle: string, targetFamily: string): string {
+  const raw = sourceStyle || 'Regular'
+  // Avenir → HarmonyOS Sans SC / HarmonyOS Sans TC: 替换不兼容的字重名
+  if (
+    sourceFamily === 'Avenir' &&
+    (targetFamily === 'HarmonyOS Sans SC' || targetFamily === 'HarmonyOS Sans TC')
+  ) {
+    return AVENIR_TO_HARMONYOS_STYLE[raw] || raw
+  }
+  return raw
+}
+
 function autoMapFonts() {
   for (const item of items.value) {
     const mapping = getAutoFontMapping(item.fontFamily, targetLang.value)
@@ -1755,8 +1749,12 @@ function autoMapFonts() {
     }
 
     item.targetFontFamily = mapping.targetFamily
-    // 继承源字体样式（字重），确保 Bold → Bold 等映射正确
-    item.targetFontStyle = item.fontStyle || 'Regular'
+    // 继承源字体样式（字重），跨字体族时做 style name 映射
+    item.targetFontStyle = normalizeFontStyle(item.fontFamily, item.fontStyle, mapping.targetFamily)
+    // 继承源字号/行距/字距（此前缺失导致 applyFonts 发送 targetFontSize: 0）
+    item.targetFontSize = item.fontSize
+    item.targetLineHeight = item.lineHeight ?? null
+    item.targetLetterSpacing = item.letterSpacing ?? null
     if (mapping.targetTextAlign) {
       item.targetTextAlign = mapping.targetTextAlign
     }
@@ -2788,59 +2786,6 @@ body {
 }
 .toolbar-row { display: flex; gap: 6px; align-items: center; }
 
-/* ---- 调试面板 ---- */
-.debug-ta {
-  display: block !important;
-  width: 100%;
-  min-height: 80px;
-  max-height: 160px;
-  margin: 0;
-  padding: 6px 8px;
-  font-size: 10px;
-  font-family: monospace;
-  line-height: 1.4;
-  color: #333;
-  background: #fffde7;
-  border: 2px solid #f59e0b;
-  border-radius: 0;
-  resize: vertical;
-  box-sizing: border-box;
-}
-.debug-panel {
-  margin-top: 10px;
-  border: 2px solid #f59e0b;
-  border-radius: 6px;
-  background: #fffbeb;
-  max-height: 300px;
-  overflow-y: auto;
-}
-.debug-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  background: #fef3c7;
-  border-bottom: 1px solid #f59e0b;
-  position: sticky;
-  top: 0;
-}
-.debug-title { font-size: 12px; font-weight: 600; color: #92400e; }
-.debug-log {
-  margin: 0;
-  padding: 8px;
-  font-size: 11px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-all;
-  color: #333;
-}
-.debug-empty {
-  padding: 8px;
-  font-size: 11px;
-  color: #999;
-  text-align: center;
-}
-
 /* ---- 翻译风格栏 ---- */
 .style-bar {
   background: #fff;
@@ -3101,10 +3046,10 @@ body {
 
 .trans-input {
   width: 100%; padding: 10px 12px; border: 1px solid var(--gray-200); border-radius: var(--radius-sm);
-  font-size: 13px; resize: none; font-family: inherit; line-height: 1.5;
+  font-size: 14px; resize: none; font-family: inherit; line-height: 1.5;
   color: var(--gray-900); overflow: hidden; background: #fff;
   transition: border-color var(--transition), box-shadow var(--transition), height 0.15s;
-  font-weight: 500;
+  font-weight: 700;
 }
 .trans-input:focus { outline: none; border-color: var(--gray-900); box-shadow: 0 0 0 3px rgba(0,0,0,0.08); }
 .trans-input::placeholder { color: var(--gray-200); font-weight: 400; }
