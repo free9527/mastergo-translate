@@ -1,10 +1,9 @@
 {
   "compilerOptions": {
-    "baseUrl": ".",
     "sourceMap": false,
     "target": "esnext",
     "module": "esnext",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "allowJs": false,
     "strict": true,
     "noUnusedLocals": true,
@@ -13,7 +12,7 @@
     "removeComments": false,
     "jsx": "preserve",
     "importHelpers": true,
-    "lib": ["esnext", "dom"],
+    "lib": ["esnext"],
     "types": [
       "@mastergo/plugin-typings"
     ],
@@ -24,10 +23,9 @@
     },
   },
   "include": [
-    "./ui/**/*.ts",
-    "./ui/**/*.vue",
-    "./typings/*.d.ts",
     "./lib/**/*.ts",
-    "./messages/**/*.ts",
+    "./messages/types.ts",
+    "./messages/main-sender.ts",
+    "./typings/plugin-runtime.d.ts"
   ]
 }

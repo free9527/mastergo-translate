@@ -5,16 +5,16 @@
 import XMLHttpRequest from 'xhr2';
 (globalThis as any).XMLHttpRequest = XMLHttpRequest
 
-import { translateBatch } from './lib/llm-api'
-import { detectUntranslatedText, isUntranslatable } from './lib/llm-api'
-import { normalizeText, DEBUG_MODE } from './lib/constants'
+import { translateBatch } from '../lib/llm-api'
+import { detectUntranslatedText, isUntranslatable } from '../lib/llm-api'
+import { DEBUG_MODE } from '../lib/constants'
 
 // 强制开启 debug 日志
 (globalThis as any).DEBUG_MODE = true
 
 const API_URL = 'https://aigo.lexar.com/v1/chat/completions'
-const API_KEY = 'sk-FS2AGf1vcZU1OpIIho7nBd8bQGcm45nII6UlZAECxj5Iaamn'
-const MODEL = 'qwen3.7-max'
+const API_KEY = 'sk-LcscmmvLrVlwRbWtoPgF1jSNg6fzR7rgp2FX8pFaHreVYMyu'
+const MODEL = 'gpt-5.5'
 
 // 模拟真实页面的文本集合（包含 BIT Running 和常见产品文本）
 const TEXTS = [

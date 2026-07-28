@@ -9,7 +9,7 @@
 
 import os, re, glob, csv, io
 
-BASE = os.path.dirname(os.path.abspath(__file__))
+BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # 项目根目录
 GLOSSARY_DIR = os.path.join(BASE, '术语素材')
 EXCLUSIVE_FILE = os.path.join(BASE, '术语素材', 'Lexar术语库_专属.csv')
 OUTPUT = os.path.join(BASE, 'lib', 'default-glossary.ts')

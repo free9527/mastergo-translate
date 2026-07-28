@@ -44,6 +44,7 @@ function stemEnglish(word: string): string {
 /**
  * 判断术语是否为品类词（产品品类名称）
  * 品类词在产品名文本中不应被翻译，因为产品名整体保留英文
+ * v8.6: 品类词已在 [LANG_RULES] 的品类词对照表中注入，跳过以避免重复
  */
 function isCategoryWord(term: string): boolean {
   const CATEGORY_WORDS = new Set([
@@ -72,22 +73,30 @@ function containsModelNumber(text: string): boolean {
 }
 
 /**
+ * 术语匹配归一化：处理大小写/连字符/空格/商标符号变体
+ * 解决源文与术语库录入格式不一致的问题（如 "Up To Read" vs "read speed up to"）
+ */
+function normalizeForMatch(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[®™©]/g, '')           // 去商标符号
+    .replace(/[-_]/g, ' ')           // 连字符/下划线 → 空格
+    .replace(/\s+/g, ' ')            // 空白归一化
+    .trim()
+}
+
+/**
  * 检查术语是否在源文本中出现
  * 支持精确匹配、子串匹配和词形还原匹配
  */
 function termMatches(term: string, sourceTexts: string[]): boolean {
-  const termLower = term.toLowerCase().trim()
-  if (termLower.length < 2) return false
-
-  // 规范化：去 ®™© + 空白归一化（合并多余空格），解决 CSV 数据中 "CFexpress  4.0" 双空格问题
-  const normalize = (s: string) => s.replace(/[®™©]/g, '').replace(/\s+/g, ' ').trim()
-  const termNorm = normalize(termLower)
+  const termNorm = normalizeForMatch(term)
+  if (termNorm.length < 2) return false
 
   for (const text of sourceTexts) {
-    const textLower = text.toLowerCase()
-    const textNorm = normalize(textLower)
+    const textNorm = normalizeForMatch(text)
 
-    // 1. 精确子串匹配（优先用规范化后的文本）
+    // 1. 精确子串匹配（优先用归一化后的文本）
     if (termNorm.length <= 3) {
       const escaped = termNorm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
       if (new RegExp(`\\b${escaped}\\b`, 'i').test(textNorm)) return true
@@ -100,18 +109,12 @@ function termMatches(term: string, sourceTexts: string[]): boolean {
     const textWords = textNorm.split(/[\s,.;:!?()\[\]{}]+/)
     if (termWords.every(tw => textWords.some(tw2 => tw2 === tw))) return true
 
-    // 3. 词形还原匹配（仅对英文术语）
-    if (/[a-z]/.test(termLower)) {
+    // 3. 词形还原匹配（仅对英文术语）— 只保留精确词形还原，删除前缀匹配
+    // v8.2: 删除前缀匹配（stemmedTerm.startsWith(stw)），避免 write 匹配到 writing 等不相关术语
+    if (/[a-z]/.test(termNorm)) {
       const stemmedTerm = termWords.map(stemEnglish).join(' ')
       const stemmedText = textWords.map(stemEnglish).join(' ')
       if (stemmedText.includes(stemmedTerm)) return true
-      // 宽松前缀匹配：处理 write/writing → writ/write 这类变形
-      if (termWords.length === 1 && stemmedTerm.length > 2) {
-        for (const tw of textWords) {
-          const stw = stemEnglish(tw)
-          if (stw.length > 2 && (stemmedTerm.startsWith(stw) || stw.startsWith(stemmedTerm))) return true
-        }
-      }
     }
   }
   return false
@@ -135,18 +138,32 @@ export function filterRelevantGlossary(
   // 如果包含，说明是产品名相关文本，应更保守地注入术语库
   const hasModelNumber = sourceTexts.some(t => containsModelNumber(t))
 
-  for (const [source, target] of Object.entries(glossaryMap)) {
+  // v8.5: 按翻译值去重，避免冗余条目（如 "Up To Read" / "Read Speed Up To"）重复注入prompt
+  // 相同翻译值只保留最先匹配的源文（通常是最长的/最完整的）
+  const injectedTargets = new Set<string>()
+
+  // 先按源文长度降序排序，确保长术语优先匹配
+  const sortedEntries = Object.entries(glossaryMap).sort((a, b) => b[0].length - a[0].length)
+
+  for (const [source, target] of sortedEntries) {
     // 跳过 source === target 的条目：产品名在目标语言中保持英文原样，
     // 注入 prompt 无翻译价值，反而挤占 token、给 LLM 混淆信号。
     // 依据：Lexar 产品命名规则 — 硬件参数/系列名/型号全语种保留英文。
     if (source === target) continue
 
+    // v8.6: 品类词已在 [LANG_RULES] 的品类词对照表中注入，跳过以避免重复
+    if (isCategoryWord(source)) continue
+
     // 如果源文本包含产品型号，跳过品类词术语（避免与产品名冲突）
     // 例如 "NM790 PCIe 4.0 SSD" 是产品名，不应注入 "SSD → 固态硬盘"
     if (hasModelNumber && isCategoryWord(source)) continue
 
+    // v8.5: 按翻译值去重 — 相同翻译值只注入一次
+    if (injectedTargets.has(target)) continue
+
     if (termMatches(source, sourceTexts)) {
       filtered[source] = target
+      injectedTargets.add(target)
     }
     if (Object.keys(filtered).length >= maxTerms) break
   }
@@ -156,9 +173,7 @@ export function filterRelevantGlossary(
   }
 
   const lines = Object.entries(filtered).map(([k, v]) => `${k} → ${v}`)
-  const glossaryHint = `\n术语库（最高优先级，仅列出当前文本中出现的术语，必须严格使用）：
-⛔ 仅当源文与左列完全一致（含大小写、空格）时才执行替换。部分匹配一律不替换，也不得基于术语库模式推断补全。
-${lines.join('\n')}`
+  const glossaryHint = `\n[GLOSSARY]\n${lines.join('\n')}`
 
   return { filteredMap: filtered, glossaryHint }
 }

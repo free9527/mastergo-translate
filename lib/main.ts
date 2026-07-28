@@ -1,7 +1,7 @@
 import { PluginMessage, UIMessage, TextItem, LLMConfig, GlossaryEntry, TranslationCorrection } from '@messages/types'
 import { sendMsgToUI } from '@messages/main-sender'
 import { STORAGE_KEY_GLOSSARY_VERSION, STORAGE_KEY_GLOSSARY_PRODUCTS, STORAGE_KEY_GLOSSARY_EXCLUSIVE, STORAGE_KEY_SETTINGS, STORAGE_KEY_ORIGINALS, STORAGE_KEY_TRANSLATION_CACHE, STORAGE_KEY_CORRECTIONS, CORRECTION_THRESHOLD, UI_WIDTH, UI_HEIGHT, MAX_CACHE_SIZE, GLOSSARY_VERSION, makeFontKey, DEBUG_MODE } from '@lib/constants'
-import { collectTextNodes, mergeDuplicates, TraversableNode } from '@lib/text-collector'
+import { collectTextNodes, mergeDuplicates } from '@lib/text-collector'
 import { exportCSV, importCSV } from '@lib/csv-handler'
 import { DEFAULT_GLOSSARY_PRODUCTS_CSV, DEFAULT_GLOSSARY_EXCLUSIVE_CSV } from '@lib/default-glossary'
 import { parseCSVRow } from '@lib/parse-csv'
@@ -485,7 +485,7 @@ async function saveGlossaryProducts(entries: GlossaryEntry[]): Promise<void> {
   const json = JSON.stringify(entries)
   for (const page of mg.document.children) {
     try {
-      (page as BaseNode).setSharedPluginData('translate', STORAGE_KEY_GLOSSARY_PRODUCTS, json)
+      asSharedPluginDataPage(page).setSharedPluginData('translate', STORAGE_KEY_GLOSSARY_PRODUCTS, json)
     } catch (_) { /* 页面不支持 SharedPluginData 则跳过 */ }
   }
   sendMsgToUI(PluginMessage.GLOSSARY_PRODUCTS_SAVED)
@@ -525,7 +525,7 @@ async function saveGlossaryExclusive(entries: GlossaryEntry[]): Promise<void> {
   const json = JSON.stringify(entries)
   for (const page of mg.document.children) {
     try {
-      (page as BaseNode).setSharedPluginData('translate', STORAGE_KEY_GLOSSARY_EXCLUSIVE, json)
+      asSharedPluginDataPage(page).setSharedPluginData('translate', STORAGE_KEY_GLOSSARY_EXCLUSIVE, json)
     } catch (_) { /* 页面不支持 SharedPluginData 则跳过 */ }
   }
   sendMsgToUI(PluginMessage.GLOSSARY_EXCLUSIVE_SAVED)
@@ -600,7 +600,7 @@ async function loadSettings(): Promise<LLMConfig | null> {
   // 尝试从文档 SharedPluginData 中读取（跨客户端同步）
   for (const page of mg.document.children) {
     try {
-      const json = (page as BaseNode).getSharedPluginData('translate', STORAGE_KEY_SETTINGS)
+      const json = asSharedPluginDataPage(page).getSharedPluginData('translate', STORAGE_KEY_SETTINGS)
       if (json) {
         const config = JSON.parse(json)
         await mg.clientStorage.setAsync(STORAGE_KEY_SETTINGS, config)
@@ -618,7 +618,7 @@ async function saveSettings(config: LLMConfig): Promise<void> {
   const json = JSON.stringify(config)
   for (const page of mg.document.children) {
     try {
-      (page as BaseNode).setSharedPluginData('translate', STORAGE_KEY_SETTINGS, json)
+      asSharedPluginDataPage(page).setSharedPluginData('translate', STORAGE_KEY_SETTINGS, json)
     } catch (_) { /* 页面不支持 SharedPluginData 则跳过 */ }
   }
   sendMsgToUI(PluginMessage.SETTINGS_SAVED)
@@ -659,6 +659,19 @@ async function saveCorrection(correction: TranslationCorrection): Promise<void> 
 // 消息路由
 // ============================================================
 type UIMessageEvent = { type?: UIMessage; data?: unknown; pluginMessage?: { type: UIMessage; data: unknown } }
+
+type NotifyPayload = { message: string; type?: 'normal' | 'highlight' | 'error' | 'warning' | 'success' }
+type SharedPluginDataPage = PageNode & Pick<BaseNodeMixin, 'getSharedPluginData' | 'setSharedPluginData'>
+
+function asSharedPluginDataPage(page: PageNode): SharedPluginDataPage {
+  return page as SharedPluginDataPage
+}
+
+function isNotifyPayload(value: unknown): value is NotifyPayload {
+  return typeof value === 'object'
+    && value !== null
+    && typeof (value as { message?: unknown }).message === 'string'
+}
 
 mg.ui.onmessage = async function (msg: UIMessageEvent) {
   debugLog('[translate] onmessage raw msg:', JSON.stringify(msg))
@@ -760,7 +773,9 @@ mg.ui.onmessage = async function (msg: UIMessageEvent) {
       sendMsgToUI(PluginMessage.CORRECTION_SAVED)
       break
     case UIMessage.NOTIFY:
-      mg.notify(data.message, { type: data.type || 'normal' })
+      if (isNotifyPayload(data)) {
+        mg.notify(data.message, { type: data.type || 'normal' })
+      }
       break
     case UIMessage.LOCATE_NODE: {
       const nodeId = data as string

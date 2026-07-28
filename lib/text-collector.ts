@@ -88,18 +88,10 @@ export function collectTextNodes(container: TraversableNode): TextNode[] {
 
 // 合并重复文本
 export function mergeDuplicates(nodes: TextNode[]): TextItem[] {
-  // 规范化键：保留 ®™© 符号（避免 "Lexar®" 和 "Lexar" 被错误合并丢失商标）
-  function mergeKey(text: string): string {
-    return text
-      .replace(/[\n\r]+/g, ' ')
-      .replace(/\s+/g, ' ')
-      .toLowerCase()
-      .trim()
-  }
-
+  // 规范化键：使用统一的 normalizeText（去除 ®™©，避免缓存污染）
   const map = new Map<string, TextNode[]>()
   for (const node of nodes) {
-    const key = mergeKey(node.characters)
+    const key = normalizeText(node.characters)
     if (!key) continue
     const group = map.get(key)
     if (group) {
@@ -110,7 +102,7 @@ export function mergeDuplicates(nodes: TextNode[]): TextItem[] {
   }
 
   const items: TextItem[] = []
-  for (const [text, group] of map) {
+  for (const [, group] of map) {
     const first = group[0]
     const firstStyle = first.textStyles?.[0]
     const lineHeight = firstStyle?.textStyle?.lineHeight
@@ -124,11 +116,12 @@ export function mergeDuplicates(nodes: TextNode[]): TextItem[] {
       proofreadText: '',
       proofreadReason: '',
       corrected: false,
+      isUntranslated: false,
       fontSize: firstStyle?.textStyle?.fontSize ?? 12,
       fontFamily: firstStyle?.textStyle?.fontName?.family ?? 'Inter',
       fontStyle: firstStyle?.textStyle?.fontName?.style ?? 'Regular',
-      lineHeight: lineHeight && typeof lineHeight === 'object' && 'value' in lineHeight ? (lineHeight as LineHeight).value : null,
-      letterSpacing: letterSpacing && typeof letterSpacing === 'object' && 'value' in letterSpacing ? (letterSpacing as LetterSpacing).value : null,
+      lineHeight: lineHeight && typeof lineHeight === 'object' && 'value' in lineHeight && typeof lineHeight.value === 'number' ? lineHeight.value : null,
+      letterSpacing: letterSpacing && typeof letterSpacing === 'object' && 'value' in letterSpacing && typeof letterSpacing.value === 'number' ? letterSpacing.value : null,
       textAlignHorizontal: first.textAlignHorizontal ?? 'LEFT',
       targetFontFamily: '',
       targetFontStyle: '',

@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "sourceMap": false,
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "allowJs": false,
+    "strict": true,
+    "noUnusedLocals": true,
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "removeComments": false,
+    "jsx": "preserve",
+    "importHelpers": true,
+    "lib": ["esnext", "dom"],
+    "types": [],
+    "paths": {
+      "@lib/*": ["./lib/*"],
+      "@ui/*": ["./ui/*"],
+      "@messages/*": ["./messages/*"]
+    }
+  },
+  "include": [
+    "./ui/**/*.ts",
+    "./typings/vue.d.ts",
+    "./messages/types.ts",
+    "./messages/ui-sender.ts"
+  ]
+}

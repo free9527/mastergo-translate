@@ -77,8 +77,9 @@
           <svg v-if="!applying" class="btn-icon-svg" width="14" height="14" viewBox="0 0 16 16"><path d="M3 8l3 3 7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           {{ applying && !applyingFonts ? `应用中 ${Math.floor(applyingProgressPercent)}%` : '应用翻译' }}
         </button>
-        <button class="btn btn-accent flex-1" @click="applyTranslationsWithFonts" :disabled="applying || translating || proofreading || !hasTranslation">
-          应用翻译+字体
+        <button class="btn btn-accent flex-1" @click="applyFonts" :disabled="applyingFonts || fontMappings.length === 0">
+          <svg v-if="!applyingFonts" class="btn-icon-svg" width="14" height="14" viewBox="0 0 16 16"><path d="M4 2h8M4 6h8M4 10h5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          {{ applyingFonts ? `替换中 ${Math.floor(applyingProgressPercent)}%` : '替换字体' }}
         </button>
         <button v-if="translating || proofreading" class="btn btn-ghost flex-1" @click="cancelOperation">
           取消
@@ -468,6 +469,7 @@ import { parseCSVRow, csvEncodeCell } from '@lib/parse-csv'
 import { formatCJKSpace } from '@lib/format-text'
 import { postProcessTranslation, restoreTrademarkSymbols, restoreStorageUnitFormatting, enforceGlossaryTerms, detectTranslationExpansion, sanitizeLineBreaks, cleanKey } from '@lib/post-process'
 import { translateBatch, proofreadBatch, fetchWithRetry, isProofreadScriptMismatch, detectTruncatedTexts, STYLE_PRESETS, SCENE_PRESETS, detectProductLine, buildTaskGlossaryHint, isUntranslatable } from '@lib/llm-api'
+import { startMetricsCollection, recordBatchMetrics, recordProofreadMetrics, finalizeMetrics, formatMetricsReport, createBatchTimer } from '@lib/metrics'
 import { DEFAULT_GLOSSARY_PRODUCTS_CSV } from '@lib/default-glossary'
 import { TRANSLATE_BATCH_SIZE, PROOFREAD_BATCH_SIZE, TOAST_DURATION_MS, CORRECTION_THRESHOLD, makeFontKey, parseFontKey, normalizeText } from '@lib/constants'
 import { convertStorageUnit } from '@lib/unit-convert'
@@ -485,9 +487,45 @@ const glossaryExclusive = ref<GlossaryEntry[]>([])
 const glossary = computed(() => [...glossaryProducts.value, ...glossaryExclusive.value])
 /** 术语库映射（响应式），供 UI 层漏翻检测复用，避免重复构建 */
 const glossaryMapForUi = computed(() => buildGlossaryMap())
+
+/** 检测是否为同语系变体语言对（共享字符集，放宽漏翻检测） */
+function isSameScriptLanguagePair(src: string, tgt: string): boolean {
+  const SAME_SCRIPT_PAIRS = [
+    ['zh-CN', 'zh-TW'], ['zh-CN', 'zh-HK'],
+    ['pt', 'pt-BR'],
+  ]
+  return SAME_SCRIPT_PAIRS.some(([s, t]) =>
+    (s === src && t === tgt) || (t === src && s === tgt)
+  )
+}
+
+/** 检测单条文本的语言 */
+function detectSingleTextLanguage(text: string): string {
+  if (!text) return 'en'
+  let cjkChars = 0, latinChars = 0, hiragana = 0, katakana = 0, hangul = 0
+  for (const ch of text) {
+    const code = ch.charCodeAt(0)
+    if (code >= 0x4E00 && code <= 0x9FFF) cjkChars++
+    else if (code >= 0x3040 && code <= 0x309F) hiragana++
+    else if (code >= 0x30A0 && code <= 0x30FF) katakana++
+    else if (code >= 0xAC00 && code <= 0xD7AF) hangul++
+    else if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')) latinChars++
+  }
+  if (hiragana + katakana > 0 && (hiragana + katakana) >= cjkChars * 0.15) return 'ja'
+  if (hangul > 0 && hangul >= (cjkChars + hangul) * 0.1) return 'ko'
+  return cjkChars > latinChars ? 'zh-CN' : 'en'
+}
+
 /** 判断条目是否应显示漏翻标记（兼容术语库中 source==target 的全球统一英文术语） */
 function showUntranslatedBadge(item: { sourceText: string; translatedText: string }): boolean {
   if (item.sourceText !== item.translatedText) return false
+
+  // v8.5: 同语系变体（CN→TW/HK、PT→PT-BR）共享字符集，源文=译文可能是正确的
+  const srcLang = detectSingleTextLanguage(item.sourceText)
+  if (isSameScriptLanguagePair(srcLang, targetLang.value)) {
+    return false // 同语系变体不显示漏翻标记
+  }
+
   return !isUntranslatable(item.sourceText, glossaryMapForUi.value)
 }
 const translationCache = ref<Record<string, string>>({})
@@ -1059,6 +1097,16 @@ async function startTranslate() {
   let cursor = autoSkipped
   translateProgress.value = { current: cursor, total }
 
+  // ═══ v8.4: 启动翻译指标收集 ═══
+  const detectedProductLine = detectProductLine(
+    items.value.map(it => it.sourceText),
+    pageName.value,
+    fileName.value,
+  )
+  const totalBatches = Math.ceil(apiTotal / TRANSLATE_BATCH_SIZE)
+  startMetricsCollection(totalBatches, apiTotal, targetLang.value, detectedProductLine)
+  const translationTimer = createBatchTimer()
+
   // ═══ 流水线化：预计算校对参数（翻译开始前就准备好，翻译完一波立即校对） ═══
   const proofreadEnabled = llmConfig.value.enableProofread
   let proofreadGlossaryHint: string | undefined
@@ -1093,6 +1141,10 @@ async function startTranslate() {
       concurrentBatchPromises.push((async () => {
         if (cancelFlag.value) return
         const texts = batch.map(it => it.sourceText)
+        const batchTimer = createBatchTimer()
+        let batchApiCalls = 0
+        let batchUntranslated = 0
+        let batchTruncated = 0
 
         try {
           // 检查缓存：分离已缓存和未缓存的文本
@@ -1126,7 +1178,7 @@ async function startTranslate() {
             const uncachedTexts = uncachedIndices.map(idx => texts[idx])
             // 翻译记忆：同型号不同容量/速度的文本压缩为唯一模板，减少 API 调用
             const { uniqueTexts, expandData } = compressBatch(uncachedTexts)
-            const uniqueResult = await translateBatch(uniqueTexts, targetLang.value, glossaryMap, llmConfig.value, sourceLang.value === 'auto' ? undefined : sourceLang.value, pageName.value || undefined, fileName.value || undefined, crossBatchTerms, taskGlossaryHint)
+            const uniqueResult = await translateBatch(uniqueTexts, targetLang.value, glossaryMap, llmConfig.value, sourceLang.value === 'auto' ? undefined : sourceLang.value, pageName.value || undefined, fileName.value || undefined, crossBatchTerms, taskGlossaryHint, normalizedGlossaryMap)
             // 将模板译文展开回原始文本
             const expandedResult = expandBatch(uniqueResult, expandData, uncachedTexts.length)
             // v7.5.7: 追踪关键文本在各环节的值
@@ -1156,6 +1208,41 @@ async function startTranslate() {
           for (let j = 0; j < batch.length; j++) {
             batch[j].translatedText = formatCJKSpace(translated[j] || '', targetLang.value)
           }
+
+          // v8.4: 记录批次指标
+          batchApiCalls = uncachedIndices.length > 0 ? 1 : 0
+          batchUntranslated = translated.filter(t => !t || t.trim() === '').length
+          const batchDuration = batchTimer.stop()
+          recordBatchMetrics({
+            batchIndex: Math.floor(batchStart / TRANSLATE_BATCH_SIZE),
+            batchSize: batch.length,
+            targetLang: targetLang.value,
+            productLine: detectedProductLine,
+            apiCalls: batchApiCalls,
+            retryLayers: {
+              unified: false,
+              aggressive: 0,
+              sentenceSplit: 0,
+              caseNormalization: 0,
+            },
+            duration: {
+              total: batchDuration,
+              llm: batchDuration,
+              preprocessing: 0,
+              postprocessing: 0,
+            },
+            glossary: {
+              totalTerms: glossaryMap.size,
+              matchedTerms: 0,
+              hitRate: 0,
+            },
+            quality: {
+              untranslated: batchUntranslated,
+              truncated: batchTruncated,
+              brandInjection: 0,
+              expansion: 0,
+            },
+          })
         } catch (e) {
           failedBatches++
           lastErrors.push(e instanceof Error ? e.message : String(e))
@@ -1311,6 +1398,13 @@ async function startTranslate() {
       console.error('[translate] proofread crashed', e)
       showToast('校对异常: ' + (e instanceof Error ? e.message : String(e)), 'error')
     }
+  }
+
+  // v8.4: 完成指标收集并显示报告
+  const metrics = finalizeMetrics()
+  if (metrics) {
+    const report = formatMetricsReport(metrics)
+    console.log('[translate] 翻译指标报告:\n' + report)
   }
 
   translating.value = false
@@ -1661,41 +1755,6 @@ function applyTranslationsOnly() {
   // applying state reset by APPLY_DONE message
 }
 
-/** 先应用翻译，完成后自动触发字体替换 */
-async function applyTranslationsWithFonts() {
-  if (items.value.length === 0) return
-  // 跳过已手动应用的节点
-  const unapplied = items.value.filter(function (it) { return !it.nodeIds.some(function (id) { return appliedNodeIds.value.has(id) }) })
-  const skipped = items.value.length - unapplied.length
-  if (unapplied.length === 0) {
-    showToast(skipped > 0 ? '所有条目已手动应用，无需批量操作' : '没有待应用的译文', 'info')
-    return
-  }
-  applying.value = true
-  applyingFonts.value = true
-  if (skipped > 0) showToast('跳过 ' + skipped + ' 条已手动应用，正在应用剩余 ' + unapplied.length + ' 条...', 'info')
-  // 1. 先只应用翻译内容（清除字体目标属性，字体后续单独应用）
-  syncFontMappings()  // 先同步字体映射以确保 items 上的字体属性是最新的
-  const textPayload = unapplied.map(function (it) {
-    return {
-      ...it,
-      // 清除字体目标：翻译阶段不改字体
-      targetFontFamily: '',
-      targetFontStyle: '',
-      targetFontSize: 0,
-      targetLineHeight: null,
-      targetLetterSpacing: null,
-      targetTextAlign: '',
-      proofreadText: '',
-      proofreadReason: '',
-      corrected: false,
-    }
-  })
-  sendMsgToPlugin(UIMessage.APPLY_TRANSLATIONS, JSON.parse(JSON.stringify(textPayload)))
-  showToast('正在应用翻译，完成后自动替换字体...', 'info')
-  // APPLY_DONE 消息中检测 applyingFonts 并自动触发 applyFonts()
-}
-
 function syncFontMappings() {
   const lookup = new Map(fontMappings.value.map(f => [f.key, f]))
   for (const item of items.value) {
@@ -1761,7 +1820,7 @@ function autoMapFonts() {
   }
 }
 
-/** 向主线程触发独立的字体替换操作 */
+/** 向主线程触发独立的字体替换操作（不改字号/行距/字距，只换字体族+字重） */
 function applyFonts() {
   syncFontMappings()
   const fontPayload = items.value.map(function (it) {
@@ -1771,10 +1830,10 @@ function applyFonts() {
       fontStyle: it.fontStyle,
       targetFontFamily: it.targetFontFamily || '',
       targetFontStyle: it.targetFontStyle || '',
-      targetFontSize: it.targetFontSize || 0,
-      targetLineHeight: it.targetLineHeight,
-      targetLetterSpacing: it.targetLetterSpacing,
-      targetTextAlign: it.targetTextAlign || '',
+      targetFontSize: 0,
+      targetLineHeight: null,
+      targetLetterSpacing: null,
+      targetTextAlign: '',
     }
   })
   sendMsgToPlugin(UIMessage.APPLY_FONTS, JSON.parse(JSON.stringify(fontPayload)))
@@ -2231,11 +2290,11 @@ async function retranslateSingle(item: TextItem) {
 // 设置
 // ============================================================
 function useDefaultConfig() {
-  llmConfig.value.apiKey = 'sk-FS2AGf1vcZU1OpIIho7nBd8bQGcm45nII6UlZAECxj5Iaamn'
+  llmConfig.value.apiKey = 'sk-LcscmmvLrVlwRbWtoPgF1jSNg6fzR7rgp2FX8pFaHreVYMyu'
   llmConfig.value.apiUrl = 'https://aigo.lexar.com/v1/chat/completions'
-  llmConfig.value.model = 'qwen3.7-max'
+  llmConfig.value.model = 'gpt-5.5'
   llmConfig.value.enableProofread = true
-  llmConfig.value.proofreadModel = 'qwen3.7-max'
+  llmConfig.value.proofreadModel = 'gpt-5.5'
   saveSettings()
   showToast('已恢复默认团队配置并保存', 'success')
 }
@@ -2410,15 +2469,9 @@ onMounted(() => {
           : `已应用 ${d.count} 条译文到画布`
         showToast(msg, d.failed ? 'error' : 'success')
 
-        // 如果用户点击了"应用翻译+字体"，翻译完成后自动触发字体替换
-        if (applyingFonts.value) {
-          showToast('翻译已应用，正在替换字体...', 'info')
-          applyFonts()
-        } else {
-          applying.value = false
-          applyingProgress.value.current = 0
-          applyingProgress.value.total = 0
-        }
+        applying.value = false
+        applyingProgress.value.current = 0
+        applyingProgress.value.total = 0
         break
       }
 
@@ -2476,11 +2529,7 @@ onMounted(() => {
           if (raw.scenePreset === undefined) {
             raw.scenePreset = 'ecommerce'
           }
-          llmConfig.value = { translationStyle: 'standard', translationStyleCustom: '', scenePreset: 'ecommerce', enableProofread: false, proofreadApiKey: '', proofreadApiUrl: '', proofreadModel: 'qwen3.7-max', ...(raw as LLMConfig) }
-          // 兜底：旧版配置可能没有 proofreadModel / 为空 / 等于翻译模型（冗余配置）
-          if (!llmConfig.value.proofreadModel || llmConfig.value.proofreadModel === llmConfig.value.model) {
-            llmConfig.value.proofreadModel = 'qwen3.7-max'
-          }
+          llmConfig.value = { translationStyle: 'standard', translationStyleCustom: '', scenePreset: 'ecommerce', enableProofread: false, proofreadApiKey: '', proofreadApiUrl: '', proofreadModel: '', ...(raw as LLMConfig) }
         }
         selectedPreset.value = detectPreset()
         settingsReady = true
@@ -3046,8 +3095,8 @@ body {
 
 .trans-input {
   width: 100%; padding: 10px 12px; border: 1px solid var(--gray-200); border-radius: var(--radius-sm);
-  font-size: 14px; resize: none; font-family: inherit; line-height: 1.5;
-  color: var(--gray-900); overflow: hidden; background: #fff;
+  font-size: 13px; resize: none; font-family: inherit; line-height: 1.5;
+  color: var(--gray-600); overflow: hidden; background: #fff;
   transition: border-color var(--transition), box-shadow var(--transition), height 0.15s;
   font-weight: 700;
 }

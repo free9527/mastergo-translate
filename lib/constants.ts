@@ -9,6 +9,12 @@ export const DEBUG_MODE = false
 export const TRANSLATE_BATCH_SIZE = 15
 export const PROOFREAD_BATCH_SIZE = 8
 
+// 交叉污染检测最小长度（避免短文本误判）
+export const MIN_DUP_LEN = 20
+
+// 产品线缓存上限（防止内存泄漏）
+export const PRODUCT_LINE_CACHE_SIZE = 5000
+
 // API 超时（毫秒）— 正常LLM响应5-30s，复杂批次可能需60s+，90s留足余量避免误超时
 export const API_TIMEOUT_MS = 90000
 

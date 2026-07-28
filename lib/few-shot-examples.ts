@@ -4,7 +4,8 @@
  * 基于 Lexar 已有人工审校翻译文档提取和行业最佳实践
  */
 
-export type ContentType = 'title' | 'specification' | 'marketing' | 'description'
+// v8.2: 移除 'title' 类型 — 选择逻辑只使用 marketing/specification/description
+export type ContentType = 'specification' | 'marketing' | 'description'
 
 interface FewShotExample {
   source: string
@@ -18,11 +19,6 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
   // ============================================================
   // 中文 → 英文 (zh-CN → en)
   // ============================================================
-  'zh_en_title': [
-    { source: 'Lexar ARES RGB DDR5 战神之翼 台式机内存', target: 'Lexar ARES RGB DDR5 Desktop Memory' },
-    { source: 'NM1090 PRO PCIe 5.0 固态硬盘', target: 'NM1090 PRO PCIe 5.0 SSD' },
-    { source: 'SL500 移动固态硬盘', target: 'SL500 Portable SSD' },
-  ],
   'zh_en_specification': [
     { source: '顺序读取速度最高可达 7400MB/s，顺序写入速度最高可达 6500MB/s', target: 'Sequential read speed up to 7400MB/s, sequential write speed up to 6500MB/s' },
     { source: '采用 PCIe 4.0 x4 接口，NVMe 1.4 协议', target: 'PCIe 4.0 x4 interface, NVMe 1.4 protocol' },
@@ -41,11 +37,6 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
   // ============================================================
   // 英文 → 中文 (en → zh-CN)
   // ============================================================
-  'en_zh_title': [
-    { source: 'Lexar Professional 1667x SDXC UHS-II Card', target: 'Lexar Professional 1667x SDXC UHS-II 存储卡' },
-    { source: 'ARES RGB DDR5 Desktop Memory', target: 'ARES RGB DDR5 战神之翼 台式机内存' },
-    { source: 'Professional GOLD microSD UHS-II', target: 'Professional GOLD microSD UHS-II 存储卡' },
-  ],
   'en_zh_specification': [
     { source: 'Read speed up to 250MB/s, write speed up to 120MB/s', target: '读取速度最高 250MB/s，写入速度最高 120MB/s' },
     { source: 'Interface: PCIe 5.0 x4, NVMe 2.0', target: '接口：PCIe 5.0 x4，NVMe 2.0 协议' },
@@ -55,6 +46,7 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
     { source: 'Blazing-fast performance that leaves the competition behind.', target: '疾速性能，超越竞品，一骑绝尘。' },
     { source: 'Designed for those who demand the absolute best.', target: '为追求极致的你而生。' },
     { source: 'Dominate your game with next-gen speed.', target: '以新一代速度主宰你的游戏。' },
+    { source: 'ARES DDR5 memory delivers breakthrough performance for next-level gaming.', target: 'ARES DDR5 内存以突破性性能，带你进入次世代游戏新境界。' },
   ],
   'en_zh_description': [
     { source: 'The Lexar SL500 Portable SSD combines sleek design with blazing-fast transfer speeds up to 2000MB/s, making it the perfect companion for content creators on the go.', target: 'Lexar SL500 移动固态硬盘兼具时尚设计与最高 2000MB/s 的疾速传输速度，是内容创作者外出工作的理想拍档。' },
@@ -64,10 +56,6 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
   // ============================================================
   // 英文 → 德语 (en → de)
   // ============================================================
-  'en_de_title': [
-    { source: 'Lexar Professional 1667x SDXC UHS-II Card', target: 'Lexar Professional 1667x SDXC UHS-II Karte' },
-    { source: 'SL500 Portable SSD', target: 'SL500 Portable SSD' },
-  ],
   'en_de_specification': [
     { source: 'Sequential read speed up to 7400MB/s', target: 'Sequenzielle Lesegeschwindigkeit von bis zu 7.400 MB/s' },
     { source: 'Interface: PCIe 4.0 x4, NVMe 1.4', target: 'Schnittstelle: PCIe 4.0 x4, NVMe 1.4' },
@@ -75,6 +63,7 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
   'en_de_marketing': [
     { source: 'Extreme performance, engineered for gamers and professional creators.', target: 'Extreme Leistung, entwickelt für Gamer und professionelle Kreative.' },
     { source: 'Unleash your creative potential with blazing-fast transfers.', target: 'Entfesseln Sie Ihr kreatives Potenzial mit blitzschnellen Übertragungen.' },
+    { source: 'ARES DDR5 memory delivers breakthrough performance for next-level gaming.', target: 'ARES DDR5 Arbeitsspeicher liefert bahnbrechende Performance für Gaming auf höchstem Niveau.' },
   ],
   'en_de_description': [
     { source: 'Lexar ARES RGB DDR5 Desktop Memory features premium ICs and PMIC voltage control, delivering exceptional performance and rock-solid stability.', target: 'Der Lexar ARES RGB DDR5 Desktop-Speicher verfügt über Premium-ICs und PMIC-Spannungssteuerung und liefert außergewöhnliche Leistung und höchste Stabilität.' },
@@ -83,10 +72,6 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
   // ============================================================
   // 英文 → 法语 (en → fr)
   // ============================================================
-  'en_fr_title': [
-    { source: 'SL500 Portable SSD', target: 'SSD portable SL500' },
-    { source: 'Professional GOLD microSD UHS-II', target: 'Carte Professional GOLD microSD UHS-II' },
-  ],
   'en_fr_specification': [
     { source: 'Sequential read speed up to 7400MB/s', target: 'Vitesse de lecture séquentielle jusqu\'à 7 400 Mo/s' },
     { source: 'Capacity: 1TB / 2TB / 4TB', target: 'Capacité : 1 To / 2 To / 4 To' },
@@ -94,6 +79,7 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
   'en_fr_marketing': [
     { source: 'Designed for those who demand the absolute best.', target: 'Conçu pour ceux qui exigent le meilleur.' },
     { source: 'Blazing-fast performance that leaves the competition behind.', target: 'Des performances fulgurantes qui laissent la concurrence derrière.' },
+    { source: 'ARES DDR5 memory delivers breakthrough performance for next-level gaming.', target: 'La mémoire RAM ARES DDR5 offre des performances révolutionnaires pour une expérience de jeu inégalée.' },
   ],
   'en_fr_description': [
     { source: 'The Lexar SL500 Portable SSD combines sleek design with blazing-fast transfer speeds up to 2000MB/s.', target: 'Le SSD portable Lexar SL500 allie un design élégant à des vitesses de transfert fulgurantes pouvant atteindre 2 000 Mo/s.' },
@@ -102,10 +88,6 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
   // ============================================================
   // 英文 → 日语 (en → ja)
   // ============================================================
-  'en_ja_title': [
-    { source: 'Lexar Professional 1667x SDXC UHS-II Card', target: 'Lexar Professional 1667x SDXC UHS-II カード' },
-    { source: 'SL500 Portable SSD', target: 'SL500 ポータブル SSD' },
-  ],
   'en_ja_specification': [
     { source: 'Sequential read speed up to 7400MB/s', target: 'シーケンシャル読み取り速度 最大 7400MB/s' },
     { source: 'Capacity: 1TB / 2TB / 4TB', target: '容量: 1TB / 2TB / 4TB' },
@@ -113,6 +95,7 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
   'en_ja_marketing': [
     { source: 'Extreme performance, engineered for gamers and professional creators.', target: 'ゲーマーとプロフェッショナルクリエイターのために設計された、究極のパフォーマンス。' },
     { source: 'Dominate your game with next-gen speed.', target: '次世代のスピードでゲームを制覇せよ。' },
+    { source: 'ARES DDR5 memory delivers breakthrough performance for next-level gaming.', target: 'ARES DDR5メモリは、次世代のゲーミング体験を実現する圧倒的なパフォーマンスを発揮します。' },
   ],
   'en_ja_description': [
     { source: 'Lexar ARES RGB DDR5 Desktop Memory features premium ICs and PMIC voltage control.', target: 'Lexar ARES RGB DDR5 デスクトップメモリは、高品質 IC と PMIC 電圧制御を搭載しています。' },
@@ -121,10 +104,6 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
   // ============================================================
   // 英文 → 韩语 (en → ko)
   // ============================================================
-  'en_ko_title': [
-    { source: 'SL500 Portable SSD', target: 'SL500 포터블 SSD' },
-    { source: 'Professional GOLD microSD UHS-II', target: 'Professional GOLD microSD UHS-II 카드' },
-  ],
   'en_ko_specification': [
     { source: 'Sequential read speed up to 7400MB/s', target: '순차 읽기 속도 최대 7400MB/s' },
     { source: 'Capacity: 1TB / 2TB / 4TB', target: '용량: 1TB / 2TB / 4TB' },
@@ -132,6 +111,7 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
   'en_ko_marketing': [
     { source: 'Designed for those who demand the absolute best.', target: '최고를 원하는 당신을 위해 설계되었습니다.' },
     { source: 'Blazing-fast performance that leaves the competition behind.', target: '경쟁 제품을 압도하는 초고속 성능.' },
+    { source: 'ARES DDR5 memory delivers breakthrough performance for next-level gaming.', target: 'ARES DDR5 메모리는 극한의 퍼포먼스로 차원이 다른 게이밍 경험을 선사합니다.' },
   ],
   'en_ko_description': [
     { source: 'The Lexar SL500 Portable SSD combines sleek design with blazing-fast transfer speeds up to 2000MB/s.', target: 'Lexar SL500 포터블 SSD는 세련된 디자인과 최대 2000MB/s의 초고속 전송 속도를 결합했습니다.' },
@@ -140,10 +120,6 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
   // ============================================================
   // 英文 → 阿拉伯语 (en → ar)
   // ============================================================
-  'en_ar_title': [
-    { source: 'SL500 Portable SSD', target: 'SL500 قرص SSD محمول' },
-    { source: 'Professional GOLD microSD UHS-II', target: 'بطاقة Professional GOLD microSD UHS-II' },
-  ],
   'en_ar_specification': [
     { source: 'Sequential read speed up to 7400MB/s', target: 'سرعة قراءة متتابعة تصل إلى 7400 ميجابايت/ثانية' },
     { source: 'Capacity: 1TB / 2TB / 4TB', target: 'السعة: 1 تيرابايت / 2 تيرابايت / 4 تيرابايت' },
@@ -151,6 +127,7 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
   'en_ar_marketing': [
     { source: 'Designed for those who demand the absolute best.', target: 'مُصمم لأولئك الذين يطلبون الأفضل على الإطلاق.' },
     { source: 'Unleash your creative potential.', target: 'أطلق العنان لإبداعك.' },
+    { source: 'ARES DDR5 memory delivers breakthrough performance for next-level gaming.', target: 'توفر ذاكرة ARES DDR5 أداءً استثنائياً لتجربة ألعاب من المستوى التالي.' },
   ],
   'en_ar_description': [
     { source: 'Lexar ARES RGB DDR5 Desktop Memory features premium ICs and PMIC voltage control.', target: 'تتميز ذاكرة Lexar ARES RGB DDR5 المكتبية بشرائح IC متميزة وتحكم في الجهد PMIC.' },
@@ -159,11 +136,6 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
   // ============================================================
   // 中文 → 繁体中文 (zh-CN → zh-TW)
   // ============================================================
-  'zh_zh-TW_title': [
-    { source: 'Lexar ARES RGB DDR5 战神之翼 台式机内存', target: 'Lexar ARES RGB DDR5 戰神之翼 桌上型記憶體' },
-    { source: 'NM1090 PRO PCIe 5.0 固态硬盘', target: 'NM1090 PRO PCIe 5.0 固態硬碟' },
-    { source: 'SL500 移动固态硬盘', target: 'SL500 可攜式固態硬碟' },
-  ],
   'zh_zh-TW_specification': [
     { source: '顺序读取速度最高可达 7400MB/s，顺序写入速度最高可达 6500MB/s', target: '循序讀取速度最高可達 7400MB/s，循序寫入速度最高可達 6500MB/s' },
     { source: '容量：1TB / 2TB / 4TB', target: '容量：1TB / 2TB / 4TB' },
@@ -180,16 +152,13 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
   // ============================================================
   // 英文 → 繁体中文 (en → zh-TW)
   // ============================================================
-  'en_zh-TW_title': [
-    { source: 'Lexar Professional 1667x SDXC UHS-II Card', target: 'Lexar Professional 1667x SDXC UHS-II 記憶卡' },
-    { source: 'SL500 Portable SSD', target: 'SL500 可攜式固態硬碟' },
-  ],
   'en_zh-TW_specification': [
     { source: 'Sequential read speed up to 7400MB/s', target: '循序讀取速度最高可達 7400MB/s' },
     { source: 'Interface: PCIe 4.0 x4, NVMe 1.4', target: '介面：PCIe 4.0 x4，NVMe 1.4 協定' },
   ],
   'en_zh-TW_marketing': [
     { source: 'Designed for those who demand the absolute best.', target: '為追求極致的你而生。' },
+    { source: 'ARES DDR5 memory delivers breakthrough performance for next-level gaming.', target: 'ARES DDR5 記憶體為次世代遊戲體驗帶來突破性效能。' },
   ],
   'en_zh-TW_description': [
     { source: 'The Lexar SL500 Portable SSD combines sleek design with blazing-fast transfer speeds up to 2000MB/s.', target: 'Lexar SL500 可攜式固態硬碟兼具時尚設計與最高 2000MB/s 的極速傳輸速度。' },
@@ -198,11 +167,6 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
   // ============================================================
   // 英文 → 葡萄牙语 (en → pt)
   // ============================================================
-  'en_pt_title': [
-    { source: 'SL500 Portable SSD', target: 'SSD Portátil SL500' },
-    { source: 'Professional GOLD microSD UHS-II', target: 'Cartão Professional GOLD microSD UHS-II' },
-    { source: 'NM1090 PRO PCIe 5.0 SSD', target: 'SSD NM1090 PRO PCIe 5.0' },
-  ],
   'en_pt_specification': [
     { source: 'Sequential read speed up to 7400MB/s', target: 'Velocidade de leitura sequencial até 7400 MB/s' },
     { source: 'Capacity: 1TB / 2TB / 4TB', target: 'Capacidade: 1 TB / 2 TB / 4 TB' },
@@ -211,6 +175,7 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
   'en_pt_marketing': [
     { source: 'Designed for those who demand the absolute best.', target: 'Projetado para quem exige o melhor absoluto.' },
     { source: 'Unleash your creative potential with blazing-fast transfers.', target: 'Liberte o seu potencial criativo com transferências ultrarrápidas.' },
+    { source: 'ARES DDR5 memory delivers breakthrough performance for next-level gaming.', target: 'A memória RAM ARES DDR5 oferece um desempenho revolucionário para uma experiência de jogo de nível superior.' },
   ],
   'en_pt_description': [
     { source: 'The Lexar SL500 Portable SSD combines sleek design with blazing-fast transfer speeds up to 2000MB/s.', target: 'O SSD Portátil Lexar SL500 combina um design elegante com velocidades de transferência ultrarrápidas de até 2000 MB/s.' },
@@ -219,10 +184,6 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
   // ============================================================
   // 英文 → 巴西葡萄牙语 (en → pt-BR)
   // ============================================================
-  'en_pt-BR_title': [
-    { source: 'SL500 Portable SSD', target: 'SSD Portátil SL500' },
-    { source: 'Professional GOLD microSD UHS-II', target: 'Cartão Professional GOLD microSD UHS-II' },
-  ],
   'en_pt-BR_specification': [
     { source: 'Sequential read speed up to 7400MB/s', target: 'Velocidade de leitura sequencial de até 7400 MB/s' },
     { source: 'Capacity: 1TB / 2TB / 4TB', target: 'Capacidade: 1 TB / 2 TB / 4 TB' },
@@ -230,6 +191,7 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
   'en_pt-BR_marketing': [
     { source: 'Designed for those who demand the absolute best.', target: 'Projetado para quem exige o melhor.' },
     { source: 'Blazing-fast performance that leaves the competition behind.', target: 'Desempenho ultrarrápido que deixa a concorrência para trás.' },
+    { source: 'ARES DDR5 memory delivers breakthrough performance for next-level gaming.', target: 'A memória RAM ARES DDR5 oferece desempenho revolucionário para uma experiência de jogo de outro nível.' },
   ],
   'en_pt-BR_description': [
     { source: 'The Lexar SL500 Portable SSD combines sleek design with blazing-fast transfer speeds up to 2000MB/s.', target: 'O SSD Portátil Lexar SL500 combina design elegante com velocidades de transferência ultrarrápidas de até 2000 MB/s.' },
@@ -238,11 +200,6 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
   // ============================================================
   // 英文 → 俄语 (en → ru)
   // ============================================================
-  'en_ru_title': [
-    { source: 'SL500 Portable SSD', target: 'Портативный SSD-накопитель SL500' },
-    { source: 'Professional GOLD microSD UHS-II', target: 'Карта памяти Professional GOLD microSD UHS-II' },
-    { source: 'NM1090 PRO PCIe 5.0 SSD', target: 'SSD-накопитель NM1090 PRO PCIe 5.0' },
-  ],
   'en_ru_specification': [
     { source: 'Sequential read speed up to 7400MB/s', target: 'Скорость последовательного чтения до 7400 МБ/с' },
     { source: 'Capacity: 1TB / 2TB / 4TB', target: 'Ёмкость: 1 ТБ / 2 ТБ / 4 ТБ' },
@@ -251,6 +208,7 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
   'en_ru_marketing': [
     { source: 'Designed for those who demand the absolute best.', target: 'Создан для тех, кто требует самого лучшего.' },
     { source: 'Unleash your creative potential with blazing-fast transfers.', target: 'Раскройте свой творческий потенциал с молниеносной скоростью передачи данных.' },
+    { source: 'ARES DDR5 memory delivers breakthrough performance for next-level gaming.', target: 'Память ARES DDR5 обеспечивает революционную производительность для игр нового уровня.' },
   ],
   'en_ru_description': [
     { source: 'The Lexar SL500 Portable SSD combines sleek design with blazing-fast transfer speeds up to 2000MB/s.', target: 'Портативный SSD-накопитель Lexar SL500 сочетает элегантный дизайн и молниеносную скорость передачи данных до 2000 МБ/с.' },
@@ -259,11 +217,6 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
   // ============================================================
   // 英文 → 意大利语 (en → it)
   // ============================================================
-  'en_it_title': [
-    { source: 'SL500 Portable SSD', target: 'SSD Portatile SL500' },
-    { source: 'Professional GOLD microSD UHS-II', target: 'Scheda Professional GOLD microSD UHS-II' },
-    { source: 'ARES RGB DDR5 Desktop Memory', target: 'Memoria Desktop ARES RGB DDR5' },
-  ],
   'en_it_specification': [
     { source: 'Sequential read speed up to 7400MB/s', target: 'Velocità di lettura sequenziale fino a 7400 MB/s' },
     { source: 'Capacity: 1TB / 2TB / 4TB', target: 'Capacità: 1 TB / 2 TB / 4 TB' },
@@ -272,6 +225,7 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
   'en_it_marketing': [
     { source: 'Designed for those who demand the absolute best.', target: 'Progettato per chi esige solo il meglio.' },
     { source: 'Blazing-fast performance that leaves the competition behind.', target: 'Prestazioni fulminee che lasciano la concorrenza indietro.' },
+    { source: 'ARES DDR5 memory delivers breakthrough performance for next-level gaming.', target: 'La memoria RAM ARES DDR5 offre prestazioni estreme per un\'esperienza di gioco di livello superiore.' },
   ],
   'en_it_description': [
     { source: 'The Lexar SL500 Portable SSD combines sleek design with blazing-fast transfer speeds up to 2000MB/s.', target: 'L\'SSD Portatile Lexar SL500 unisce un design elegante a velocità di trasferimento fulminee fino a 2000 MB/s.' },
@@ -280,11 +234,6 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
   // ============================================================
   // 英文 → 越南语 (en → vi)
   // ============================================================
-  'en_vi_title': [
-    { source: 'SL500 Portable SSD', target: 'SSD Di Động SL500' },
-    { source: 'Professional GOLD microSD UHS-II', target: 'Thẻ Professional GOLD microSD UHS-II' },
-    { source: 'NM1090 PRO PCIe 5.0 SSD', target: 'SSD NM1090 PRO PCIe 5.0' },
-  ],
   'en_vi_specification': [
     { source: 'Sequential read speed up to 7400MB/s', target: 'Tốc độ đọc tuần tự lên đến 7400 MB/s' },
     { source: 'Capacity: 1TB / 2TB / 4TB', target: 'Dung lượng: 1TB / 2TB / 4TB' },
@@ -293,6 +242,7 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
   'en_vi_marketing': [
     { source: 'Designed for those who demand the absolute best.', target: 'Được thiết kế cho những ai đòi hỏi điều tốt nhất.' },
     { source: 'Unleash your creative potential with blazing-fast transfers.', target: 'Giải phóng tiềm năng sáng tạo của bạn với tốc độ truyền tải vượt trội.' },
+    { source: 'ARES DDR5 memory delivers breakthrough performance for next-level gaming.', target: 'RAM DDR5 ARES mang lại hiệu năng bứt phá, đưa trải nghiệm chiến game lên tầm cao mới.' },
   ],
   'en_vi_description': [
     { source: 'The Lexar SL500 Portable SSD combines sleek design with blazing-fast transfer speeds up to 2000MB/s.', target: 'SSD Di Động Lexar SL500 kết hợp thiết kế tinh tế với tốc độ truyền tải vượt trội lên đến 2000 MB/s.' },
@@ -301,11 +251,6 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
   // ============================================================
   // 英文 → 泰语 (en → th)
   // ============================================================
-  'en_th_title': [
-    { source: 'SL500 Portable SSD', target: 'SL500 พกพา SSD' },
-    { source: 'Professional GOLD microSD UHS-II', target: 'การ์ด Professional GOLD microSD UHS-II' },
-    { source: 'NM1090 PRO PCIe 5.0 SSD', target: 'NM1090 PRO PCIe 5.0 SSD' },
-  ],
   'en_th_specification': [
     { source: 'Sequential read speed up to 7400MB/s', target: 'ความเร็วในการอ่านต่อเนื่องสูงสุด 7400MB/s' },
     { source: 'Capacity: 1TB / 2TB / 4TB', target: 'ความจุ: 1TB / 2TB / 4TB' },
@@ -314,6 +259,7 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
   'en_th_marketing': [
     { source: 'Designed for those who demand the absolute best.', target: 'ออกแบบมาสำหรับผู้ที่ต้องการสิ่งที่ดีที่สุดเท่านั้น' },
     { source: 'Unleash your creative potential.', target: 'ปลดปล่อยศักยภาพความคิดสร้างสรรค์ของคุณ' },
+    { source: 'ARES DDR5 memory delivers breakthrough performance for next-level gaming.', target: 'แรม ARES DDR5 มอบประสิทธิภาพที่ก้าวล้ำเพื่อประสบการณ์การเล่นเกมขั้นสุด' },
   ],
   'en_th_description': [
     { source: 'The Lexar SL500 Portable SSD combines sleek design with blazing-fast transfer speeds up to 2000MB/s.', target: 'Lexar SL500 พกพา SSD ผสมผสานการออกแบบที่ทันสมัยเข้ากับความเร็วในการถ่ายโอนที่รวดเร็วสูงสุด 2000MB/s' },
@@ -322,11 +268,6 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
   // ============================================================
   // 英文 → 印尼语 (en → id)
   // ============================================================
-  'en_id_title': [
-    { source: 'SL500 Portable SSD', target: 'SSD Portabel SL500' },
-    { source: 'Professional GOLD microSD UHS-II', target: 'Kartu Professional GOLD microSD UHS-II' },
-    { source: 'ARES RGB DDR5 Desktop Memory', target: 'Memori Desktop ARES RGB DDR5' },
-  ],
   'en_id_specification': [
     { source: 'Sequential read speed up to 7400MB/s', target: 'Kecepatan baca sekuensial hingga 7400 MB/s' },
     { source: 'Capacity: 1TB / 2TB / 4TB', target: 'Kapasitas: 1TB / 2TB / 4TB' },
@@ -335,6 +276,7 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
   'en_id_marketing': [
     { source: 'Designed for those who demand the absolute best.', target: 'Dirancang untuk mereka yang menginginkan yang terbaik.' },
     { source: 'Blazing-fast performance that leaves the competition behind.', target: 'Performa sangat cepat yang meninggalkan pesaing di belakang.' },
+    { source: 'ARES DDR5 memory delivers breakthrough performance for next-level gaming.', target: 'RAM ARES DDR5 memberikan performa terobosan untuk pengalaman gaming level berikutnya.' },
   ],
   'en_id_description': [
     { source: 'The Lexar SL500 Portable SSD combines sleek design with blazing-fast transfer speeds up to 2000MB/s.', target: 'SSD Portabel Lexar SL500 menggabungkan desain ramping dengan kecepatan transfer sangat cepat hingga 2000 MB/s.' },
@@ -343,11 +285,6 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
   // ============================================================
   // 英文 → 荷兰语 (en → nl)
   // ============================================================
-  'en_nl_title': [
-    { source: 'SL500 Portable SSD', target: 'SL500 Draagbare SSD' },
-    { source: 'Professional GOLD microSD UHS-II', target: 'Professional GOLD microSD UHS-II Kaart' },
-    { source: 'NM1090 PRO PCIe 5.0 SSD', target: 'NM1090 PRO PCIe 5.0 SSD' },
-  ],
   'en_nl_specification': [
     { source: 'Sequential read speed up to 7400MB/s', target: 'Sequentiële leessnelheid tot 7400 MB/s' },
     { source: 'Capacity: 1TB / 2TB / 4TB', target: 'Capaciteit: 1 TB / 2 TB / 4 TB' },
@@ -356,6 +293,7 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
   'en_nl_marketing': [
     { source: 'Designed for those who demand the absolute best.', target: 'Ontworpen voor wie alleen het allerbeste eist.' },
     { source: 'Unleash your creative potential.', target: 'Ontketen uw creatieve potentieel.' },
+    { source: 'ARES DDR5 memory delivers breakthrough performance for next-level gaming.', target: 'ARES DDR5 RAM-geheugen levert baanbrekende prestaties voor gamen op het hoogste niveau.' },
   ],
   'en_nl_description': [
     { source: 'The Lexar SL500 Portable SSD combines sleek design with blazing-fast transfer speeds up to 2000MB/s.', target: 'De Lexar SL500 Draagbare SSD combineert een strak design met razendsnelle overdrachtssnelheden tot 2000 MB/s.' },
@@ -364,11 +302,6 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
   // ============================================================
   // 英文 → 波兰语 (en → pl)
   // ============================================================
-  'en_pl_title': [
-    { source: 'SL500 Portable SSD', target: 'Przenośny SSD SL500' },
-    { source: 'Professional GOLD microSD UHS-II', target: 'Karta Professional GOLD microSD UHS-II' },
-    { source: 'ARES RGB DDR5 Desktop Memory', target: 'Pamięć Desktopowa ARES RGB DDR5' },
-  ],
   'en_pl_specification': [
     { source: 'Sequential read speed up to 7400MB/s', target: 'Sekwencyjna prędkość odczytu do 7400 MB/s' },
     { source: 'Capacity: 1TB / 2TB / 4TB', target: 'Pojemność: 1 TB / 2 TB / 4 TB' },
@@ -377,19 +310,15 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
   'en_pl_marketing': [
     { source: 'Designed for those who demand the absolute best.', target: 'Zaprojektowany dla tych, którzy wymagają absolutnie najlepszego.' },
     { source: 'Blazing-fast performance that leaves the competition behind.', target: 'Błyskawiczna wydajność, która zostawia konkurencję w tyle.' },
+    { source: 'ARES DDR5 memory delivers breakthrough performance for next-level gaming.', target: 'Pamięć RAM ARES DDR5 zapewnia przełomową wydajność, wznosząc rozgrywkę na zupełnie nowy poziom.' },
   ],
   'en_pl_description': [
-    { source: 'The Lexar SL500 Portable SSD combines sleek design with blazing-fast transfer speeds up to 2000MB/s.', target: 'Przenośny SSD Lexar SL500 łączy elegancki design z błyskawiczną prędkością przesyłu danych do 2000 MB/s.' },
+    { source: 'The Lexar SL500 Portable SSD combines sleek design with blazing-fast transfer speeds up to 2000MB/s.', target: 'Przenośny dysk SSD Lexar SL500 łączy elegancki design z błyskawiczną prędkością przesyłu danych do 2000 MB/s.' },
   ],
 
   // ============================================================
   // 英文 → 瑞典语 (en → sv)
   // ============================================================
-  'en_sv_title': [
-    { source: 'SL500 Portable SSD', target: 'SL500 Bärbar SSD' },
-    { source: 'Professional GOLD microSD UHS-II', target: 'Professional GOLD microSD UHS-II Kort' },
-    { source: 'NM1090 PRO PCIe 5.0 SSD', target: 'NM1090 PRO PCIe 5.0 SSD' },
-  ],
   'en_sv_specification': [
     { source: 'Sequential read speed up to 7400MB/s', target: 'Sekventiell läshastighet upp till 7400 MB/s' },
     { source: 'Capacity: 1TB / 2TB / 4TB', target: 'Kapacitet: 1 TB / 2 TB / 4 TB' },
@@ -398,6 +327,7 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
   'en_sv_marketing': [
     { source: 'Designed for those who demand the absolute best.', target: 'Designad för dig som kräver det allra bästa.' },
     { source: 'Unleash your creative potential.', target: 'Släpp loss din kreativa potential.' },
+    { source: 'ARES DDR5 memory delivers breakthrough performance for next-level gaming.', target: 'ARES DDR5 arbetsminne leverer banbrytande prestanda för gaming på nästa nivå.' },
   ],
   'en_sv_description': [
     { source: 'The Lexar SL500 Portable SSD combines sleek design with blazing-fast transfer speeds up to 2000MB/s.', target: 'Den bärbara SSD-enheten Lexar SL500 kombinerar elegant design med blixtsnabba överföringshastigheter upp till 2000 MB/s.' },
@@ -406,11 +336,6 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
   // ============================================================
   // 英文 → 土耳其语 (en → tr)
   // ============================================================
-  'en_tr_title': [
-    { source: 'SL500 Portable SSD', target: 'SL500 Taşınabilir SSD' },
-    { source: 'Professional GOLD microSD UHS-II', target: 'Professional GOLD microSD UHS-II Kart' },
-    { source: 'ARES RGB DDR5 Desktop Memory', target: 'ARES RGB DDR5 Masaüstü Belleği' },
-  ],
   'en_tr_specification': [
     { source: 'Sequential read speed up to 7400MB/s', target: 'Sıralı okuma hızı 7400 MB/s\'ye kadar' },
     { source: 'Capacity: 1TB / 2TB / 4TB', target: 'Kapasite: 1 TB / 2 TB / 4 TB' },
@@ -419,6 +344,7 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
   'en_tr_marketing': [
     { source: 'Designed for those who demand the absolute best.', target: 'Yalnızca en iyisini talep edenler için tasarlandı.' },
     { source: 'Blazing-fast performance that leaves the competition behind.', target: 'Rakiplerini geride bırakan inanılmaz hızlı performans.' },
+    { source: 'ARES DDR5 memory delivers breakthrough performance for next-level gaming.', target: 'ARES DDR5 RAM, yeni nesil oyun deneyimi için çığır açan performans sunar.' },
   ],
   'en_tr_description': [
     { source: 'The Lexar SL500 Portable SSD combines sleek design with blazing-fast transfer speeds up to 2000MB/s.', target: 'Lexar SL500 Taşınabilir SSD, şık tasarımı 2000 MB/s\'ye varan inanılmaz aktarım hızlarıyla birleştirir.' },
@@ -427,10 +353,6 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
   // ============================================================
   // 英文 → 西班牙语 (en → es)
   // ============================================================
-  'en_es_title': [
-    { source: 'SL500 Portable SSD', target: 'SSD Portátil SL500' },
-    { source: 'Professional GOLD microSD UHS-II', target: 'Tarjeta Professional GOLD microSD UHS-II' },
-  ],
   'en_es_specification': [
     { source: 'Sequential read speed up to 7400MB/s', target: 'Velocidad de lectura secuencial de hasta 7400 MB/s' },
     { source: 'Capacity: 1TB / 2TB / 4TB', target: 'Capacidad: 1 TB / 2 TB / 4 TB' },
@@ -438,6 +360,7 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
   'en_es_marketing': [
     { source: 'Extreme performance, engineered for gamers and professional creators.', target: 'Rendimiento extremo, diseñado para jugadores y creadores profesionales.' },
     { source: 'Dominate your game with next-gen speed.', target: 'Domina tu juego con velocidad de nueva generación.' },
+    { source: 'ARES DDR5 memory delivers breakthrough performance for next-level gaming.', target: 'La memoria RAM ARES DDR5 ofrece un rendimiento revolucionario para una experiencia de juego de otro nivel.' },
   ],
   'en_es_description': [
     { source: 'The Lexar SL500 Portable SSD combines sleek design with blazing-fast transfer speeds up to 2000MB/s.', target: 'El SSD Portátil Lexar SL500 combina un diseño elegante con velocidades de transferencia ultrarrápidas de hasta 2000 MB/s.' },
@@ -445,32 +368,55 @@ const FEWSHOT_STORE: Record<string, FewShotExample[]> = {
 }
 
 /**
- * 获取用于翻译 prompt 的 few-shot 示例
- * 返回格式化的示例文本，可直接注入 system prompt
+ * 获取用于翻译 prompt 的 few-shot 示例。
+ * 返回格式化的示例文本，可直接注入 system prompt。
+ *
+ * @param sourceLang 源语言代码
+ * @param targetLang 目标语言代码
+ * @param maxExamples 最多返回示例数
+ * @param scenePreset 场景预设（用于选择示例类型：ecommerce→marketing, technical→specification, 默认→description）
+ * @param style 翻译风格（marketing 风格优先使用 marketing 示例）
  */
 export function getFewShotExamples(
   sourceLang: string,
   targetLang: string,
   maxExamples = 3,
+  scenePreset?: string,
+  style?: string,
 ): string {
   // 标准化语言代码
   const src = sourceLang.startsWith('zh') ? 'zh' : 'en'
   const tgt = targetLang === 'zh-CN' ? 'zh' : targetLang
 
-  // Qwen 3.7 对中文（母语）质量可靠，去掉 few-shot 省 token
-  // 其他语言（ja/ko/de/fr/es等）全部保留
-  if (tgt === 'zh' || tgt === 'zh-TW') {
-    return ''
+  // 根据场景和风格动态选择示例类型
+  // ecommerce + marketing → marketing 示例（提供营销语气参照）
+  // technical_doc/spec_sheet → specification 示例（提供技术参数格式参照）
+  // 默认 → description 示例（通用描述性文本）
+  let contentType: ContentType = 'description'
+  if (style === 'marketing' || scenePreset === 'ecommerce') {
+    contentType = 'marketing'
+  } else if (scenePreset === 'technical_doc' || scenePreset === 'spec_sheet') {
+    contentType = 'specification'
   }
 
-  // 全部使用 description 类型示例（内容类型指南已由场景预设覆盖）
-  let key = `${src}_${tgt}_description`
+  // 优先按选定类型查找，无匹配则回退到 description
+  let key = `${src}_${tgt}_${contentType}`
   let examples = FEWSHOT_STORE[key]
+
+  // 回退链：选定类型 → description → zh-CN description → en description
+  if ((!examples || examples.length === 0) && contentType !== 'description') {
+    key = `${src}_${tgt}_description`
+    examples = FEWSHOT_STORE[key]
+  }
 
   // zh-TW 没有示例时，回退到 zh (zh-CN)
   if ((!examples || examples.length === 0) && tgt === 'zh-TW') {
-    key = `${src}_zh_description`
+    key = `${src}_zh_${contentType}`
     examples = FEWSHOT_STORE[key]
+    if (!examples || examples.length === 0) {
+      key = `${src}_zh_description`
+      examples = FEWSHOT_STORE[key]
+    }
   }
 
   // 如果目标语言没有，回退到 en description 示例
@@ -484,8 +430,14 @@ export function getFewShotExamples(
   }
 
   const selected = examples.slice(0, maxExamples)
+  // v8.1: 标签语言随目标语言 — CJK 用中文，非 CJK 用英文
+  const isCJK = ['zh-CN', 'zh-TW', 'ja', 'ko'].includes(tgt)
+  const labelExample = isCJK ? '示例' : 'Example'
+  const labelSource = isCJK ? '原文' : 'Source'
+  const labelTranslation = isCJK ? '译文' : 'Translation'
+  const sectionTitle = isCJK ? '【高质量翻译参考示例】' : '[REFERENCE EXAMPLES]'
   const lines = selected.map((ex, i) =>
-    `示例 ${i + 1}:\n原文: ${ex.source}\n译文: ${ex.target}`
+    `${labelExample} ${i + 1}:\n${labelSource}: ${ex.source}\n${labelTranslation}: ${ex.target}`
   )
-  return `\n【高质量翻译参考示例】\n${lines.join('\n\n')}\n`
+  return `\n${sectionTitle}\n${lines.join('\n\n')}\n`
 }

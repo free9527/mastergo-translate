@@ -23,8 +23,7 @@
 //   __PRD_N__ = 保留词/产品型号     (maskPreservedTerms + PRODUCT_CODE_RE, 原样还原)
 //   __URL_N__ = URL                 (原样还原)
 //   __EML_N__ = Email               (原样还原)
-//   ZZ{N}ZZ   = 术语库遮蔽           (maskGlossaryTerms, 还原时替换为目标语译文)
-//   YY{N}YY   = 术语库遮蔽（冲突备用）
+//   __GLOSSARY_N__ = 术语库遮蔽      (maskGlossaryTerms, 还原时替换为目标语译文)
 // ═══════════════════════════════════════════════════════════════
 
 interface EntityMaskResult {
@@ -35,7 +34,7 @@ interface EntityMaskResult {
 // ============================================================
 // 保留词遮蔽 — 翻译前遮蔽纯技术缩略语，消除 LLM "保留偏置"
 // ============================================================
-// 问题：IRON_RULES #1 的保留术语列表已被移除，翻译 LLM 不再收到
+// 问题：CORE_PRINCIPLES #1 允许保留品牌名和型号代码，
 // "保留"指令。但纯技术缩略语（PCIe/NVMe/DDR5 等）在所有语种中都
 // 不应翻译。为保证术语库未覆盖时仍有兜底，翻译前遮蔽为 __PRD_N__。
 // 翻译后 unmaskEntities 还原。
@@ -263,35 +262,40 @@ export function maskEntitiesForProofread(
 }
 
 // ============================================================
-// 术语遮蔽（译前）：将术语替换为 ZZ{N}ZZ 占位符
+// 术语遮蔽（译前）：将术语替换为 __GLOSSARY_N__ 占位符
 // LLM 只看到占位符无法扩展为营销文案，译后还原为术语库译文
 // ============================================================
 
 export interface GlossaryMaskResult {
   texts: string[]
-  termMap: Map<string, string>   // ZZ0ZZ → 术语库目标语言译文
+  termMap: Map<string, string>   // __GLOSSARY_0__ → 术语库目标语言译文
 }
 
-/** 去除商标符号 + 空白归一化（与 post-process.ts:cleanKey 一致） */
+/** 去除商标符号 + 空白归一化 + 连字符处理（与 glossary-filter.ts:normalizeForMatch 一致） */
 function cleanKeyForMask(s: string): string {
-  return s.replace(/[®™©]/g, '').replace(/\s+/g, ' ').trim()
+  return s
+    .toLowerCase()
+    .replace(/[®™©]/g, '')
+    .replace(/[-_]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 /**
- * 将文本中匹配术语库的子串替换为 ZZ{N}ZZ 占位符。
+ * 将文本中匹配术语库的子串替换为 __GLOSSARY_N__ 占位符。
  *
  * - 按术语长度降序替换，避免短术语先匹配导致长术语部分被遮蔽
  * - 用 cleanKey 归一化后匹配（忽略 ®™© 和多余空格）
- * - 占位符格式 ZZ{N}ZZ，全大写+数字，外观类似硬件型号，LLM 会保留
+ * - 占位符格式 __GLOSSARY_N__，与 __PRD_N__、__TRM_N__ 一致，LLM 更可能保留
  */
 export function maskGlossaryTerms(
   texts: string[],
   glossaryMap: Map<string, string>,
 ): GlossaryMaskResult {
-  // 预扫描：源文中天然存在 ZZ\d+ZZ → 换用 YY\d+YY
-  let prefix = 'ZZ'
+  // v8.2: 预扫描：源文中天然存在 __GLOSSARY_\d+__ → 换用 __GLOSSARYALT_\d+__
+  let prefix = 'GLOSSARY'
   for (const t of texts) {
-    if (/ZZ\d+ZZ/i.test(t)) { prefix = 'YY'; break }
+    if (/__GLOSSARY_\d+__/i.test(t)) { prefix = 'GLOSSARYALT'; break }
   }
 
   const termMap = new Map<string, string>()
@@ -373,19 +377,17 @@ export function maskGlossaryTerms(
       const regex = new RegExp(flexible, 'gi')
 
       let found = false
-      let searchIdx = 0
       let execResult: RegExpExecArray | null
-      // 重置 regex（每次使用前需要新实例或重置 lastIndex）
-      const freshRegex = new RegExp(flexible, 'gi')
-      while ((execResult = freshRegex.exec(result)) !== null) {
+      while ((execResult = regex.exec(result)) !== null) {
         // 验证这个匹配对应到 cleanKey 空间中的正确位置
-        const matchClean = cleanKeyForMask(execResult[0])
         const estimatedCleanPos = cleanKeyForMask(result.slice(0, execResult.index)).length
         // 用 start+offset 估算在原始文本 cleanKey 中的位置
         const expectedPos = m.start + offset
 
-        if (Math.abs(estimatedCleanPos - expectedPos) <= 5) {  // 5 字符容差
-          const placeholder = `${prefix}${counter}${prefix}`
+        // v8.2: 动态容差 — 短术语（<5字符）用3字符容差，长术语用5字符容差
+        const tolerance = m.source.length < 5 ? 3 : 5
+        if (Math.abs(estimatedCleanPos - expectedPos) <= tolerance) {
+          const placeholder = `__${prefix}_${counter}__`
           termMap.set(placeholder, m.target)
           result = result.slice(0, execResult.index) + placeholder + result.slice(execResult.index + execResult[0].length)
           offset += placeholder.length - execResult[0].length
@@ -413,9 +415,9 @@ export function maskGlossaryTerms(
 }
 
 /**
- * 将译文中 ZZ{N}ZZ 占位符还原为术语库译文。
+ * 将译文中 __GLOSSARY_N__ 占位符还原为术语库译文。
  *
- * 使用模糊正则匹配，容忍 LLM 的大小写变化和空格插入（如 ZZ 0 ZZ, zz0zz）。
+ * 使用模糊正则匹配，容忍 LLM 的大小写变化和空格插入（如 __GLOSSARY_ 0 __）。
  * 如果占位符找不到，标记该条索引。
  */
 export function unmaskGlossaryTerms(
@@ -434,12 +436,15 @@ export function unmaskGlossaryTerms(
     let allFound = true
 
     for (const [placeholder, target] of termMap) {
-      // 提取数字部分构建模糊正则：ZZ 任意空格 数字 任意空格 ZZ
-      const numMatch = placeholder.match(/\d+/)
+      // 提取数字部分构建模糊正则：__GLOSSARY_ 任意空格 数字 任意空格 __
+      // v8.2: 统一占位符格式为 __GLOSSARY_N__，与 __PRD_N__ 一致
+      const numMatch = placeholder.match(/_(\d+)_/)
       if (!numMatch) continue
-      const num = numMatch[0]
-      const prefix = placeholder[0] + placeholder[1] // "ZZ" or "YY"
-      const fuzzyRegex = new RegExp(`${prefix}\\s*${num}\\s*${prefix}`, 'gi')
+      const num = numMatch[1]
+      const prefixMatch = placeholder.match(/__([A-Z]+)_/)
+      if (!prefixMatch) continue
+      const prefix = prefixMatch[1] // "GLOSSARY" or "GLOSSARYALT"
+      const fuzzyRegex = new RegExp(`__\\s*${prefix}\\s*_\\s*${num}\\s*__`, 'gi')
 
       if (fuzzyRegex.test(result)) {
         fuzzyRegex.lastIndex = 0

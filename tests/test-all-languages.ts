@@ -12,16 +12,16 @@
 import XMLHttpRequest from 'xhr2'
 ;(globalThis as any).XMLHttpRequest = XMLHttpRequest
 
-import { translateBatch, proofreadBatch, detectUntranslatedText, buildTaskGlossaryHint } from './lib/llm-api'
-import { LLMConfig } from './messages/types'
+import { translateBatch, proofreadBatch, detectUntranslatedText, buildTaskGlossaryHint } from '../lib/llm-api'
+import { LLMConfig } from '../messages/types'
 
 // ============================================================
 // 配置
 // ============================================================
 
 const API_URL = 'https://aigo.lexar.com/v1/chat/completions'
-const API_KEY = 'sk-FS2AGf1vcZU1OpIIho7nBd8bQGcm45nII6UlZAECxj5Iaamn'
-const MODEL = 'qwen3.7-max'
+const API_KEY = 'sk-LcscmmvLrVlwRbWtoPgF1jSNg6fzR7rgp2FX8pFaHreVYMyu'
+const MODEL = 'gpt-5.5'
 
 const config: LLMConfig = {
   apiKey: API_KEY,

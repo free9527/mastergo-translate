@@ -202,11 +202,16 @@ export function restoreStorageUnitFormatting(sourceTexts: string[], translatedTe
 // ============================================================
 
 /**
- * 文本归一化：去除商标符号 + 空白归一化。
- * 用于术语匹配时忽略 ®™© 和多余空格的干扰。
+ * 文本归一化：去除商标符号 + 空白归一化 + 连字符处理。
+ * 用于术语匹配时忽略 ®™©、多余空格和连字符的干扰。
  */
 export function cleanKey(s: string): string {
-  return s.replace(/[®™©]/g, '').replace(/\s+/g, ' ').trim()
+  return s
+    .toLowerCase()
+    .replace(/[®™©]/g, '')
+    .replace(/[-_]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 export function enforceGlossaryTerms(
@@ -214,14 +219,16 @@ export function enforceGlossaryTerms(
   translatedTexts: string[],
   glossaryMap: Map<string, string>,
   skipIndices?: Set<number>,
+  precomputedNormalizedMap?: Map<string, string>,
 ): string[] {
-  // 构建去商标符号 + 空白归一化的查找表
-  // 空白归一化解决 CSV 数据中可能存在的多余空格（如 "CFexpress  4.0" → "CFexpress 4.0"）
-  const normalizedGlossaryMap = new Map<string, string>()
-  for (const [key, value] of glossaryMap.entries()) {
-    const normalizedKey = cleanKey(key)
-    if (!normalizedGlossaryMap.has(normalizedKey)) {
-      normalizedGlossaryMap.set(normalizedKey, value)
+  // 使用预计算的 normalizedGlossaryMap，避免每次调用都重新构建
+  const normalizedGlossaryMap = precomputedNormalizedMap || new Map<string, string>()
+  if (!precomputedNormalizedMap) {
+    for (const [key, value] of glossaryMap.entries()) {
+      const normalizedKey = cleanKey(key)
+      if (!normalizedGlossaryMap.has(normalizedKey)) {
+        normalizedGlossaryMap.set(normalizedKey, value)
+      }
     }
   }
 
@@ -274,8 +281,11 @@ export function enforceGlossaryTerms(
     }
 
     // 2. 子串匹配：源文本包含术语库条目
+    // v8.2: 按术语长度降序匹配，长术语优先（避免短术语覆盖长术语的一部分）
+    // v8.2: 删除 CJK fallback 位置推算，因为 CJK→CJK 不是 1:1 字符映射，位置推算不可靠
     if (result === translated) {
-      for (const [glossarySource, glossaryTarget] of glossaryMap.entries()) {
+      const sortedEntries = [...glossaryMap.entries()].sort((a, b) => b[0].length - a[0].length)
+      for (const [glossarySource, glossaryTarget] of sortedEntries) {
         const normalizedGlossarySource = cleanKey(glossarySource)
         if (normalizedGlossarySource.length < 3) continue
         if (normalizedSource.includes(normalizedGlossarySource)) {
@@ -284,41 +294,10 @@ export function enforceGlossaryTerms(
             const termInTranslation = new RegExp(escapedSource, 'i').exec(result)
             if (termInTranslation) {
               result = result.slice(0, termInTranslation.index) + glossaryTarget + result.slice(termInTranslation.index + termInTranslation[0].length)
-            } else if (normalizedGlossarySource === cleanKey(glossaryTarget)) {
-              // CJK fallback: 模型翻译了"保持原文"的术语（source==target），正则搜不到。
-              // 用源文中术语位置比例推算译文插入点。仅 CJK→CJK（1:1 字符映射）启用。
-              if (/[一-鿿]/.test(normalizedSource)) {
-                const srcIdx = normalizedSource.indexOf(normalizedGlossarySource)
-                if (srcIdx >= 0) {
-                  const srcRatio = srcIdx / Math.max(normalizedSource.length, 1)
-                  const estIdx = Math.min(Math.floor(srcRatio * result.length), result.length)
-                  // 用术语前后的源文字符作为锚点，在译文中定位
-                  const ctxBefore = normalizedSource.slice(Math.max(0, srcIdx - 2), srcIdx)
-                  const ctxAfter = normalizedSource.slice(
-                    srcIdx + normalizedGlossarySource.length,
-                    srcIdx + normalizedGlossarySource.length + 2,
-                  )
-                  let insPos = estIdx
-                  let endPos = estIdx
-                  if (ctxBefore) {
-                    const ctxIdx = result.indexOf(ctxBefore, Math.max(0, estIdx - 10))
-                    if (ctxIdx >= 0) insPos = ctxIdx + ctxBefore.length
-                  }
-                  if (ctxAfter) {
-                    const afterIdx = result.indexOf(ctxAfter, insPos)
-                    if (afterIdx > insPos) endPos = afterIdx
-                  }
-                  if (endPos > insPos) {
-                    // 有明确边界：替换模型翻译的文本
-                    result = result.slice(0, insPos) + glossaryTarget + result.slice(endPos)
-                  } else if (insPos < result.length) {
-                    // 无法确定边界：在推定位置插入术语目标
-                    const prefix = insPos > 0 && !/[ \s]$/.test(result.slice(0, insPos)) ? ' ' : ''
-                    const suffix = insPos < result.length && !/^[ \s]/.test(result.slice(insPos)) ? ' ' : ''
-                    result = result.slice(0, insPos) + prefix + glossaryTarget + suffix + result.slice(insPos)
-                  }
-                }
-              }
+            } else {
+              // v8.2: 术语在译文中找不到，只记录日志，不强制插入
+              // 避免 CJK fallback 位置推算导致的错误插入
+              console.warn('[enforceGlossaryTerms] term not found in translation:', glossarySource, '→', glossaryTarget)
             }
           }
         }
@@ -413,8 +392,16 @@ export function postProcessTranslation(text: string, lang: string): string {
 // ============================================================
 // 首字母大写（拉丁/西里尔字母语言）
 // 安全策略：仅当首字符为小写字母且第二个字符也是小写字母时才转换
-// 避免误伤 "iPhone"、"eBay" 等专有名词
+// 避免误伤 "iPhone"、"eBay"、"microSD" 等专有名词
 // ============================================================
+
+// 品牌名例外列表：这些词不应被首字母大写
+const BRAND_EXCEPTIONS = new Set([
+  'microSD', 'microSDXC', 'microSDHC', 'microUSB', 'microHDMI',
+  'iPhone', 'iPad', 'iPod', 'iMac', 'iOS',
+  'eBay', 'eBook',
+])
+
 export function capitalizeFirstLetter(text: string): string {
   if (!text || text.length === 0) return text
   const first = text[0]
@@ -422,14 +409,18 @@ export function capitalizeFirstLetter(text: string): string {
 
   // 拉丁小写字母 a-z
   if (first >= 'a' && first <= 'z') {
-    // 仅当第二个字符也是小写字母时才大写（排除 iPhone、eBay 等）
+    // 提取第一个单词用于品牌例外检查
+    const firstWord = text.match(/^[a-zA-Z]+/)?.[0] || ''
+    if (BRAND_EXCEPTIONS.has(firstWord)) return text
+
+    // 仅当第二个字符也是小写字母时才大写（排除 iPhone、eBay、microSD 等）
     if (second && (second < 'a' || second > 'z')) return text
     return first.toUpperCase() + text.slice(1)
   }
 
   // 西里尔小写字母 а-я (Unicode: 0430-044F), ё (0451)
   if ((first >= 'а' && first <= 'я') || first === 'ё') {
-    if (second && (second < 'а' || second > 'я') && second !== 'ё') return text
+    if (second && (second < 'а' && second !== 'ё') || (second > 'я')) return text
     return first.toUpperCase() + text.slice(1)
   }
 
@@ -510,10 +501,8 @@ function postProcessJapanese(text: string): string {
   result = result.replace(/([ァ-ヶ])-(?!\d)/g, '$1ー')
 
   // 常见外来语规范
-  result = result.replace(/ケーブル/g, 'ケーブル')
-  result = result.replace(/ファームウェア/g, 'ファームウェア')
+  // v8.2: 删除无效自替换（替换为自身），保留有效替换
   result = result.replace(/インターフェイス/g, 'インターフェース')
-  result = result.replace(/パーフェクト/g, 'パーフェクト')
   result = result.replace(/クリエーター/g, 'クリエイター')
 
   // 确保使用全角标点
@@ -532,8 +521,9 @@ function postProcessKorean(text: string): string {
   // 助词拼写：은/는 和 이/가
   // 有终声 → 은/이, 无终声 → 는/가
   // 这里主要做已知常见错误修正
-  result = result.replace(/\b(SSD|HMB|ECC|TBW)는\b/gi, '$1은')
-  result = result.replace(/\b(SSD|HMB|ECC|TBW)가\b/gi, '$1이')
+  // v8.2: HMB 可能是 HDD 的拼写错误（Host Memory Buffer 是 SSD 技术，但文案中极少出现）
+  result = result.replace(/\b(SSD|HDD|ECC|TBW)는\b/gi, '$1은')
+  result = result.replace(/\b(SSD|HDD|ECC|TBW)가\b/gi, '$1이')
 
   return result
 }
@@ -786,11 +776,11 @@ export function detectBrandInjection(
   const brandTokens = new Set([
     'lexar', 'lexar®', 'pexar',
     'ares', 'thor', 'armor', 'play',
-    'silver', 'gold', 'diamond',
+    'silver', 'gold', 'diamond', 'blue',
   ])
   // v7.5: 与常见英文词重叠的品牌 token，仅在伴随其他品牌特征时才判定注入
   // 防止 "play"/"silver"/"gold"/"diamond"/"armor" 等常见词被误判
-  const COMMON_WORD_BRANDS = new Set(['play', 'silver', 'gold', 'diamond', 'armor'])
+  const COMMON_WORD_BRANDS = new Set(['play', 'silver', 'gold', 'diamond', 'armor', 'blue'])
 
   // 从术语库提取合法的品牌词翻译
   // 只要术语库译文中包含品牌词，该品牌词在译文中就是合法的（术语库是权威参考）
@@ -815,7 +805,7 @@ export function detectBrandInjection(
   ])
   if (glossaryMap) {
     for (const key of glossaryMap.keys()) {
-      const firstWord = key.split(/\s+/)[0].toLowerCase()
+      const firstWord = key.split(/\s+/)[0].toLowerCase().replace(/[™®©]/g, '')
       if (KNOWN_LEXAR_BRANDS.has(firstWord)) {
         brandTokens.add(firstWord)
       }
@@ -823,13 +813,14 @@ export function detectBrandInjection(
   }
 
   // 规格注入模式（不在源文中的技术参数标识）
+  // v8.2: 移除 ® 检测 — ® 由 restoreTrademarkSymbols 独立处理，
+  // 放在此处会在 restoreTrademarkSymbols 之前误判为"规格注入"
   const specPatterns: Array<{ re: RegExp; name: string }> = [
     { re: /\bM\.2\b/i, name: 'M.2 form factor' },
     { re: /\bNVMe\b/i, name: 'NVMe protocol' },
     { re: /\bPCIe\s*[345]\.0\b/i, name: 'PCIe generation' },
     { re: /\bGen\s*[345]\s*x?\s*4\b/i, name: 'PCIe Gen x4' },
     { re: /\b(2230|2242|2280)\b/, name: 'M.2 form factor size' },
-    { re: /®/, name: 'registered trademark symbol' },
   ]
 
   // 数值规格注入模式（LLM 编造的带单位的数字：5200MB/s、128GB等）
@@ -845,9 +836,6 @@ export function detectBrandInjection(
   const result = translatedTexts.map((trans, i) => {
     const src = sourceTexts[i] || ''
     if (!src || !trans) return trans
-
-    const srcLower = src.toLowerCase()
-    const transLower = trans.toLowerCase()
 
     // 1. 品牌标记注入检测：译文有但源文没有的品牌词
     // 使用词边界检测，避免子串误匹配（如越南语 "play" 被误判为品牌注入）
@@ -896,7 +884,7 @@ export function detectBrandInjection(
     }
 
     // 3. 数值规格注入检测：译文有带单位的数字但源文没有
-    for (const { re, name } of measurePatterns) {
+    for (const { re } of measurePatterns) {
       const transMatch = re.test(trans)
       const srcMatch = re.test(src)
       if (transMatch && !srcMatch) {
