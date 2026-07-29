@@ -908,12 +908,10 @@ export const SCENE_CONSTRAINTS: Record<string, {
       'ja': [
         'Japanese: Spec sheets use 常体/である form (vs ecommerce です・ます)',
         'Japanese: Durability terms unified (耐摩耗、耐温度、耐落下衝撃、X線耐性、耐振動、耐磁気、耐衝撃)',
-        'Japanese: Brand annotated as 「レクサー」 on first mention, then Lexar',
       ],
       'ko': [
         'Korean: Technical docs use 하십시오체 (습니다/ㅂ니다) polite form',
         'Korean: Avoid superlative expressions (최고 → 높은 성능)',
-        'Korean: Brand annotated as 「렉사르」',
       ],
       'zh-CN': [
         'Chinese (zh-CN): Technical docs avoid extreme words (极致、领先、革命性)',
@@ -1731,7 +1729,7 @@ export const LANG_SPECIFIC: Record<string, LangBlock> = {
 - 檢查譯文是否像台灣母語者寫的，而非簡體中文的繁化版`,
   },
   'ja': {
-    rules: `ブランド初出時に「レクサー」と注記、以降は Lexar で統一。文体：商品詳細ページはです・ます敬体で統一。句読点：必ず全角「。」「、」を使用、半角「.」「,」禁止。文字幅：英数字は半角（Lexar、2000MB/s、5年）、全角英数字（Ｌｅｘａｒ、２０００）は厳禁。技術用語：技術記号は英文保持、一般用語は業界標準の和製漢語（SDカード、読み込み速度、書き込み速度、プロフェッショナル）。禁止：中式日本語の直訳。「安定」「安心」「長寿命」「高耐久」など日本市場が好む表現を使用。カタカナ外来語は業界標準の転写を使用し、独自の音訳は禁止。`,
+    rules: `文体：商品詳細ページはです・ます敬体で統一。句読点：必ず全角「。」「、」を使用、半角「.」「,」禁止。文字幅：英数字は半角（Lexar、2000MB/s、5年）、全角英数字（Ｌｅｘａｒ、２０００）は厳禁。技術用語：技術記号は英文保持、一般用語は業界標準の和製漢語（SDカード、読み込み速度、書き込み速度、プロフェッショナル）。禁止：中式日本語の直訳。「安定」「安心」「長寿命」「高耐久」など日本市場が好む表現を使用。カタカナ外来語は業界標準の転写を使用し、独自の音訳は禁止。`,
     compliance: `景品表示法・薬機法を遵守：過度な誇張表現、最上級表現（日本一、世界最高等）、未実証の効能効果を禁止。`,
     quality: `日本語ネイティブとして訳文を吟味してください——自然で業界標準の表現になっていますか？`,
     commonErrors: `常见错误：
@@ -1747,7 +1745,7 @@ export const LANG_SPECIFIC: Record<string, LangBlock> = {
 - 检查片假名是否使用业界标准转写`,
   },
   'ko': {
-    rules: `브랜드 첫 언급 시 렉사르로 표기, 본문은 Lexar 유지. 기술 용어는 업계 표준 영어 외래어 우선 사용. 생소한 한자어 강제 사용 금지. 일본어 유래 한자어 사용 금지. 문체는 하십시오체(습니다/ㅂ니다) 통일, 반말 금지. 띄어쓰기 엄수 — 조사는 앞 명사에 붙이고 독립된 단어는 반드시 띄어쓰기. UI 확장: 한국어는 영어보다 10-15% 길어짐 — 짧은 레이블은 축약 표현 사용.`,
+    rules: `기술 용어는 업계 표준 영어 외래어 우선 사용. 생소한 한자어 강제 사용 금지. 일본어 유래 한자어 사용 금지. 문체는 하십시오체(습니다/ㅂ니다) 통일, 반말 금지. 띄어쓰기 엄수 — 조사는 앞 명사에 붙이고 독립된 단어는 반드시 띄어쓰기. UI 확장: 한국어는 영어보다 10-15% 길어짐 — 짧은 레이블은 축약 표현 사용.`,
     compliance: `표시·광고의 공정화에 관한 법률 준수: 최고급, 최대, 1위 등 최고급 표현 및 허위·과장 광고 금지.`,
     quality: `한국어 원어민의 감각으로 번역문을 검토하세요 — 자연스럽고 업계 표준 표현에 맞습니까？`,
     commonErrors: `常见错误：
@@ -2376,7 +2374,7 @@ export function getStyleCard(
 //   [OUTPUT FORMAT]        — 输出：纯 JSON 数组，正确项省略，错误项包含 i/text/reason/ambiguous
 //
 // ── 设计原则 ──
-//   1. CORE DIRECTIVE 压制度纠正 — 历史教训：Qwen 倾向"改写"而非"审查"
+//   1. CORE DIRECTIVE 压制度纠正 — 历史教训：LLM 倾向"改写"而非"审查"
 //   2. CHECK 3 判定树 — 决策树解决"产品名保留 vs 描述性翻译"的模糊地带
 //   3. JSON Schema 显式声明 — 解决旧版 "RAW JSON only" 仍被包装在 ```json 块中的问题
 //   4. reason 枚举限定（4个值）— 防止 LLM 编造原因标签

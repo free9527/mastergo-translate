@@ -37,13 +37,17 @@ export const STORAGE_KEY_GLOSSARY_PRODUCTS = 'translate_glossary_products'
 export const STORAGE_KEY_GLOSSARY_EXCLUSIVE = 'translate_glossary_exclusive'
 export const STORAGE_KEY_SETTINGS = 'translate_settings'
 export const STORAGE_KEY_ORIGINALS = 'translate_originals'
+export const STORAGE_KEY_APPLIED = 'translate_applied'
 export const STORAGE_KEY_TRANSLATION_CACHE = 'translate_cache'
 export const STORAGE_KEY_CORRECTIONS = 'translate_corrections'
 export const CORRECTION_THRESHOLD = 1  // 同一源文本被修正后立即生效，加入术语库
 
-// UI 尺寸
-export const UI_WIDTH = 420
-export const UI_HEIGHT = 720
+// UI 尺寸（v9.1 #16: 420×720 → 480×840，sticky 操作区增大后结果区保有可视空间）
+export const UI_WIDTH = 480
+export const UI_HEIGHT = 840
+
+// 扫描节点数上限（超出提示用户改用局部扫描，避免主线程长时间无响应）
+export const MAX_SCAN_NODES = 1500
 
 // 字体 key 工具
 export const FONT_KEY_SEP = '\x00'

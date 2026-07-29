@@ -340,7 +340,7 @@ export function postProcessTranslation(text: string, lang: string): string {
   // 由 text-normalizer 在预处理时替换，此处还原以保留源文断行
   result = result.replace(/\s*↵\s*/g, '\n')
 
-  // 还原 ※ → *（译前转义避免 Qwen 将其解析为 markdown 列表标记）
+  // 还原 ※ → *（译前转义避免 LLM 将其解析为 markdown 列表标记）
   result = result.replace(/※\s*/g, '* ')
 
   // 清理 LLM 偶尔输出的 $N 伪引用标记（如 3.725GB$3 → 3.725GB, 8TB$3 → 8TB）

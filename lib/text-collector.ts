@@ -23,7 +23,7 @@ function filterVisible(nodes: TextNode[]): TextNode[] {
   return nodes.filter(function (n) { return isEffectivelyVisible(n) })
 }
 
-export function collectTextNodes(container: TraversableNode): TextNode[] {
+export function collectTextNodes(container: TraversableNode, onProgress?: (found: number) => void): TextNode[] {
   if (!container) {
     console.error('[translate] container is null/undefined')
     return []
@@ -34,11 +34,17 @@ export function collectTextNodes(container: TraversableNode): TextNode[] {
 
   // 策略1: 手动递归遍历（children 数组顺序 = 图层面板顺序，文档明确保证）
   const results: TextNode[] = []
+  let lastReported = 0
   function walk(node: TraversableNode) {
     if (!node) return
     if (node.isVisible === false) return
     if (node.type === 'TEXT' && isEffectivelyVisible(node)) {
       results.push(node as unknown as TextNode)
+      // v9.1 #11: 大文档扫描进度反馈（每 100 节点上报一次，UI 按钮显示"扫描中(N)..."）
+      if (onProgress && results.length - lastReported >= 100) {
+        lastReported = results.length
+        onProgress(results.length)
+      }
     }
     const children = node.children
     if (children && typeof children.length === 'number') {

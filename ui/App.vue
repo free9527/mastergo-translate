@@ -1,6 +1,6 @@
 <template>
   <div class="app" :class="{ dark: isDark }">
-    <!-- 状态栏 -->
+    <!-- ① 状态栏 -->
     <div class="statusbar">
       <div class="sb-left">
         <span class="sb-dot" :class="statusClass"></span>
@@ -13,26 +13,28 @@
       </div>
     </div>
 
-    <!-- 主操作区 -->
-    <div class="toolbar">
-      <!-- 翻译范围 — 分段控件 -->
-      <div class="field-label">翻译范围</div>
+    <!-- ② 主操作区（sticky 顶部常驻） -->
+    <div class="action-panel">
+      <!-- 翻译范围（v9.0.3 回滚到 v8.7 版式：标签 + 蓝色描边分段按钮） -->
+      <div class="field-label">扫描方式</div>
       <div class="segmented-control">
         <button
           class="seg-btn"
           :class="{ active: lastScanMode === 'all' }"
           @click="scanAll"
           :disabled="scanning"
-        >{{ scanning && lastScanMode === 'all' ? '扫描中...' : '当前页扫描' }}</button>
+        >{{ scanning && lastScanMode === 'all' ? scanProgressText : '当前页扫描' }}</button>
         <button
           class="seg-btn"
           :class="{ active: lastScanMode === 'selection' }"
           @click="scanSelection"
-          :disabled="scanning"
-        >选中对象扫描</button>
+          :disabled="scanning || selectionCount === 0"
+          :title="selectionCount === 0 ? '请先在画布中选中至少一个图层' : ''"
+        >{{ scanning && lastScanMode === 'selection' ? scanProgressText : (selectionCount > 0 ? `选中对象扫描 (${selectionCount})` : '选中对象扫描') }}</button>
       </div>
+      <div class="disabled-hint" v-if="selectionCount === 0 && !scanning">画布中未选中图层时，"选中对象扫描"不可用</div>
 
-      <!-- 语言选择 -->
+      <!-- 语言选择（v9.0.3 回滚：源/目标带标签分列） -->
       <div class="lang-row">
         <div class="lang-col">
           <div class="field-label">源语言</div>
@@ -52,140 +54,180 @@
         </div>
       </div>
 
-      <!-- 统计 + 翻译按钮 -->
-      <div class="stats-card" v-if="items.length > 0">
-        <div class="stats-info">
-          <div class="stat-item">
-            <span class="stat-value">{{ items.length }}</span>
-            <span class="stat-label">文本数</span>
-          </div>
-          <div class="stat-divider"></div>
-          <div class="stat-item">
-            <span class="stat-value">{{ charCount }}</span>
-            <span class="stat-label">字符数</span>
+      <!-- 统计 + 翻译 / 统一进度条（v9.0.3：翻译按钮加长） -->
+      <div class="translate-row" v-if="!busyPhase">
+        <div class="stats-info" v-if="items.length > 0">
+          <span class="stat-value">{{ items.length }}</span><span class="stat-label">条</span>
+          <span class="stat-divider"></span>
+          <span class="stat-value">{{ charCount }}</span><span class="stat-label">字符</span>
+        </div>
+        <div class="stats-info stats-empty" v-else>
+          <span class="stat-label">扫描后开始翻译</span>
+        </div>
+        <!-- v9.1 #1/#6: 未配置 API 前置提示 / 禁用原因内联 -->
+        <span class="disabled-hint" v-if="!apiConfigured">⚠ 未配置大模型，点翻译前往设置</span>
+        <span class="disabled-hint" v-else-if="translateDisabledReason">{{ translateDisabledReason }}</span>
+        <button class="btn btn-primary btn-translate" @click="startTranslate" :disabled="translating || proofreading || items.length === 0">
+          <svg class="btn-icon-svg" width="14" height="14" viewBox="0 0 16 16"><path d="M2 4l4 4-4 4M8 2l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          翻译
+        </button>
+      </div>
+      <div class="progress-bar" v-else :data-phase="busyPhase">
+        <div class="progress-meta">
+          <span class="progress-phase">{{ busyLabel }}</span>
+          <span class="progress-pct">{{ Math.floor(busyPercent) }}%</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" :style="{ width: busyPercent + '%' }"></div>
+        </div>
+        <button
+          v-if="busyPhase === 'translate' || busyPhase === 'proofread'"
+          class="btn btn-xs btn-plain progress-cancel"
+          @click="cancelOperation"
+        >取消</button>
+      </div>
+
+      <!-- 流程终点操作（v9.1 #3：应用/字体需有译文；恢复原文常驻，可撤销性以画布快照为准） -->
+      <div class="apply-row">
+        <template v-if="hasTranslation">
+          <button class="btn btn-accent flex-1" @click="applyTranslationsOnly" :disabled="applying || translating || proofreading || !hasTranslation || hasPendingBlockingIssue">
+            <svg v-if="!applying" class="btn-icon-svg" width="14" height="14" viewBox="0 0 16 16"><path d="M3 8l3 3 7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            {{ hasPendingBlockingIssue ? `应用翻译 (${pendingItems.length}条待处理)` : '应用翻译' }}
+          </button>
+          <button class="btn btn-gray" @click="applyFonts" :disabled="applyingFonts || fontMappings.length === 0">
+            <svg v-if="!applyingFonts" class="btn-icon-svg" width="14" height="14" viewBox="0 0 16 16"><path d="M4 2h8M4 6h8M4 10h5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            {{ applyingFonts ? `替换中 ${Math.floor(applyingProgressPercent)}%` : '替换字体' }}
+          </button>
+        </template>
+        <span v-else class="apply-row-spacer"></span>
+        <button class="btn btn-plain" @click="undoAll" :disabled="undoing || applying || !canUndo" title="将画布上已应用的译文恢复为原文；手动改过的节点会跳过">
+          {{ undoCount > 0 ? `恢复原文 (${undoCount})` : '恢复原文' }}
+        </button>
+      </div>
+      <!-- v9.1 #5/#6: 顺序引导 / 撤销禁用原因（合并一行，不挤 apply-row） -->
+      <div class="apply-hint disabled-hint" v-if="applyRowHint || undoDisabledReason">{{ applyRowHint || undoDisabledReason }}</div>
+
+      <!-- ③ v8.9: 待处理警告条（v9.1 #7: 移入 sticky 区，阻塞操作 0 次滚动可达） -->
+      <div class="pending-banner" v-if="hasPendingBlockingIssue">
+        <div class="pending-header" @click="togglePendingList">
+          <span class="pending-icon">⚠️</span>
+          <span class="pending-text">
+            {{ pendingItems.filter(p => p.type === 'error').length }} 条错误，
+            {{ pendingItems.filter(p => p.type === 'placeholder').length }} 条占位符，
+            {{ pendingItems.filter(p => p.type === 'untranslated').length }} 条漏翻待确认
+          </span>
+          <svg class="chevron" :class="{ open: showPendingList }" width="12" height="12" viewBox="0 0 12 12"><path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </div>
+        <div class="pending-actions" v-if="showPendingList">
+          <button class="btn btn-sm btn-tinted" @click="fixAllPlaceholders" :disabled="!pendingItems.some(p => p.type === 'placeholder')">
+            一键修复占位符
+          </button>
+          <button class="btn btn-sm btn-tinted" @click="acceptAllUntranslated" :disabled="!pendingItems.some(p => p.type === 'untranslated')">
+            全部接受漏翻原文
+          </button>
+        </div>
+        <div class="pending-list" v-if="showPendingList">
+          <div class="pending-item" v-for="p in pendingItems" :key="p.item.nodeIds[0]" :class="p.type">
+            <div class="pending-item-source">{{ p.item.sourceText.slice(0, 40) }}{{ p.item.sourceText.length > 40 ? '...' : '' }}</div>
+            <div class="pending-item-trans">{{ p.item.translatedText.slice(0, 40) }}{{ p.item.translatedText.length > 40 ? '...' : '' }}</div>
+            <div class="pending-item-actions">
+              <button class="btn btn-xs btn-tinted" @click="editPendingItem(p.item)">编辑</button>
+              <button class="btn btn-xs btn-plain" @click="skipPendingItem(p.item)">跳过</button>
+            </div>
           </div>
         </div>
-        <button class="btn btn-primary btn-translate" @click="startTranslate" :disabled="translating || proofreading || items.length === 0">
-          <svg v-if="!translating" class="btn-icon-svg" width="14" height="14" viewBox="0 0 16 16"><path d="M2 4l4 4-4 4M8 2l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          {{ translating ? `翻译中 ${Math.floor(translateProgressPercent)}%` : '翻译' }}
-        </button>
       </div>
 
-      <!-- 操作按钮 -->
-      <div class="action-row">
-        <button class="btn btn-accent flex-1" @click="applyTranslationsOnly" :disabled="applying || translating || proofreading || !hasTranslation">
-          <svg v-if="!applying" class="btn-icon-svg" width="14" height="14" viewBox="0 0 16 16"><path d="M3 8l3 3 7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          {{ applying && !applyingFonts ? `应用中 ${Math.floor(applyingProgressPercent)}%` : '应用翻译' }}
-        </button>
-        <button class="btn btn-accent flex-1" @click="applyFonts" :disabled="applyingFonts || fontMappings.length === 0">
-          <svg v-if="!applyingFonts" class="btn-icon-svg" width="14" height="14" viewBox="0 0 16 16"><path d="M4 2h8M4 6h8M4 10h5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-          {{ applyingFonts ? `替换中 ${Math.floor(applyingProgressPercent)}%` : '替换字体' }}
-        </button>
-        <button v-if="translating || proofreading" class="btn btn-ghost flex-1" @click="cancelOperation">
-          取消
-        </button>
-        <button v-else class="btn btn-ghost flex-1" @click="undoAll" :disabled="undoing || applying || !hasTranslation">
-          撤销
-        </button>
-      </div>
-
-      <!-- 重翻 / 重试 -->
-      <div class="toolbar-row" v-if="translateErrors.size > 0">
-        <button class="btn btn-warning flex-1" @click="retryFailedTranslations" :disabled="applying || translating || proofreading">
+      <!-- 条件行：重翻失败 / 重试应用 -->
+      <div class="retry-row" v-if="translateErrors.size > 0 || failedNodeIds.length > 0">
+        <button v-if="translateErrors.size > 0" class="btn btn-xs btn-plain warn" @click="retryFailedTranslations" :disabled="applying || translating || proofreading">
           重翻失败 ({{ translateErrors.size }})
         </button>
-      </div>
-      <div class="toolbar-row" v-if="failedNodeIds.length > 0">
-        <button class="btn btn-secondary flex-1" @click="retryFailedApply" :disabled="applying || translating || proofreading">
+        <button v-if="failedNodeIds.length > 0" class="btn btn-xs btn-plain" @click="retryFailedApply" :disabled="applying || translating || proofreading">
           重试应用 ({{ failedNodeIds.length }})
         </button>
       </div>
     </div>
 
-    <!-- 翻译风格 & 场景 -->
-    <div class="style-bar">
-      <div class="style-row">
-        <div class="style-field">
-          <label class="field-label">翻译风格</label>
-          <select class="style-select" v-model="selectedPreset" @change="applyPreset" :disabled="isStyleLocked">
-            <option value="standard">通用标准版</option>
-            <option value="professional">{{ isStyleLocked ? '严谨专业版（场景锁定）' : '严谨专业版' }}</option>
-            <option value="marketing" v-if="!isStyleLocked">电商营销版</option>
-          </select>
-        </div>
-        <div class="style-field">
-          <label class="field-label">场景</label>
-          <select class="style-select" v-model="llmConfig.scenePreset" @change="onSceneChange">
-            <option value="ecommerce">商品详情页</option>
-            <option value="technical_params">技术参数表</option>
-            <option value="packaging">包装印刷</option>
-            <option value="ui">软件UI</option>
-            <option value="after_sales">售后/保修卡</option>
-            <option value="manual">说明书</option>
-            <option value="spec_sheet">规格书</option>
-          </select>
-        </div>
-        <div class="style-field">
-          <label class="field-label">产品线</label>
-          <select class="style-select" v-model="manualProductLine" @change="onProductLineChange">
-            <option v-for="opt in productLineOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-          </select>
-          <span v-if="effectiveProductLine && manualProductLine === ''" class="auto-badge">自动</span>
-          <span v-if="manualProductLine !== ''" class="manual-badge">手动</span>
-          <span v-if="!detectedProductLine && manualProductLine === '' && items.length > 0" class="pl-warning">⚠️ 未检测到产品线，建议手动选择</span>
-        </div>
+    <!-- ④ 翻译配置（默认折叠，摘要行可见当前值） -->
+    <div class="section config-section">
+      <div class="section-header" @click="showConfig = !showConfig">
+        <svg class="chevron" :class="{ open: showConfig }" width="12" height="12" viewBox="0 0 12 12"><path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span>翻译配置</span>
+        <span class="config-summary">{{ configSummary }}</span>
       </div>
-      <textarea
-        v-if="selectedPreset === 'custom'"
-        class="style-textarea"
-        v-model="llmConfig.translationStyleCustom"
-        rows="3"
-        placeholder="自定义翻译风格，如：语气轻松活泼，适合年轻用户..."
-      ></textarea>
-      <div v-if="selectedPreset === 'custom'" class="style-ref-toggle" @click="showRef = !showRef">
-        <svg class="chevron" :class="{ open: showRef }" width="12" height="12" viewBox="0 0 12 12"><path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-        <span>参考格式（点击展开）</span>
+      <div class="section-body" v-if="showConfig">
+        <!-- v9.0.2 紧凑三列：标签一排 + 下拉框一排（上一版布局） -->
+        <div class="config-grid">
+          <div class="config-col">
+            <span class="config-label">翻译风格</span>
+            <select class="config-select" v-model="selectedPreset" @change="applyPreset" :disabled="isStyleLocked">
+              <option value="standard">通用标准版</option>
+              <option value="professional">{{ isStyleLocked ? '严谨专业版🔒' : '严谨专业版' }}</option>
+              <option value="marketing" v-if="!isStyleLocked">电商营销版</option>
+            </select>
+          </div>
+          <div class="config-col">
+            <span class="config-label">场景</span>
+            <select class="config-select" v-model="llmConfig.scenePreset" @change="onSceneChange">
+              <option value="ecommerce">商品详情页</option>
+              <option value="technical_params">技术参数表</option>
+              <option value="packaging">包装印刷</option>
+              <option value="ui">软件UI</option>
+              <option value="after_sales">售后/保修卡</option>
+              <option value="manual">说明书</option>
+              <option value="spec_sheet">规格书</option>
+            </select>
+          </div>
+          <div class="config-col">
+            <span class="config-label">
+              产品线
+              <span v-if="effectiveProductLine && manualProductLine === ''" class="auto-badge">自动</span>
+              <span v-if="manualProductLine !== '' && manualProductLine !== 'none'" class="manual-badge">手动</span>
+            </span>
+            <select class="config-select" v-model="manualProductLine" @change="onProductLineChange">
+              <option v-for="opt in productLineOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+            </select>
+          </div>
+        </div>
+        <div class="pl-detected-row" v-if="detectedProductLine && manualProductLine === ''">
+          <span class="pl-detected">检测到：{{ productLineOptions.find(o => o.value === detectedProductLine)?.label || detectedProductLine }}</span>
+        </div>
+        <div class="pl-warning-row" v-if="!detectedProductLine && manualProductLine === '' && items.length > 0">
+          <span class="pl-warning">⚠️ 未检测到产品线，建议手动选择</span>
+        </div>
+        <textarea
+          v-if="selectedPreset === 'custom'"
+          class="style-textarea"
+          v-model="llmConfig.translationStyleCustom"
+          rows="3"
+          placeholder="自定义翻译风格，如：语气轻松活泼，适合年轻用户..."
+        ></textarea>
+        <div class="style-detail-toggle" @click="showStyleDetail = !showStyleDetail">
+          <svg class="chevron" :class="{ open: showStyleDetail }" width="12" height="12" viewBox="0 0 12 12"><path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <span>查看风格详情</span>
+        </div>
+        <template v-if="showStyleDetail">
+          <!-- v9.1 #13: 参考格式不再第三层折叠，跟随风格详情直接展示 -->
+          <textarea
+            v-if="selectedPreset === 'custom'"
+            class="style-prompt"
+            :value="styleReference"
+            readonly
+            rows="8"
+          ></textarea>
+          <textarea
+            v-else
+            class="style-prompt"
+            :value="currentStylePrompt"
+            readonly
+            rows="10"
+          ></textarea>
+        </template>
       </div>
-      <textarea
-        v-if="selectedPreset === 'custom' && showRef"
-        class="style-prompt"
-        :value="styleReference"
-        readonly
-        rows="8"
-      ></textarea>
-      <textarea
-        v-if="selectedPreset !== 'custom'"
-        class="style-prompt"
-        :value="currentStylePrompt"
-        readonly
-        rows="10"
-      ></textarea>
     </div>
 
-    <!-- 翻译进度条 -->
-    <div class="progress-wrap" v-if="translating">
-      <div class="progress-track">
-        <div class="progress-fill" :style="{ width: translateProgressPercent + '%' }"></div>
-      </div>
-      <span class="progress-label">{{ Math.floor(translateProgressPercent) }}%</span>
-    </div>
-    <!-- 校对进度条 -->
-    <div class="progress-wrap" v-if="proofreading">
-      <div class="progress-track">
-        <div class="progress-fill proofread-fill" :style="{ width: proofreadProgressPercent + '%' }"></div>
-      </div>
-      <span class="progress-label">{{ Math.floor(proofreadProgressPercent) }}% - 校对中</span>
-    </div>
-
-    <!-- 应用进度条 -->
-    <div class="progress-wrap" v-if="applying">
-      <div class="progress-track">
-        <div class="progress-fill apply-fill" :style="{ width: applyingProgressPercent + '%' }"></div>
-      </div>
-      <span class="progress-label">{{ Math.floor(applyingProgressPercent) }}% - 应用译文到画布</span>
-    </div>
-
-    <!-- 翻译结果 -->
+    <!-- ⑤ 翻译结果 -->
     <div class="section">
       <div class="section-header" @click="showTexts = !showTexts">
         <svg class="chevron" :class="{ open: showTexts }" width="12" height="12" viewBox="0 0 12 12"><path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
@@ -194,17 +236,20 @@
       </div>
       <div class="section-body" v-if="showTexts">
         <div class="empty-state" v-if="items.length === 0">
-          <div class="empty-icon">⇧</div>
+          <div class="empty-icon">
+            <svg width="40" height="40" viewBox="0 0 40 40" fill="none"><rect x="6" y="8" width="28" height="20" rx="3" stroke="currentColor" stroke-width="1.5"/><path d="M12 15h16M12 19h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M20 28v6M16 34h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </div>
           <p>点击"当前页扫描"采集文本</p>
-          <p class="empty-sub">或先选中图层后点击"选中对象扫描"</p>
+          <p class="empty-sub">{{ selectionCount > 0 ? `已选中 ${selectionCount} 个图层，可点"选中对象扫描"` : '或先在画布中选中图层，再点"选中对象扫描"' }}</p>
         </div>
         <div class="text-item" :class="{
           corrected: item.corrected,
           'csv-changed': csvChangedIds.has(item.nodeIds[0]),
           'trans-error': translateErrors.has(item.nodeIds[0]),
           'applied-manually': appliedNodeIds.has(item.nodeIds[0]),
-          'untranslated': showUntranslatedBadge(item)
-        }" v-for="(item, idx) in items" :key="item.nodeIds[0] || idx" @dblclick="navigateToNode(item)">
+          'untranslated': showUntranslatedBadge(item),
+          'has-placeholder': hasPlaceholderResidue(item.translatedText)
+        }" v-for="(item, idx) in items" :key="item.nodeIds[0] || idx" :data-node-id="item.nodeIds[0]" @dblclick="navigateToNode(item)">
           <!-- 原文 — 上方全宽 -->
           <div class="item-source">
             <div class="item-label">
@@ -218,14 +263,11 @@
             <div class="item-label">
               译文
               <span class="error-badge" v-if="translateErrors.has(item.nodeIds[0])">翻译失败</span>
+              <span class="placeholder-badge" v-if="hasPlaceholderResidue(item.translatedText)">⚠️ 占位符</span>
               <span class="untranslated-badge" v-if="showUntranslatedBadge(item)">⚠️ 漏翻</span>
               <span class="proof-badge" v-if="item.corrected">校正</span>
               <span class="csv-badge" v-if="csvChangedIds.has(item.nodeIds[0])">导入变更</span>
               <span class="applied-badge" v-if="appliedNodeIds.has(item.nodeIds[0])">已应用</span>
-              <button class="btn-apply-single" v-if="item.translatedText && !appliedNodeIds.has(item.nodeIds[0])" @click.stop="applySingle(item)">应用</button>
-              <button class="btn-retranslate" v-if="item.translatedText && !translateErrors.has(item.nodeIds[0])" :disabled="retranslatingIds.has(item.nodeIds[0])" @click.stop="retranslateSingle(item)" title="重新翻译">
-                <svg width="12" height="12" viewBox="0 0 16 16"><path d="M2 8a6 6 0 0 1 10.47-4M14 8a6 6 0 0 1-10.47 4M2 4v3h3M14 12v-3h-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              </button>
             </div>
             <textarea
               class="trans-input"
@@ -233,236 +275,266 @@
               v-model="item.translatedText"
               rows="1"
               :placeholder="translating ? '翻译中...' : '待翻译'"
+              :disabled="translating || proofreading"
               @input="autoResize($event)"
               @focus="autoResize($event); onTransInputFocus(item)"
               @blur="onTransInputBlur(item)"
             ></textarea>
             <div class="proof-hint" v-if="item.corrected">
               <div class="proof-hint-body">
-                <span class="proof-reason" v-if="item.proofreadReason">{{ item.proofreadReason }}</span>
+                <div class="proof-hint-top">
+                  <span class="proof-reason" v-if="item.proofreadReason">{{ item.proofreadReason }}</span>
+                  <button class="btn btn-xs btn-plain btn-revert-proof" @click="revertProofread(item)">恢复原译文</button>
+                </div>
                 <span class="proof-original">原译文：{{ item.proofreadText }}</span>
               </div>
-              <button class="btn-revert-proof" @click="item.translatedText = item.proofreadText; item.proofreadText = ''; item.proofreadReason = ''; item.corrected = false">恢复</button>
             </div>
+            <!-- 操作行 — 全部 icon+文字 -->
+            <div class="item-actions" v-if="!appliedNodeIds.has(item.nodeIds[0])">
+              <button class="btn btn-xs btn-tinted" @click.stop="navigateToNode(item)" title="在画布中定位该文本">
+                <svg width="12" height="12" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/><path d="M8 1v2.5M8 12.5V15M1 8h2.5M12.5 8H15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                定位
+              </button>
+              <button class="btn btn-xs btn-tinted" v-if="item.translatedText && !translateErrors.has(item.nodeIds[0])" :disabled="retranslatingIds.has(item.nodeIds[0]) || translating || proofreading" @click.stop="retranslateSingle(item)">
+                <svg width="12" height="12" viewBox="0 0 16 16"><path d="M2 8a6 6 0 0 1 10.47-4M14 8a6 6 0 0 1-10.47 4M2 4v3h3M14 12v-3h-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                重翻
+              </button>
+              <button class="btn btn-xs btn-primary item-apply-btn" v-if="item.translatedText" :disabled="translating || proofreading || applying" @click.stop="applySingle(item)">应用</button>
+            </div>
+          </div>
+        </div>
+        <!-- CSV 人工兜底：LLM 翻不好时导出人工填译文再回传批量替换 -->
+        <div class="csv-row">
+          <div class="csv-row-info">
+            <div class="csv-row-title">CSV 人工兜底</div>
+            <div class="csv-row-desc">导出人工翻译 → 回传批量替换</div>
+          </div>
+          <div class="csv-row-actions">
+            <button class="btn btn-xs btn-gray" @click.stop="exportCSV" :disabled="items.length === 0">导出 CSV</button>
+            <button class="btn btn-xs btn-gray" @click.stop="triggerImport" :disabled="translating || proofreading || applying">导入 CSV</button>
+            <input ref="csvInput" type="file" accept=".csv" style="display:none" @change="handleCSVImport" />
           </div>
         </div>
       </div>
     </div>
 
-    <!-- CSV -->
-    <div class="inline-actions">
-      <button class="btn btn-sm btn-secondary" @click="exportCSV" :disabled="items.length === 0">导出 CSV</button>
-      <button class="btn btn-sm btn-secondary" @click="triggerImport">导入 CSV</button>
-      <input ref="csvInput" type="file" accept=".csv" style="display:none" @change="handleCSVImport" />
-    </div>
-
-    <!-- 字体替换 -->
-    <div class="section" v-if="fontMappings.length > 0">
-      <div class="section-header" @click="showFontMap = !showFontMap">
-        <svg class="chevron" :class="{ open: showFontMap }" width="12" height="12" viewBox="0 0 12 12"><path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-        <span>字体替换</span>
-        <span class="section-count">{{ fontMappings.length }}</span>
+    <!-- ⑥ 高级分组（默认折叠：低频功能收纳） -->
+    <div class="section">
+      <div class="section-header" @click="showAdvanced = !showAdvanced">
+        <svg class="chevron" :class="{ open: showAdvanced }" width="12" height="12" viewBox="0 0 12 12"><path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span>高级</span>
+        <span class="config-summary">字体替换 · 大模型配置 · 术语库</span>
       </div>
-      <div class="section-body" v-if="showFontMap">
-        <p class="field-hint">左侧为原文使用的字体属性，点击同步按钮可将属性传导至右侧替换目标</p>
-        <div class="font-card" v-for="f in fontMappings" :key="f.key">
-          <!-- 左栏：源字体（缩小宽度） -->
-          <div class="font-panel font-panel-source">
-            <div class="font-panel-label">原文</div>
-            <div class="font-preview" :style="{ fontFamily: f.sourceFamily }">
-              <span class="font-preview-name">{{ f.sourceFamily }}</span>
-              <span class="font-preview-style">{{ f.sourceStyle }}</span>
-            </div>
-            <div class="font-attrs-card font-attrs-source">
-              <div class="font-attr-col">
-                <div class="font-attr-val">{{ fmtNum(f.sourceFontSize) }}<span class="font-attr-unit">px</span></div>
-                <div class="font-attr-label">字号</div>
+      <div class="section-body advanced-body" v-if="showAdvanced">
+
+        <!-- 字体替换设置 -->
+        <div class="adv-sub" v-if="fontMappings.length > 0">
+          <div class="adv-sub-head" @click="showFontMap = !showFontMap">
+            <svg class="chevron" :class="{ open: showFontMap }" width="12" height="12" viewBox="0 0 12 12"><path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <span>字体替换设置</span>
+            <span class="section-count">{{ fontMappings.length }} · 已自动匹配</span>
+          </div>
+          <div class="adv-sub-body" v-if="showFontMap">
+            <p class="field-hint">左侧为原文使用的字体属性，点击同步按钮可将属性传导至右侧替换目标</p>
+            <div class="font-card" v-for="f in fontMappings" :key="f.key">
+              <!-- 左栏：源字体 -->
+              <div class="font-panel font-panel-source">
+                <div class="font-panel-label">原文</div>
+                <div class="font-preview" :style="{ fontFamily: f.sourceFamily }">
+                  <span class="font-preview-name">{{ f.sourceFamily }}</span>
+                  <span class="font-preview-style">{{ f.sourceStyle }}</span>
+                </div>
+                <div class="font-attrs-card font-attrs-source">
+                  <div class="font-attr-col">
+                    <div class="font-attr-val">{{ fmtNum(f.sourceFontSize) }}<span class="font-attr-unit">px</span></div>
+                    <div class="font-attr-label">字号</div>
+                  </div>
+                  <div class="font-attr-col">
+                    <div class="font-attr-val">{{ f.sourceLineHeight !== null ? fmtNum(f.sourceLineHeight) : 'AUTO' }}<span class="font-attr-unit" v-if="f.sourceLineHeight !== null">px</span></div>
+                    <div class="font-attr-label">行距</div>
+                  </div>
+                  <div class="font-attr-col">
+                    <div class="font-attr-val">{{ f.sourceLetterSpacing !== null ? fmtNum(f.sourceLetterSpacing) : '—' }}<span class="font-attr-unit" v-if="f.sourceLetterSpacing !== null">px</span></div>
+                    <div class="font-attr-label">字距</div>
+                  </div>
+                  <div class="font-attr-col">
+                    <div class="font-attr-val">{{ ALIGN_LABELS[f.sourceTextAlign] || f.sourceTextAlign }}</div>
+                    <div class="font-attr-label">对齐</div>
+                  </div>
+                </div>
               </div>
-              <div class="font-attr-col">
-                <div class="font-attr-val">{{ f.sourceLineHeight !== null ? fmtNum(f.sourceLineHeight) : 'AUTO' }}<span class="font-attr-unit" v-if="f.sourceLineHeight !== null">px</span></div>
-                <div class="font-attr-label">行距</div>
-              </div>
-              <div class="font-attr-col">
-                <div class="font-attr-val">{{ f.sourceLetterSpacing !== null ? fmtNum(f.sourceLetterSpacing) : '—' }}<span class="font-attr-unit" v-if="f.sourceLetterSpacing !== null">px</span></div>
-                <div class="font-attr-label">字距</div>
-              </div>
-              <div class="font-attr-col">
-                <div class="font-attr-val">{{ ALIGN_LABELS[f.sourceTextAlign] || f.sourceTextAlign }}</div>
-                <div class="font-attr-label">对齐</div>
+
+              <!-- 右栏：目标字体 -->
+              <div class="font-panel font-panel-target">
+                <div class="font-panel-head">
+                  <div class="font-panel-label">替换为</div>
+                  <button class="btn-sync" @click="syncFontAttrs(f)" title="将原文属性同步到替换目标">
+                    <svg width="14" height="14" viewBox="0 0 16 16"><path d="M4 8a4 4 0 0 1 4-4 3.96 3.96 0 0 1 3.46 2M13 8a4 4 0 0 1-4 4 3.96 3.96 0 0 1-3.46-2" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M12 4l1.5-1.5L15 4M4 12l-1.5 1.5L1 12" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <span class="btn-sync-text">同步</span>
+                  </button>
+                </div>
+                <input
+                  class="font-search-input"
+                  type="text"
+                  placeholder="搜索字体..."
+                  :value="fontSearchMap[f.key] || ''"
+                  @input="fontSearchMap = { ...fontSearchMap, [f.key]: ($event.target as HTMLInputElement).value }"
+                />
+                <select class="font-family-select" v-model="f.selectedFont" @change="onFontSelected(f)">
+                  <option value="">继承原字体</option>
+                  <optgroup v-for="group in groupedFontOptions(filteredFontOptions(f), f.key + '|' + (fontSearchMap[f.key] || ''))" :key="group[0]" :label="group[0]">
+                    <option v-for="fs in group[1]" :key="fs.key" :value="fs.key">{{ fs.style }}</option>
+                  </optgroup>
+                </select>
+                <div class="font-preview" v-if="f.selectedFont" :style="{ fontFamily: f.targetFamily || f.sourceFamily }">
+                  <span class="font-preview-name">{{ f.targetFamily || '—' }}</span>
+                  <span class="font-preview-style">{{ f.targetStyle || '—' }}</span>
+                </div>
+                <div class="font-attrs-card font-attrs-target">
+                  <div class="font-attr-col">
+                    <input class="font-attr-input" type="number" :value="fmtNum(f.targetFontSize)" @input="f.targetFontSize = ($event.target as HTMLInputElement).valueAsNumber || 0" placeholder="继承" />
+                    <div class="font-attr-label">字号</div>
+                  </div>
+                  <div class="font-attr-col">
+                    <input class="font-attr-input" type="number" :value="fmtNum(f.targetLineHeight)" @input="f.targetLineHeight = ($event.target as HTMLInputElement).valueAsNumber || null" placeholder="继承" />
+                    <div class="font-attr-label">行距</div>
+                  </div>
+                  <div class="font-attr-col">
+                    <input class="font-attr-input" type="number" :value="fmtNum(f.targetLetterSpacing)" @input="f.targetLetterSpacing = ($event.target as HTMLInputElement).valueAsNumber || null" placeholder="继承" />
+                    <div class="font-attr-label">字距</div>
+                  </div>
+                  <div class="font-attr-col">
+                    <select class="font-attr-select" v-model="f.targetTextAlign">
+                      <option value="">继承</option>
+                      <option value="LEFT">左</option>
+                      <option value="CENTER">中</option>
+                      <option value="RIGHT">右</option>
+                      <option value="JUSTIFIED">两端</option>
+                    </select>
+                    <div class="font-attr-label">对齐</div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
+        </div>
 
-          <!-- 右栏：目标字体 -->
-          <div class="font-panel font-panel-target">
-            <div class="font-panel-head">
-              <div class="font-panel-label">替换为</div>
-              <button class="btn-sync" @click="syncFontAttrs(f)" title="将原文属性同步到替换目标">
-                <svg width="14" height="14" viewBox="0 0 16 16"><path d="M4 8a4 4 0 0 1 4-4 3.96 3.96 0 0 1 3.46 2M13 8a4 4 0 0 1-4 4 3.96 3.96 0 0 1-3.46-2" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M12 4l1.5-1.5L15 4M4 12l-1.5 1.5L1 12" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                <span class="btn-sync-text">同步</span>
+        <!-- 大模型配置 -->
+        <div class="adv-sub">
+          <div class="adv-sub-head" @click="showSettings = !showSettings">
+            <svg class="chevron" :class="{ open: showSettings }" width="12" height="12" viewBox="0 0 12 12"><path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <span>大模型配置</span>
+          </div>
+          <div class="adv-sub-body" v-if="showSettings">
+            <div class="field-group">
+              <label class="field-label">API Key</label>
+              <input class="field" type="password" v-model="llmConfig.apiKey" placeholder="sk-..." />
+            </div>
+            <div class="field-group">
+              <label class="field-label">API 地址</label>
+              <input class="field" v-model="llmConfig.apiUrl" placeholder="https://api.openai.com/v1/chat/completions" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">模型</label>
+              <input class="field" v-model="llmConfig.model" placeholder="gpt-4o" />
+            </div>
+            <div class="field-group">
+              <label class="toggle-label" @click="llmConfig.enableProofread = !llmConfig.enableProofread">
+                <span class="toggle" :class="{ on: llmConfig.enableProofread }">
+                  <span class="toggle-knob"></span>
+                </span>
+                AI 校对（翻译后自动二次审查）
+              </label>
+            </div>
+            <template v-if="llmConfig.enableProofread">
+              <div class="proof-section-label">校对模型配置</div>
+              <div class="field-group">
+                <label class="field-label">校对 API Key（空则复用翻译）</label>
+                <input class="field" type="password" v-model="llmConfig.proofreadApiKey" placeholder="sk-..." />
+              </div>
+              <div class="field-group">
+                <label class="field-label">校对 API 地址</label>
+                <input class="field" v-model="llmConfig.proofreadApiUrl" placeholder="与翻译相同" />
+              </div>
+              <div class="field-group">
+                <label class="field-label">校对模型</label>
+                <input class="field" v-model="llmConfig.proofreadModel" placeholder="与翻译相同" />
+              </div>
+            </template>
+            <div class="btn-row">
+              <button class="btn btn-primary flex-1" @click="saveSettings" :disabled="saving">
+                {{ saving ? '保存中...' : '保存配置' }}
+              </button>
+              <button class="btn btn-gray flex-1" @click="useDefaultConfig">
+                使用默认配置
+              </button>
+              <button class="btn btn-gray flex-1" @click="testTranslationConnection" :disabled="testingTrans">
+                {{ testingTrans ? '测试中...' : '测试翻译' }}
+              </button>
+              <button v-if="llmConfig.enableProofread" class="btn btn-gray flex-1" @click="testProofConnection" :disabled="testingProof">
+                {{ testingProof ? '测试中...' : '测试校对' }}
               </button>
             </div>
-            <input
-              class="font-search-input"
-              type="text"
-              placeholder="搜索字体..."
-              :value="fontSearchMap[f.key] || ''"
-              @input="fontSearchMap = { ...fontSearchMap, [f.key]: ($event.target as HTMLInputElement).value }"
-            />
-            <select class="font-family-select" v-model="f.selectedFont" @change="onFontSelected(f)">
-              <option value="">继承原字体</option>
-              <optgroup v-for="group in groupedFontOptions(filteredFontOptions(f))" :key="group[0]" :label="group[0]">
-                <option v-for="fs in group[1]" :key="fs.key" :value="fs.key">{{ fs.style }}</option>
-              </optgroup>
-            </select>
-            <div class="font-preview" v-if="f.selectedFont" :style="{ fontFamily: f.targetFamily || f.sourceFamily }">
-              <span class="font-preview-name">{{ f.targetFamily || '—' }}</span>
-              <span class="font-preview-style">{{ f.targetStyle || '—' }}</span>
+            <div class="test-result" v-if="testResultTrans" :class="{ success: testResultTrans.success, fail: !testResultTrans.success }">
+              <span class="test-icon">{{ testResultTrans.success ? '✓' : '✗' }}</span>
+              <span>翻译: {{ testResultTrans.message }}</span>
             </div>
-            <div class="font-attrs-card font-attrs-target">
-              <div class="font-attr-col">
-                <input class="font-attr-input" type="number" :value="fmtNum(f.targetFontSize)" @input="f.targetFontSize = ($event.target as HTMLInputElement).valueAsNumber || 0" placeholder="继承" />
-                <div class="font-attr-label">字号</div>
-              </div>
-              <div class="font-attr-col">
-                <input class="font-attr-input" type="number" :value="fmtNum(f.targetLineHeight)" @input="f.targetLineHeight = ($event.target as HTMLInputElement).valueAsNumber || null" placeholder="继承" />
-                <div class="font-attr-label">行距</div>
-              </div>
-              <div class="font-attr-col">
-                <input class="font-attr-input" type="number" :value="fmtNum(f.targetLetterSpacing)" @input="f.targetLetterSpacing = ($event.target as HTMLInputElement).valueAsNumber || null" placeholder="继承" />
-                <div class="font-attr-label">字距</div>
-              </div>
-              <div class="font-attr-col">
-                <select class="font-attr-select" v-model="f.targetTextAlign">
-                  <option value="">继承</option>
-                  <option value="LEFT">左</option>
-                  <option value="CENTER">中</option>
-                  <option value="RIGHT">右</option>
-                  <option value="JUSTIFIED">两端</option>
-                </select>
-                <div class="font-attr-label">对齐</div>
-              </div>
+            <div class="test-result" v-if="testResultProof" :class="{ success: testResultProof.success, fail: !testResultProof.success }">
+              <span class="test-icon">{{ testResultProof.success ? '✓' : '✗' }}</span>
+              <span>校对: {{ testResultProof.message }}</span>
             </div>
           </div>
         </div>
+
+        <!-- 术语库 -->
+        <div class="adv-sub">
+          <div class="adv-sub-head" @click="showGlossary = !showGlossary">
+            <svg class="chevron" :class="{ open: showGlossary }" width="12" height="12" viewBox="0 0 12 12"><path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <span>术语库</span>
+            <span class="section-count">{{ glossaryProducts.length + glossaryExclusive.length }}</span>
+          </div>
+          <div class="adv-sub-body" v-if="showGlossary">
+            <div class="glossary-sub">
+              <div class="glossary-sub-head">
+                <span class="glossary-sub-title">产品名</span>
+                <span class="glossary-sub-count">{{ glossaryProducts.length }} 条</span>
+              </div>
+              <div class="inline-actions">
+                <button class="btn btn-sm btn-gray" @click="downloadGlossaryProducts">下载</button>
+                <button class="btn btn-sm btn-gray" @click="triggerGlossaryProductsUpload">替换</button>
+                <input ref="glossaryProductsInput" type="file" accept=".csv" style="display:none" @change="handleGlossaryProductsUpload" />
+              </div>
+            </div>
+            <div class="glossary-sub">
+              <div class="glossary-sub-head">
+                <span class="glossary-sub-title">专属术语</span>
+                <span class="glossary-sub-count">{{ glossaryExclusive.length }} 条</span>
+              </div>
+              <div class="inline-actions">
+                <button class="btn btn-sm btn-gray" @click="downloadGlossaryExclusive">下载</button>
+                <button class="btn btn-sm btn-gray" @click="triggerGlossaryExclusiveUpload">替换</button>
+                <input ref="glossaryExclusiveInput" type="file" accept=".csv" style="display:none" @change="handleGlossaryExclusiveUpload" />
+              </div>
+            </div>
+            <p class="glossary-hint">"替换"上传将完全覆盖对应术语库，而非合并。</p>
+          </div>
+        </div>
+
       </div>
     </div>
 
-    <!-- 术语库 -->
-    <div class="section">
-      <div class="section-header" @click="showGlossary = !showGlossary">
-        <svg class="chevron" :class="{ open: showGlossary }" width="12" height="12" viewBox="0 0 12 12"><path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-        <span>术语库</span>
-        <span class="section-count">{{ glossaryProducts.length + glossaryExclusive.length }}</span>
-      </div>
-      <div class="section-body" v-if="showGlossary">
-        <!-- 产品名术语库 -->
-        <div class="glossary-sub">
-          <div class="glossary-sub-head">
-            <span class="glossary-sub-title">产品名</span>
-            <span class="glossary-sub-count">{{ glossaryProducts.length }} 条</span>
-          </div>
-          <div class="inline-actions">
-            <button class="btn btn-sm btn-secondary" @click="downloadGlossaryProducts">下载</button>
-            <button class="btn btn-sm btn-secondary" @click="triggerGlossaryProductsUpload">替换</button>
-            <input ref="glossaryProductsInput" type="file" accept=".csv" style="display:none" @change="handleGlossaryProductsUpload" />
-          </div>
-          <p class="glossary-hint">上传将完全替换现有产品名术语库，而非合并。</p>
-        </div>
-        <!-- 专属术语术语库 -->
-        <div class="glossary-sub">
-          <div class="glossary-sub-head">
-            <span class="glossary-sub-title">专属术语</span>
-            <span class="glossary-sub-count">{{ glossaryExclusive.length }} 条</span>
-          </div>
-          <div class="inline-actions">
-            <button class="btn btn-sm btn-secondary" @click="downloadGlossaryExclusive">下载</button>
-            <button class="btn btn-sm btn-secondary" @click="triggerGlossaryExclusiveUpload">替换</button>
-            <input ref="glossaryExclusiveInput" type="file" accept=".csv" style="display:none" @change="handleGlossaryExclusiveUpload" />
-          </div>
-          <p class="glossary-hint">上传将完全替换现有专属术语术语库，而非合并。</p>
-        </div>
-      </div>
-    </div>
-
-    <!-- 设置 -->
-    <div class="section">
-      <div class="section-header" @click="showSettings = !showSettings">
-        <svg class="chevron" :class="{ open: showSettings }" width="12" height="12" viewBox="0 0 12 12"><path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-        <span>大模型配置</span>
-      </div>
-      <div class="section-body" v-if="showSettings">
-        <div class="field-group">
-          <label class="field-label">API Key</label>
-          <input class="field" type="password" v-model="llmConfig.apiKey" placeholder="sk-..." />
-        </div>
-        <div class="field-group">
-          <label class="field-label">API 地址</label>
-          <input class="field" v-model="llmConfig.apiUrl" placeholder="https://api.openai.com/v1/chat/completions" />
-        </div>
-        <div class="field-group">
-          <label class="field-label">模型</label>
-          <input class="field" v-model="llmConfig.model" placeholder="gpt-4o" />
-        </div>
-                <div class="field-group">
-          <label class="toggle-label" @click="llmConfig.enableProofread = !llmConfig.enableProofread">
-            <span class="toggle" :class="{ on: llmConfig.enableProofread }">
-              <span class="toggle-knob"></span>
-            </span>
-            AI 校对（翻译后自动二次审查）
-          </label>
-        </div>
-        <template v-if="llmConfig.enableProofread">
-          <div class="proof-section-label">校对模型配置</div>
-          <div class="field-group">
-            <label class="field-label">校对 API Key（空则复用翻译）</label>
-            <input class="field" type="password" v-model="llmConfig.proofreadApiKey" placeholder="sk-..." />
-          </div>
-          <div class="field-group">
-            <label class="field-label">校对 API 地址</label>
-            <input class="field" v-model="llmConfig.proofreadApiUrl" placeholder="与翻译相同" />
-          </div>
-          <div class="field-group">
-            <label class="field-label">校对模型</label>
-            <input class="field" v-model="llmConfig.proofreadModel" placeholder="与翻译相同" />
-          </div>
-        </template>
-        <div class="btn-row">
-          <button class="btn btn-primary flex-1" @click="saveSettings" :disabled="saving">
-            {{ saving ? '保存中...' : '保存配置' }}
-          </button>
-          <button class="btn btn-secondary flex-1" @click="useDefaultConfig">
-            使用默认配置
-          </button>
-          <button class="btn btn-secondary flex-1" @click="testTranslationConnection" :disabled="testingTrans">
-            {{ testingTrans ? '测试中...' : '测试翻译' }}
-          </button>
-          <button v-if="llmConfig.enableProofread" class="btn btn-secondary flex-1" @click="testProofConnection" :disabled="testingProof">
-            {{ testingProof ? '测试中...' : '测试校对' }}
-          </button>
-        </div>
-        <div class="test-result" v-if="testResultTrans" :class="{ success: testResultTrans.success, fail: !testResultTrans.success }">
-          <span class="test-icon">{{ testResultTrans.success ? '✓' : '✗' }}</span>
-          <span>翻译: {{ testResultTrans.message }}</span>
-        </div>
-        <div class="test-result" v-if="testResultProof" :class="{ success: testResultProof.success, fail: !testResultProof.success }">
-          <span class="test-icon">{{ testResultProof.success ? '✓' : '✗' }}</span>
-          <span>校对: {{ testResultProof.message }}</span>
-        </div>
-      </div>
-    </div>
+    <!-- 页脚署名（v9.3 恢复：v9.0 重构时误删，v8.7 及更早版本均有） -->
+    <div class="footer">by Lexar Design Team</div>
 
     <!-- Toast -->
     <transition name="fade">
       <div class="toast" v-if="toastMsg" :class="toastType">{{ toastMsg }}</div>
     </transition>
-
-    <div class="footer">by Lexar Design Team</div>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { ref, shallowRef, markRaw, computed, onMounted, nextTick, watch } from 'vue'
 import { UIMessage, PluginMessage, TextItem, LLMConfig, GlossaryEntry, TranslationCorrection, LANGUAGES, TestConnectionResult } from '@messages/types'
 import { sendMsgToPlugin } from '@messages/ui-sender'
 import { parseCSVRow, csvEncodeCell } from '@lib/parse-csv'
@@ -482,8 +554,9 @@ import { compressBatch, expandBatch } from '@lib/translation-memory'
 const items = ref<TextItem[]>([])
 const targetLang = ref('en')
 const sourceLang = ref('auto')
-const glossaryProducts = ref<GlossaryEntry[]>([])
-const glossaryExclusive = ref<GlossaryEntry[]>([])
+// v9.0.1 性能：术语库/字体列表为大批量静态数据，shallowRef + markRaw 避免深层响应式递归开销
+const glossaryProducts = shallowRef<GlossaryEntry[]>([])
+const glossaryExclusive = shallowRef<GlossaryEntry[]>([])
 const glossary = computed(() => [...glossaryProducts.value, ...glossaryExclusive.value])
 /** 术语库映射（响应式），供 UI 层漏翻检测复用，避免重复构建 */
 const glossaryMapForUi = computed(() => buildGlossaryMap())
@@ -517,9 +590,21 @@ function detectSingleTextLanguage(text: string): string {
 }
 
 /** 判断条目是否应显示漏翻标记（兼容术语库中 source==target 的全球统一英文术语） */
+/** v9.0.1 性能：漏翻检测结果缓存 — 模板每卡调用 2 次，pendingItems 再调 1 次，
+ * 且任一响应式变化触发全模板重渲染时 48 卡×3 次全量重跑。
+ * 键含源文/译文/目标语言/术语库规模，任一变化自动失效。 */
+const untranslatedBadgeCache = new Map<string, boolean>()
 function showUntranslatedBadge(item: { sourceText: string; translatedText: string }): boolean {
   if (item.sourceText !== item.translatedText) return false
-
+  const key = item.sourceText + '' + targetLang.value + '' + glossaryProducts.value.length + '/' + glossaryExclusive.value.length
+  const cached = untranslatedBadgeCache.get(key)
+  if (cached !== undefined) return cached
+  const result = computeUntranslatedBadge(item)
+  if (untranslatedBadgeCache.size > 5000) untranslatedBadgeCache.clear()
+  untranslatedBadgeCache.set(key, result)
+  return result
+}
+function computeUntranslatedBadge(item: { sourceText: string; translatedText: string }): boolean {
   // v8.5: 同语系变体（CN→TW/HK、PT→PT-BR）共享字符集，源文=译文可能是正确的
   const srcLang = detectSingleTextLanguage(item.sourceText)
   if (isSameScriptLanguagePair(srcLang, targetLang.value)) {
@@ -528,10 +613,41 @@ function showUntranslatedBadge(item: { sourceText: string; translatedText: strin
 
   return !isUntranslatable(item.sourceText, glossaryMapForUi.value)
 }
+
+/** v8.9: 检测译文是否含未还原的占位符（__GLOSSARY_N__/__PRD_N__ 等） */
+function hasPlaceholderResidue(text: string): boolean {
+  return /__[A-Z]+_\d+__/.test(text)
+}
+
+/** v8.9: 待确认条目 — 三类阻塞问题 */
+const pendingItems = computed(() => {
+  const errors: Array<{ item: typeof items.value[0]; type: 'error' | 'placeholder' | 'untranslated' }> = []
+  for (const item of items.value) {
+    if (appliedNodeIds.value.has(item.nodeIds[0])) continue // 已应用的不参与
+    if (translateErrors.value.has(item.nodeIds[0])) {
+      errors.push({ item, type: 'error' })
+    } else if (hasPlaceholderResidue(item.translatedText)) {
+      errors.push({ item, type: 'placeholder' })
+    } else if (showUntranslatedBadge(item)) {
+      errors.push({ item, type: 'untranslated' })
+    }
+  }
+  return errors
+})
+
+/** v8.9: 是否有阻塞批量应用的问题 */
+const hasPendingBlockingIssue = computed(() => pendingItems.value.length > 0)
 const translationCache = ref<Record<string, string>>({})
 const llmConfig = ref<LLMConfig>({ apiKey: '', apiUrl: '', model: '', translationStyle: 'standard', translationStyleCustom: '', scenePreset: 'ecommerce', enableProofread: false, proofreadApiKey: '', proofreadApiUrl: '', proofreadModel: '' })
 
 const scanning = ref(false)
+/** v9.1 #11: 扫描进度（main.ts 每 100 节点上报），按钮文案"扫描中(N)..." */
+const scanFoundCount = ref(0)
+const scanProgressText = computed(() =>
+  scanFoundCount.value > 0 ? `扫描中(${scanFoundCount.value})...` : '扫描中...'
+)
+/** v9.1 #8: 画布选区计数（main.ts selectionchange 推送），无选区时禁用"选中对象扫描" */
+const selectionCount = ref(0)
 const lastScanMode = ref<'all' | 'selection' | null>(null)
 const pageName = ref('')
 const fileName = ref('')
@@ -540,6 +656,9 @@ const proofreading = ref(false)
 const applying = ref(false)
 const applyingFonts = ref(false)
 const undoing = ref(false)
+/** v9.1 #3: 撤销可用性以画布快照为准（main.ts UNDO_STATE 推送），而非 UI 列表是否有译文 */
+const canUndo = ref(false)
+const undoCount = ref(0)
 const cancelFlag = ref(false)
 const failedNodeIds = ref<string[]>([])
 const translateErrors = ref<Set<string>>(new Set())
@@ -570,6 +689,17 @@ const showTexts = ref(true)
 const showGlossary = ref(false)
 const showFontMap = ref(false)
 const showSettings = ref(false)
+const showPendingList = ref(false)
+/** v9.1 #7: 待确认条出现时自动展开（一键操作 0 次点击）；用户手动收起后不再自动展开 */
+let pendingUserCollapsed = false
+function togglePendingList() {
+  showPendingList.value = !showPendingList.value
+  pendingUserCollapsed = !showPendingList.value
+}
+watch(pendingItems, (list) => {
+  if (list.length > 0 && !pendingUserCollapsed) showPendingList.value = true
+  if (list.length === 0) pendingUserCollapsed = false
+})
 const isDark = ref(false)
 
 const testingTrans = ref(false)
@@ -623,7 +753,7 @@ const fontMappings = computed(() => {
   return Array.from(map.values())
 })
 
-const availableFonts = ref<{ family: string; style: string }[]>([])
+const availableFonts = shallowRef<{ family: string; style: string }[]>([])
 
 const STYLE_WEIGHT: Record<string, number> = {
   Thin: 0, ThinItalic: 1, ExtraLight: 2, ExtraLightItalic: 3, Light: 4, LightItalic: 5,
@@ -653,6 +783,10 @@ const fontStyleOptions = computed(() => {
 
 const fontSearchMap = ref<Record<string, string>>({})
 
+/** v9.0.1 性能：字体分组结果缓存 — 模板中每个字体映射卡都调用
+ * groupedFontOptions(filteredFontOptions(f))，任一响应式变化全量重跑 */
+const fontGroupCache = new Map<string, Array<[string, FontOption[]]>>()
+
 function filteredFontOptions(fm: FontMapping): FontOption[] {
   const q = (fontSearchMap.value[fm.key] || '').trim().toLowerCase()
   if (!q) return fontStyleOptions.value
@@ -661,7 +795,11 @@ function filteredFontOptions(fm: FontMapping): FontOption[] {
   })
 }
 
-function groupedFontOptions(options: FontOption[]): Array<[string, FontOption[]]> {
+function groupedFontOptions(options: FontOption[], cacheKey?: string): Array<[string, FontOption[]]> {
+  if (cacheKey !== undefined) {
+    const cached = fontGroupCache.get(cacheKey)
+    if (cached) return cached
+  }
   const map = new Map<string, FontOption[]>()
   for (const opt of options) {
     const group = map.get(opt.family)
@@ -671,7 +809,12 @@ function groupedFontOptions(options: FontOption[]): Array<[string, FontOption[]]
       map.set(opt.family, [opt])
     }
   }
-  return Array.from(map.entries())
+  const result = Array.from(map.entries())
+  if (cacheKey !== undefined) {
+    if (fontGroupCache.size > 200) fontGroupCache.clear()
+    fontGroupCache.set(cacheKey, result)
+  }
+  return result
 }
 
 function onFontSelected(f: FontMapping) {
@@ -713,6 +856,12 @@ const toastMsg = ref('')
 const toastType = ref('info')
 let toastTimer = 0
 
+/** v9.1 #10: toast 队列 — 同时只显示 1 条，同类连续合并计数，error 展示更久。
+ *  解决"翻译完成→校对开始→校对完成"3 连 toast 互相覆盖的问题。 */
+interface ToastItem { msg: string; type: string; repeat: number }
+const toastQueue: ToastItem[] = []
+const TOAST_SHOW_MS: Record<string, number> = { error: 4000, warning: 3000, success: 2500, info: 1500 }
+
 const csvInput = ref<HTMLInputElement | null>(null)
 
 const activeGlossaryLangs = computed(() => {
@@ -729,6 +878,26 @@ const activeGlossaryLangs = computed(() => {
 
 const hasTranslation = computed(() => items.value.some(it => it.translatedText))
 
+/** v9.1 #6: 禁用原因内联小字 — 用户不用猜按钮为什么灰 */
+const translateDisabledReason = computed(() => {
+  if (items.value.length === 0) return ''  // stats-empty 已有"扫描后开始翻译"引导，不重复
+  if (proofreading.value) return '校对中...'
+  return ''
+})
+/** 应用行下方的综合提示：优先顺序引导（应用翻译→替换字体），其次撤销原因 */
+const applyRowHint = computed(() => {
+  if (hasTranslation.value && appliedNodeIds.value.size === 0 && !applyingFonts.value) {
+    return '建议先"应用翻译"再"替换字体"'
+  }
+  if (!hasTranslation.value && !canUndo.value) return ''
+  return ''
+})
+const undoDisabledReason = computed(() => {
+  if (canUndo.value || undoing.value || applying.value) return ''
+  if (hasTranslation.value) return ''  // 有译文时 applyRowHint 已占此行
+  return '画布上没有可恢复的应用'
+})
+
 const charCount = computed(() => {
   let count = 0
   for (const item of items.value) {
@@ -742,6 +911,32 @@ const statusClass = computed(() => {
   if (hasTranslation.value) return 'done'
   return 'idle'
 })
+
+// v9.0: 折叠区开关
+const showConfig = ref(false)
+const showAdvanced = ref(false)
+const showStyleDetail = ref(false)
+
+// v9.0: 统一进度条 — 优先级 apply > proofread > translate（同时只跑一个阶段）
+const busyPhase = computed((): 'translate' | 'proofread' | 'apply' | null => {
+  if (applying.value) return 'apply'
+  if (proofreading.value) return 'proofread'
+  if (translating.value) return 'translate'
+  return null
+})
+const busyPercent = computed(() => {
+  if (busyPhase.value === 'apply') return applyingProgressPercent.value
+  if (busyPhase.value === 'proofread') return proofreadProgressPercent.value
+  return translateProgressPercent.value
+})
+const busyLabel = computed(() => {
+  if (busyPhase.value === 'apply') return '应用中'
+  if (busyPhase.value === 'proofread') return '校对中'
+  return '翻译中'
+})
+
+// v9.0: 配置摘要 — 折叠时显示当前生效值（含产品线自动检测结果）
+// 见下方 productLineOptions 定义之后
 
 function resizeTextareaEl(el: HTMLTextAreaElement) {
   el.style.height = 'auto'
@@ -762,10 +957,26 @@ function resizeAllTextareas() {
 }
 
 function showToast(msg: string, type = 'info') {
-  toastMsg.value = msg
-  toastType.value = type
+  // 同类连续合并：与队尾同 msg 则计数 +1（"xx (×2)"），不刷队列
+  const tail = toastQueue[toastQueue.length - 1]
+  if (tail && tail.msg === msg && tail.type === type) {
+    tail.repeat++
+    return
+  }
+  toastQueue.push({ msg, type, repeat: 1 })
+  if (toastQueue.length === 1) drainToastQueue()
+}
+
+function drainToastQueue() {
+  const cur = toastQueue[0]
+  if (!cur) { toastMsg.value = ''; return }
+  toastMsg.value = cur.repeat > 1 ? `${cur.msg} (×${cur.repeat})` : cur.msg
+  toastType.value = cur.type
   clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => { toastMsg.value = '' }, TOAST_DURATION_MS) as unknown as number
+  toastTimer = setTimeout(() => {
+    toastQueue.shift()
+    drainToastQueue()
+  }, (TOAST_SHOW_MS[cur.type] || TOAST_DURATION_MS)) as unknown as number
 }
 
 // ============================================================
@@ -773,6 +984,15 @@ function showToast(msg: string, type = 'info') {
 // ============================================================
 const editingOriginal = ref<{ item: TextItem; originalTranslation: string } | null>(null)
 const corrections = ref<TranslationCorrection[]>([])
+
+/** v9.1 #13: 恢复原译文抽函数 + 反馈 toast（原内联赋值无任何反馈） */
+function revertProofread(item: TextItem) {
+  item.translatedText = item.proofreadText
+  item.proofreadText = ''
+  item.proofreadReason = ''
+  item.corrected = false
+  showToast('已恢复原译文', 'info')
+}
 
 function onTransInputFocus(item: TextItem) {
   // 记录编辑前的译文，用于后续比对
@@ -802,10 +1022,25 @@ function onTransInputBlur(item: TextItem) {
 // ============================================================
 // 扫描
 // ============================================================
+/** v9.1 #2: 扫描即开始新一轮工作 — 完整重置上一轮的所有状态，避免徽章/阻塞残留 */
+function resetWorkState() {
+  items.value = []
+  translateErrors.value = new Set()
+  failedNodeIds.value = []
+  appliedNodeIds.value = new Set()
+  retranslatingIds.value = new Set()
+  csvChangedIds.value = new Set()
+  showPendingList.value = false
+  scanFoundCount.value = 0
+  translateProgress.value = { current: 0, total: 0 }
+  proofreadProgress.value = { current: 0, total: 0 }
+  untranslatedBadgeCache.clear()
+}
+
 function scanAll() {
   lastScanMode.value = 'all'
   scanning.value = true
-  items.value = []
+  resetWorkState()
   sendMsgToPlugin(UIMessage.SCAN_ALL)
   // scanning state reset by SCAN_RESULT message
 }
@@ -813,7 +1048,7 @@ function scanAll() {
 function scanSelection() {
   lastScanMode.value = 'selection'
   scanning.value = true
-  items.value = []
+  resetWorkState()
   sendMsgToPlugin(UIMessage.SCAN_SELECTION)
   // scanning state reset by SCAN_RESULT message
 }
@@ -968,7 +1203,8 @@ async function startTranslate() {
     return
   }
   if (!llmConfig.value.apiKey || !llmConfig.value.apiUrl) {
-    showToast('请先展开下方"大模型配置"并填写 API Key 和 API 地址', 'error')
+    showToast('请先填写大模型 API Key 和 API 地址', 'error')
+    showAdvanced.value = true
     showSettings.value = true
     return
   }
@@ -1821,8 +2057,14 @@ function autoMapFonts() {
 }
 
 /** 向主线程触发独立的字体替换操作（不改字号/行距/字距，只换字体族+字重） */
+let fontOrderHintShown = false  // v9.1 #5: 顺序提示只弹一次，不打扰
 function applyFonts() {
   syncFontMappings()
+  if (!fontOrderHintShown && appliedNodeIds.value.size === 0) {
+    fontOrderHintShown = true
+    showToast('提示：若尚未应用翻译，建议先点"应用翻译"——单独应用翻译时不会带上字体', 'info')
+  }
+  applyingFonts.value = true
   const fontPayload = items.value.map(function (it) {
     return {
       nodeIds: it.nodeIds,
@@ -2035,7 +2277,7 @@ function handleGlossaryProductsUpload(e: Event) {
   const reader = new FileReader()
   reader.onload = () => {
     const entries = parseGlossaryCSV(reader.result as string)
-    glossaryProducts.value = entries
+    glossaryProducts.value = markRaw(entries)
     saveGlossaryProducts()
     showToast(`已替换产品名术语库（${entries.length} 条）`, 'success')
   }
@@ -2077,7 +2319,7 @@ function handleGlossaryExclusiveUpload(e: Event) {
   const reader = new FileReader()
   reader.onload = () => {
     const entries = parseGlossaryCSV(reader.result as string)
-    glossaryExclusive.value = entries
+    glossaryExclusive.value = markRaw(entries)
     saveGlossaryExclusive()
     showToast(`已替换专属术语术语库（${entries.length} 条）`, 'success')
   }
@@ -2102,11 +2344,11 @@ const selectedPreset = ref('professional')
 // 场景锁定：非电商场景强制严谨专业版
 const isStyleLocked = computed(() => llmConfig.value.scenePreset !== 'ecommerce')
 const previousStyle = ref('marketing')
-const showRef = ref(false)
 
 // 自动检测的产品线
 const detectedProductLine = computed(() => {
   if (items.value.length === 0) return null
+  // 性能：pageName/fileName 未加载完成时不检测（它们到达后会触发重算并命中缓存）
   return detectProductLine(items.value.map(it => it.sourceText), pageName.value || undefined, fileName.value || undefined)
 })
 
@@ -2131,6 +2373,31 @@ const productLineOptions = [
   { value: 'innovation_lifestyle', label: '创新生活' },
   { value: 'none', label: '不注入' },
 ]
+
+// v9.0: 配置摘要 — 折叠时显示当前生效值（含产品线自动检测结果）
+const configSummary = computed(() => {
+  const styleMap: Record<string, string> = {
+    standard: '通用标准版',
+    professional: '严谨专业版',
+    marketing: '电商营销版',
+    custom: '自定义',
+  }
+  const sceneMap: Record<string, string> = {
+    ecommerce: '商品详情页',
+    technical_params: '技术参数表',
+    packaging: '包装印刷',
+    ui: '软件UI',
+    after_sales: '售后/保修卡',
+    manual: '说明书',
+    spec_sheet: '规格书',
+  }
+  const style = styleMap[selectedPreset.value] || selectedPreset.value
+  const scene = sceneMap[llmConfig.value.scenePreset] || llmConfig.value.scenePreset
+  const plOpt = productLineOptions.find(o => o.value === effectiveProductLine.value)
+  const plName = plOpt ? plOpt.label : '未检测'
+  const plTag = manualProductLine.value === '' && effectiveProductLine.value ? `${plName}·自动` : plName
+  return `${style} / ${scene} / ${plTag}`
+})
 
 const currentStylePrompt = computed(() => {
   if (selectedPreset.value === 'custom') return ''
@@ -2287,6 +2554,59 @@ async function retranslateSingle(item: TextItem) {
 }
 
 // ============================================================
+// v8.9: 待处理条目操作
+// ============================================================
+
+/** 一键修复占位符残留：重新跑 unmaskEntities */
+function fixAllPlaceholders() {
+  const placeholderItems = pendingItems.value.filter(p => p.type === 'placeholder')
+  if (placeholderItems.length === 0) return
+  let fixed = 0
+  for (const p of placeholderItems) {
+    // 简单尝试：移除所有 __XXX_N__ 占位符（保守策略，避免复杂映射重建）
+    const before = p.item.translatedText
+    p.item.translatedText = before.replace(/__[A-Z]+_\d+__/g, '').trim()
+    if (p.item.translatedText !== before && p.item.translatedText.length > 0) fixed++
+  }
+  showToast(`已修复 ${fixed}/${placeholderItems.length} 条占位符残留`, fixed > 0 ? 'success' : 'warning')
+}
+
+/** 全部接受漏翻原文：确认保留源文作为译文 */
+function acceptAllUntranslated() {
+  const untranslatedItems = pendingItems.value.filter(p => p.type === 'untranslated')
+  if (untranslatedItems.length === 0) return
+  // 标记为已确认：从 pending 中移除的方式是确保 showUntranslatedBadge 返回 false
+  // 但 showUntranslatedBadge 是计算属性，无法直接修改。这里用 appliedNodeIds 标记跳过批量应用拦截。
+  // 实际上这些条目会被正常应用（因为 translatedText 就是原文），只是不再阻塞。
+  for (const p of untranslatedItems) {
+    for (const nid of p.item.nodeIds) {
+      appliedNodeIds.value.add(nid)
+    }
+  }
+  showToast(`已确认保留 ${untranslatedItems.length} 条原文`, 'success')
+}
+
+/** 编辑待处理条目：聚焦到该条目的 textarea */
+function editPendingItem(item: TextItem) {
+  showPendingList.value = false
+  // 通过 nodeId 找到对应的 textarea 并聚焦
+  const el = document.querySelector(`[data-node-id="${item.nodeIds[0]}"] textarea`)
+  if (el instanceof HTMLTextAreaElement) {
+    el.focus()
+    el.select()
+  }
+  showToast('请编辑译文', 'info')
+}
+
+/** 跳过待处理条目：标记为已应用，不再阻塞 */
+function skipPendingItem(item: TextItem) {
+  for (const nid of item.nodeIds) {
+    appliedNodeIds.value.add(nid)
+  }
+  showToast('已跳过该条目', 'info')
+}
+
+// ============================================================
 // 设置
 // ============================================================
 function useDefaultConfig() {
@@ -2394,6 +2714,8 @@ async function testProofConnection() {
 // ============================================================
 let settingsReady = false
 let glossaryReady = false
+/** v9.1 #1: settings 加载完成后若未配置 API，UI 主动提示（而非等点翻译才报错） */
+const apiConfigured = ref(true)
 let glossaryProductsLoaded = false
 let glossaryExclusiveLoaded = false
 function checkGlossaryReady() {
@@ -2495,25 +2817,45 @@ onMounted(() => {
         break
       }
 
-      case PluginMessage.UNDO_DONE:
+      case PluginMessage.UNDO_DONE: {
         undoing.value = false
-        showToast(`已恢复 ${(data as { count: number }).count} 条原文`, 'success')
+        const ud = data as { count: number; skipped?: number }
+        showToast(
+          `已恢复 ${ud.count} 条原文到画布（列表译文保留）` + (ud.skipped ? `，跳过 ${ud.skipped} 条手动修改` : ''),
+          'success',
+        )
+        break
+      }
+
+      case PluginMessage.UNDO_STATE: {
+        const us = data as { canUndo: boolean; count: number }
+        canUndo.value = us.canUndo
+        undoCount.value = us.count
+        break
+      }
+
+      case PluginMessage.SELECTION_STATE:
+        selectionCount.value = (data as { count: number }).count
+        break
+
+      case PluginMessage.SCAN_PROGRESS:
+        scanFoundCount.value = (data as { found: number }).found
         break
 
       case PluginMessage.GLOSSARY_PRODUCTS_LOADED:
-        glossaryProducts.value = ((data as GlossaryEntry[]) || []).map(function (g: GlossaryEntry) {
+        glossaryProducts.value = markRaw(((data as GlossaryEntry[]) || []).map(function (g: GlossaryEntry) {
           if (g.translations) return g
           return { source: g.source, translations: (g as Record<string, unknown>).target ? { en: (g as Record<string, unknown>).target as string } : {} }
-        })
+        }))
         glossaryProductsLoaded = true
         checkGlossaryReady()
         break
 
       case PluginMessage.GLOSSARY_EXCLUSIVE_LOADED:
-        glossaryExclusive.value = ((data as GlossaryEntry[]) || []).map(function (g: GlossaryEntry) {
+        glossaryExclusive.value = markRaw(((data as GlossaryEntry[]) || []).map(function (g: GlossaryEntry) {
           if (g.translations) return g
           return { source: g.source, translations: (g as Record<string, unknown>).target ? { en: (g as Record<string, unknown>).target as string } : {} }
-        })
+        }))
         glossaryExclusiveLoaded = true
         checkGlossaryReady()
         break
@@ -2533,10 +2875,12 @@ onMounted(() => {
         }
         selectedPreset.value = detectPreset()
         settingsReady = true
+        apiConfigured.value = !!(llmConfig.value.apiKey && llmConfig.value.apiUrl)
         break
 
       case PluginMessage.SETTINGS_SAVED:
         saving.value = false
+        apiConfigured.value = !!(llmConfig.value.apiKey && llmConfig.value.apiUrl)
         showToast('配置已保存，可跨客户端同步', 'success')
         break
 
@@ -2565,7 +2909,7 @@ onMounted(() => {
 
 
       case PluginMessage.FONTS_LOADED:
-        availableFonts.value = (data as { family: string; style: string }[]) || []
+        availableFonts.value = markRaw((data as { family: string; style: string }[]) || [])
         break
 
       case PluginMessage.CORRECTIONS_LOADED:
@@ -2651,825 +2995,3 @@ function handleCSVImportDone(data: { nodeIds: string[]; translatedText: string }
   showToast(`已导入 ${count} 条译文` + (changed > 0 ? `，${changed} 条有变更已高亮` : ''), 'success')
 }
 </script>
-
-<style>
-/* ============================================================
-   Apple 风格设计系统
-   ============================================================ */
-* { box-sizing: border-box; margin: 0; padding: 0; }
-
-:root {
-  --blue: #007AFF;
-  --blue-hover: #0062CC;
-  --blue-light: rgba(0,122,255,0.08);
-  --green: #34C759;
-  --green-hover: #2DA64A;
-  --orange: #FF9500;
-  --red: #FF3B30;
-  --gray-50: #F5F5F7;
-  --gray-100: #E5E5EA;
-  --gray-200: #D1D1D6;
-  --gray-400: #86868B;
-  --gray-600: #636366;
-  --gray-800: #2C2C2E;
-  --gray-900: #1D1D1F;
-  --radius-sm: 8px;
-  --radius: 10px;
-  --radius-lg: 14px;
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.04);
-  --shadow: 0 4px 12px rgba(0,0,0,0.08);
-  --transition: 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
-}
-
-body {
-  font-family: -apple-system, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, sans-serif;
-  font-size: 13px;
-  background: var(--gray-50);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-.app {
-  padding: 16px;
-  color: var(--gray-900);
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.app.dark {
-  --gray-50: #1C1C1E;
-  --gray-100: #2C2C2E;
-  --gray-200: #3A3A3C;
-  --gray-400: #8E8E93;
-  --gray-600: #AEAEB2;
-  --gray-800: #E5E5EA;
-  --gray-900: #F5F5F7;
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
-  --shadow: 0 4px 12px rgba(0,0,0,0.4);
-  background: #000;
-  color: var(--gray-900);
-}
-
-/* ---- 状态栏 ---- */
-.statusbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 2px 0 10px;
-}
-.sb-left { display: flex; align-items: center; gap: 8px; }
-.sb-dot {
-  width: 7px; height: 7px; border-radius: 50%;
-  background: var(--gray-200);
-  transition: background var(--transition);
-}
-.sb-dot.busy { background: var(--orange); animation: pulse 1.2s infinite; }
-.sb-dot.done { background: var(--green); }
-@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
-.sb-title { font-size: 14px; font-weight: 600; letter-spacing: -0.02em; }
-.sb-badge {
-  font-size: 10px; color: var(--gray-400); background: var(--gray-100);
-  padding: 2px 8px; border-radius: 20px; font-weight: 500;
-}
-.sb-badge.active { color: var(--blue); background: var(--blue-light); }
-
-/* ---- 工具栏 ---- */
-.toolbar {
-  background: #fff;
-  border-radius: var(--radius);
-  padding: 16px;
-  box-shadow: var(--shadow-sm);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.toolbar:hover { box-shadow: var(--shadow); }
-.app.dark .toolbar { background: var(--gray-100); }
-
-/* ---- 分段控件 (Segmented Control) — Apple 边框按钮风格 ---- */
-.segmented-control {
-  display: flex;
-  gap: 8px;
-}
-.seg-btn {
-  flex: 1;
-  padding: 8px 14px;
-  border: 1.5px solid var(--blue);
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  font-family: inherit;
-  background: transparent;
-  color: var(--blue);
-  transition: all var(--transition);
-  white-space: nowrap;
-  letter-spacing: -0.01em;
-}
-.seg-btn:hover:not(:disabled):not(.active) {
-  background: var(--blue-light);
-}
-.seg-btn.active {
-  background: var(--blue);
-  color: #fff;
-  font-weight: 600;
-}
-.seg-btn.active:hover:not(:disabled) {
-  background: var(--blue-hover);
-}
-.seg-btn:active:not(:disabled) { transform: scale(0.97); }
-.seg-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-
-/* ---- 统计卡片 + 翻译按钮 ---- */
-.stats-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: var(--gray-50);
-  border-radius: var(--radius-sm);
-  padding: 10px 14px;
-  gap: 12px;
-}
-.app.dark .stats-card { background: var(--gray-200); }
-.stats-info {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-.stat-item {
-  display: flex;
-  align-items: baseline;
-  gap: 5px;
-}
-.stat-value {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--gray-800);
-  letter-spacing: -0.02em;
-}
-.stat-label {
-  font-size: 11px;
-  color: var(--gray-400);
-  font-weight: 500;
-}
-.stat-divider {
-  width: 1px;
-  height: 20px;
-  background: var(--gray-200);
-}
-.app.dark .stat-value { color: var(--gray-900); }
-.app.dark .stat-divider { background: var(--gray-400); }
-.btn-translate {
-  flex-shrink: 0;
-  padding: 8px 18px;
-  font-weight: 600;
-}
-
-/* ---- 操作按钮行 ---- */
-.action-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-.toolbar-row { display: flex; gap: 6px; align-items: center; }
-
-/* ---- 翻译风格栏 ---- */
-.style-bar {
-  background: #fff;
-  border-radius: var(--radius);
-  padding: 16px;
-  box-shadow: var(--shadow-sm);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.style-bar:hover { box-shadow: var(--shadow); }
-.app.dark .style-bar { background: var(--gray-100); }
-.style-row {
-  display: flex;
-  gap: 12px;
-}
-.style-field {
-  flex: 1;
-  min-width: 0;
-}
-.style-select {
-  width: 100%;
-  padding: 8px 10px;
-  border: 1px solid var(--gray-100);
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-  background: #fff;
-  color: var(--gray-800);
-  cursor: pointer;
-  font-family: inherit;
-  transition: border-color var(--transition);
-  -webkit-appearance: none;
-  appearance: none;
-}
-.style-select:focus { outline: none; border-color: var(--blue); }
-.style-select:disabled { opacity: 0.5; cursor: not-allowed; background: var(--gray-50); }
-.auto-badge, .manual-badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 3px; margin-left: 6px; vertical-align: middle; }
-.auto-badge { color: var(--blue); background: rgba(66,133,244,0.10); }
-.manual-badge { color: var(--orange); background: rgba(230,126,34,0.10); }
-.pl-warning { display: inline-block; font-size: 11px; color: var(--orange); margin-left: 8px; vertical-align: middle; }
-.app.dark .style-select {
-  background: var(--gray-200);
-  border-color: var(--gray-200);
-  color: var(--gray-900);
-}
-.style-textarea {
-  width: 100%;
-  font-size: 13px;
-  padding: 8px 10px;
-  border: 1px solid var(--gray-200);
-  border-radius: var(--radius-sm);
-  background: #fff;
-  color: var(--gray-900);
-  resize: vertical;
-  font-family: inherit;
-  line-height: 1.5;
-  transition: border-color var(--transition), box-shadow var(--transition);
-}
-.style-textarea:focus {
-  outline: none;
-  border-color: var(--blue);
-  box-shadow: 0 0 0 3px rgba(0,122,255,0.12);
-}
-.style-textarea::placeholder { color: var(--gray-200); }
-.app.dark .style-textarea {
-  background: var(--gray-200);
-  border-color: var(--gray-400);
-  color: var(--gray-900);
-}
-.style-prompt {
-  width: 100%;
-  font-size: 12px;
-  padding: 10px 12px;
-  border: 1px solid var(--gray-100);
-  border-radius: var(--radius-sm);
-  background: var(--gray-50);
-  color: var(--gray-600);
-  resize: none;
-  font-family: -apple-system, 'SF Pro Text', 'Helvetica Neue', Helvetica, sans-serif;
-  line-height: 1.6;
-  max-height: 240px;
-  overflow-y: auto;
-  cursor: default;
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-.style-prompt:focus { outline: none; }
-.style-ref-toggle {
-  display: flex; align-items: center; gap: 6px;
-  padding: 4px 0; cursor: pointer; user-select: none;
-  font-size: 11px; color: var(--gray-400);
-  transition: color var(--transition);
-}
-.style-ref-toggle:hover { color: var(--blue); }
-.style-ref-toggle .chevron {
-  color: var(--gray-400); flex-shrink: 0;
-  transition: transform var(--transition);
-}
-.style-ref-toggle .chevron.open { transform: rotate(90deg); }
-.app.dark .style-prompt {
-  background: var(--gray-200);
-  border-color: var(--gray-400);
-  color: var(--gray-400);
-}
-
-/* ---- 语言选择行 ---- */
-.lang-row {
-  display: flex; align-items: flex-end; gap: 8px;
-  padding: 2px 0;
-}
-.lang-col { flex: 1; min-width: 0; }
-.lang-arrow {
-  display: flex; align-items: center; justify-content: center;
-  padding-bottom: 8px; color: var(--gray-200); flex-shrink: 0;
-}
-.app.dark .lang-arrow { color: var(--gray-400); }
-
-/* ---- 语言选择 ---- */
-.lang-select {
-  width: 100%;
-  padding: 8px 10px;
-  border: 1px solid var(--gray-100);
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-  background: #fff;
-  color: var(--gray-800);
-  cursor: pointer;
-  font-family: inherit;
-  transition: border-color var(--transition);
-  -webkit-appearance: none;
-  appearance: none;
-}
-.lang-select:focus { outline: none; border-color: var(--blue); }
-.app.dark .lang-select { background: var(--gray-200); border-color: var(--gray-200); color: var(--gray-900); }
-
-/* ---- 按钮 ---- */
-.btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
-  padding: 9px 16px; border: none; border-radius: var(--radius-sm);
-  font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap;
-  transition: all var(--transition); font-family: inherit;
-  letter-spacing: -0.01em; position: relative;
-}
-.btn:active:not(:disabled) { transform: scale(0.97); }
-.btn:disabled { opacity: 0.3; cursor: not-allowed; }
-.btn-icon-svg {
-  flex-shrink: 0; opacity: 0.9;
-}
-.btn-primary { background: var(--blue); color: #fff; }
-.btn-primary:hover:not(:disabled) { background: var(--blue-hover); box-shadow: 0 2px 8px rgba(0,122,255,0.3); }
-.btn-secondary { background: var(--gray-100); color: var(--gray-800); }
-.btn-secondary:hover:not(:disabled) { background: var(--gray-200); }
-.btn-accent { background: var(--green); color: #fff; }
-.btn-accent:hover:not(:disabled) { background: var(--green-hover); box-shadow: 0 2px 8px rgba(52,199,89,0.3); }
-.btn-warning { background: var(--orange); color: #fff; }
-.btn-warning:hover:not(:disabled) { background: #e68600; }
-.btn-ghost { background: transparent; color: var(--gray-400); padding: 9px 12px; }
-.btn-ghost:hover:not(:disabled) { background: var(--gray-100); color: var(--gray-600); }
-.btn-sm { padding: 5px 12px; font-size: 12px; border-radius: var(--radius-sm); }
-.flex-1 { flex: 1; }
-
-.app.dark .btn-secondary { background: var(--gray-200); }
-.app.dark .btn-ghost { color: var(--gray-400); }
-.app.dark .btn-ghost:hover:not(:disabled) { background: var(--gray-200); color: var(--gray-600); }
-
-/* ---- 进度条 ---- */
-.progress-wrap { display: flex; align-items: center; gap: 10px; padding: 4px 2px; }
-.progress-track {
-  flex: 1; height: 4px; background: var(--gray-100);
-  border-radius: 2px; overflow: hidden;
-}
-.progress-fill {
-  height: 100%; background: var(--blue); border-radius: 2px;
-  transition: width 0.4s cubic-bezier(0.25, 0.1, 0.25, 1);
-}
-.proofread-fill { background: var(--orange); }
-.apply-fill { background: var(--green); }
-.progress-label { font-size: 11px; color: var(--gray-400); font-weight: 500; min-width: 36px; text-align: right; }
-
-/* ---- 面板 ---- */
-.section {
-  background: #fff; border-radius: var(--radius);
-  box-shadow: var(--shadow-sm); overflow: hidden;
-}
-.section:hover { box-shadow: var(--shadow); }
-.app.dark .section { background: var(--gray-100); }
-.section-header {
-  display: flex; align-items: center; gap: 8px;
-  padding: 14px 16px; cursor: pointer; user-select: none;
-  font-size: 13px; font-weight: 600; color: var(--gray-800);
-  transition: background var(--transition);
-  letter-spacing: -0.01em;
-}
-.section-header:hover { background: rgba(0,0,0,0.02); }
-.section-count {
-  font-size: 11px; color: var(--gray-400); background: var(--gray-50);
-  padding: 2px 8px; border-radius: 10px; font-weight: 500; margin-left: auto;
-}
-.app.dark .section-count { background: var(--gray-200); }
-.chevron {
-  color: var(--gray-400); flex-shrink: 0;
-  transition: transform 0.25s cubic-bezier(0.25, 0.1, 0.25, 1);
-}
-.chevron.open { transform: rotate(90deg); }
-.section-body { padding: 0 16px 16px 16px; }
-
-/* ---- 空状态 ---- */
-.empty-state { text-align: center; padding: 36px 0 28px; color: var(--gray-400); }
-.empty-icon { font-size: 32px; margin-bottom: 10px; opacity: 0.25; }
-.empty-state p { font-size: 13px; line-height: 1.6; font-weight: 500; }
-.empty-sub { font-size: 12px !important; opacity: 0.5; font-weight: 400; }
-
-/* ---- 文本项 — 垂直布局 ---- */
-.text-item {
-  border: 1px solid var(--gray-100); border-radius: var(--radius);
-  padding: 12px; margin-bottom: 8px;
-  transition: all var(--transition); background: var(--gray-50);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.text-item:hover { border-color: var(--gray-200); box-shadow: var(--shadow-sm); }
-.text-item.untranslated {
-  border-color: #ffa500;
-  background: #fff8e6;
-  box-shadow: 0 0 0 1px rgba(255, 165, 0, 0.2);
-}
-.app.dark .text-item { border-color: var(--gray-200); background: transparent; }
-.app.dark .text-item.untranslated {
-  border-color: #ff9500;
-  background: rgba(255, 149, 0, 0.1);
-}
-
-.item-source, .item-target {
-  width: 100%;
-  min-width: 0;
-}
-.item-label {
-  font-size: 10px; font-weight: 600; color: var(--gray-400);
-  text-transform: uppercase; letter-spacing: 0.04em;
-  margin-bottom: 5px; display: flex; align-items: center; gap: 6px;
-}
-.merge-badge {
-  font-size: 10px; background: var(--blue-light); color: var(--blue);
-  padding: 1px 6px; border-radius: 8px; font-weight: 500;
-  text-transform: none; letter-spacing: 0;
-}
-.app.dark .merge-badge { background: rgba(0,122,255,0.2); }
-
-.source-box {
-  font-size: 13px; padding: 10px 12px; background: #fff;
-  border-radius: var(--radius-sm); word-break: break-all;
-  line-height: 1.5; min-height: 48px; color: var(--gray-600);
-  border: 1px solid var(--gray-200);
-  width: 100%;
-}
-.app.dark .source-box { background: var(--gray-100); color: var(--gray-600); border-color: var(--gray-400); }
-
-.trans-input {
-  width: 100%; padding: 10px 12px; border: 1px solid var(--gray-200); border-radius: var(--radius-sm);
-  font-size: 13px; resize: none; font-family: inherit; line-height: 1.5;
-  color: var(--gray-600); overflow: hidden; background: #fff;
-  transition: border-color var(--transition), box-shadow var(--transition), height 0.15s;
-  font-weight: 700;
-}
-.trans-input:focus { outline: none; border-color: var(--gray-900); box-shadow: 0 0 0 3px rgba(0,0,0,0.08); }
-.trans-input::placeholder { color: var(--gray-200); font-weight: 400; }
-.app.dark .trans-input { background: var(--gray-100); border-color: var(--gray-400); color: var(--gray-900); }
-.app.dark .trans-input:focus { border-color: var(--gray-800); box-shadow: 0 0 0 3px rgba(255,255,255,0.1); }
-
-/* 校对 */
-.text-item.corrected { border-color: var(--orange); background: rgba(255,149,0,0.03); }
-.app.dark .text-item.corrected { background: rgba(255,149,0,0.06); }
-.proof-badge {
-  font-size: 10px; background: var(--orange); color: #fff;
-  padding: 1px 5px; border-radius: 4px; font-weight: 600;
-  text-transform: none; letter-spacing: 0;
-}
-.trans-input.proofread { border-color: var(--orange); }
-.trans-input.proofread:focus { box-shadow: 0 0 0 3px rgba(255,149,0,0.12); }
-.proof-hint {
-  font-size: 11px; color: var(--orange); margin-top: 6px;
-  padding: 6px 10px; background: rgba(255,149,0,0.06); border-radius: 8px; word-break: break-all;
-  display: flex; align-items: flex-start; gap: 8px; justify-content: space-between;
-}
-/* CSV 导入变更 */
-.text-item.csv-changed { border-color: #8B5CF6; background: rgba(139,92,246,0.03); }
-.app.dark .text-item.csv-changed { background: rgba(139,92,246,0.08); }
-.csv-badge {
-  font-size: 10px; background: #8B5CF6; color: #fff;
-  padding: 1px 5px; border-radius: 4px; font-weight: 600;
-  text-transform: none; letter-spacing: 0;
-}
-
-/* 翻译失败条目 */
-.text-item.trans-error { border-color: var(--red); background: rgba(255,59,48,0.03); }
-.app.dark .text-item.trans-error { background: rgba(255,59,48,0.08); }
-.error-badge {
-  font-size: 10px; background: var(--red); color: #fff;
-  padding: 1px 5px; border-radius: 4px; font-weight: 600;
-  text-transform: none; letter-spacing: 0;
-}
-
-.untranslated-badge {
-  font-size: 10px; background: #ffa500; color: #fff;
-  padding: 1px 5px; border-radius: 4px; font-weight: 600;
-  text-transform: none; letter-spacing: 0;
-}
-
-.proof-hint-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.proof-reason {
-  font-size: 10px; color: #c77d00; font-weight: 500;
-  background: rgba(255,149,0,0.1); padding: 1px 6px; border-radius: 3px;
-  display: inline-block; align-self: flex-start;
-}
-.proof-original {
-  font-size: 11px; color: var(--gray-400); word-break: break-all;
-  padding: 2px 0; line-height: 1.4;
-}
-.btn-revert-proof {
-  flex-shrink: 0; padding: 4px 10px; border: 1px solid var(--gray-200); border-radius: 6px;
-  background: transparent; color: var(--gray-400); font-size: 11px; font-weight: 500;
-  cursor: pointer; font-family: inherit; white-space: nowrap;
-  transition: all var(--transition);
-}
-.btn-revert-proof:hover { border-color: var(--orange); color: var(--orange); background: rgba(255,149,0,0.05); }
-
-/* 手动应用按钮 */
-.btn-apply-single {
-  padding: 2px 8px; border: 1px solid var(--green); border-radius: 4px;
-  background: transparent; color: var(--green); font-size: 10px; font-weight: 600;
-  cursor: pointer; font-family: inherit; white-space: nowrap; margin-left: auto;
-  transition: all var(--transition);
-}
-.btn-apply-single:hover { background: var(--green); color: #fff; }
-
-.btn-retranslate {
-  padding: 2px 5px; border: 1px solid var(--blue); border-radius: 4px;
-  background: transparent; color: var(--blue); cursor: pointer;
-  display: inline-flex; align-items: center; justify-content: center;
-  transition: all var(--transition); margin-left: 4px;
-}
-.btn-retranslate:hover { background: var(--blue); color: #fff; }
-.btn-retranslate:disabled { opacity: 0.4; cursor: not-allowed; }
-
-/* 已应用标签 */
-.applied-badge {
-  font-size: 10px; padding: 1px 5px; border-radius: 4px; font-weight: 600;
-  background: var(--green); color: #fff; text-transform: none; letter-spacing: 0;
-}
-
-/* 手动已应用卡片 */
-.text-item.applied-manually { opacity: 0.45; }
-
-/* ---- 字体替换 ---- */
-.field-hint { font-size: 11px; color: var(--gray-400); padding: 0 0 8px; }
-
-.font-card {
-  display: flex;
-  align-items: stretch;
-  gap: 10px;
-  margin-bottom: 12px;
-  background: transparent;
-  border-radius: var(--radius);
-  overflow: visible;
-}
-
-/* 字体面板 — 源/目标两侧匹配的卡片风格 */
-.font-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 14px;
-  background: #fff;
-  border-radius: var(--radius);
-  border: 1px solid var(--gray-100);
-  box-shadow: var(--shadow-sm);
-  min-height: 0;
-  min-width: 0;
-  overflow: hidden;
-}
-.font-panel:hover { box-shadow: var(--shadow); }
-.app.dark .font-panel { background: var(--gray-100); border-color: var(--gray-400); }
-.font-panel-source { width: 120px; flex-shrink: 0; }
-.font-panel-target { flex: 1; min-width: 0; }
-
-.font-panel-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0;
-}
-
-.font-panel-label {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--gray-400);
-}
-.font-panel-target .font-panel-label { color: var(--blue); }
-
-/* 同步按钮 — 内嵌在替换为卡片头部 */
-.btn-sync {
-  display: inline-flex; align-items: center; gap: 3px;
-  padding: 3px 8px;
-  border: 1px solid var(--gray-200); border-radius: 6px;
-  background: #fff; color: var(--gray-400);
-  cursor: pointer; font-size: 11px; font-family: inherit; font-weight: 500;
-  transition: all var(--transition);
-}
-.btn-sync:hover {
-  background: var(--blue); color: #fff;
-  border-color: var(--blue);
-  box-shadow: 0 2px 8px rgba(0,122,255,0.3);
-}
-.btn-sync:active { transform: scale(0.94); }
-.btn-sync-text { font-size: 10px; }
-.app.dark .btn-sync { background: var(--gray-200); border-color: var(--gray-400); }
-.app.dark .btn-sync:hover { background: var(--blue); color: #fff; border-color: var(--blue); }
-
-.font-preview {
-  padding: 10px 12px;
-  background: var(--gray-50);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--gray-100);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-height: 44px;
-  justify-content: center;
-}
-.app.dark .font-preview { background: var(--gray-200); border-color: var(--gray-400); }
-.font-preview-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--gray-900);
-  line-height: 1.3;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.font-preview-style {
-  font-size: 11px;
-  color: var(--gray-400);
-  font-weight: 500;
-}
-
-/* 字体属性 — 源面板 2×2 网格，目标面板 4 列网格 */
-.font-attrs-card {
-  display: grid;
-  gap: 8px;
-}
-.font-attrs-source {
-  grid-template-columns: repeat(2, 1fr);
-}
-.font-attrs-target {
-  grid-template-columns: repeat(2, 1fr);
-}
-.font-attr-col {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  min-height: 44px;
-  justify-content: center;
-}
-.font-attr-val {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--gray-800);
-  text-align: center;
-  line-height: 1.3;
-}
-.app.dark .font-attr-val { color: var(--gray-900); }
-.font-attr-unit {
-  font-size: 10px;
-  color: var(--gray-400);
-  font-weight: 400;
-  margin-left: 1px;
-}
-.font-attr-label {
-  font-size: 10px;
-  color: var(--gray-400);
-  font-weight: 500;
-  text-align: center;
-}
-
-.font-attr-input {
-  width: 100%;
-  padding: 5px 4px;
-  border: 1px solid var(--gray-200);
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  font-family: inherit;
-  color: var(--gray-800);
-  background: #fff;
-  text-align: center;
-  transition: border-color var(--transition), box-shadow var(--transition);
-}
-.font-attr-input:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(0,122,255,0.12); }
-.font-attr-input::placeholder { color: var(--gray-200); font-weight: 400; font-size: 10px; }
-.app.dark .font-attr-input { background: var(--gray-200); border-color: var(--gray-400); color: var(--gray-900); }
-
-.font-attr-select {
-  width: 100%;
-  padding: 5px 4px;
-  border: 1px solid var(--gray-200);
-  border-radius: 6px;
-  font-size: 11px;
-  font-family: inherit;
-  color: var(--gray-800);
-  background: #fff;
-  cursor: pointer;
-  text-align: center;
-  transition: border-color var(--transition);
-}
-.font-attr-select:focus { outline: none; border-color: var(--blue); }
-.app.dark .font-attr-select { background: var(--gray-200); border-color: var(--gray-400); color: var(--gray-900); }
-
-.font-search-input {
-  padding: 7px 10px;
-  border: 1px solid var(--gray-200);
-  border-radius: var(--radius-sm);
-  font-size: 12px;
-  font-family: inherit;
-  color: var(--gray-900);
-  background: var(--gray-50);
-  transition: background var(--transition), border-color var(--transition);
-}
-.font-search-input:focus { outline: none; background: #fff; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(0,122,255,0.12); }
-.font-search-input::placeholder { color: var(--gray-400); font-size: 12px; }
-.app.dark .font-search-input { background: var(--gray-200); color: var(--gray-900); }
-.app.dark .font-search-input:focus { background: var(--gray-100); }
-
-.font-family-select {
-  padding: 7px 10px;
-  border: 1px solid var(--gray-200);
-  border-radius: var(--radius-sm);
-  font-size: 12px;
-  font-family: inherit;
-  color: var(--gray-900);
-  background: #fff;
-  cursor: pointer;
-  transition: border-color var(--transition);
-}
-.font-family-select:focus { outline: none; border-color: var(--blue); }
-.app.dark .font-family-select { background: var(--gray-200); border-color: var(--gray-400); }
-
-/* ---- 表单 ---- */
-.field { width: 100%; padding: 8px 10px; border: 1px solid var(--gray-200); border-radius: var(--radius-sm); font-size: 13px; font-family: inherit; color: var(--gray-900); background: #fff; transition: border-color var(--transition); }
-.field:focus { outline: none; border-color: var(--blue); }
-.field::placeholder { color: var(--gray-200); }
-.app.dark .field { background: var(--gray-200); border-color: var(--gray-400); }
-
-/* ---- 内联操作 ---- */
-.inline-actions { display: flex; gap: 6px; padding: 2px 0; flex-wrap: wrap; }
-
-/* ---- 测试结果 ---- */
-.test-result {
-  display: flex; align-items: center; gap: 8px; margin-top: 10px;
-  padding: 10px 12px; border-radius: var(--radius-sm); font-size: 13px; line-height: 1.5;
-}
-.test-result.success { background: rgba(52,199,89,0.1); color: var(--green); }
-.test-result.fail { background: rgba(255,59,48,0.1); color: var(--red); }
-.test-icon { font-size: 16px; font-weight: 700; flex-shrink: 0; }
-
-/* ---- 表单 ---- */
-.field-group { margin-bottom: 10px; }
-.field-label { display: block; font-size: 11px; font-weight: 600; color: var(--gray-400); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
-.btn-row { display: flex; flex-wrap: wrap; gap: 8px; }
-
-/* ---- 校对模型 ---- */
-.proof-section-label {
-  font-size: 11px; font-weight: 600; color: var(--orange);
-  text-transform: uppercase; letter-spacing: 0.03em;
-  padding: 6px 0 4px; border-top: 1px solid rgba(255,149,0,0.15);
-  margin-top: 4px;
-}
-
-/* ---- Toggle 开关 ---- */
-.toggle-label { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: var(--gray-800); }
-.toggle {
-  width: 40px; height: 24px; background: var(--gray-200); border-radius: 12px;
-  position: relative; transition: background var(--transition); flex-shrink: 0;
-}
-.toggle.on { background: var(--green); }
-.toggle-knob {
-  position: absolute; top: 2px; left: 2px;
-  width: 20px; height: 20px; background: #fff; border-radius: 50%;
-  transition: transform var(--transition); box-shadow: 0 1px 3px rgba(0,0,0,0.15);
-}
-.toggle.on .toggle-knob { transform: translateX(16px); }
-
-/* ---- 术语库 ---- */
-.glossary-sub { padding: 8px 0; border-bottom: 1px solid var(--gray-100); }
-.glossary-sub:last-child { border-bottom: none; }
-.app.dark .glossary-sub { border-color: var(--gray-200); }
-.glossary-sub-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
-.glossary-sub-title { font-size: 13px; font-weight: 500; }
-.glossary-sub-count { font-size: 11px; color: var(--gray-500); }
-.app.dark .glossary-sub-count { color: var(--gray-400); }
-.glossary-hint { font-size: 11px; color: var(--gray-400); margin: 4px 0 0; line-height: 1.4; }
-.app.dark .glossary-hint { color: var(--gray-500); }
-
-/* ---- Toast ---- */
-.toast {
-  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-  padding: 10px 22px; border-radius: 20px; font-size: 13px; font-weight: 500;
-  z-index: 100; pointer-events: none; letter-spacing: -0.01em;
-  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.12);
-  animation: toastIn 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
-}
-@keyframes toastIn {
-  from { opacity: 0; transform: translateX(-50%) translateY(8px); }
-  to { opacity: 1; transform: translateX(-50%) translateY(0); }
-}
-.toast.info { background: rgba(0,0,0,0.82); color: #fff; }
-.toast.success { background: rgba(52,199,89,0.92); color: #fff; }
-.toast.error { background: rgba(255,59,48,0.92); color: #fff; }
-.toast.warning { background: rgba(255,149,0,0.92); color: #fff; }
-.app.dark .toast.info { background: rgba(255,255,255,0.15); color: #fff; }
-
-.fade-enter-active { transition: opacity 0.3s, transform 0.3s; }
-.fade-leave-active { transition: opacity 0.2s, transform 0.2s; }
-.fade-enter-from, .fade-leave-to { opacity: 0; transform: translateX(-50%) translateY(8px); }
-
-/* ---- 滚动条 ---- */
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--gray-200); border-radius: 2px; }
-.app.dark ::-webkit-scrollbar-thumb { background: var(--gray-400); }
-
-.footer { text-align: center; padding: 16px 0 4px; font-size: 11px; color: var(--gray-200); letter-spacing: 0.3px; font-weight: 500; }
-.app.dark .footer { color: var(--gray-400); }
-</style>

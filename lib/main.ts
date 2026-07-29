@@ -1,6 +1,6 @@
 import { PluginMessage, UIMessage, TextItem, LLMConfig, GlossaryEntry, TranslationCorrection } from '@messages/types'
 import { sendMsgToUI } from '@messages/main-sender'
-import { STORAGE_KEY_GLOSSARY_VERSION, STORAGE_KEY_GLOSSARY_PRODUCTS, STORAGE_KEY_GLOSSARY_EXCLUSIVE, STORAGE_KEY_SETTINGS, STORAGE_KEY_ORIGINALS, STORAGE_KEY_TRANSLATION_CACHE, STORAGE_KEY_CORRECTIONS, CORRECTION_THRESHOLD, UI_WIDTH, UI_HEIGHT, MAX_CACHE_SIZE, GLOSSARY_VERSION, makeFontKey, DEBUG_MODE } from '@lib/constants'
+import { STORAGE_KEY_GLOSSARY_VERSION, STORAGE_KEY_GLOSSARY_PRODUCTS, STORAGE_KEY_GLOSSARY_EXCLUSIVE, STORAGE_KEY_SETTINGS, STORAGE_KEY_ORIGINALS, STORAGE_KEY_APPLIED, STORAGE_KEY_TRANSLATION_CACHE, STORAGE_KEY_CORRECTIONS, CORRECTION_THRESHOLD, UI_WIDTH, UI_HEIGHT, MAX_CACHE_SIZE, MAX_SCAN_NODES, GLOSSARY_VERSION, makeFontKey, DEBUG_MODE } from '@lib/constants'
 import { collectTextNodes, mergeDuplicates } from '@lib/text-collector'
 import { exportCSV, importCSV } from '@lib/csv-handler'
 import { DEFAULT_GLOSSARY_PRODUCTS_CSV, DEFAULT_GLOSSARY_EXCLUSIVE_CSV } from '@lib/default-glossary'
@@ -19,8 +19,19 @@ const AVENIR_TO_HARMONYOS_STYLE: Record<string, string> = {
 }
 
 const originalTexts = new Map<string, string>()
+/** v9.1 #3/#15: 记录每个节点最近一次被插件写入的译文快照。
+ *  撤销时三方对比（original/applied/current）：只有 current===applied 的节点才恢复原文，
+ *  用户在画布上手改过的节点跳过，避免撤销吞掉用户改动。 */
+const appliedTexts = new Map<string, string>()
 
 mg.showUI(__html__, { width: UI_WIDTH, height: UI_HEIGHT })
+
+// v9.1 #8: 选区变化实时推送，UI 据此禁用"选中对象扫描"（无选区时点击只会报错）
+function pushSelectionState(): void {
+  const sel = mg.document.currentPage.selection
+  sendMsgToUI(PluginMessage.SELECTION_STATE, { count: sel ? sel.length : 0 })
+}
+mg.on('selectionchange', pushSelectionState)
 
 // ============================================================
 // 全页扫描
@@ -29,15 +40,23 @@ function scanAllTextNodes(): void {
   const page = mg.document.currentPage
   debugLog('[translate] scanAllTextNodes, page:', page.name, 'page.type:', page.type)
 
-  let textNodes = collectTextNodes(page)
+  const reportProgress = (found: number) => sendMsgToUI(PluginMessage.SCAN_PROGRESS, { found })
+  let textNodes = collectTextNodes(page, reportProgress)
 
   if (textNodes.length === 0) {
     debugLog('[translate] page scan returned 0, trying mg.document...')
-    const docNodes = collectTextNodes(mg.document)
+    const docNodes = collectTextNodes(mg.document, reportProgress)
     debugLog('[translate] mg.document scan returned', docNodes.length, 'nodes')
     if (docNodes.length > 0) {
       textNodes = docNodes
     }
+  }
+
+  // v9.1 #11: 节点数上限 — 超大文档提示用户改用局部扫描，避免长时间无响应
+  if (textNodes.length > MAX_SCAN_NODES) {
+    sendMsgToUI(PluginMessage.SCAN_RESULT, { items: [], pageName: page.name, fileName: mg.document.name })
+    sendMsgToUI(PluginMessage.ERROR, `本页文本节点过多（${textNodes.length} > ${MAX_SCAN_NODES}），请选中局部对象后使用"选中对象扫描"`)
+    return
   }
 
   if (textNodes.length === 0) {
@@ -56,15 +75,17 @@ function scanAllTextNodes(): void {
     return
   }
 
-  // 扫描时立即保存原始文本，确保撤销时还原的是最原始的设计稿文字
+  // 扫描时保存原始文本，确保撤销时还原的是最原始的设计稿文字。
+  // v9.1 #15: 已有快照的节点不覆盖 — 节点当前可能已是译文，覆盖会让"原文"变成译文，撤销失效
   for (const node of textNodes) {
-    if (node.characters) originalTexts.set(node.id, node.characters)
+    if (node.characters && !originalTexts.has(node.id)) originalTexts.set(node.id, node.characters)
   }
 
   const items = mergeDuplicates(textNodes)
   pruneStaleOriginals(items)
   debugLog('[translate] final merged items:', items.length)
   sendMsgToUI(PluginMessage.SCAN_RESULT, { items, pageName: page.name, fileName: mg.document.name })
+  sendUndoState()
 }
 
 // ============================================================
@@ -78,9 +99,10 @@ function scanSelectedTextNodes(): void {
   }
 
   const allTextNodes: TextNode[] = []
+  const reportProgress = (found: number) => sendMsgToUI(PluginMessage.SCAN_PROGRESS, { found })
   for (let i = 0; i < selection.length; i++) {
     const node = selection[i]
-    const found = collectTextNodes(node)
+    const found = collectTextNodes(node, reportProgress)
     for (let j = 0; j < found.length; j++) {
       allTextNodes.push(found[j])
     }
@@ -91,15 +113,22 @@ function scanSelectedTextNodes(): void {
     return
   }
 
-  // 扫描时立即保存原始文本，确保撤销时还原的是最原始的设计稿文字
+  if (allTextNodes.length > MAX_SCAN_NODES) {
+    sendMsgToUI(PluginMessage.SCAN_RESULT, { items: [], pageName: mg.document.currentPage.name, fileName: mg.document.name })
+    sendMsgToUI(PluginMessage.ERROR, `选中图层文本节点过多（${allTextNodes.length} > ${MAX_SCAN_NODES}），请缩小选中范围`)
+    return
+  }
+
+  // 扫描时保存原始文本（已有快照不覆盖，理由同全页扫描）
   for (const node of allTextNodes) {
-    if (node.characters) originalTexts.set(node.id, node.characters)
+    if (node.characters && !originalTexts.has(node.id)) originalTexts.set(node.id, node.characters)
   }
 
   const items = mergeDuplicates(allTextNodes)
   pruneStaleOriginals(items)
   const page = mg.document.currentPage
   sendMsgToUI(PluginMessage.SCAN_RESULT, { items, pageName: page.name, fileName: mg.document.name })
+  sendUndoState()
 }
 
 // ============================================================
@@ -252,6 +281,7 @@ async function applyTranslations(items: TextItem[]): Promise<void> {
 
         if (textApplied) {
           done++
+          appliedTexts.set(nodeId, item.translatedText)
           try {
             applyTextStyle(node, item)
             fixAvenirRegisterSymbol(node, item)
@@ -274,6 +304,7 @@ async function applyTranslations(items: TextItem[]): Promise<void> {
     ? '已应用 ' + done + ' 处译文，' + failed + ' 处失败'
     : '已应用 ' + done + ' 处译文'
   sendMsgToUI(PluginMessage.APPLY_DONE, { count: done, failed, failedNodeIds })
+  sendUndoState()
   mg.notify(msg, { type: failed > 0 ? 'error' : 'success' })
 }
 
@@ -389,11 +420,24 @@ async function applyFontsOnly(payloads: FontPayload[]): Promise<void> {
 // ============================================================
 // 撤销
 // ============================================================
+/** 向 UI 同步当前撤销可用性（真相在画布/originalTexts，而非 UI 列表状态） */
+function sendUndoState(): void {
+  sendMsgToUI(PluginMessage.UNDO_STATE, { canUndo: originalTexts.size > 0, count: originalTexts.size })
+}
+
 async function undoAll(): Promise<void> {
   let count = 0
+  let skippedModified = 0
   for (const [nodeId, originalText] of originalTexts) {
     const node = mg.getNodeById<TextNode>(nodeId)
     if (!node) continue
+    // v9.1 #15: 三方对比 — 用户在画布上手改过的节点（current !== 当时应用的译文）跳过，
+    // 避免撤销把用户手动调整的内容吞掉
+    const applied = appliedTexts.get(nodeId)
+    if (applied !== undefined && node.characters !== applied) {
+      skippedModified++
+      continue
+    }
     if (node.hasMissingFont && node.textStyles[0]) {
       await mg.loadFontAsync(node.textStyles[0].textStyle.fontName)
     }
@@ -411,9 +455,14 @@ async function undoAll(): Promise<void> {
     }
   }
   originalTexts.clear()
+  appliedTexts.clear()
   await persistOriginals()
-  sendMsgToUI(PluginMessage.UNDO_DONE, { count })
-  mg.notify('已恢复 ' + count + ' 条原文', { type: 'success' })
+  sendMsgToUI(PluginMessage.UNDO_DONE, { count, skipped: skippedModified })
+  sendUndoState()
+  mg.notify(
+    '已恢复 ' + count + ' 条原文' + (skippedModified > 0 ? '，跳过 ' + skippedModified + ' 条手动修改' : ''),
+    { type: 'success' },
+  )
 }
 
 // ============================================================
@@ -430,6 +479,7 @@ function pruneStaleOriginals(items: TextItem[]): void {
   for (const key of originalTexts.keys()) {
     if (!activeIds.has(key)) {
       originalTexts.delete(key)
+      appliedTexts.delete(key)
       pruned++
     }
   }
@@ -441,6 +491,7 @@ function pruneStaleOriginals(items: TextItem[]): void {
 
 async function persistOriginals(): Promise<void> {
   await mg.clientStorage.setAsync(STORAGE_KEY_ORIGINALS, Array.from(originalTexts.entries()))
+  await mg.clientStorage.setAsync(STORAGE_KEY_APPLIED, Array.from(appliedTexts.entries()))
 }
 
 async function loadOriginals(): Promise<void> {
@@ -449,6 +500,12 @@ async function loadOriginals(): Promise<void> {
     originalTexts.clear()
     for (const [k, v] of data) originalTexts.set(k, v)
   }
+  const appliedData = await mg.clientStorage.getAsync(STORAGE_KEY_APPLIED)
+  if (appliedData) {
+    appliedTexts.clear()
+    for (const [k, v] of appliedData) appliedTexts.set(k, v)
+  }
+  sendUndoState()
 }
 
 // ============================================================
@@ -790,3 +847,4 @@ mg.ui.onmessage = async function (msg: UIMessageEvent) {
 }
 
 loadOriginals()
+pushSelectionState()

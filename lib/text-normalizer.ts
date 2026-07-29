@@ -93,7 +93,7 @@ export function normalizeTextForLLM(texts: string[]): string[] {
     // 1. Unicode NFC 正规化（组合字符统一为规范形式）
     result = result.normalize('NFC')
 
-    // 1.5. 换行符保护：将硬件换行替换为 ↵（U+21B5），防止 LLM（Qwen）将换行视为条目分隔符。
+    // 1.5. 换行符保护：将硬件换行替换为 ↵（U+21B5），防止 LLM 将换行视为条目分隔符。
     // 翻译完成后由 postProcessTranslation 还原为实际换行。
     result = result.replace(/[\n\r]+/g, ' ↵ ')
 
@@ -113,7 +113,7 @@ export function normalizeTextForLLM(texts: string[]): string[] {
 // ============================================================
 // CJK 空格保护 — 防止 LLM 将 CJK 文本中的空格误判为条目分隔符
 //
-// 根因：Qwen 等模型在遇到 "超会玩 A2性能 体验3A游戏大作" 时，
+// 根因：LLM 在遇到 "超会玩 A2性能 体验3A游戏大作" 时，
 // 会将空格视为分隔符，只翻译前半段 "超會玩" 而丢弃后续内容。
 //
 // 方案（v2）：直接删除 CJK 主导文本（CJK 字符占比 > 30%）中的 ASCII 空格。
@@ -121,7 +121,7 @@ export function normalizeTextForLLM(texts: string[]): string[] {
 // 会自动包含正确间距，因此无需还原。
 //
 // 历史：曾使用 SP{N} 占位符（PUA 字符 U+E000），但该字符同样
-// 不在 Qwen BPE tokenizer 词汇表中，被当作 token 边界处理，导致
+// 不在 LLM BPE tokenizer 词汇表中，被当作 token 边界处理，导致
 // 占位符处文本被拆分，保护失效。详见 2026-06-29 根因分析。
 // ============================================================
 
@@ -145,7 +145,7 @@ function isCJKDominant(text: string): boolean {
 /**
  * CJK 空格保护 — 合并多余连续空格，保留有效空格和 ↵ 断行标记周围的空格。
  *
- * 历史：曾直接删除所有空格（text.replace(/ /g, '')），因为 Qwen 可能将 CJK 文本
+ * 历史：曾直接删除所有空格（text.replace(/ /g, '')），因为 LLM 可能将 CJK 文本
  * 中的空格误判为条目分隔符。但该逻辑导致两个问题：
  * 1. CJK 短语间的有效空格被删除（"生而强大 耐力十足" → "生而强大耐力十足"）
  * 2. ↵ 断行标记被 CJK 字符夹住（"强大↵耐力"），LLM 难以识别

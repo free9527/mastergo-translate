@@ -88,6 +88,31 @@ export async function fetchWithRetry(
 // ============================================================
 // 源语言检测
 // ============================================================
+
+/**
+ * 拉丁语区分词表 — 只收互相不重叠的高频词，用于批次级拉丁语判定。
+ * 与 LANG_FUNCTION_WORDS 不同：那里的词表为"确认目标语言身份"设计，
+ * es/pt 共享 17+ 词（que/para/por/de/a/se/como…），直接投票会把 es 误判成 pt。
+ * 这里的词表只收各语言独占词，平局/弱信号一律回退 'en'（保守方向 = 维持现状行为）。
+ * 注意：pt 投票无法区分 pt 与 pt-BR（两变体共享几乎全部词汇），统一返回 'pt'。
+ */
+const LATIN_DISTINCTIVE_WORDS: Record<string, Set<string>> = {
+  en: new Set(['the', 'of', 'and', 'to', 'in', 'is', 'are', 'for', 'with', 'on', 'at', 'by', 'be', 'has', 'have', 'it', 'its', 'not', 'can', 'will', 'from', 'this', 'that', 'your', 'you', 'an', 'or', 'as', 'up', 'our', 'we']),
+  pt: new Set(['é', 'são', 'tem', 'têm', 'sem', 'até', 'não', 'muito', 'um', 'uma', 'ao', 'à', 'do', 'da', 'na', 'no', 'estão', 'isso', 'contra', 'baixas', 'resistente', 'proteção']),
+  es: new Set(['el', 'la', 'los', 'las', 'es', 'son', 'está', 'están', 'y', 'pero', 'muy', 'tiene', 'tienen', 'al', 'del', 'un', 'una', 'con', 'sin', 'hasta', 'ñandú']),
+  de: new Set(['und', 'oder', 'mit', 'für', 'von', 'zu', 'der', 'die', 'das', 'ein', 'eine', 'ist', 'sind', 'nicht', 'auch', 'auf', 'bei', 'nach', 'über', 'wird', 'werden', 'kann', 'sich']),
+  fr: new Set(['et', 'ou', 'mais', 'que', 'qui', 'dans', 'sur', 'avec', 'sans', 'pour', 'par', 'le', 'la', 'les', 'un', 'une', 'des', 'du', 'est', 'sont', 'ne', 'pas', 'plus', 'ce', 'cette']),
+  it: new Set(['che', 'per', 'con', 'da', 'fra', 'tra', 'senza', 'su', 'il', 'lo', 'gli', 'le', 'un', 'uno', 'è', 'sono', 'ha', 'hanno', 'di', 'del', 'della', 'nel', 'alla', 'anche', 'più']),
+  nl: new Set(['en', 'of', 'maar', 'met', 'voor', 'van', 'tot', 'op', 'bij', 'het', 'een', 'zijn', 'heeft', 'niet', 'aan', 'uit', 'om', 'ook', 'deze', 'dit', 'dat', 'wordt', 'tegen']),
+}
+
+/** 各语言独占特征字符（一票顶十票的强信号） */
+const LATIN_DISTINCTIVE_CHARS: Record<string, RegExp> = {
+  pt: /[ãõÃÕ]/,       // 葡语几乎独占（西语无 ãõ，除借词）
+  es: /[ñÑ¿¡]/,       // 西语独占
+  de: /[ßẞ]/,         // 德语独占（äöü 与瑞典语等共享，不作信号）
+}
+
 export function detectSourceLanguage(texts: string[]): string {
   let cjkChars = 0, latinChars = 0, hiragana = 0, katakana = 0, hangul = 0, thai = 0, arabic = 0, cyrillic = 0
   for (const t of texts) {
@@ -113,8 +138,42 @@ export function detectSourceLanguage(texts: string[]): string {
   if (arabic > latinChars * 0.5) return 'ar'
   // 西里尔（俄语等）
   if (cyrillic > latinChars * 0.5) return 'ru'
-  // 中文 vs 英文
-  return cjkChars > latinChars ? 'zh-CN' : 'en'
+  // 中文 vs 拉丁文本
+  if (cjkChars > latinChars) return 'zh-CN'
+
+  // v9.3: 拉丁文本细分判定（en/es/pt/de/fr/it/nl）
+  // 背景：此前所有拉丁文本一律返回 'en'，导致 pt→pt-BR 同语系豁免成为死代码
+  // （detectUntranslatedText 的 ['pt','pt-BR'] 配对永远配不上），且 de→de 等同语言
+  // 校对场景的"源==目标跳过"防线对拉丁语全部失效。
+  // 判定策略：独占区分词投票 + 独占特征字符强信号，保守裁决——
+  // 平局/弱信号一律回退 'en'（=维持现状行为），宁可误判为 en 也不可误判为其他拉丁语。
+  const joined = texts.join(' ').toLowerCase()
+
+  // 特征字符强信号：某语言独占字符出现 ≥2 次 → 直接判定（一票顶十票）
+  for (const [lang, pattern] of Object.entries(LATIN_DISTINCTIVE_CHARS)) {
+    const charMatches = joined.match(new RegExp(pattern.source, 'g'))
+    if (charMatches && charMatches.length >= 2) return lang
+  }
+
+  // 区分词投票
+  const words = joined.split(/[\s,.;:!?()\[\]{}\-\/"'"'""«»]+/).filter(w => w.length >= 2)
+  const votes: Record<string, number> = {}
+  for (const w of words) {
+    for (const [lang, dict] of Object.entries(LATIN_DISTINCTIVE_WORDS)) {
+      if (dict.has(w)) votes[lang] = (votes[lang] || 0) + 1
+    }
+  }
+
+  // 保守裁决：最高票 ≥3 且严格大于第二名 ≥2 倍才采纳，否则回退 'en'
+  let topLang = 'en'
+  let topVotes = 0
+  let secondVotes = 0
+  for (const [lang, count] of Object.entries(votes)) {
+    if (count > topVotes) { secondVotes = topVotes; topVotes = count; topLang = lang }
+    else if (count > secondVotes) { secondVotes = count }
+  }
+  if (topVotes >= 3 && topVotes >= secondVotes * 2 && topLang !== 'en') return topLang
+  return 'en'
 }
 
 /**
@@ -583,7 +642,7 @@ export function buildSystemPrompt(params: {
   // ── OUTPUT (instruction language) ──
   const outputFormat = isZhInstruction
     ? `\n[输出格式]\n格式："[N] 译文" — 每行一条。纯文本，无 markdown，无解释。\n⛔ ↵ 是字面字符标记，不是换行指令 — 输出字符 "↵"，不要转为真实换行。\n→ 开始翻译：`
-    : `\n[OUTPUT]\nFormat: "[N] translated text" — one line per item. Plain text only.\n⛔ The ↵ symbol is a LITERAL CHARACTER, NOT a line break — output it as the characters "↵".\n→ Output translations now:`
+    : `\n[OUTPUT]\nFormat: "[N] translated text" — one line per item. Plain text only.\n⛔ The ↵ symbol is a LITERAL CHARACTER, NOT a line break — output it as the characters "↵".\nDo not wrap translations in quotation marks unless the source text itself is quoted.\n→ Output translations now:`
 
   // ── Assembly: IDENTITY → PRINCIPLES → MISSION → STYLE → FEWSHOT → LANG_RULES → CONTEXT → GLOSSARY → OUTPUT ──
   return `${role}\n\n${principles}\n\n[MISSION·${targetLang}]\n${mission}${styleCard}${fewShotBlock}${langBlock_str}${contextHint}${glossaryBlock}${outputFormat}`
@@ -679,7 +738,7 @@ export async function translateBatch(
   const detectedSource = sourceLang || detectSourceLanguage(texts)
   const isEnSource = detectedSource === 'en'
   // 指令语言选择：只由目标语言决定，不受源语言影响
-  // CJK目标（zh-CN/zh-TW/ja/ko）→ 中文指令（Qwen母语 + 共享字符系统 + 语法接近）
+  // CJK目标（zh-CN/zh-TW/ja/ko）→ 中文指令（与目标语言共享字符系统 + 语法接近，LLM 对 CJK 语言指令理解更稳定）
   // 其余目标 → 英文指令（通用拉丁脚本，不会干扰西里尔/阿拉伯/泰文等输出）
   const useEnInstruction = !isCJKTarget(targetLang)
 
@@ -725,17 +784,22 @@ export async function translateBatch(
     return text
   })
 
-  // ⚠️ 实体遮蔽必须在 CJK 空格保护之前执行！
-  // 仅遮蔽正则匹配的实体（产品型号/URL/Email/测量值），不遮蔽术语。
-  const { texts: maskedTexts, entityMap } = maskEntities(preprocessedTexts)
-
+  // ⚠️ 遮蔽顺序（v9.2 修正）：术语遮蔽必须先于实体遮蔽！
+  // 术语优先级最高（用户术语库是最高事实源），先占位后实体正则不会再触碰已遮蔽区域。
+  // 若顺序反转（实体在前），"Lexar Recovery Tool" 等术语可能被实体正则误判为产品名/型号，
+  // 抢先替换为 __PRD_N__/__TRM_N__，导致术语遮蔽匹配不到、术语库失效（如 ja 译文漏掉术语库对应译法）。
+  //
   // v8.2: 术语遮蔽 — 用 __GLOSSARY_N__ 占位符替换术语库中的英文术语
   // LLM 只看到占位符，消除"保留偏置"。译后 unmaskGlossaryTerms 还原为目标语。
   // v8.2: 统一占位符格式为 __GLOSSARY_N__，与 __PRD_N__、__TRM_N__ 一致，提高 LLM 保留率
-  const { texts: glossaryMaskedTexts, termMap } = maskGlossaryTerms(maskedTexts, glossaryMap)
+  const { texts: glossaryMaskedTexts, termMap } = maskGlossaryTerms(preprocessedTexts, glossaryMap)
+
+  // ⚠️ 实体遮蔽必须在 CJK 空格保护之前执行！
+  // 仅遮蔽正则匹配的实体（产品型号/URL/Email/测量值），不遮蔽术语（术语已在上一步遮蔽）。
+  const { texts: maskedTexts, entityMap } = maskEntities(glossaryMaskedTexts)
 
   // CJK 空格保护：直接删除 CJK 主导文本中的空格，防止 LLM 误判为条目分隔符
-  const spaceProtectedTexts = protectCjkSpaces(glossaryMaskedTexts)
+  const spaceProtectedTexts = protectCjkSpaces(maskedTexts)
 
   // ™®©符号保护：翻译前移除源文中的商标符号，防止 LLM 乱加符号到其他位置
   // restoreTrademarkSymbols 会在翻译后用原始源文（texts）把符号加回来
@@ -782,13 +846,13 @@ export async function translateBatch(
     }
   }
 
-  // 使用 [N] 格式包裹每条文本，防止 LLM（Qwen）将文本内部空格误判为条目分隔符
+  // 使用 [N] 格式包裹每条文本，防止 LLM 将文本内部空格误判为条目分隔符
   // 含空格的文本加引号包裹，LLM 识别为单个实体
   // v7.1: 逐条标注 (源语言→目标语言)，解决批次内混合语种导致漏翻的问题
   const quotedIndices = new Set<number>()
   const textList = tmStrippedTexts.map((t, i) => {
     const srcLang = detectSingleTextLanguage(t)
-    // 行首 * 替换为 ※，避免 Qwen 将其解析为 markdown 列表标记导致漏翻
+    // 行首 * 替换为 ※，避免 LLM 将其解析为 markdown 列表标记导致漏翻
     const escaped = t.replace(/^\*\s*/, '※ ')
     if (/\s/.test(escaped)) {
       quotedIndices.add(i)
@@ -903,18 +967,39 @@ ${texts.map((t, i) => `${i + 1}. "${t.slice(0, 100)}"`).join('\n')}
   result = result.slice(0, texts.length)
 
   // v3：含空格源文本用 "[N] \"text\"" 包裹发送，LLM 可能将引号一同输出。
-  // 对源文本被引号包裹的条目，自动剥离译文首尾的配对引号。
+  // v8.8: 增加语言特有引号回显剥离，带源文对照避免误剥源文本来的引号。
+  // 仅剥高回显率+低源文风险的引号对（„" «» “” 「」 『』），ASCII 引号由下方 v3 逻辑处理。
+  const ECHO_QUOTE_PAIRS: Record<string, string> = {
+    '„': '"',   // 德语/波兰语/荷兰语/捷克语等
+    '«': '»',   // 法语/俄语/瑞士德语/西班牙语（本土）
+    '“': '”',   // 中文 curly quotes
+    '「': '」', // 日语/繁体中文/韩语
+    '『': '』', // 日语/繁体中文（书名/二层引用）
+  }
+  const stripEchoQuotes = (source: string, translation: string): string => {
+    if (translation.length < 2) return translation
+    const open = translation[0]
+    const close = ECHO_QUOTE_PAIRS[open]
+    if (!close || !translation.endsWith(close)) return translation
+    // 源文首尾本来就是这个引号对 → 不是回显 → 保留
+    if (source.startsWith(open) && source.endsWith(close)) return translation
+    // 内部还有同种开引号 → 可能是嵌套结构 → 保守保留
+    const inner = translation.slice(1, -1)
+    if (inner.includes(open)) return translation
+    return inner
+  }
+
   if (quotedIndices.size > 0) {
     result = result.map((t, i) => {
       if (!quotedIndices.has(i)) return t
-      // 仅当首尾是配对引号时才剥离（避免剥离译文本身包含的引号）
+      // v3: 仅当首尾是配对 ASCII 双引号时才剥离（避免剥离译文本身包含的引号）
       if (t.startsWith('"') && t.endsWith('"') && t.length >= 2) {
         const inner = t.slice(1, -1)
         // 防止过度剥离：如果内部还有引号（嵌套），保留原样
-        if (inner.includes('"')) return t
-        return inner
+        if (!inner.includes('"')) t = inner
       }
-      return t
+      // v8.8: 再剥语言特有回显引号（带源文对照）
+      return stripEchoQuotes(texts[i], t)
     })
   }
 
@@ -1045,7 +1130,7 @@ ${texts.map((t, i) => `${i + 1}. "${t.slice(0, 100)}"`).join('\n')}
     // 排除品牌注入/扩展检测回退的索引（这些是LLM输出了错误内容，重试无意义）
     // v7.3: validateNumbers 不再回退，revertedIndices 仅含品牌注入+扩展检测
     let truncatedIndices = detectTruncatedTexts(texts, result)
-    let untranslatedIndices = detectUntranslatedText(texts, result, targetLang, glossaryMap)
+    let untranslatedIndices = detectUntranslatedText(texts, result, targetLang, glossaryMap, detectedSource)
     for (const idx of revertedIndices) {
       truncatedIndices.delete(idx)
       untranslatedIndices.delete(idx)
@@ -1091,7 +1176,7 @@ ${texts.map((t, i) => `${i + 1}. "${t.slice(0, 100)}"`).join('\n')}
       // 重试后再次检测，标记仍失败的条目
       // 优化：并行化重试后检测（与首次检测一致）
       const retriedTruncated = detectTruncatedTexts(texts, result)
-      const retriedUntranslated = detectUntranslatedText(texts, result, targetLang, glossaryMap)
+      const retriedUntranslated = detectUntranslatedText(texts, result, targetLang, glossaryMap, detectedSource)
 
       if (retriedTruncated.size > 0) {
         debugWarn(
@@ -1119,7 +1204,11 @@ ${texts.map((t, i) => `${i + 1}. "${t.slice(0, 100)}"`).join('\n')}
         // Layer 1: 激进逐条翻译
         const aggressiveTargetDisplayName = getLangDisplayName(targetLang, !isCJKTarget(targetLang))
         // v8.5: 同语系变体（CN→TW、PT→PT-BR）增加变体转换提示
-        const isSameScript = isSameScriptLanguagePair(detectSingleTextLanguage(texts[0] || ''), targetLang)
+        // v9.3: 并集判定——批次级（detectedSource，治 pt→pt-BR 死代码：逐条检测对拉丁文本恒返回 'en'）
+        // ∪ 逐条级（保 zh 等现有行为）。中文 prompt 的简繁措辞保持原样（能工作的不碰）。
+        const perTextSrcLang = detectSingleTextLanguage(texts[0] || '')
+        const isSameScript = isSameScriptLanguagePair(perTextSrcLang, targetLang)
+          || isSameScriptLanguagePair(detectedSource, targetLang)
         const aggressiveSystemPrompt = isCJKTarget(targetLang)
           ? `你是翻译专家。将以下文本翻译成${aggressiveTargetDisplayName}。
 保留专有名词、产品型号和数字 — 其他所有内容必须翻译。
@@ -1129,7 +1218,7 @@ ${isSameScript ? `重要：源文是简体中文，译文必须转换为繁体�
           : `You are a translator. Translate the given text to ${aggressiveTargetDisplayName}.
 Keep proper nouns, product codes, and numbers in their original form — translate EVERYTHING else.
 CRITICAL: Title Case, ALL CAPS, or text with bullet points is NOT an excuse to skip — translate it.
-${isSameScript ? `IMPORTANT: The source text is in a different variant of the language. You MUST convert it to the target variant, not just copy it.` : ''}
+${isSameScript ? `IMPORTANT: The source text is in a different variant of the language. You MUST convert it to the target variant, not just copy it. However, if a sentence is written identically in both variants, keeping it unchanged is CORRECT — do not change it just to look different.` : ''}
 DO NOT return the source text unchanged. Output ONLY the translation, no explanations.`
 
         const stillUntranslatedAfterAggressive = new Set<number>()
@@ -1202,8 +1291,9 @@ DO NOT return the source text unchanged. Output ONLY the translation, no explana
               agTranslated = unmaskForRetry(agTranslated, retryTermMap)
 
               // v7.5.3: 验证激进翻译结果是否真正被翻译（防止只改标点/空格但实质仍是英文）
-              if (agTranslated && agTranslated !== srcText) {
-                const agCheck = detectUntranslatedText([srcText], [agTranslated], targetLang, glossaryMap)
+              // v9.3: 同语系变体对豁免"与源文相同=失败"——两变体写法相同的句子，原样保留是正确答案
+              if (agTranslated && (agTranslated !== srcText || isSameScript)) {
+                const agCheck = detectUntranslatedText([srcText], [agTranslated], targetLang, glossaryMap, detectedSource)
                 if (agCheck.size === 0) {
                   result[j] = agTranslated
                   debugWarn(`[translateBatch] 激进翻译成功: "${srcText.slice(0, 50)}" → "${agTranslated.slice(0, 50)}"`)
@@ -1295,7 +1385,7 @@ DO NOT return the source text unchanged. Output ONLY the translation, no explana
             }
             // v7.5.5: 还原术语占位符后再检测
             const combined = unmaskForRetry(sentenceResults.join(' '), fallbackTermMap)
-            const combinedCheck = detectUntranslatedText([srcText], [combined], targetLang, glossaryMap)
+            const combinedCheck = detectUntranslatedText([srcText], [combined], targetLang, glossaryMap, detectedSource)
             if (combinedCheck.size === 0) {
               result[j] = combined
               debugWarn(`[translateBatch] 逐句拆分翻译成功: ${sentences.length}句 → "${combined.slice(0, 80)}"`)
@@ -1333,7 +1423,7 @@ DO NOT return the source text unchanged. Output ONLY the translation, no explana
                   if (ncTrans) {
                     // v7.5.5: 还原术语占位符
                     ncTrans = unmaskForRetry(ncTrans, fallbackTermMap)
-                    const ncCheck = detectUntranslatedText([srcText], [ncTrans], targetLang, glossaryMap)
+                    const ncCheck = detectUntranslatedText([srcText], [ncTrans], targetLang, glossaryMap, detectedSource)
                     if (ncCheck.size === 0) {
                       result[j] = ncTrans
                       debugWarn(`[translateBatch] 大小写归一化翻译成功: "${srcText.slice(0, 50)}" → "${ncTrans.slice(0, 50)}"`)
@@ -1502,6 +1592,8 @@ export async function proofreadBatch(
   taskGlossaryHint?: string,
 ): Promise<ProofreadResult[]> {
   const sourceTexts = items.map(it => it.sourceText)
+  // v9.3: 批次级源语言判定（校对后漏翻检测用，治 pt→pt-BR 拉丁源文恒判 'en' 的死代码）
+  const detectedProofreadSource = detectSourceLanguage(sourceTexts)
   // 指令语言选择：只由目标语言决定
   // CJK目标→中文指令，其余→英文指令
   const useEnInstruction = !isCJKTarget(targetLang)
@@ -1541,7 +1633,7 @@ export async function proofreadBatch(
   // v7.1: 逐条标注源语言，校对 LLM 需检查每条是否确实翻译到了目标语言
   const textList = items.map((it, i) => {
     const srcLang = detectSingleTextLanguage(it.sourceText)
-    // 行首 * 替换为 ※，避免 Qwen 将其解析为 markdown 列表标记
+    // 行首 * 替换为 ※，避免 LLM 将其解析为 markdown 列表标记
     const escapedSource = proofTmStrippedSources[i].replace(/^\*\s*/, '※ ')
     return `[${i + 1}] (${srcLang}→${targetLang}) ${escapedSource}\n${transLabel}：${maskedTranslations[i]}`
   }).join('\n\n')
@@ -1728,7 +1820,7 @@ export async function proofreadBatch(
   // v7.5.1: 校对后漏翻检测 — 防止校对 LLM 将译文改回英文
   const proofreadSources = items.map(it => it.sourceText)
   const proofreadFinals = resultTexts.map(t => t || '')
-  const proofreadUntranslated = detectUntranslatedText(proofreadSources, proofreadFinals, targetLang, glossaryMap)
+  const proofreadUntranslated = detectUntranslatedText(proofreadSources, proofreadFinals, targetLang, glossaryMap, detectedProofreadSource)
   if (proofreadUntranslated.size > 0) {
     debugWarn(
       `[proofreadBatch] 校对后检测到 ${proofreadUntranslated.size} 条漏翻，回退到校对前译文`,
@@ -1902,6 +1994,51 @@ const CONTEXT_PATTERNS: RegExp[] = [
   /\d+\.\d+/,
 ]
 
+// ============================================================
+// isUntranslatable 术语库预索引（WeakMap 按 Map 实例缓存，避免每次调用全库遍历）
+// ============================================================
+interface UntranslatableIndex {
+  /** 归一化源词 → 归一化目标值 */
+  norm: Map<string, string>
+  /** 词形还原后的源词 → 归一化目标值 */
+  lemma: Map<string, string>
+}
+const untranslatableIndexCache = new WeakMap<Map<string, string>, UntranslatableIndex>()
+
+/** 归一化：小写 + 去 ®™© + trim */
+function normalizeGlossaryKey(s: string): string {
+  return s.toLowerCase().replace(/[®™©]/g, '').trim()
+}
+
+/** 英语词形还原：ies→y → sses→ss → (x|z|ch|sh)es→词干 → 去尾s */
+function lemmaWord(w: string): string {
+  if (w.length < 3 || !/^[a-z]+$/.test(w)) return w
+  if (/(?<=.[^i])ies$/.test(w)) return w.replace(/ies$/, 'y')
+  if (/sses$/.test(w)) return w.slice(0, -2)
+  if (/(?:x|z|ch|sh)es$/.test(w)) return w.slice(0, -2)
+  if (/[^s]s$/.test(w)) return w.slice(0, -1)
+  return w
+}
+
+function lemmaPhrase(s: string): string {
+  return s.split(/\s+/).map(lemmaWord).join(' ')
+}
+
+function getUntranslatableIndex(glossaryMap: Map<string, string>): UntranslatableIndex {
+  let idx = untranslatableIndexCache.get(glossaryMap)
+  if (!idx) {
+    idx = { norm: new Map(), lemma: new Map() }
+    for (const [k, v] of glossaryMap.entries()) {
+      const kNorm = normalizeGlossaryKey(k)
+      const vNorm = normalizeGlossaryKey(v)
+      idx.norm.set(kNorm, vNorm)
+      idx.lemma.set(lemmaPhrase(kNorm), vNorm)
+    }
+    untranslatableIndexCache.set(glossaryMap, idx)
+  }
+  return idx
+}
+
 export function isUntranslatable(s: string, glossaryMap?: Map<string, string>): boolean {
   // 0. 纯标点/符号不承载可翻译语义，避免 +、—、• 等触发漏翻重试。
   // 保留字母、数字和占位符中的下划线以免掩盖真正的文本或实体还原失败。
@@ -1909,42 +2046,23 @@ export function isUntranslatable(s: string, glossaryMap?: Map<string, string>): 
 
   // 1. 术语库检查：如果源文在术语库中且目标语言与源文相同，不算漏翻
   if (glossaryMap) {
-    const normalizedKey = s.toLowerCase().replace(/[®™©]/g, '').trim()
-    let glossaryValue = glossaryMap.get(s)
-    if (!glossaryValue) {
-      for (const [k, v] of glossaryMap.entries()) {
-        if (k.toLowerCase().replace(/[®™©]/g, '').trim() === normalizedKey) {
-          glossaryValue = v
-          break
-        }
-      }
-    }
-    if (glossaryValue && glossaryValue.toLowerCase().replace(/[®™©]/g, '').trim() === normalizedKey) {
+    const normalizedKey = normalizeGlossaryKey(s)
+    const idx = getUntranslatableIndex(glossaryMap)
+    // v8.10 性能：WeakMap 预索引 O(1) 查询，替代全库遍历（原实现每次调用 O(n) 扫两遍）
+    const directValue = idx.norm.get(normalizedKey)
+    if (directValue !== undefined && directValue === normalizedKey) {
       return true // 术语库中英文目标语言一致，不算漏翻
     }
     // v8.7: 单复数归一化豁免 — 术语库可能只收录复数（Drones/Tablets），
     // 源文出现单数（Drone/Tablet）且该目标语言同形（pt/pt-BR/es 等）时也应豁免。
     // 注意：此处归一化仅用于豁免判断，不参与任何替换，单复数规则只作用于判断不污染译文。
-    // 词形还原顺序：ies→y（cities→city）→ (s|x|z|ch|sh)es→词干（boxes→box/classes→class）→ 去尾s（drones→drone）
-    const lemma = (w: string): string => {
-      if (w.length < 3 || !/^[a-z]+$/.test(w)) return w
-      if (/(?<=.[^i])ies$/.test(w)) return w.replace(/ies$/, 'y')
-      // 复数后缀：sses→ss（classes→class）、xes/zes/ches/shes→去es（boxes→box）
-      if (/sses$/.test(w)) return w.slice(0, -2)
-      if (/(?:x|z|ch|sh)es$/.test(w)) return w.slice(0, -2)
-      if (/[^s]s$/.test(w)) return w.slice(0, -1)
-      return w
-    }
-    if (!glossaryValue) {
-      const lemmaKey = normalizedKey.split(/\s+/).map(lemma).join(' ')
-      for (const [k, v] of glossaryMap.entries()) {
-        const kNorm = k.toLowerCase().replace(/[®™©]/g, '').trim()
-        if (kNorm.split(/\s+/).map(lemma).join(' ') === lemmaKey) {
-          const vNorm = v.toLowerCase().replace(/[®™©]/g, '').trim()
-          // 术语目标值与源文词形一致（同形）→ 豁免；不同形（如 de: Drohnen）→ 不豁免，正常判漏翻
-          if (vNorm === kNorm || vNorm.split(/\s+/).map(lemma).join(' ') === lemmaKey) {
-            return true
-          }
+    if (directValue === undefined) {
+      const lemmaKey = lemmaPhrase(normalizedKey)
+      const lemmaValue = idx.lemma.get(lemmaKey)
+      if (lemmaValue !== undefined) {
+        // 术语目标值与源文词形一致（同形）→ 豁免；不同形（如 de: Drohnen）→ 不豁免，正常判漏翻
+        if (lemmaValue === normalizedKey || lemmaPhrase(lemmaValue) === lemmaKey) {
+          return true
         }
       }
     }
@@ -2142,12 +2260,15 @@ export function detectTargetLanguageFeatures(
 /**
  * 检测是否为同语系变体语言对（共享字符集，放宽漏翻检测）
  * v8.5: CN→TW/HK、PT→PT-BR 等场景
+ * v9.3: pt 与 pt-BR 任一侧出现即视为同语系对（区分词投票无法区分欧葡/巴葡，
+ *       且 pt-BR→pt 反向场景同样适用）
  */
 function isSameScriptLanguagePair(src: string, tgt: string): boolean {
   const SAME_SCRIPT_PAIRS = [
     ['zh-CN', 'zh-TW'], ['zh-CN', 'zh-HK'],
     ['pt', 'pt-BR'],
   ]
+  if ((src === 'pt' || src === 'pt-BR') && (tgt === 'pt' || tgt === 'pt-BR')) return true
   return SAME_SCRIPT_PAIRS.some(([s, t]) =>
     (s === src && t === tgt) || (t === src && s === tgt)
   )
@@ -2156,12 +2277,18 @@ function isSameScriptLanguagePair(src: string, tgt: string): boolean {
 /**
  * 检测翻译/校对后是否存在漏翻（译文==源文但应被翻译）。
  * 返回漏翻条目的索引集合，由调用方决定处理策略。
+ *
+ * v9.3: 新增可选参数 batchSrcLang — 批次级源语言判定结果（detectSourceLanguage）。
+ * 解决：逐条 detectSingleTextLanguage 是字符集级检测，拉丁文本一律返回 'en'，
+ * 导致 ['pt','pt-BR'] 同语系豁免成为死代码、de→de 校对场景"源==目标跳过"失效。
+ * 批次级判定只做加法（多豁免），永不做减法（少检测）。
  */
 export function detectUntranslatedText(
   sourceTexts: string[],
   translatedTexts: string[],
   targetLang: string,
   glossaryMap?: Map<string, string>,
+  batchSrcLang?: string,
 ): Set<number> {
   const untranslatedIndices = new Set<number>()
 
@@ -2183,16 +2310,40 @@ export function detectUntranslatedText(
     ? new Set([...glossaryMap.keys()].map(k => k.toLowerCase()))
     : null
 
-  // 同语系变体语言对：共享字符集，放宽漏翻检测
-  // v8.5: 只保留实际存在的场景
-  const SAME_SCRIPT_PAIRS = [
-    ['zh-CN', 'zh-TW'], ['zh-CN', 'zh-HK'],
-    ['pt', 'pt-BR'],
-  ]
-  function isSameScriptLanguagePair(src: string, tgt: string): boolean {
-    return SAME_SCRIPT_PAIRS.some(([s, t]) =>
-      (s === src && t === tgt) || (t === src && s === tgt)
-    )
+  // v9.3: 批次级豁免的纯度条件 — 批次文本有明显英文信号时，批次级豁免静默失效。
+  // 多语种混杂批次（如 pt 为主+混入英文）防止批次级豁免把英文条目也豁免掉。
+  // 判定：英文区分词命中 ≥2 个 → 视为有英文信号。
+  const batchHasEnglishSignal = (() => {
+    if (!batchSrcLang || batchSrcLang === 'en') return false
+    let enHits = 0
+    const enDict = LATIN_DISTINCTIVE_WORDS.en
+    for (const t of sourceTexts) {
+      const ws = t.toLowerCase().split(/[\s,.;:!?()\[\]{}\-\/"'"'""«»]+/)
+      for (const w of ws) {
+        if (w.length >= 2 && enDict.has(w)) { enHits++; break }
+      }
+      if (enHits >= 2) return true
+    }
+    return false
+  })()
+  // 批次级豁免生效条件：判定为非英语言 且 无英文混入信号
+  const batchExemptLang = (batchSrcLang && batchSrcLang !== 'en' && !batchHasEnglishSignal)
+    ? batchSrcLang
+    : undefined
+
+  // v9.3: 同语系对的二元守卫 — 同语系对跳过维度2后，防止 LLM 摆烂返回纯英文。
+  // 译文含 ≥2 个英文区分词 且 无目标语言特征/功能词 → 仍判漏翻。
+  // 只拦"明显是英语"的长句，短句（零命中）零误伤。
+  function englishLeakGuard(trans: string): boolean {
+    const ws = trans.toLowerCase().split(/[\s,.;:!?()\[\]{}\-\/"'"'""«»]+/).filter(w => w.length >= 2)
+    let enCount = 0
+    for (const w of ws) { if (LATIN_DISTINCTIVE_WORDS.en.has(w)) enCount++ }
+    if (enCount < 2) return false
+    // 有目标语言特征字符 → 不是纯英文摆烂
+    if (/[^\x00-\x7F]/.test(trans)) return false
+    // 有目标语言功能词 → 不是纯英文摆烂
+    if (containsLanguageFunctionWords(trans, targetLang)) return false
+    return true
   }
 
   for (let i = 0; i < sourceTexts.length; i++) {
@@ -2207,18 +2358,39 @@ export function detectUntranslatedText(
     }
 
     // 跳过源语言==目标语言的条目（不需要翻译，如同语言校对场景）
+    // v9.3: 批次级判定补充——拉丁源文逐条检测恒为 'en'，de→de/pt→pt 等校对场景
+    // 靠批次级判定生效（带纯度条件，混杂英文时失效回退逐条维度2）
     const srcLang = detectSingleTextLanguage(src)
     if (srcLang === targetLang) continue
+    if (batchExemptLang && batchExemptLang === targetLang) continue
 
     // 跳过不需要翻译的文本（品牌名/技术缩写/存储容量/术语库一致项）
     if (isUntranslatable(src, glossaryMap)) continue
 
-    // 同语系变体语言对：放宽维度1检测，但仍检查维度2
+    // 同语系变体语言对：放宽检测
+    // v9.3: 并集判定——批次级（治 pt→pt-BR 死代码）∪ 逐条级（保 zh 等现有行为），
+    // 豁免只增不减，混杂批次中少数派语言条目反而比现在多一层保护
     const isSameScript = isSameScriptLanguagePair(srcLang, targetLang)
+      || (batchExemptLang !== undefined && isSameScriptLanguagePair(batchExemptLang, targetLang))
 
     // 维度1：归一化后完全相同 → 漏翻（同语系变体跳过此检测）
     if (!isSameScript && normalize(src) === normalize(trans)) {
       untranslatedIndices.add(i)
+      continue
+    }
+
+    // v9.3: 同语系对跳过维度1+维度2，只保留二元守卫。
+    // 原因：维度2 的特征字符表/功能词表对 pt/pt-BR 完全相同，天生无区分度，
+    // 只能靠"英文占比"代理指标，误报率天然高；zh 对维度2本来就空转（CJK 特征恒真）。
+    // 真质检交给校对环节（母语者语感检查）。二元守卫拦"LLM 摆烂返回纯英文"。
+    if (isSameScript) {
+      if (englishLeakGuard(trans)) {
+        debugWarn(
+          `[detectUntranslatedText] 同语系对二元守卫命中：译文疑为纯英文`,
+          { idx: i, source: src.slice(0, 80), translation: trans.slice(0, 80) }
+        )
+        untranslatedIndices.add(i)
+      }
       continue
     }
 
