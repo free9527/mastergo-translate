@@ -2232,6 +2232,31 @@ export function isCJKTarget(targetLang: string): boolean {
 // v8.0: CORE_PRINCIPLES — 3 条核心原则（已替代旧的 IRON_RULES + BRAND_ASSET_RULES）
 // ═══════════════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════════════
+// v9.4: QUALITY_STANDARD — 六维质量标准（业务定义，放在 CORE_PRINCIPLES 之前）
+// 作用：让翻译/校对 LLM 先理解"什么是好翻译"，再进入具体规则
+// ═══════════════════════════════════════════════════════════════
+
+/** English version — for non-CJK targets (16 languages) */
+export const QUALITY_STANDARD = `[QUALITY STANDARD — 6 dimensions every translation must satisfy]
+
+I.   ACCURATE & FAITHFUL (bottom line) — Complete semantic transfer: no omissions, no mistranslation, no added information. Key specs (speed, capacity, generation) correspond verbatim. Rhetoric may be restructured for the market, but facts map 1:1 to source.
+II.  NATIVE EXPRESSION — Reads as if originally written in the target language by a native speaker, not translated. Eliminate machine-translation flavor. Distinguish language variants (zh-CN vs zh-TW, European vs Brazilian Portuguese) — use local wording.
+III. INDUSTRY TERMINOLOGY — Use standard storage & consumer-electronics industry terms and idioms (no literal word-for-word rendering). Terms, product names, model codes stay consistent throughout; where a glossary standard exists, it prevails.
+IV.  TONE MATCH — Match the product line's voice and target-audience register: Professional line = restrained and precise; Gaming line = young and energetic; Consumer line = plain and direct. Also match the material type: poster copy = punchy; detail page = thorough; legal/compliance copy = rigorous.
+V.   FORMAT CONSISTENCY — Punctuation, capitalization, spacing, number and unit formatting uniform throughout, following target-language writing conventions (e.g., full-width punctuation in Chinese, noun capitalization in German).
+VI.  COMPLIANCE & CULTURE — Comply with target-market laws (advertising law, certification mark requirements). Respect religious and cultural taboos. Legal declarations correspond verbatim — nothing added, nothing removed.`
+
+/** Chinese version — for CJK targets (zh-CN, zh-TW, ja, ko) */
+export const QUALITY_STANDARD_ZH = `[质量标准 — 每条译文须同时满足六维]
+
+一、准确忠实（底线）— 完整传达原文语义，不漏译、不错译、不擅自添加原文没有的信息。关键参数（速度、容量、代次等）逐字对应；修辞表达可本地化重组，但事实信息与原文一一对应。
+二、本地化表达 — 符合目标语言母语表达习惯，读起来像原创文案而非翻译，去除机翻味。区分语言变体（简/繁中文、欧洲/巴西葡语），用词符合当地习惯。
+三、行业表达 — 使用存储与消费电子行业通用术语和惯用说法（如「读取速度」「散热片」），不做字面直译；术语、产品名、型号全篇统一，已有术语标准的以术语标准为准。
+四、调性匹配 — 符合产品线语感与目标客群表达习惯：专业线专业克制、游戏线年轻有张力、大众线直白易懂；匹配物料类型——海报短促有力、详情页详尽清晰、声明文案严谨规范。
+五、格式规范统一 — 标点、大小写、空格、数字与单位写法全篇统一，遵循目标语言书写规范（中文全角标点、德语名词大写）。
+六、合规与文化适配 — 符合目标市场法律法规（广告法、认证标识要求），尊重当地宗教与文化禁忌；法律声明逐字对应，不增不减。`
+
 /** English version — for non-CJK targets (16 languages) */
 export const CORE_PRINCIPLES = `[CORE PRINCIPLES]
 
@@ -2391,6 +2416,14 @@ export function getStyleCard(
 export const PROOFREAD_SYSTEM_PROMPT = `[ROLE]
 You are an expert Localization QA Reviewer for Lexar. Review translations against source texts.
 
+[QUALITY BAR — review against these 6 dimensions]
+I. Accurate & faithful: no omissions, no additions, specs correspond verbatim.
+II. Native expression: reads like original target-language copy, not translation.
+III. Industry terminology: standard storage/CE terms, consistent throughout.
+IV. Tone match: fits product line voice and material type.
+V. Format consistency: punctuation/capitalization/units uniform, per target-language conventions.
+VI. Compliance & culture: legal copy verbatim, market-appropriate.
+
 [CORE DIRECTIVE]
 Fix ALL objective errors. Do NOT make subjective changes.
 - ✅ Fix: grammar errors, spelling mistakes, punctuation errors, wrong terms, wrong numbers, untranslated text, added content, inconsistent terminology.
@@ -2472,6 +2505,14 @@ Example (item 1 has grammar error, item 2 correct):
 /** CJK 版本（zh-CN/zh-TW/ja/ko 校对使用）— 与翻译指令语言策略一致 */
 export const PROOFREAD_SYSTEM_PROMPT_ZH = `[角色]
 你是 Lexar（雷克沙）存储产品的本地化 QA 审校专家。对照源文审查译文。
+
+[质量基准 — 按六维审查]
+一、准确忠实：不漏不增，参数逐字对应。
+二、本地化表达：读起来像目标语言原创，非翻译腔。
+三、行业表达：存储/消费电子标准术语，全篇统一。
+四、调性匹配：符合产品线语感与物料类型。
+五、格式规范：标点/大小写/单位全篇统一，符合目标语言规范。
+六、合规文化：法律声明逐字对应，符合目标市场。
 
 [核心指令]
 修复所有客观错误。不做主观修改。

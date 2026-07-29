@@ -8,6 +8,8 @@ import {
   IDENTITY_MISSION,
   CORE_PRINCIPLES,
   CORE_PRINCIPLES_ZH,
+  QUALITY_STANDARD,
+  QUALITY_STANDARD_ZH,
   getStyleCard,
   renderLangForTranslate,
   renderLangForProofread,
@@ -622,6 +624,9 @@ export function buildSystemPrompt(params: {
     ? `[身份]\n你是 Lexar（雷克沙）存储产品的本地化专家。你产出自然、精准的译文，读起来像母语者写的一样。`
     : `[IDENTITY]\nYou translate Lexar storage product content. Your translations read as if originally written in the target language by a native speaker.`
 
+  // ── QUALITY STANDARD (instruction language) — v9.4 六维质量标准，先于规则 ──
+  const qualityStandard = isZhInstruction ? QUALITY_STANDARD_ZH : QUALITY_STANDARD
+
   // ── CORE PRINCIPLES (instruction language) ──
   const principles = isZhInstruction ? CORE_PRINCIPLES_ZH : CORE_PRINCIPLES
 
@@ -644,8 +649,8 @@ export function buildSystemPrompt(params: {
     ? `\n[输出格式]\n格式："[N] 译文" — 每行一条。纯文本，无 markdown，无解释。\n⛔ ↵ 是字面字符标记，不是换行指令 — 输出字符 "↵"，不要转为真实换行。\n→ 开始翻译：`
     : `\n[OUTPUT]\nFormat: "[N] translated text" — one line per item. Plain text only.\n⛔ The ↵ symbol is a LITERAL CHARACTER, NOT a line break — output it as the characters "↵".\nDo not wrap translations in quotation marks unless the source text itself is quoted.\n→ Output translations now:`
 
-  // ── Assembly: IDENTITY → PRINCIPLES → MISSION → STYLE → FEWSHOT → LANG_RULES → CONTEXT → GLOSSARY → OUTPUT ──
-  return `${role}\n\n${principles}\n\n[MISSION·${targetLang}]\n${mission}${styleCard}${fewShotBlock}${langBlock_str}${contextHint}${glossaryBlock}${outputFormat}`
+  // ── Assembly: IDENTITY → QUALITY_STANDARD → PRINCIPLES → MISSION → STYLE → FEWSHOT → LANG_RULES → CONTEXT → GLOSSARY → OUTPUT ──
+  return `${role}\n\n${qualityStandard}\n\n${principles}\n\n[MISSION·${targetLang}]\n${mission}${styleCard}${fewShotBlock}${langBlock_str}${contextHint}${glossaryBlock}${outputFormat}`
 }
 
 // ============================================================
