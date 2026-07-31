@@ -531,7 +531,7 @@
           <div class="adv-sub-body" v-if="showDiagLog">
             <div class="inline-actions">
               <button class="btn btn-sm btn-gray" @click="copyDiagLogs">复制日志</button>
-              <button class="btn btn-sm btn-gray" @click="clearUiLogs(); diagLogs = []">清空</button>
+              <button class="btn btn-sm btn-gray" @click="clearDiagLogs">清空</button>
             </div>
             <pre ref="diagLogPre" class="diag-log-view">{{ diagLogs.length ? diagLogs.map(e => `[${e.time}] [${e.tag}] ${e.message}`).join('\n') : '（暂无日志，执行一次翻译后此处显示诊断信息）' }}</pre>
             <p class="glossary-hint">翻译异常时：点「复制日志」把内容发给开发者。</p>
@@ -565,7 +565,7 @@ import { TRANSLATE_BATCH_SIZE, PROOFREAD_BATCH_SIZE, TOAST_DURATION_MS, CORRECTI
 import { convertStorageUnit } from '@lib/unit-convert'
 import { getAutoFontMapping } from '@lib/font-mapper'
 import { compressBatch, expandBatch } from '@lib/translation-memory'
-import { uiLog, getUiLogs, getUiLogVersion, clearUiLogs, formatUiLogs, UiLogEntry } from '@lib/ui-debug-log'
+import { uiLog, getUiLogs, getUiLogVersion, clearUiLogs, formatUiLogs, receiveMainLog, restoreUiLogs, serializeUiLogs, UiLogEntry } from '@lib/ui-debug-log'
 
 // ============================================================
 // 响应式状态
@@ -953,6 +953,18 @@ watch(showDiagLog, (open) => {
   }
 })
 const diagLogPre = ref<HTMLElement | null>(null)
+// v10.3: 日志变化时防抖持久化（主线程是 clientStorage 唯一持有者，经消息写入）
+let diagLogPersistTimer: ReturnType<typeof setTimeout> | null = null
+let diagLogLastPersistedVersion = -1
+function schedulePersistUiLogs() {
+  if (diagLogPersistTimer) clearTimeout(diagLogPersistTimer)
+  diagLogPersistTimer = setTimeout(() => {
+    const v = getUiLogVersion()
+    if (v === diagLogLastPersistedVersion) return
+    diagLogLastPersistedVersion = v
+    sendMsgToPlugin(UIMessage.SAVE_UI_LOGS, JSON.parse(JSON.stringify(serializeUiLogs())))
+  }, 2000)
+}
 async function copyDiagLogs() {
   const text = formatUiLogs() || '（暂无日志）'
   try {
@@ -972,6 +984,13 @@ async function copyDiagLogs() {
       showToast('复制失败，请手动全选日志文本复制', 'warning')
     }
   }
+}
+// v10.3: 清空日志同时清掉持久化存储
+function clearDiagLogs() {
+  clearUiLogs()
+  diagLogs.value = []
+  diagLogLastPersistedVersion = getUiLogVersion()
+  sendMsgToPlugin(UIMessage.SAVE_UI_LOGS, [])
 }
 
 // v9.0: 统一进度条 — 优先级 apply > proofread > translate（同时只跑一个阶段）
@@ -2986,6 +3005,17 @@ onMounted(() => {
         scanFoundCount.value = (data as { found: number }).found
         break
 
+      // v10.3: 主线程日志入缓冲 + 触发防抖持久化
+      case PluginMessage.MAIN_LOG:
+        receiveMainLog(data as UiLogEntry)
+        schedulePersistUiLogs()
+        break
+
+      // v10.3: 启动时从持久化恢复上次会话日志
+      case PluginMessage.UI_LOGS_LOADED:
+        restoreUiLogs(data as UiLogEntry[])
+        break
+
       case PluginMessage.GLOSSARY_PRODUCTS_LOADED:
         glossaryProducts.value = markRaw(((data as GlossaryEntry[]) || []).map(function (g: GlossaryEntry) {
           if (g.translations) return g
@@ -3090,6 +3120,7 @@ onMounted(() => {
   sendMsgToPlugin(UIMessage.LOAD_GLOSSARY_EXCLUSIVE)
   sendMsgToPlugin(UIMessage.LOAD_FONTS)
   sendMsgToPlugin(UIMessage.LOAD_TRANSLATION_CACHE)
+  sendMsgToPlugin(UIMessage.LOAD_UI_LOGS)
 
   if (window.matchMedia) {
     const mq = window.matchMedia('(prefers-color-scheme: dark)')

@@ -40,6 +40,8 @@ export const STORAGE_KEY_ORIGINALS = 'translate_originals'
 export const STORAGE_KEY_APPLIED = 'translate_applied'
 export const STORAGE_KEY_TRANSLATION_CACHE = 'translate_cache'
 export const STORAGE_KEY_CORRECTIONS = 'translate_corrections'
+// v10.3: 诊断日志持久化（崩溃/刷新后可追溯，主线程写入）
+export const STORAGE_KEY_UI_LOGS = 'translate_ui_logs'
 export const CORRECTION_THRESHOLD = 1  // 同一源文本被修正后立即生效，加入术语库
 
 // UI 尺寸（v9.1 #16: 420×720 → 480×840，sticky 操作区增大后结果区保有可视空间）

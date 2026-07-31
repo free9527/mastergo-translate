@@ -27,6 +27,9 @@ export enum UIMessage {
   CORRECTION_SUGGESTION = 'CORRECTION_SUGGESTION',
   LOCATE_NODE = 'LOCATE_NODE',
   APPLY_SINGLE = 'APPLY_SINGLE',
+  // v10.3 日志持久化（主线程是唯一 clientStorage 持有者）
+  SAVE_UI_LOGS = 'SAVE_UI_LOGS',
+  LOAD_UI_LOGS = 'LOAD_UI_LOGS',
 }
 
 export interface TestConnectionResult {
@@ -62,6 +65,9 @@ export enum PluginMessage {
   SUGGESTED_TERMS_LOADED = 'SUGGESTED_TERMS_LOADED',
   ERROR = 'ERROR',
   STATUS = 'STATUS',
+  // v10.3 日志持久化：主线程日志推送到 UI 缓冲 + 持久化日志回传
+  MAIN_LOG = 'MAIN_LOG',
+  UI_LOGS_LOADED = 'UI_LOGS_LOADED',
 }
 
 export interface TextItem {

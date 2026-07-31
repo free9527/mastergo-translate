@@ -32,9 +32,45 @@ MasterGo 设计工具插件，将 Lexar 产品设计稿从英文翻译成 20 个
 
 ---
 
-## 二、当前版本（v10.2）
+## 二、当前版本（v10.4）
 
-### 2.0 v10.2 截断误杀根治（2026-07-31，确立"代码管形式/LLM管语义"原则）
+### 2.0 v10.4 管道阶段化 + 不变量审计（2026-08-01，v9.11 结构性根因止血）
+
+**问题**：`translateBatch` 922 行单函数、`result[]` 23 处赋值（12 处集中在异常兜底链单点写入）。v9.11 漏翻静默 bug 的根因就是这个结构——中间检测点的 result 快照被后续兜底链覆盖，无任何机制能发现。当时靠"最终安全网"补丁治标，结构问题还在。
+
+**改动**（对应"五点一、架构复盘"优化方向 ③兜底无不变量）：
+
+| 改动 | 内容 | 位置 |
+|------|------|------|
+| 阶段化注释 | 922 行划分为 S1预处理→S2遮蔽→S3 Prompt→S4 LLM+解析→S5还原→S6安全后处理→S7异常六层(a检测/b统一重试/b-trunc截断标记/c-d激进+子兜底/e-f术语组合+标记)→S8最终兜底，每段 banner 注明输入/输出/允许做什么 | lib/llm-api.ts |
+| auditStage 不变量审计 | 模块级私有函数，13 个审计点（S4/S5/S6/S7a/S7b/S7b-trunc/S7c-d/S7e-f/S8 出口）。三项不变量：①长度恒等（result.length===texts.length，漂移即阶段函数违约）②S5 后不得残留 __XXX_N__ 占位符 ③条目必须是字符串。**只报警不改数据**——审计里做隐式修复 = 给审计本身埋 v9.11 同款雷（决策见下） | lib/llm-api.ts |
+| 阶段轨迹日志 | 每阶段一行 `S{n} 完成: N条 [关键计数]`（S1-S2 术语短路/遮蔽数、S4 空结果数、S6 品牌注入回退数、S8 返回数），翻译一批的日志从零散 debugWarn 变成 S1→S8 时间线，配合 v10.3 持久化可直接看阶段序列定位 | lib/llm-api.ts |
+
+**关键决策（正反论证后拍板）**：
+1. **S7 必须细分六层**——23 处 result 赋值中 12 处在 S7 内部（v9.11 事故现场），粗粒度阶段名形同虚设。审计点插在每个子层出口。
+2. **审计只报警不改数据**——现有 L839 已有 LLM 解析出口硬归一化（`while(result.length<len) push(''); slice(0,len)`），此后所有 `result=f(result)` 的 f 都是保长映射，真正可能漂移的只有"外部函数违约返回不等长数组"。审计正是抓这种违约的——抓到了就该修那个函数，而不是在审计里叠隐式归一化（=给审计埋同款雷）。长度漂移只 uiLog+debugWarn 记录，不做截断/填充。
+3. **不改函数签名/逻辑/顺序**——本次纯结构+审计，行为零变化；不拆文件（922 行拆 8 函数要传 10+ 上下文参数，风险大于收益）。
+
+**测试**：`tests/test-v104-pipeline-audit.ts` 17/17（正常路径零告警 + S1-S8 阶段日志齐全 + 顽固漏翻全兜底链审计零告警 + 术语短路路径零告警 + 阶段日志计数正确）；全量回归全绿（v10.3 22 / v10.2 38 / v10.0 21 / v9.11 21 / v9.9+9.10 33 / v9.8 10 / v9.7 9 / v9.5 40 / 同语系 21 / v8.7 26 / 术语遮蔽 80）；typecheck 双配置 + build 通过；dist/index.html 含 auditStage + 阶段日志（v10.4 改动在 UI 线程包，dist/main.js 不含——translateBatch 由 UI 线程 import）。
+
+### 2.0.1 v10.3 日志持久化 + 主线程跨线程可见（2026-08-01，优化方向 ④）
+
+**问题**：①诊断日志（ui-debug-log 内存环形缓冲）插件关闭即丢，实机 bug 只能靠用户复述；②主线程（扫描/应用/撤销/字体替换）行为完全不可见，诊断面板只有 UI 线程日志。
+
+**架构约束**：`mg.clientStorage` 只在主线程存在，UI 线程无 `mg` 全局。所有持久化必须 UI→UIMessage→主线程→clientStorage，回来走 PluginMessage。
+
+**改动**：
+
+| 改动 | 内容 | 位置 |
+|------|------|------|
+| 持久化通道 | UIMessage 加 `SAVE_UI_LOGS`(防抖2s+版本去重)/`LOAD_UI_LOGS`(启动)；PluginMessage 加 `MAIN_LOG`(主→UI推事件)/`UI_LOGS_LOADED`(启动恢复) | messages/types.ts |
+| 存储 | `STORAGE_KEY_UI_LOGS='translate_ui_logs'`，主线程 `saveUiLogs`/`loadUiLogs`（clientStorage 落盘，截断500条） | lib/constants.ts, lib/main.ts |
+| 跨线程 | 主线程 `mainLog()` 辅助函数推 MAIN_LOG；扫描(开始/完成/超上限/0节点/选中扫描)+应用译文+字体替换+撤销 完成事件埋点，tag 前缀 `main:` | lib/main.ts |
+| UI 侧 | 容量 300→500；`receiveMainLog`(保留主线程时间戳)/`restoreUiLogs`(启动恢复+上次会话/本次会话分隔标记+脏数据防御)/`serializeUiLogs`(排除分隔行)；"清空"改 `clearDiagLogs()` 同时清持久化 | lib/ui-debug-log.ts, ui/App.vue |
+
+**测试**：`tests/test-v103-log-persistence.ts` 22/22；全量回归全绿；typecheck + build 通过；dist/main.js + dist/index.html 均含 3 个新消息类型。
+
+### 2.0.2 v10.2 截断误杀根治（2026-07-31，确立"代码管形式/LLM管语义"原则）
 
 **问题**：实机日志 16:33——pt→ja `Resistente a altas temperaturas`（31字符）LLM 首调即翻对 `高温に強い`（6字符），却被 `detectTruncatedTexts` 判"截断"（比例 0.19 < 0.25 阈值），统一重试→激进重试→子兜底连环空耗后标记失败；同批 `Resistente a baixas temperaturas` 同命。另：诊断日志"复制日志"按钮在 MasterGo iframe 中失效（clipboard API 不可用）。
 
@@ -467,7 +503,7 @@ v8.7 设计"激进失败→保留原文不标记，交给校对 LLM 判断"，�
 | 文件 | 职责 |
 |------|------|
 | `lib/prompt-constants.ts` | 提示词常量（STYLE_GUIDES、LANG_SPECIFIC、PRODUCT_LINE_TONE_GUIDES、SCENE_CONSTRAINTS、CORE_PRINCIPLES、PROOFREAD_SYSTEM_PROMPT） |
-| `lib/llm-api.ts` | LLM 调用 + 翻译/校对管道 + 重试逻辑 + v9.5 三层漏翻检测 + v9.9 术语合规校验 + v9.10 双视图分发 + v9.11 批次级标注/untranslatedIndices/最终安全网 + v10.0 re-export lang-detect（兼容层）+ **v10.2 截断判定（脚本存在性）+ 子兜底守卫 + 诊断日志埋点** |
+| `lib/llm-api.ts` | LLM 调用 + 翻译/校对管道 + 重试逻辑 + v9.5 三层漏翻检测 + v9.9 术语合规校验 + v9.10 双视图分发 + v9.11 批次级标注/untranslatedIndices/最终安全网 + v10.0 re-export lang-detect（兼容层）+ v10.2 截断判定（脚本存在性）+ 子兜底守卫 + 诊断日志埋点 + **v10.4 管道阶段化(S1-S8)+auditStage 不变量审计** |
 | `lib/lang-detect.ts` | v10.0 语言检测单一事实源（三套检测/词表/字符集分类/同语系对，detectSingleTextLanguage 死代码已修为委托批次级）+ **v10.2 TARGET_SCRIPT_PATTERNS** |
 | `lib/keep-source.ts` | **v10.0 豁免中央注册表**（shouldKeepSource/isSameLanguageExempt，F3b 三重守卫迁入） |
 | `lib/post-process.ts` | 译后处理（enforceGlossaryTerms、detectBrandInjection、restoreTrademarkSymbols、detectTranslationExpansion、cleanKey） |
@@ -511,6 +547,8 @@ npx tsx tests/test-v98-script-validation.ts      # v9.8 字符集校验 10 断�
 npx tsx tests/test-v911-non-en-source.ts         # v9.11 非英源文漏翻闭环 21 断言
 npx tsx tests/test-v100-arch-consolidation.ts    # v10.0 判定逻辑收口 21 断言
 npx tsx tests/test-v102-truncation-fix.ts        # v10.2 截断误杀根治 38 断言
+npx tsx tests/test-v103-log-persistence.ts       # v10.3 日志持久化+跨线程 22 断言
+npx tsx tests/test-v104-pipeline-audit.ts        # v10.4 管道阶段化+不变量审计 17 断言
 ```
 
 **铁律**：每次改代码后必须执行 `npm run typecheck` + `npm run build`。build 过 ≠ tsc 过。
@@ -521,14 +559,16 @@ npx tsx tests/test-v102-truncation-fix.ts        # v10.2 截断误杀根治 38 �
 
 **短期**：
 1. ~~实机验证 v10.2~~ **已通过（2026-07-31）**：pt→ja 两句温度文案正常翻译，不再标漏翻/失败。遗留可选回归（有空顺带验证）：de→de 无误报、zh-CN→zh-TW、en→拉丁、"复制日志"自动全选 fallback
-2. 实机验证 v9.9/v9.10：pt-BR 自动检测 → ja 产品名走短路出术语库值；非电商场景营销术语不注入；校对改错术语时被合规校验拉回
-3. 实机验证 v9.6：Avenir 字体的 `Lexar®` 文本，不翻译直接应用 + 字体替换后，® 是否都显示为 HarmonyOS 样式
-4. 提交代码（v9.2-v10.2 改动未提交）
-5. ~~R7 决策~~（已拍板 2026-07-31：现状即规则——去符号匹配，®™ 由源文驱动恢复，CSV 不携带符号，无需改代码）
+2. 实机验证 v10.3/v10.4：跑一批翻译 → 诊断日志面板应看到 S1→S8 阶段轨迹 + 主线程 [main:scan]/[main:apply] 事件；关闭重开插件 → 应看到"── 恢复上次会话日志（N 条）──"分隔标记
+3. 实机验证 v9.9/v9.10：pt-BR 自动检测 → ja 产品名走短路出术语库值；非电商场景营销术语不注入；校对改错术语时被合规校验拉回
+4. 实机验证 v9.6：Avenir 字体的 `Lexar®` 文本，不翻译直接应用 + 字体替换后，® 是否都显示为 HarmonyOS 样式
+5. ~~提交代码~~ **已提交 5df3af2 + 已推 GitHub**（v9.5-v10.2，2026-07-31）
+6. ~~R7 决策~~（已拍板 2026-07-31：现状即规则——去符号匹配，®™ 由源文驱动恢复，CSV 不携带符号，无需改代码）
 
 **架构优化（见"五点一、架构复盘"，按收益/风险排序）**：
 1. ~~判定逻辑单一事实源 + 豁免中央注册表~~ **已完成 v10.0**（lib/lang-detect.ts + lib/keep-source.ts）
-2. 结构改进：管道阶段化 + 不变量审计 → Prompt 减肥 → LLM 输出 schema 化
+2. 结构改进：~~管道阶段化 + 不变量审计~~ **已完成 v10.4** → Prompt 减肥（~2600行 prompt 稀释注意力）→ LLM 输出 schema 化（退役 `[N] text` 解析防御）
+3. ~~日志持久化~~ **已完成 v10.3**；剩余：⑤metrics UI 面板（finalizeMetrics 只 console.log）⑥detectTranslationExpansion 语义移交校对（v10.2 同型长度代理问题，反方向）
 
 **中期**：
 3. 指标收集器 UI 面板（当前只 console.log）

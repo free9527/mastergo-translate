@@ -1,6 +1,6 @@
 import { PluginMessage, UIMessage, TextItem, LLMConfig, GlossaryEntry, TranslationCorrection } from '@messages/types'
 import { sendMsgToUI } from '@messages/main-sender'
-import { STORAGE_KEY_GLOSSARY_VERSION, STORAGE_KEY_GLOSSARY_PRODUCTS, STORAGE_KEY_GLOSSARY_EXCLUSIVE, STORAGE_KEY_SETTINGS, STORAGE_KEY_ORIGINALS, STORAGE_KEY_APPLIED, STORAGE_KEY_TRANSLATION_CACHE, STORAGE_KEY_CORRECTIONS, CORRECTION_THRESHOLD, UI_WIDTH, UI_HEIGHT, MAX_CACHE_SIZE, MAX_SCAN_NODES, GLOSSARY_VERSION, makeFontKey, DEBUG_MODE } from '@lib/constants'
+import { STORAGE_KEY_GLOSSARY_VERSION, STORAGE_KEY_GLOSSARY_PRODUCTS, STORAGE_KEY_GLOSSARY_EXCLUSIVE, STORAGE_KEY_SETTINGS, STORAGE_KEY_ORIGINALS, STORAGE_KEY_APPLIED, STORAGE_KEY_TRANSLATION_CACHE, STORAGE_KEY_CORRECTIONS, STORAGE_KEY_UI_LOGS, CORRECTION_THRESHOLD, UI_WIDTH, UI_HEIGHT, MAX_CACHE_SIZE, MAX_SCAN_NODES, GLOSSARY_VERSION, makeFontKey, DEBUG_MODE } from '@lib/constants'
 import { collectTextNodes, mergeDuplicates } from '@lib/text-collector'
 import { exportCSV, importCSV } from '@lib/csv-handler'
 import { DEFAULT_GLOSSARY_PRODUCTS_CSV, DEFAULT_GLOSSARY_EXCLUSIVE_CSV } from '@lib/default-glossary'
@@ -8,6 +8,17 @@ import { parseCSVRow } from '@lib/parse-csv'
 
 // DEBUG 日志辅助函数
 const debugLog = (...args: unknown[]) => DEBUG_MODE && console.log(...args)
+
+// v10.3: 主线程日志推送到 UI 诊断缓冲（跨线程可见 — 扫描/应用/撤销等行为不再不可见）
+function mainLog(tag: string, message: string): void {
+  const d = new Date()
+  const p = (n: number) => String(n).padStart(2, '0')
+  sendMsgToUI(PluginMessage.MAIN_LOG, {
+    time: `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`,
+    tag,
+    message,
+  })
+}
 
 // Avenir → HarmonyOS 样式名映射（Avenir 用 "Roman"/"Heavy" 等，HarmonyOS 用 "Regular"/"Bold"）
 const AVENIR_TO_HARMONYOS_STYLE: Record<string, string> = {
@@ -59,6 +70,7 @@ mg.on('selectionchange', pushSelectionState)
 function scanAllTextNodes(): void {
   const page = mg.document.currentPage
   debugLog('[translate] scanAllTextNodes, page:', page.name, 'page.type:', page.type)
+  mainLog('main:scan', `全页扫描开始（页面: ${page.name}）`)
 
   const reportProgress = (found: number) => sendMsgToUI(PluginMessage.SCAN_PROGRESS, { found })
   let textNodes = collectTextNodes(page, reportProgress)
@@ -74,6 +86,7 @@ function scanAllTextNodes(): void {
 
   // v9.1 #11: 节点数上限 — 超大文档提示用户改用局部扫描，避免长时间无响应
   if (textNodes.length > MAX_SCAN_NODES) {
+    mainLog('main:scan', `扫描超上限：${textNodes.length} > ${MAX_SCAN_NODES}，中止`)
     sendMsgToUI(PluginMessage.SCAN_RESULT, { items: [], pageName: page.name, fileName: mg.document.name })
     sendMsgToUI(PluginMessage.ERROR, `本页文本节点过多（${textNodes.length} > ${MAX_SCAN_NODES}），请选中局部对象后使用"选中对象扫描"`)
     return
@@ -90,6 +103,7 @@ function scanAllTextNodes(): void {
       console.error('[translate] page.children is undefined! page keys:', Object.keys(page))
     }
 
+    mainLog('main:scan', '扫描结果：0 个文本节点')
     sendMsgToUI(PluginMessage.SCAN_RESULT, { items: [], pageName: page.name, fileName: mg.document.name })
     sendMsgToUI(PluginMessage.STATUS, '当前页面未找到文本节点（已输出诊断日志，请按 F12 查看控制台）')
     return
@@ -104,6 +118,7 @@ function scanAllTextNodes(): void {
   const items = mergeDuplicates(textNodes)
   pruneStaleOriginals(items)
   debugLog('[translate] final merged items:', items.length)
+  mainLog('main:scan', `扫描完成：${textNodes.length} 节点 → 合并 ${items.length} 条目`)
   sendMsgToUI(PluginMessage.SCAN_RESULT, { items, pageName: page.name, fileName: mg.document.name })
   sendUndoState()
 }
@@ -114,10 +129,12 @@ function scanAllTextNodes(): void {
 function scanSelectedTextNodes(): void {
   const selection = mg.document.currentPage.selection
   if (!selection || selection.length === 0) {
+    mainLog('main:scan', '选中扫描：无选区，中止')
     sendMsgToUI(PluginMessage.ERROR, '请先在画布中选中至少一个图层')
     return
   }
 
+  mainLog('main:scan', `选中扫描开始（${selection.length} 个图层）`)
   const allTextNodes: TextNode[] = []
   const reportProgress = (found: number) => sendMsgToUI(PluginMessage.SCAN_PROGRESS, { found })
   for (let i = 0; i < selection.length; i++) {
@@ -129,11 +146,13 @@ function scanSelectedTextNodes(): void {
   }
 
   if (allTextNodes.length === 0) {
+    mainLog('main:scan', '选中扫描：未找到文本节点')
     sendMsgToUI(PluginMessage.ERROR, '选中的图层中未找到文本节点')
     return
   }
 
   if (allTextNodes.length > MAX_SCAN_NODES) {
+    mainLog('main:scan', `选中扫描超上限：${allTextNodes.length} > ${MAX_SCAN_NODES}，中止`)
     sendMsgToUI(PluginMessage.SCAN_RESULT, { items: [], pageName: mg.document.currentPage.name, fileName: mg.document.name })
     sendMsgToUI(PluginMessage.ERROR, `选中图层文本节点过多（${allTextNodes.length} > ${MAX_SCAN_NODES}），请缩小选中范围`)
     return
@@ -146,6 +165,7 @@ function scanSelectedTextNodes(): void {
 
   const items = mergeDuplicates(allTextNodes)
   pruneStaleOriginals(items)
+  mainLog('main:scan', `选中扫描完成：${allTextNodes.length} 节点 → 合并 ${items.length} 条目`)
   const page = mg.document.currentPage
   sendMsgToUI(PluginMessage.SCAN_RESULT, { items, pageName: page.name, fileName: mg.document.name })
   sendUndoState()
@@ -318,6 +338,7 @@ async function applyTranslations(items: TextItem[]): Promise<void> {
   const msg = failed > 0
     ? '已应用 ' + done + ' 处译文，' + failed + ' 处失败'
     : '已应用 ' + done + ' 处译文'
+  mainLog('main:apply', `应用译文完成：成功 ${done}，失败 ${failed}`)
   sendMsgToUI(PluginMessage.APPLY_DONE, { count: done, failed, failedNodeIds })
   sendUndoState()
   mg.notify(msg, { type: failed > 0 ? 'error' : 'success' })
@@ -419,6 +440,7 @@ async function applyFontsOnly(payloads: FontPayload[]): Promise<void> {
     }
   }
 
+  mainLog('main:apply', `字体替换完成：成功 ${done}，失败 ${failed}`)
   sendMsgToUI(PluginMessage.APPLY_FONTS_DONE, { count: done, failed })
   mg.notify('字体替换完成：' + done + ' 处' + (failed > 0 ? '，' + failed + ' 处失败' : ''), { type: failed > 0 ? 'error' : 'success' })
 }
@@ -463,6 +485,7 @@ async function undoAll(): Promise<void> {
   originalTexts.clear()
   appliedTexts.clear()
   await persistOriginals()
+  mainLog('main:apply', `撤销完成：恢复 ${count} 条原文` + (skippedModified > 0 ? `，跳过 ${skippedModified} 条手动修改` : ''))
   sendMsgToUI(PluginMessage.UNDO_DONE, { count, skipped: skippedModified })
   sendUndoState()
   mg.notify(
@@ -656,6 +679,32 @@ async function saveTranslationCache(cache: Record<string, string>): Promise<void
   await mg.clientStorage.setAsync(STORAGE_KEY_TRANSLATION_CACHE, cache)
 }
 
+// ============================================================
+// v10.3: UI 诊断日志持久化（clientStorage 唯一持有者在主线程）
+// ============================================================
+interface PersistedLogEntry { time: string; tag: string; message: string }
+const MAX_PERSISTED_LOGS = 500
+
+async function saveUiLogs(entries: PersistedLogEntry[]): Promise<void> {
+  try {
+    const trimmed = entries.length > MAX_PERSISTED_LOGS ? entries.slice(-MAX_PERSISTED_LOGS) : entries
+    await mg.clientStorage.setAsync(STORAGE_KEY_UI_LOGS, trimmed)
+  } catch (e) {
+    // 日志持久化失败不阻塞主流程
+    debugLog('[translate] saveUiLogs failed', e)
+  }
+}
+
+async function loadUiLogs(): Promise<PersistedLogEntry[]> {
+  try {
+    const data = await mg.clientStorage.getAsync(STORAGE_KEY_UI_LOGS)
+    return Array.isArray(data) ? data : []
+  } catch (e) {
+    debugLog('[translate] loadUiLogs failed', e)
+    return []
+  }
+}
+
 async function loadSettings(): Promise<LLMConfig | null> {
   const fromLocal = await mg.clientStorage.getAsync(STORAGE_KEY_SETTINGS)
   if (fromLocal) return fromLocal
@@ -827,6 +876,12 @@ mg.ui.onmessage = async function (msg: UIMessageEvent) {
       break
     case UIMessage.SAVE_TRANSLATION_CACHE:
       await saveTranslationCache(data as Record<string, string>)
+      break
+    case UIMessage.SAVE_UI_LOGS:
+      await saveUiLogs(data as PersistedLogEntry[])
+      break
+    case UIMessage.LOAD_UI_LOGS:
+      sendMsgToUI(PluginMessage.UI_LOGS_LOADED, await loadUiLogs())
       break
     case UIMessage.LOAD_CORRECTIONS:
       sendMsgToUI(PluginMessage.CORRECTIONS_LOADED, await loadCorrections())

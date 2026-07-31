@@ -560,6 +560,37 @@ const TECH_TERM_EXEMPT = new Set([
 // 向后兼容：TECH_ABBREVS 指向同一个集合
 const TECH_ABBREVS = TECH_TERM_EXEMPT
 
+// ============================================================
+// v10.4: 管道阶段化 — auditStage 不变量审计
+// ============================================================
+// 背景（v9.11 根因）：translateBatch 922 行单函数、result[] 23 处赋值，
+// 中间检测点快照被后续兜底链静默覆盖，无任何机制能发现。
+// v10.4 不改逻辑，只在每个阶段出口做只读审计：
+//   不变量1 长度恒等（result.length === texts.length，漂移即阶段函数违约）
+//   不变量2 S5(还原)之后不得残留 __XXX_N__ 占位符
+//   不变量3 条目必须是字符串（不得产生 null/undefined）
+// 只报警不改数据——审计里做隐式修复 = 给审计本身埋 v9.11 同款雷（见 HANDOFF v10.4）。
+// S4 出口长度漂移沿用既有 L839 归一化（既有行为），审计只记录漂移量。
+const PLACEHOLDER_RE = /__[A-Z]+_\d+__/
+function auditStage(stage: string, texts: string[], result: string[]): void {
+  if (result.length !== texts.length) {
+    uiLog('translate', `⛔ [audit:${stage}] 长度漂移 源${texts.length}条→译${result.length}条`)
+    debugWarn(`[audit:${stage}] ⛔ length mismatch`, { expected: texts.length, got: result.length })
+  }
+  if (stage >= 'S5') {
+    const residual = result.filter(t => typeof t === 'string' && PLACEHOLDER_RE.test(t)).length
+    if (residual > 0) {
+      uiLog('translate', `⛔ [audit:${stage}] ${residual} 条残留 __XXX_N__ 占位符`)
+      debugWarn(`[audit:${stage}] ⛔ residual placeholders`, { residual })
+    }
+  }
+  const bad = result.filter(t => typeof t !== 'string').length
+  if (bad > 0) {
+    uiLog('translate', `⛔ [audit:${stage}] ${bad} 条非字符串条目`)
+    debugWarn(`[audit:${stage}] ⛔ non-string entries`, { bad })
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════
 // translateBatch — 翻译主函数（翻译 LLM 入口）
 // ═══════════════════════════════════════════════════════════════
@@ -595,6 +626,10 @@ export async function translateBatch(
   glossaryEnMap?: Map<string, string>,  // v9.10: EN 视图，供 isUntranslatable 豁免（防全语言视图误判豁免 R5）
   untranslatedIndices?: Set<number>,    // v9.11: 输出参数 — 最终仍漏翻（保留原文）的条目索引，供 UI 标记翻译失败
 ): Promise<string[]> {
+  // ═══════════════════════════════════════════════════════════
+  // S1: 预处理（产出 texts 变体，不动 result）
+  //     HTML标签保护 → NFC标准化 → 术语整条短路（glossaryMatchedIndices）
+  // ═══════════════════════════════════════════════════════════
   const detectedSource = sourceLang || detectSourceLanguage(texts)
   const isEnSource = detectedSource === 'en'
   if (!_isRetry) {
@@ -647,6 +682,11 @@ export async function translateBatch(
     return text
   })
 
+  // ═══════════════════════════════════════════════════════════
+  // S2: 遮蔽（产出 texts 变体，不动 result）
+  //     术语遮蔽(__GLOSSARY_N__) → 实体遮蔽(__PRD_N__等) → CJK空格保护 → ™剥离
+  //     ⚠️ 顺序是 v9.2 修正结果：术语必须先于实体，见下方详细注释
+  // ═══════════════════════════════════════════════════════════
   // ⚠️ 遮蔽顺序（v9.2 修正）：术语遮蔽必须先于实体遮蔽！
   // 术语优先级最高（用户术语库是最高事实源），先占位后实体正则不会再触碰已遮蔽区域。
   // 若顺序反转（实体在前），"Lexar Recovery Tool" 等术语可能被实体正则误判为产品名/型号，
@@ -667,7 +707,11 @@ export async function translateBatch(
   // ™®©符号保护：翻译前移除源文中的商标符号，防止 LLM 乱加符号到其他位置
   // restoreTrademarkSymbols 会在翻译后用原始源文（texts）把符号加回来
   const tmStrippedTexts = spaceProtectedTexts.map(t => t.replace(/[™®©]/g, ''))
+  uiLog('translate', `S1-S2 预处理+遮蔽完成: ${texts.length}条, 术语短路${glossaryMatchedIndices.size}条, 术语遮蔽${termMap.size}词, 实体遮蔽${entityMap.size}词`)
 
+  // ═══════════════════════════════════════════════════════════
+  // S3: Prompt 构建（产品线/风格/术语提示/风格卡/few-shot，不动 result）
+  // ═══════════════════════════════════════════════════════════
   // 产品线检测（提前到术语过滤之前）
   const productLine = getEffectiveProductLine(config, texts, pageName, fileName)
 
@@ -755,6 +799,9 @@ ${texts.map((t, i) => `${i + 1}. "${t.slice(0, 100)}"`).join('\n')}
 
   const temperature = 0.2
 
+  // ═══════════════════════════════════════════════════════════
+  // S4: LLM 调用 + 结果解析（产生 result，出口长度归一化到 texts.length）
+  // ═══════════════════════════════════════════════════════════
   const res = await fetchWithRetry(config.apiUrl, {
     method: 'POST',
     headers: {
@@ -876,6 +923,13 @@ ${texts.map((t, i) => `${i + 1}. "${t.slice(0, 100)}"`).join('\n')}
     })
   }
 
+  auditStage('S4', texts, result)
+  uiLog('translate', `S4 LLM调用+解析完成: ${result.length}条, 空结果${result.filter(t => !t).length}条`)
+
+  // ═══════════════════════════════════════════════════════════
+  // S5: 还原（unmask → restoreHtmlTags → postProcessTranslation）
+  //     出口后不得残留 __XXX_N__ 占位符（不变量2 起点）
+  // ═══════════════════════════════════════════════════════════
   // 还原实体占位符（必须在 restoreHtmlTags 之前）
   if (entityMap.size > 0) {
     // v7.5.6 诊断：追踪 __PRD_N__ 占位符还原失败
@@ -909,6 +963,12 @@ ${texts.map((t, i) => `${i + 1}. "${t.slice(0, 100)}"`).join('\n')}
   // 语言特定后处理
   result = result.map(t => postProcessTranslation(t, targetLang))
 
+  auditStage('S5', texts, result)
+  uiLog('translate', `S5 还原完成: 实体还原${entityMap.size}词, 术语还原${termMap.size}词`)
+
+  // ═══════════════════════════════════════════════════════════
+  // S6: 安全后处理（品牌注入→术语校准→v9.9合规→™还原→数字校验→存储单位→首字母→扩展检测→重复检测）
+  // ═══════════════════════════════════════════════════════════
   // 收集被检测函数回退到源文的索引（避免误判为"漏翻"）
   const revertedIndices = new Set<number>()
 
@@ -1016,6 +1076,13 @@ ${texts.map((t, i) => `${i + 1}. "${t.slice(0, 100)}"`).join('\n')}
     }
   }
 
+  auditStage('S6', texts, result)
+  uiLog('translate', `S6 安全后处理完成: 品牌注入回退${revertedIndices.size}条`)
+
+  // ═══════════════════════════════════════════════════════════
+  // S7: 异常检测 + 多层兜底重试（S7a检测→S7b统一重试→S7c激进→S7d子兜底→S7e术语组合→S7f标记）
+  //     仅首轮（!_isRetry）执行；result[j] 单点写入集中在 S7b-S7f，v9.11 事故现场
+  // ═══════════════════════════════════════════════════════════
   // 异常检测 + 统一重试：截断 + 漏翻合并为一次重试
   // 优化：从最多4次额外API调用降为1次
   if (!_isRetry) {
@@ -1029,6 +1096,7 @@ ${texts.map((t, i) => `${i + 1}. "${t.slice(0, 100)}"`).join('\n')}
       untranslatedIndices.delete(idx)
     }
     const hasAnomaly = truncatedIndices.size > 0 || untranslatedIndices.size > 0
+    auditStage('S7a', texts, result)
 
     if (hasAnomaly) {
       // 合并异常条目（去重）
@@ -1076,6 +1144,7 @@ ${texts.map((t, i) => `${i + 1}. "${t.slice(0, 100)}"`).join('\n')}
         result[j] = result[j].replace(/\[(MANDATORY|MANDATORY TRANSLATION|PARTIAL TRANSLATION DETECTED|TRANSLATE REQUIRED)\][\s\S]*?\n\n/g, '').trim()
         k++
       }
+      auditStage('S7b', texts, result)
 
       // 重试后再次检测，标记仍失败的条目
       // 优化：并行化重试后检测（与首次检测一致）
@@ -1092,6 +1161,7 @@ ${texts.map((t, i) => `${i + 1}. "${t.slice(0, 100)}"`).join('\n')}
         for (const j of retriedTruncated) {
           result[j] = ''
         }
+        auditStage('S7b-trunc', texts, result)
       }
 
       if (retriedUntranslated.size > 0) {
@@ -1413,6 +1483,7 @@ DO NOT return the source text unchanged. Output ONLY the translation, no explana
           if (!rescued) {
             stillUntranslatedAfterAggressive.add(j)
           }
+          auditStage('S7c-d', texts, result)
         }
 
         // Layer 2 + 3: 术语库组合兜底 + 标记失败
@@ -1454,6 +1525,7 @@ DO NOT return the source text unchanged. Output ONLY the translation, no explana
               )
             }
           }
+          auditStage('S7e-f', texts, result)
         }
       }
     }
@@ -1462,6 +1534,9 @@ DO NOT return the source text unchanged. Output ONLY the translation, no explana
   // v7.5.4: 最终商标符号兜底 — 确保管道中任何步骤都不会丢失 ®™©
   result = restoreTrademarkSymbols(texts, result)
 
+  // ═══════════════════════════════════════════════════════════
+  // S8: 最终兜底（™还原 → 残留占位符清理 → v9.11 漏翻安全网）
+  // ═══════════════════════════════════════════════════════════
   // v7.5.6: 最终实体占位符兜底 — 扫描并还原任何残留的 __XXX_N__
   // unmaskEntities 可能在中间步骤被意外覆盖，此处做最终清理
   const residualPrd = result.filter(t => /__[A-Z]+_\d+__/.test(t)).length
@@ -1499,6 +1574,9 @@ DO NOT return the source text unchanged. Output ONLY the translation, no explana
       uiLog('translate', `上报漏翻索引: ${[...untranslatedIndices].join(',')}`)
     }
   }
+
+  auditStage('S8', texts, result)
+  uiLog('translate', `S8 最终兜底完成: 返回${result.length}条`)
 
   return result
 }
