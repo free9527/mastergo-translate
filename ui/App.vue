@@ -295,7 +295,8 @@
                 <svg width="12" height="12" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/><path d="M8 1v2.5M8 12.5V15M1 8h2.5M12.5 8H15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
                 定位
               </button>
-              <button class="btn btn-xs btn-tinted" v-if="item.translatedText && !translateErrors.has(item.nodeIds[0])" :disabled="retranslatingIds.has(item.nodeIds[0]) || translating || proofreading" @click.stop="retranslateSingle(item)">
+              <!-- 重翻按钮：有译文（非失败）或翻译失败时都显示 — 失败条目用户需要重翻补救 -->
+              <button class="btn btn-xs btn-tinted" v-if="item.translatedText || translateErrors.has(item.nodeIds[0])" :disabled="retranslatingIds.has(item.nodeIds[0]) || translating || proofreading" @click.stop="retranslateSingle(item)">
                 <svg width="12" height="12" viewBox="0 0 16 16"><path d="M2 8a6 6 0 0 1 10.47-4M14 8a6 6 0 0 1-10.47 4M2 4v3h3M14 12v-3h-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 重翻
               </button>
@@ -520,6 +521,23 @@
           </div>
         </div>
 
+        <!-- v10.1: 诊断日志（排障用，默认折叠；翻译/校对时自动记录） -->
+        <div class="adv-sub">
+          <div class="adv-sub-head" @click="showDiagLog = !showDiagLog">
+            <svg class="chevron" :class="{ open: showDiagLog }" width="12" height="12" viewBox="0 0 12 12"><path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <span>诊断日志</span>
+            <span class="section-count">{{ diagLogs.length }}</span>
+          </div>
+          <div class="adv-sub-body" v-if="showDiagLog">
+            <div class="inline-actions">
+              <button class="btn btn-sm btn-gray" @click="copyDiagLogs">复制日志</button>
+              <button class="btn btn-sm btn-gray" @click="clearUiLogs(); diagLogs = []">清空</button>
+            </div>
+            <pre ref="diagLogPre" class="diag-log-view">{{ diagLogs.length ? diagLogs.map(e => `[${e.time}] [${e.tag}] ${e.message}`).join('\n') : '（暂无日志，执行一次翻译后此处显示诊断信息）' }}</pre>
+            <p class="glossary-hint">翻译异常时：点「复制日志」把内容发给开发者。</p>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -540,13 +558,14 @@ import { sendMsgToPlugin } from '@messages/ui-sender'
 import { parseCSVRow, csvEncodeCell } from '@lib/parse-csv'
 import { formatCJKSpace } from '@lib/format-text'
 import { postProcessTranslation, restoreTrademarkSymbols, restoreStorageUnitFormatting, enforceGlossaryTerms, detectTranslationExpansion, sanitizeLineBreaks, cleanKey } from '@lib/post-process'
-import { translateBatch, proofreadBatch, fetchWithRetry, isProofreadScriptMismatch, detectTruncatedTexts, STYLE_PRESETS, SCENE_PRESETS, detectProductLine, buildTaskGlossaryHint, isUntranslatable } from '@lib/llm-api'
+import { translateBatch, proofreadBatch, fetchWithRetry, isProofreadScriptMismatch, detectTruncatedTexts, STYLE_PRESETS, SCENE_PRESETS, detectProductLine, buildTaskGlossaryHint, isUntranslatable, classifyNecessity, getTargetScript, hasFunctionWords, hasSimplifiedOnlyChars, hasTraditionalOnlyChars } from '@lib/llm-api'
 import { startMetricsCollection, recordBatchMetrics, recordProofreadMetrics, finalizeMetrics, formatMetricsReport, createBatchTimer } from '@lib/metrics'
 import { DEFAULT_GLOSSARY_PRODUCTS_CSV } from '@lib/default-glossary'
 import { TRANSLATE_BATCH_SIZE, PROOFREAD_BATCH_SIZE, TOAST_DURATION_MS, CORRECTION_THRESHOLD, makeFontKey, parseFontKey, normalizeText } from '@lib/constants'
 import { convertStorageUnit } from '@lib/unit-convert'
 import { getAutoFontMapping } from '@lib/font-mapper'
 import { compressBatch, expandBatch } from '@lib/translation-memory'
+import { uiLog, getUiLogs, getUiLogVersion, clearUiLogs, formatUiLogs, UiLogEntry } from '@lib/ui-debug-log'
 
 // ============================================================
 // 响应式状态
@@ -559,35 +578,7 @@ const glossaryProducts = shallowRef<GlossaryEntry[]>([])
 const glossaryExclusive = shallowRef<GlossaryEntry[]>([])
 const glossary = computed(() => [...glossaryProducts.value, ...glossaryExclusive.value])
 /** 术语库映射（响应式），供 UI 层漏翻检测复用，避免重复构建 */
-const glossaryMapForUi = computed(() => buildGlossaryMap())
-
-/** 检测是否为同语系变体语言对（共享字符集，放宽漏翻检测） */
-function isSameScriptLanguagePair(src: string, tgt: string): boolean {
-  const SAME_SCRIPT_PAIRS = [
-    ['zh-CN', 'zh-TW'], ['zh-CN', 'zh-HK'],
-    ['pt', 'pt-BR'],
-  ]
-  return SAME_SCRIPT_PAIRS.some(([s, t]) =>
-    (s === src && t === tgt) || (t === src && s === tgt)
-  )
-}
-
-/** 检测单条文本的语言 */
-function detectSingleTextLanguage(text: string): string {
-  if (!text) return 'en'
-  let cjkChars = 0, latinChars = 0, hiragana = 0, katakana = 0, hangul = 0
-  for (const ch of text) {
-    const code = ch.charCodeAt(0)
-    if (code >= 0x4E00 && code <= 0x9FFF) cjkChars++
-    else if (code >= 0x3040 && code <= 0x309F) hiragana++
-    else if (code >= 0x30A0 && code <= 0x30FF) katakana++
-    else if (code >= 0xAC00 && code <= 0xD7AF) hangul++
-    else if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')) latinChars++
-  }
-  if (hiragana + katakana > 0 && (hiragana + katakana) >= cjkChars * 0.15) return 'ja'
-  if (hangul > 0 && hangul >= (cjkChars + hangul) * 0.1) return 'ko'
-  return cjkChars > latinChars ? 'zh-CN' : 'en'
-}
+const glossaryMapForUi = computed(() => buildGlossaryMaps().full)
 
 /** 判断条目是否应显示漏翻标记（兼容术语库中 source==target 的全球统一英文术语） */
 /** v9.0.1 性能：漏翻检测结果缓存 — 模板每卡调用 2 次，pendingItems 再调 1 次，
@@ -605,13 +596,36 @@ function showUntranslatedBadge(item: { sourceText: string; translatedText: strin
   return result
 }
 function computeUntranslatedBadge(item: { sourceText: string; translatedText: string }): boolean {
-  // v8.5: 同语系变体（CN→TW/HK、PT→PT-BR）共享字符集，源文=译文可能是正确的
-  const srcLang = detectSingleTextLanguage(item.sourceText)
-  if (isSameScriptLanguagePair(srcLang, targetLang.value)) {
-    return false // 同语系变体不显示漏翻标记
-  }
+  if (item.sourceText !== item.translatedText) return false
 
-  return !isUntranslatable(item.sourceText, glossaryMapForUi.value)
+  // 第一层：不可翻译 → 不显示
+  if (isUntranslatable(item.sourceText, glossaryMapForUi.value)) return false
+
+  // 逐条 necessity 分类（与后端 detectUntranslatedText 三层架构一致）
+  const necessity = classifyNecessity(item.sourceText, targetLang.value)
+
+  switch (necessity.kind) {
+    case 'translate':
+      // 跨字符集：源文==译文 → 漏翻
+      // 反向校验：拉丁目标语言，含目标语言功能词 → 已翻译，不显示
+      if (getTargetScript(targetLang.value) === 'latin' && hasFunctionWords(item.translatedText, targetLang.value)) {
+        return false
+      }
+      return true
+
+    case 'variant':
+      // 变体转换校验
+      if (necessity.conversion === 's2t') return hasSimplifiedOnlyChars(item.translatedText)
+      if (necessity.conversion === 't2s') return hasTraditionalOnlyChars(item.translatedText)
+      if (necessity.conversion === 'pt') {
+        return hasFunctionWords(item.translatedText, 'en') && !hasFunctionWords(item.translatedText, 'pt')
+      }
+      return false
+
+    case 'verify':
+      // 同语言：不显示
+      return false
+  }
 }
 
 /** v8.9: 检测译文是否含未还原的占位符（__GLOSSARY_N__/__PRD_N__ 等） */
@@ -917,6 +931,49 @@ const showConfig = ref(false)
 const showAdvanced = ref(false)
 const showStyleDetail = ref(false)
 
+// v10.1: 诊断日志面板（高级区，默认折叠；轮询版本号刷新，免深响应式）
+const showDiagLog = ref(false)
+const diagLogs = ref<UiLogEntry[]>([])
+let diagLogTimer: ReturnType<typeof setInterval> | null = null
+let diagLogSeenVersion = -1
+watch(showDiagLog, (open) => {
+  if (open) {
+    diagLogs.value = getUiLogs()
+    diagLogSeenVersion = getUiLogVersion()
+    diagLogTimer = setInterval(() => {
+      const v = getUiLogVersion()
+      if (v !== diagLogSeenVersion) {
+        diagLogSeenVersion = v
+        diagLogs.value = getUiLogs()
+      }
+    }, 500)
+  } else if (diagLogTimer) {
+    clearInterval(diagLogTimer)
+    diagLogTimer = null
+  }
+})
+const diagLogPre = ref<HTMLElement | null>(null)
+async function copyDiagLogs() {
+  const text = formatUiLogs() || '（暂无日志）'
+  try {
+    await navigator.clipboard.writeText(text)
+    showToast('日志已复制', 'success')
+  } catch {
+    // 剪贴板 API 不可用（MasterGo iframe 环境常见）：自动全选日志文本，用户 Ctrl+C 即可
+    const el = diagLogPre.value
+    if (el) {
+      const range = document.createRange()
+      range.selectNodeContents(el)
+      const sel = window.getSelection()
+      sel?.removeAllRanges()
+      sel?.addRange(range)
+      showToast('已全选日志，按 Ctrl+C 复制', 'warning')
+    } else {
+      showToast('复制失败，请手动全选日志文本复制', 'warning')
+    }
+  }
+}
+
 // v9.0: 统一进度条 — 优先级 apply > proofread > translate（同时只跑一个阶段）
 const busyPhase = computed((): 'translate' | 'proofread' | 'apply' | null => {
   if (applying.value) return 'apply'
@@ -1175,25 +1232,44 @@ function findHighFreqGlossaryTerms(
 
 
 // ============================================================
-/** 构建术语库映射表（EN key → 目标语言译文），供翻译和重翻复用 */
-function buildGlossaryMap(): Map<string, string> {
-  const map = new Map<string, string>()
+/** 术语库双视图：匹配类用 full（任意语言源文），判断类用 en（仅 EN source） */
+interface GlossaryMaps {
+  /** 全语言视图：任意语言列值→目标译文。供 短路/遮蔽/校准/合规校验/漏翻检测 匹配 */
+  full: Map<string, string>
+  /** EN 视图：仅 EN source→目标译文。供 场景过滤/noTranslateTerms/isUntranslatable 判断 */
+  en: Map<string, string>
+}
+
+/**
+ * 构建术语库映射表（双视图）。
+ * v9.9 无条件注册全部语言列 key（匹配任意源语言，含 auto 检测）。
+ * v9.10 拆分双视图：full 供匹配，en 供判断 —— 修复场景过滤/豁免/不翻判断误用全语言视图
+ * 导致的 R1(营销术语污染 prompt)/R4(跨语言同形词整句不翻)/R5(漏翻误判豁免)。
+ */
+function buildGlossaryMaps(): GlossaryMaps {
+  // EN 视图：仅 EN source（分类器 isMarketingTerm/isComplianceTerm 是 EN 精确匹配，只认这个）
+  const en = new Map<string, string>()
   for (const g of glossary.value) {
     const t = g.translations[targetLang.value]
-    if (t) map.set(g.source, t)
+    if (t) en.set(g.source, t)
   }
-  // 解决非EN源语言（如 zh-CN "无人机"）无法匹配术语库 key "Drones"（EN）的问题
-  if (sourceLang.value !== 'auto' && sourceLang.value !== 'en') {
-    const srcCol = sourceLang.value
-    for (const g of glossary.value) {
-      const srcVal = g.translations[srcCol]
-      const tgtVal = g.translations[targetLang.value]
-      if (srcVal && tgtVal && !map.has(srcVal)) {
-        map.set(srcVal, tgtVal)
+  // 全语言视图：EN 优先，再补其他语言列（先到者胜，撞 key 行为确定 + 观测）
+  const full = new Map<string, string>(en)
+  for (const g of glossary.value) {
+    const tgtVal = g.translations[targetLang.value]
+    if (!tgtVal) continue
+    for (const [lang, srcVal] of Object.entries(g.translations)) {
+      if (lang === targetLang.value) continue
+      if (srcVal) {
+        // 撞 key 观测：非 EN 列值与已注册 key 冲突且目标值不同 → 记录（不阻断，先到者胜）
+        if (full.has(srcVal) && full.get(srcVal) !== tgtVal) {
+          console.warn('[glossary] key collision:', srcVal.slice(0, 40), '→', full.get(srcVal)!.slice(0, 30), 'vs', tgtVal.slice(0, 30))
+        }
+        if (!full.has(srcVal)) full.set(srcVal, tgtVal)
       }
     }
   }
-  return map
+  return { full, en }
 }
 
 // ============================================================
@@ -1223,7 +1299,7 @@ async function startTranslate() {
   }
 
   try {
-    const glossaryMap = buildGlossaryMap()
+    const { full: glossaryMap, en: glossaryEnMap } = buildGlossaryMaps()
 
     // 构建归一化术语查找表（去®™© + 空白归一化），用于译前精确匹配跳过LLM
     const normalizedGlossaryMap = new Map<string, string>()
@@ -1241,8 +1317,9 @@ async function startTranslate() {
 
   // 任务级术语预计算：用全部源文本一次性过滤术语库，每个批次注入相同 glossaryHint
   // → system prompt 跨批次 100% 一致 → LLM API 自动缓存命中，后续批次不消耗 prompt token
+  // v9.10: 传 EN 视图 — 场景/营销/合规分类器是 EN 精确匹配，只对 EN source 有效
   const taskGlossaryHint = buildTaskGlossaryHint(
-    glossaryMap,
+    glossaryEnMap,
     llmConfig.value.scenePreset,
     allSourceTexts,
   )
@@ -1259,8 +1336,9 @@ async function startTranslate() {
   // 纯数字、单字符、纯存储规格文本直接沿用/本地转换，不请求 API
   let autoSkipped = 0
   // 预收集术语库中 source===target 的产品名（全语种保留的硬件型号/系列名，无需翻译）
+  // v9.10: 仅 EN 视图 — 其他语言列的同形值不触发整句不翻（修 R4 跨语言同形词漏翻）
   const noTranslateTerms = new Set<string>()
-  for (const [src, tgt] of glossaryMap) {
+  for (const [src, tgt] of glossaryEnMap) {
     if (src === tgt && src.length >= 4) {
       noTranslateTerms.add(src)
     }
@@ -1347,10 +1425,18 @@ async function startTranslate() {
   const proofreadEnabled = llmConfig.value.enableProofread
   let proofreadGlossaryHint: string | undefined
   let proofreadGlossaryMap: Map<string, string> | undefined
+  let proofreadNormalizedMap: Map<string, string> | undefined
   if (proofreadEnabled) {
-    proofreadGlossaryMap = buildGlossaryMap()
+    const { full, en } = buildGlossaryMaps()
+    proofreadGlossaryMap = full
+    // v9.10: 校对路径也构建归一化查找表，供合规校验锁死术语（与翻译管道对齐）
+    proofreadNormalizedMap = new Map<string, string>()
+    for (const [key, value] of full) {
+      const ck = cleanKey(key)
+      if (ck.length >= 3 && !proofreadNormalizedMap.has(ck)) proofreadNormalizedMap.set(ck, value)
+    }
     proofreadGlossaryHint = buildTaskGlossaryHint(
-      proofreadGlossaryMap,
+      en,
       llmConfig.value.scenePreset,
       items.value.map(it => it.sourceText),
     )
@@ -1414,9 +1500,18 @@ async function startTranslate() {
             const uncachedTexts = uncachedIndices.map(idx => texts[idx])
             // 翻译记忆：同型号不同容量/速度的文本压缩为唯一模板，减少 API 调用
             const { uniqueTexts, expandData } = compressBatch(uncachedTexts)
-            const uniqueResult = await translateBatch(uniqueTexts, targetLang.value, glossaryMap, llmConfig.value, sourceLang.value === 'auto' ? undefined : sourceLang.value, pageName.value || undefined, fileName.value || undefined, crossBatchTerms, taskGlossaryHint, normalizedGlossaryMap)
+            // v9.11: 收集管道最终仍漏翻（保留原文）的唯一条目 → 标记翻译失败（进待确认）
+            const uniqueUntranslated = new Set<number>()
+            const uniqueResult = await translateBatch(uniqueTexts, targetLang.value, glossaryMap, llmConfig.value, sourceLang.value === 'auto' ? undefined : sourceLang.value, pageName.value || undefined, fileName.value || undefined, crossBatchTerms, taskGlossaryHint, normalizedGlossaryMap, false, false, glossaryEnMap, uniqueUntranslated)
             // 将模板译文展开回原始文本
             const expandedResult = expandBatch(uniqueResult, expandData, uncachedTexts.length)
+            // v9.11: 唯一模板索引 → 展开后索引（同源文复制项共享同一模板译文，同样视为漏翻）
+            const expandedUntranslated = new Set<number>()
+            for (const u of uniqueUntranslated) {
+              for (let x = 0; x < expandedResult.length; x++) {
+                if (expandedResult[x] !== undefined && expandedResult[x] === uniqueResult[u]) expandedUntranslated.add(x)
+              }
+            }
             // v7.5.7: 追踪关键文本在各环节的值
             // 合并缓存+API结果
             translated = texts.map((_, idx) => {
@@ -1433,6 +1528,11 @@ async function startTranslate() {
                 cache[cacheKey(texts[srcIdx])] = resultText
               }
             }
+            // v9.11: 漏翻条目索引 → 本批次条目索引
+            for (const x of expandedUntranslated) {
+              const batchIdx = uncachedIndices[x]
+              if (batchIdx !== undefined) translateErrors.value.add(batch[batchIdx].nodeIds[0])
+            }
           } else {
             translated = cachedResult as string[]
           }
@@ -1443,6 +1543,13 @@ async function startTranslate() {
 
           for (let j = 0; j < batch.length; j++) {
             batch[j].translatedText = formatCJKSpace(translated[j] || '', targetLang.value)
+            // v9.7: 空结果且源文非空 → 标记翻译失败
+            // 管道内部兜底（激进翻译/逐句拆分/大小写归一化/术语组合）全部失败时，
+            // translateBatch 静默返回空字符串，UI 层无法感知 → 条目显示"待翻译"、
+            // 无徽章、无重翻按钮、无待确认。此处兜底标记，让用户能重翻。
+            if (!batch[j].translatedText.trim() && texts[j].trim()) {
+              translateErrors.value.add(batch[j].nodeIds[0])
+            }
           }
 
           // v8.4: 记录批次指标
@@ -1536,6 +1643,7 @@ async function startTranslate() {
                       pageName.value || undefined,
                       fileName.value || undefined,
                       proofreadGlossaryHint,
+                      proofreadNormalizedMap,
                     )
                     for (let j = 0; j < pBatch.length; j++) {
                       const proofed = batchResults[j]
@@ -1681,12 +1789,19 @@ async function startProofread() {
     return
   }
 
-  // 提前构建 glossaryMap，供校对后 enforceGlossaryTerms 兜底使用
-  const glossaryMap = buildGlossaryMap()
+  // 提前构建术语库双视图，供校对后 enforceGlossaryTerms 兜底 + 合规校验使用
+  const { full: glossaryMap, en: glossaryEnMap } = buildGlossaryMaps()
+  // v9.10: 校对路径归一化查找表，供合规校验锁死术语（与翻译管道对齐）
+  const proofreadNormalizedMap = new Map<string, string>()
+  for (const [key, value] of glossaryMap) {
+    const ck = cleanKey(key)
+    if (ck.length >= 3 && !proofreadNormalizedMap.has(ck)) proofreadNormalizedMap.set(ck, value)
+  }
 
   // 任务级术语预计算：用全部源文本一次性过滤 → 校对各批次 system prompt 100% 一致 → 缓存命中
+  // v9.10: 传 EN 视图 — 场景/营销/合规分类器是 EN 精确匹配
   const proofreadGlossaryHint = buildTaskGlossaryHint(
-    glossaryMap,
+    glossaryEnMap,
     llmConfig.value.scenePreset,
     items.value.map(it => it.sourceText),
   )
@@ -1719,6 +1834,7 @@ async function startProofread() {
               pageName.value || undefined,
               fileName.value || undefined,
               proofreadGlossaryHint,
+              proofreadNormalizedMap,
             )
             for (let j = 0; j < batch.length; j++) {
               const proofed = batchResults[j]
@@ -2126,16 +2242,17 @@ async function retryFailedTranslations() {
     }
   }
 
-  // 构建术语库并调用翻译
-  const glossaryMap = buildGlossaryMap()
+  // 构建术语库双视图并调用翻译
+  const { full: glossaryMap, en: glossaryEnMap } = buildGlossaryMaps()
 
   const crossBatchTerms = findHighFreqGlossaryTerms(
     items.value.map(it => it.sourceText), glossaryMap,
   )
 
   // 任务级术语预计算：用全部源文本一次性过滤 → system prompt 跨批次一致 → 缓存命中
+  // v9.10: 传 EN 视图 — 场景/营销/合规分类器是 EN 精确匹配
   const taskGlossaryHint = buildTaskGlossaryHint(
-    glossaryMap,
+    glossaryEnMap,
     llmConfig.value.scenePreset,
     items.value.map(it => it.sourceText),
   )
@@ -2143,6 +2260,7 @@ async function retryFailedTranslations() {
   translating.value = true
   cancelFlag.value = false
   translateProgress.value = { current: 0, total: failedItems.length }
+  uiLog('retry', `开始重翻 ${failedItems.length} 条失败条目 → ${targetLang.value}`)
 
   // 分批处理失败项
   for (let i = 0; i < failedItems.length; i += TRANSLATE_BATCH_SIZE) {
@@ -2153,20 +2271,33 @@ async function retryFailedTranslations() {
     try {
       // 翻译记忆：同型号不同容量/速度的文本压缩为唯一模板
       const { uniqueTexts, expandData } = compressBatch(texts)
+      // v9.11: 收集管道最终仍漏翻的唯一条目 → 标记翻译失败（进待确认，可再次重翻）
+      const uniqueUntranslated = new Set<number>()
       const uniqueResult = await translateBatch(
         uniqueTexts, targetLang.value, glossaryMap, llmConfig.value,
         sourceLang.value === 'auto' ? undefined : sourceLang.value,
         pageName.value || undefined, fileName.value || undefined,
         crossBatchTerms, taskGlossaryHint,
+        undefined, false, false, glossaryEnMap,
+        uniqueUntranslated,
       )
       const expandedResult = expandBatch(uniqueResult, expandData, texts.length)
       for (let j = 0; j < batch.length; j++) {
         batch[j].translatedText = formatCJKSpace(expandedResult[j] || '', targetLang.value)
       }
+      // v9.11: 唯一模板索引 → 展开后索引（同源文复制项共享模板译文）
+      for (const u of uniqueUntranslated) {
+        for (let j = 0; j < expandedResult.length; j++) {
+          if (expandedResult[j] !== undefined && expandedResult[j] === uniqueResult[u]) {
+            translateErrors.value.add(batch[j].nodeIds[0])
+          }
+        }
+      }
     } catch (e) {
       for (const item of batch) {
         translateErrors.value.add(item.nodeIds[0])
       }
+      uiLog('retry', `❌ 重翻批次异常: ${e instanceof Error ? e.message : String(e)}`)
       console.error('[translate] retry batch failed', e)
     }
     translateProgress.value = { current: Math.min(i + TRANSLATE_BATCH_SIZE, failedItems.length), total: failedItems.length }
@@ -2179,6 +2310,7 @@ async function retryFailedTranslations() {
 
   const succeeded = failedItems.filter(it => it.translatedText && !translateErrors.value.has(it.nodeIds[0])).length
   const stillFailed = translateErrors.value.size
+  uiLog('retry', `重翻结束: 成功 ${succeeded} 条, 仍失败 ${stillFailed} 条`)
   if (succeeded > 0 && stillFailed === 0) {
     showToast(`重翻成功 ${succeeded} 条`, 'success')
   } else if (succeeded > 0) {
@@ -2521,7 +2653,9 @@ async function retranslateSingle(item: TextItem) {
   retranslatingIds.value.add(id)
 
   try {
-    const glossaryMap = buildGlossaryMap()
+    const glossaryMap = buildGlossaryMaps().full
+    // v9.11: 收集管道最终仍漏翻的条目 — 模型顽固保留原文时不再静默成功
+    const untranslated = new Set<number>()
     const results = await translateBatch(
       [item.sourceText],
       targetLang.value,
@@ -2530,8 +2664,15 @@ async function retranslateSingle(item: TextItem) {
       sourceLang.value === 'auto' ? undefined : sourceLang.value,
       pageName.value || undefined,
       fileName.value || undefined,
+      undefined, undefined, undefined, false, false, undefined,
+      untranslated,
     )
-    if (results[0]) {
+    if (untranslated.size > 0) {
+      // v9.11: 兜底链全失败 → 保留原文 + 标记失败（待确认可见 + 可重翻）
+      item.translatedText = item.sourceText
+      translateErrors.value.add(id)
+      showToast('重翻未成功：模型多次返回原文，已标记为翻译失败', 'error')
+    } else if (results[0]) {
       item.translatedText = formatCJKSpace(results[0], targetLang.value)
       // 清空旧校对状态（重翻后旧校对结论已无效）
       item.proofreadText = ''
@@ -2541,8 +2682,11 @@ async function retranslateSingle(item: TextItem) {
       for (const nid of item.nodeIds) {
         appliedNodeIds.value.delete(nid)
       }
+      translateErrors.value.delete(id)
       showToast('已重新翻译', 'success')
     } else {
+      // v9.11: 空结果也标记失败（此前只弹 toast，条目状态不变，用户无处可查）
+      translateErrors.value.add(id)
       showToast('重翻失败：返回结果为空', 'error')
     }
   } catch (e) {

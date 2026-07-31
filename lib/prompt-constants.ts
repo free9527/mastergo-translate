@@ -2400,6 +2400,13 @@ Fix ALL objective errors. Do NOT make subjective changes.
 [CHECK 1: COMPLETENESS]
 - No additions: Do NOT add information, specs, or marketing language not in the source.
 - No omissions: Do NOT remove information present in the source.
+- TRUNCATION CHECK (information-level, NOT length-level): Compare the source and
+  translation information point by information point. A translation that is much shorter
+  than the source is OFTEN CORRECT for compact scripts (e.g., Portuguese/English →
+  Japanese/Korean/Chinese can shrink 3-5x). ONLY flag as truncated (reason 漏翻) when
+  a distinct information element from the source is completely missing in the translation
+  (e.g., source says "resistant to high temperatures AND dust-proof" but the translation
+  covers only the temperature part).
 
 [CHECK 2: MEANING & NATURALNESS]
 - Factual errors: Fix wrong numbers, specs, or features.
@@ -2419,6 +2426,20 @@ Fix ALL objective errors. Do NOT make subjective changes.
   the same in both source and target language (e.g., "Drone" → "Drone" in Portuguese,
   "Tablet" → "Tablet" in German, "Hotel" → "Hotel" in French). These are CORRECT
   translations, not untranslated text.
+- VARIANT-SPECIFIC CHECKS (target variant differs from source variant):
+  * Simplified→Traditional Chinese (zh-CN→zh-TW): Ensure converted characters use
+    Traditional forms. Some words are written identically in both variants (e.g., "高速"
+    is correct in Traditional), but contextually preferred vocabulary may differ
+    (e.g., "数据" vs "資料" — prefer the Traditional market term when context requires it).
+  * Traditional→Simplified Chinese (zh-TW→zh-CN): Ensure converted characters use
+    Simplified forms. Same rule: identical-looking words are acceptable, but prefer
+    Simplified market vocabulary when context requires it.
+  * European→Brazilian Portuguese (pt→pt-BR): Ensure Brazilian market vocabulary
+    (e.g., "ficheiro" → "arquivo", "ecrã" → "tela"). Identical spelling is acceptable
+    only when both variants genuinely share the same word.
+- VERY SHORT TEXT (1-2 words): If the text is extremely short and lacks grammatical
+  context, use your judgment based on the surrounding batch context. If uncertain,
+  prefer to translate rather than keep the source.
 - Decision tree: (1) Has verbs/adjectives/prepositions? → MUST translate.
   (2) Is it ONLY a product code with zero descriptive words? → keeping English is correct.
   (3) Is it a common international word spelled the same in target language? → keeping it is correct.
@@ -2482,6 +2503,10 @@ export const PROOFREAD_SYSTEM_PROMPT_ZH = `[角色]
 [检查1: 完整性]
 - 无增译：不添加源文中没有的信息、规格或营销话术。
 - 无漏译：不删除源文中存在的信息。
+- 截断检查（按信息点判定，不按长度判定）：逐信息点比对源文与译文。
+  译文比源文短得多往往是正确的——拉丁语→日/韩/中文天然收缩 3-5 倍。
+  仅当源文中的某个独立信息要素在译文中完全缺失时才判截断（reason 漏翻），
+  例如源文为"耐高温且防尘"，译文只覆盖了温度部分。
 
 [检查2: 语义与自然度]
 - 事实错误：修正错误的数字、规格或功能描述。
@@ -2500,6 +2525,16 @@ export const PROOFREAD_SYSTEM_PROMPT_ZH = `[角色]
 - 例外（不标记）：跨语言同形词 — 在源语言和目标语言中拼写相同的词
   （如 "Drone" → "Drone" 在葡萄牙语中，"Tablet" → "Tablet" 在德语中，
   "Hotel" → "Hotel" 在法语中）。这些是正确的翻译，不是漏翻。
+- 变体专项检查（源文与目标为不同语言变体）：
+  * 简体→繁体（zh-CN→zh-TW）：确保转换后的字符使用繁体形式。部分词汇简繁同形
+    （如"高速"在繁体中也是正确写法），但上下文要求时优先使用繁体市场词汇
+    （如"数据"→"資料"）。
+  * 繁体→简体（zh-TW→zh-CN）：确保转换后的字符使用简体形式。同理，简繁同形词
+    可接受，但上下文要求时优先使用简体市场词汇。
+  * 欧葡→巴葡（pt→pt-BR）：确保使用巴西市场词汇
+    （如 "ficheiro"→"arquivo"，"ecrã"→"tela"）。拼写相同仅当两变体确实共用该词时可接受。
+- 极短文本（1-2 个词）：若文本极短且缺乏语法上下文，根据批次上下文判断。
+  不确定时，优先翻译而非保留源文。
 - 判定树：(1) 含动词/形容词/介词？→ 必须翻译。
   (2) 仅是纯产品代码，无任何描述词？→ 保留英文是正确的。
   (3) 是常见的国际词汇，在目标语言中拼写相同？→ 保留是正确的。

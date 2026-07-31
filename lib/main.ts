@@ -24,6 +24,26 @@ const originalTexts = new Map<string, string>()
  *  用户在画布上手改过的节点跳过，避免撤销吞掉用户改动。 */
 const appliedTexts = new Map<string, string>()
 
+// ® 符号修复：仅 Avenir 字体的 ® 渲染异常（过大且非上标），统一替换为 HarmonyOS Sans SC。
+// 已手动设为 HarmonyOS 的单字符跳过，避免覆盖用户设置。
+const REGISTER_FIX_FAMILY = 'HarmonyOS Sans SC'
+function fixRegisterSymbolFont(node: TextNode, rawStyle: string, effectiveFamily: string) {
+  if (effectiveFamily !== 'Avenir') return
+  const text = node.characters
+  if (text.indexOf('®') === -1) return
+  const effectiveStyle = AVENIR_TO_HARMONYOS_STYLE[rawStyle] || rawStyle
+  let idx = -1
+  while ((idx = text.indexOf('®', idx + 1)) !== -1) {
+    try {
+      // 注意：MasterGo 文本节点目前无 getRangeFontName，无法按字符读字体；直接写 ® 区间。
+      node.setRangeFontName(idx, idx + 1, {
+        family: REGISTER_FIX_FAMILY,
+        style: effectiveStyle,
+      })
+    } catch (_) { /* 单字符字体设置失败不影响整体 */ }
+  }
+}
+
 mg.showUI(__html__, { width: UI_WIDTH, height: UI_HEIGHT })
 
 // v9.1 #8: 选区变化实时推送，UI 据此禁用"选中对象扫描"（无选区时点击只会报错）
@@ -142,24 +162,6 @@ async function applyTranslations(items: TextItem[]): Promise<void> {
   const failedNodeIds: string[] = []
 
   const fontSet = new Set<string>()
-  // Avenir 字体的 ® 符号渲染异常（过大且非上标），单独替换为 HarmonyOS Sans SC
-  function fixAvenirRegisterSymbol(node: TextNode, item: TextItem) {
-    const effectiveFamily = item.targetFontFamily || item.fontFamily
-    if (effectiveFamily !== 'Avenir') return
-    const text = item.translatedText
-    const symbol = '®'
-    let idx = -1
-    const rawStyle = item.targetFontStyle || item.fontStyle || 'Regular'
-    const effectiveStyle = AVENIR_TO_HARMONYOS_STYLE[rawStyle] || rawStyle
-    while ((idx = text.indexOf(symbol, idx + 1)) !== -1) {
-      try {
-        node.setRangeFontName(idx, idx + 1, {
-          family: 'HarmonyOS Sans SC',
-          style: effectiveStyle,
-        })
-      } catch (_) { /* 单字符字体设置失败不影响整体 */ }
-    }
-  }
 
   function applyTextStyle(node: TextNode, item: TextItem) {
     const len = item.translatedText.length
@@ -234,8 +236,17 @@ async function applyTranslations(items: TextItem[]): Promise<void> {
 
   for (let i = 0; i < itemsWithTranslation.length; i++) {
     const item = itemsWithTranslation[i]
-    // 译文与源文相同，跳过无意义替换
+    // 译文与源文相同，跳过文本替换；但 ® 字体修复仍要执行（同语言/不翻译场景 Avenir 的 ® 也须修复）
     if (item.translatedText === item.sourceText) {
+      const rawStyle = item.targetFontStyle || item.fontStyle || 'Regular'
+      const effectiveFamily = item.targetFontFamily || item.fontFamily
+      for (const nodeId of item.nodeIds) {
+        const node = mg.getNodeById<TextNode>(nodeId)
+        if (!node) continue
+        try {
+          fixRegisterSymbolFont(node, rawStyle, effectiveFamily)
+        } catch (e) { /* 单字符字体设置失败不影响整体 */ }
+      }
       done++
       continue
     }
@@ -284,7 +295,11 @@ async function applyTranslations(items: TextItem[]): Promise<void> {
           appliedTexts.set(nodeId, item.translatedText)
           try {
             applyTextStyle(node, item)
-            fixAvenirRegisterSymbol(node, item)
+            fixRegisterSymbolFont(
+              node,
+              item.targetFontStyle || item.fontStyle || 'Regular',
+              item.targetFontFamily || item.fontFamily,
+            )
           } catch (styleErr) {
             console.warn('[translate] style apply failed for node', nodeId, styleErr)
           }
@@ -379,19 +394,10 @@ async function applyFontsOnly(payloads: FontPayload[]): Promise<void> {
             family: p.targetFontFamily,
             style: p.targetFontStyle || 'Regular',
           })
-          // ® 符号修复：所有字体替换后都执行，防止 ® 渲染异常（过大/非上标）
-          const text = node.characters
-          let idx = -1
-          const rawFixStyle = p.targetFontStyle || p.fontStyle || 'Regular'
-          const fixStyle = AVENIR_TO_HARMONYOS_STYLE[rawFixStyle] || rawFixStyle
-          while ((idx = text.indexOf('®', idx + 1)) !== -1) {
-            try {
-              node.setRangeFontName(idx, idx + 1, {
-                family: 'HarmonyOS Sans SC',
-                style: fixStyle,
-              })
-            } catch (_) {}
-          }
+          // ® 符号修复：替换前后任一字体为 Avenir 时执行（Avenir 的 ® 渲染异常），
+          // 每次写入前 MasterGo 内部会合并区间，重复写同字符无额外副作用
+          fixRegisterSymbolFont(node, p.targetFontStyle || p.fontStyle || 'Regular', p.targetFontFamily)
+          fixRegisterSymbolFont(node, p.targetFontStyle || p.fontStyle || 'Regular', p.fontFamily)
         }
         if (p.targetFontSize > 0) {
           node.setRangeFontSize(0, textLen, p.targetFontSize)
