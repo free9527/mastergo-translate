@@ -1310,6 +1310,33 @@ function buildGlossaryMaps(): GlossaryMaps {
 }
 
 // ============================================================
+// ═══ v11.2.2: 新产品名静默入库（抽函数，startTranslate 两处调用）═══
+// 背景：单条产品名被 normalizedGlossaryMap 短路、零 API 的场景下，startTranslate 会提前
+// return（apiTotal===0 && autoSkipped===total 分支），尾部入库块被跳过，专属库永远漏这条。
+// 抽成函数后两处调用：① apiTotal===0 提前 return 前 ② 正常走完到尾部。
+function persistAdhocProductNames(adhocDetected: ReturnType<typeof detectAdhocProductTerms>) {
+  if (adhocDetected.length === 0) return
+  let addedCount = 0
+  for (const d of adhocDetected) {
+    const already = glossaryExclusive.value.some(g => g.source === d.term) ||
+      glossaryProducts.value.some(g => g.source === d.term)
+    if (already) continue
+    const gen = generateProductNameTranslations(d.term, d.series)
+    const translations: Record<string, string> = {}
+    for (const [lang, val] of Object.entries(gen.translations)) {
+      if (lang !== 'en') translations[lang] = val  // en = source 本身，不重复入库
+    }
+    glossaryExclusive.value.push({ source: d.term, translations })
+    addedCount++
+  }
+  if (addedCount > 0) {
+    saveGlossaryExclusive()
+    const terms = adhocDetected.map(d => d.term)
+    uiLog('translate', `v11.2 新产品名已静默入库 ${addedCount} 条（20 语种）: ${terms.slice(0, 5).join(', ')}${terms.length > 5 ? ' …' : ''}`)
+    showToast(`已按命名规则自动入库 ${addedCount} 个新产品名（20 语种），中文营销名待补`, 'success')
+  }
+}
+
 async function startTranslate() {
   if (!settingsReady || !glossaryReady) {
     showToast('插件正在初始化，请稍后再试...', 'warning')
@@ -1451,10 +1478,14 @@ async function startTranslate() {
     translating.value = false
     resizeAllTextareas()
     if (autoSkipped === total) {
+      // v11.2.2: 全短路场景（单条产品名被 normalizedGlossaryMap 短路、零 API）也要入库，
+      // 否则"检测→生成→短路"成功但"入库"被提前 return 跳过，专属库永远漏这条。
+      persistAdhocProductNames(adhocDetected)
       showToast(`已沿用 ${autoSkipped} 条文本（数字/单字符无需翻译）`, 'success')
       return
     }
     // 全部已翻译：如果开启了校对，直接执行校对（支持校对失败后重试）
+    persistAdhocProductNames(adhocDetected)  // v11.2.2: 部分短路+部分已译场景同样入库
     if (llmConfig.value.enableProofread) {
       showToast('翻译已完成，执行 AI 校对...', 'info')
       try {
@@ -1865,26 +1896,7 @@ async function startTranslate() {
   // 检测到的未收录产品名，按五槽位+语序模板生成 20 语种译名，静默写入专属术语库。
   // 入库 key = 整条原文去®（与 CSV 惯例一致：140 条全部无®，cleanKey 模糊匹配天然命中带®变体）。
   // 只对产品名生效；系列/型号/规格全语种保留，品类词按 CSV 现状译法；中文营销名留空待补。
-  if (adhocDetected.length > 0) {
-    let addedCount = 0
-    for (const d of adhocDetected) {
-      const already = glossaryExclusive.value.some(g => g.source === d.term) ||
-        glossaryProducts.value.some(g => g.source === d.term)
-      if (already) continue
-      const gen = generateProductNameTranslations(d.term, d.series)
-      const translations: Record<string, string> = {}
-      for (const [lang, val] of Object.entries(gen.translations)) {
-        if (lang !== 'en') translations[lang] = val  // en = source 本身，不重复入库
-      }
-      glossaryExclusive.value.push({ source: d.term, translations })
-      addedCount++
-    }
-    if (addedCount > 0) {
-      saveGlossaryExclusive()
-      uiLog('translate', `v11.2 新产品名已静默入库 ${addedCount} 条（20 语种）: ${adhocTerms.slice(0, 5).join(', ')}${adhocTerms.length > 5 ? ' …' : ''}`)
-      showToast(`已按命名规则自动入库 ${addedCount} 个新产品名（20 语种），中文营销名待补`, 'success')
-    }
-  }
+  persistAdhocProductNames(adhocDetected)
 
   // v8.4: 完成指标收集并显示报告
   const metrics = finalizeMetrics()

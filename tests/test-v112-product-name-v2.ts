@@ -203,6 +203,41 @@ ok(dGen.translations['ar'].startsWith('SSD داخلي'), 'D6 ar 品类前置RTL'
 ok(dGen.translations['nl'] === 'Interne SSD Lexar NF100 2.5-inch SATA III', 'D7 nl 内置全称', dGen.translations['nl'])
 
 // ═══════════════════════════════════════════════════════════════
+// E. v11.2.2 入库短路场景（apiTotal===0 提前 return 也入库）
+// ═══════════════════════════════════════════════════════════════
+out.push('─'.repeat(50))
+out.push('E. v11.2.2 入库短路场景')
+
+// E1: 短路场景语义 — 产品名并入 normalizedGlossaryMap 后，整条短路命中（模拟 App.vue:1402）
+//   此场景下 startTranslate 提前 return（autoSkipped===total），v11.2.1 及之前入库块被跳过。
+//   v11.2.2 抽 persistAdhocProductNames 到两处调用，此处验证"短路场景也能拿到入库所需数据"。
+const e1Src = 'Lexar® Professional SILVER GO microSDXC™ UHS-I Card'
+const e1Detected = detectAdhocProductTerms([e1Src], emptyGlossary)
+ok(e1Detected.length === 1, 'E1 短路场景检测命中', JSON.stringify(e1Detected))
+const e1Term = e1Detected[0].term
+ok(e1Term === 'Lexar Professional SILVER GO microSDXC UHS-I Card', 'E2 入库 key 去®™', e1Term)
+// 模拟 normalizedGlossaryMap 短路（App.vue:1424 cleanKey 匹配）
+const e1Ck = e1Term.toLowerCase().replace(/[®™©]/g, '').replace(/\s+/g, ' ').trim()
+const e1SrcCk = e1Src.toLowerCase().replace(/[®™©]/g, '').replace(/\s+/g, ' ').trim()
+ok(e1Ck === e1SrcCk, 'E3 源文与入库 key cleanKey 一致（短路命中前提）', `${e1Ck} vs ${e1SrcCk}`)
+// 模拟 persistAdhocProductNames 的 already 判重：首次入库 already=false
+const e1Exclusive: Array<{ source: string }> = []
+const e1Products: Array<{ source: string }> = []
+const e1Already = e1Exclusive.some(g => g.source === e1Term) || e1Products.some(g => g.source === e1Term)
+ok(!e1Already, 'E4 首次入库 already=false（不被判重拦截）')
+// 模拟重复入库：已在专属库 → already=true（防重复）
+e1Exclusive.push({ source: e1Term })
+const e1Already2 = e1Exclusive.some(g => g.source === e1Term)
+ok(e1Already2, 'E5 重复入库 already=true（防重复）')
+// E6: 入库 translations 不含 en 列（en=source 本身，不重复入库）
+const e1Gen = generateProductNameTranslations(e1Term, e1Detected[0].series)
+const e1Translations: Record<string, string> = {}
+for (const [lang, val] of Object.entries(e1Gen.translations)) {
+  if (lang !== 'en') e1Translations[lang] = val
+}
+ok(!('en' in e1Translations) && Object.keys(e1Translations).length === 19, 'E6 入库 19 语种（不含 en）', JSON.stringify(Object.keys(e1Translations)))
+
+// ═══════════════════════════════════════════════════════════════
 // 汇总
 // ═══════════════════════════════════════════════════════════════
 out.push('─'.repeat(50))
