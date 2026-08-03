@@ -1,7 +1,7 @@
 # 项目交接文档
 
 **日期**: 2026-08-03  
-**版本**: v10.8  
+**版本**: v11.2.1  
 **项目**: Lexar 翻译插件（MasterGo 插件）
 
 ---
@@ -28,11 +28,133 @@ MasterGo 设计工具插件，将 Lexar 产品设计稿从英文翻译成 20 个
 | 五 | 格式规范统一 | 标点/大小写/数字单位全篇统一，遵循目标语言书写规范 |
 | 六 | 合规与文化适配 | 目标市场法规/宗教文化禁忌；法律声明逐字对应 |
 
-**现有 prompt 各模块与六维的对应关系**（评审时对照）：一→CORE_PRINCIPLES #2 + detectBrandInjection/validateNumbers；二→IDENTITY_MISSION + LANGUAGE_MARKET_NOTES + LANG_SPECIFIC；三→CATEGORY_WORDS + glossaryHint + enforceGlossaryTerms；四→PRODUCT_LINE_TONE_GUIDES + STYLE_GUIDES + SCENE_CONSTRAINTS；五→OUTPUT format + restoreTrademarkSymbols/capitalizeFirstLetter；六→LANG_SPECIFIC.compliance + SCENE_CONSTRAINTS.compliance_doc。
+**现有 prompt 各模块与六维的对应关系**（评审时对照）：一→CORE_PRINCIPLES #2 + detectBrandInjection/validateNumbers；二→IDENTITY_MISSION + LANGUAGE_MARKET_NOTES + LANG_SPECIFIC（**v11.0 起翻译与校对双端闭环**：翻译经 getStyleCard 注入分段市场语感，校对经 buildProofreadCalibration 注入同源同段白名单）；三→CATEGORY_WORDS + glossaryHint + enforceGlossaryTerms；四→PRODUCT_LINE_TONE_GUIDES + STYLE_GUIDES + SCENE_CONSTRAINTS（翻译端）；五→OUTPUT format + restoreTrademarkSymbols/capitalizeFirstLetter；六→LANG_SPECIFIC.compliance + SCENE_CONSTRAINTS.compliance_doc。
 
 ---
 
-## 二、当前版本（v10.8）
+## 二、当前版本（v11.2.1）
+
+### 2.0.0-pre v11.2.1 全品线扫描缺口修复（2026-08-03，真实产品名误杀清零 + 已知系列新子型号入库）
+
+**背景**：v11.2 上线后用 52 个全品线形态用例（CSV 140 条变体 + 假想新品 + 用户提供的 2 个真实新品）扫描，发现 7 个真实产品名被解析器误杀、1 个语义缺口导致已知系列新子型号不入库。
+
+**修复**（全部在 `lib/new-product-detect.ts`）：
+
+| # | 缺口 | 修复 | 验证用例 |
+|---|------|------|---------|
+| 1 | ™在规格 token 上（`microSDXC™`）被吞进系列串 → valid:false | 一切判定基于 `stripTrademark` 后的裸 token | `Lexar® Professional SILVER GO microSDXC™ UHS-I Card`（用户真实新品）✅ |
+| 2 | 斜杠双格式（`microSDHC/microSDXC`）混入系列串 | `SLASH_SPEC_RE` 终止系列串 | `BLUE PLUS microSDHC/microSDXC` ✅ |
+| 3 | 单字母系列修饰（`PLAY X`/`THOR Z`）被"≥2字符"拒 | 系列串允许单大写字母 token | `PLAY X`、`THOR Z RGB`、`TITAN X` ✅ |
+| 4 | `with` 配件话术（`with Heatsink/Hub`）被功能词误杀 | `with` 移出 FUNCTION_WORDS_RE（命名规则文档定义的标准话术） | `EQ790 with Heatsink`、`Go Portable SSD with Hub` ✅ |
+| 5 | 括号规格（`(6Gb/s)`/`(EOL)`）被 NAME_SHAPE_RE 拒 | 形态门加 `()` + `PAREN_SPEC_RE` 终止系列串 | `NM100 (6Gb/s)`、`M900 (EOL)` ✅ |
+| 6 | `Type A/B` 单字母规格后缀被功能词"a"误杀 | `SPEC_LETTER_CONTEXT_RE` 豁免（`Type/USB/Gen + A-C`、`/A-C`、`-A/` 是规格代号不是冠词） | `CFexpress Type A`、`USB-A/C Reader` ✅ |
+| 7 | **已知系列新子型号不入库**（语义缺口） | 新颖性门 2 语义修正：仅"裸已知系列"（整条==锚点+系列名）才跳过；整条新颖性由门 1 判定。ARES 已知 ≠ `Lexar ARES PCIe Gen4x4 M.2 2280 NVMe SSD` 整条已知 | 用户 ARES 用例 ✅ |
+
+另修 2 个隐藏 bug：`Type`/`B` 进 SPEC_TOKENS（CFexpress Type A/B 终止系列串）；`CAPACITY_TOKEN_RE` 的 `\d{2,5}` 漏掉单数字容量（`2TB`），改为 `\d{1,5}` 并在系列串尾部剥离容量 token（"TITAN 2TB"→series 只留 TITAN）。
+
+**全品线扫描结果**：52 用例检出 45 → 剩 7 个未检出全是合理的（2 个已在术语库被新颖性门拦 + 4 个已在 CSV 的已知型号 + 1 个对照组）。
+
+**测试**：`tests/test-v112-product-name-v2.ts` 42 断言全绿（A 检测 22 含 A14-A22 九个新缺口用例 + B 生成并入 6 + C 入库语义 6 + D NF100 端到端 8）。
+- 全量回归：v9.9+v9.10 (33) + v10.0 (21) + v10.2 (38) + v10.5 (39) + v10.6 (46) + v10.7 (14) + v10.8 (21) + v10.9 (86) + v11.0 (91) + v11.1 (42) 全绿；typecheck 双配置 + build 通过。
+
+**已知遗留（诚实声明）**：`nCARD NM card`/`Multi-Card`/`Dual-Slot` 等连字符/小写读卡器配件形态未检出（P2 低风险，LLM 直译可接受）；命名规则文档与 CSV 的 5 处品类词偏差（ja 内蔵SSD/ko 내장SSD/fr Disque SSD interne/zh-TW 桌上型記憶體/id Card Reader）未动，生成表仍以 CSV 现状为准（保证新品名与已有 140 条风格统一）。
+
+---
+
+### 2.0.0-pre v11.2 新产品名宏观方案（2026-08-03，代码/LLM 各司其职 + 整条入库 + 生成译名首轮并入）
+
+**背景**：v11.1 用真实产品名 `Lexar® NF100 2.5-inch SATA III SSD` 复盘暴露两个致命缺陷——® 把锚点门整体打死（`lexar® ≠ lexar`，设计稿常态写法全部失效）；系列名被当成必填槽（CSV 42/140 是纯型号形态无系列名，NF100/NM790/ES3 全被拒之门外）。用户拍板宏观方向：充分利用代码和 LLM 的特性，两者结合各自守住边界。
+
+**方案**（`lib/new-product-detect.ts` + `lib/product-name-generator.ts` + `ui/App.vue`）：
+
+```
+代码判定（确定性，LLM 不参与）：整条独立 + Lexar锚点(®=强信号) + 品类词指纹 + 无动词/功能词
+        ↓
+代码翻译（五槽位+语序模板+品类译法表，零 LLM）：生成 20 语种厂形译名
+        ↓
+首轮：当前目标语种译名并入 glossaryMap → S1 整条短路直接输出（LLM 不碰产品名）
+长期：无®整条 + 20 语种静默写入专属术语库 → 下次零成本 + 校对同世界
+```
+
+**关键语义**（与用户确认）：
+- **® 处理**：带 ® 是"完整产品名"强信号；入库 key 一律去 ®（与 CSV 140 条无®惯例对齐）；`cleanKey` 匹配时剥离 ®™© → 无® key 天然命中带®变体（模糊匹配成立）；`restoreTrademarkSymbols` 译后按源文加回 ®。
+- **系列名可选槽**：锚点后允许直接跟型号/规格（覆盖 42/140 纯型号形态）。
+- **候选术语=整条原文**（去®）：与 CSV key 惯例对齐，吃 S1 短路 + 跨批次一致性。
+- **品类词必含门**：`detectCategory ≠ null` 才判定产品名（规则文档严格界定的 11 个核心品类词是"产品名"指纹）。
+- **中文营销名留空**：ARES→战神/THOR→雷神 内部不一致、Air→小轻块为特例，均不可安全自动继承，由用户日后补全。
+
+**改动**：
+1. `new-product-detect.ts` — ®修复 + 系列可选 + 整条候选 + 品类指纹门 + SPEC_TOKENS 扩充（UDIMM/SODIMM/MHz/CL值等内存规格）
+2. `App.vue` — 首轮并入改为**当前目标语种生成译名**（替代 v11.1 的 source===target 原样并入），zh-TW 走 `zhCNtoZhTW` 简繁兜底；静默入库写无®整条；独立校对路径同世界并入
+3. `product-name-generator.ts` — 商标符号语义明确化（输入/输出均无®）
+
+**测试**：`tests/test-v112-product-name-v2.ts` 33 断言全绿；NF100 复盘脚本确认 S1 短路命中厂形译文（fr `SSD Lexar NF100 2.5-inch SATA III`）、遮蔽路径整体 `__GLOSSARY_0__` 占位（不再零件拼装）。
+
+---
+
+### 2.0.0-pre v11.1 新产品名检测+20语种生成（2026-08-03，初版——已被 v11.2 取代，仅留档追溯）
+
+**背景**：术语库未收录的新产品名（THOR Ultra/VELOCIS）裸奔进 LLM，可能被翻译/音译污染 20 语种。
+
+**初版方案**：检测（形态门+锚点门+新颖性门）→ adhoc 并入（source===target 原样保护）→ 翻译完成后按五槽位规则生成 20 语种静默入库。
+
+**两个新模块**：
+- `lib/new-product-detect.ts` — 五槽位解析 + 三重门检测
+- `lib/product-name-generator.ts` — 20 语种品类词译法表（CSV 现状为准）+ 语序模板（suffix: zh-CN/zh-TW/ja/ko/de/en；prefix: 其余 13 语种；vi 按品类分前置/后置/外设保留英文）+ 简→繁转换
+
+**缺陷（v11.2 已修）**：® 锚点门失效 + 系列名必填（漏 30% 纯型号形态）+ 候选术语是片段非整条 + 首轮仅原样保护非厂形译文。
+
+---
+
+### 2.0.0-pre v11.0 校对市场语感校准（2026-08-03，翻译↔校对上下文闭环）
+
+**背景**：用户重申最终目标——"匹配目标语言国家语言习惯和产品对应人群与使用场景，同时保证可靠性：不漏翻、不加戏、意思与原文一致，适配 20 个语种"。对照六维评审表发现：维度二（本地化表达）的模块（IDENTITY_MISSION + LANGUAGE_MARKET_NOTES + LANG_SPECIFIC）中，**市场语感只注入了翻译，没注入校对**——校对把翻译故意使用的正确市场原生词（满血版/가성비/Preis-Leistung）误当"不自然表达"拦下，v10.9 的分段红利被校对吃掉。翻译和校对看到的世界不一致，闭环只闭了长度信号（v10.8）和术语库两个通道。
+
+**改动**（`lib/prompt-constants.ts` + `lib/llm-api.ts`）：
+
+| # | 改动 | 要点 |
+|---|------|------|
+| 1 | `buildProofreadCalibration()` 新增 | 与翻译**同源同段**（复用 `getMarketNote`，保证两个 LLM 拿到同一份词汇表）+ **双向边界指令**：① 白名单校准（这些词已获准，不得当不自然/误译拦截改写）② 禁止加词（源文没有依据的促销/风味词即使在清单中也必须拦——校准是白名单，不是加戏许可证）。② 防 v10.2 同型病：好心信号被 LLM 读成行动指令 |
+| 2 | `buildProofreadSystemPrompt()` 提取纯函数 | 校对 prompt 组装从 proofreadBatch 提取为可测纯函数；模块顺序 MISSION → PROOFREAD_PROMPT → glossaryHint → **calibration** → langBlock（calibration 在 VALIDATION 检查清单之前——先建立"不许拦什么"的边界） |
+| 3 | proofreadBatch 委托组装 | 删内联组装代码（missionBlock/proofreadPrompt/langBlock 拼接），委托纯函数；llm-api.ts 清理失效 import |
+| 4 | `getMarketNote` 提升 export | 校对复用同一函数，杜绝两份词汇表漂移 |
+
+**守住不动的边界**（决策记录）：
+- **Success 意图行不进校对**——校对职责是"查错"不是"拦意图偏离"，注入会扩大误判面（风险大于收益）
+- **Success 行维持保留在场景约束中**（不被 suppressExpression 抑制）——它是意图信号不是语调指令，与 style 不冲突
+- **productLine 映射不改**（pc_productivity→consumer 等）——无实机数据支持改动，分段边界保持 v10.9 拍板结果
+- **校对仍不注入 scene/tone/style**——翻译已负责风格，校对聚焦正确性；市场语感是唯一例外（它决定"什么词算正确"）
+
+**测试**：`tests/test-v110-proofread-calibration.ts` 91 断言全绿（A 分段注入 10 + B 双向边界 8 + C 组装完整性 7 + D 指令语言路由 4 + E 回退全段 2 + F 20 语种×3：校准非空/校对段==翻译段/翻译风格卡含同段 60）。
+- **填补了校对 prompt 组装的测试真空**——此前 86 条 v10.9 断言 100% 在翻译路径，proofreadBatch 的 prompt 组装 0 覆盖。
+- 全量回归：v9.9+v9.10 (33) + v9.11 (21) + v10.0 (21) + v10.2 (38) + v10.3 (22) + v10.4 (17) + v10.5 (39) + v10.6 (46) + v10.7 (14) + v10.8 (21) + v10.9 (86) 全绿；typecheck 双配置 + build 通过。
+
+**已知遗留（诚实声明）**：分段映射（8 产品线→3 段）未经实机输出对比验证；v11.0 消除的是"校对误杀正确市场词"的风险，"分段选择是否最优"仍需实机抽查（professional_imaging vs pc_productivity 对比）。
+
+---
+
+### 2.0.0-pre v10.9 Prompt 注意力优化（2026-08-03，市场语感分段注入 + 场景 Success 意图行 + 风格越界清理）
+
+**背景**（站在"接收 prompt 的 LLM"立场复盘三套数据后拍板）：~2600 行 prompt 稀释注意力。四个观察：
+1. **抽象形容词对 LLM 几乎无效**——"语气：友好、自然、易懂"改变不了选词；但**市场原生词汇**（满血版/가성비/Preis-Leistung）会直接出现在输出里
+2. **市场原生词汇早已存在**——LANGUAGE_MARKET_NOTES 每条按 gaming/professional/consumer 三段写好，但**不分产品线整段注入**：翻电竞内存时 LLM 同时收到"消费级突出性价比"无关段落，稀释注意力 + 浪费 token
+3. **场景约束只说"不许做什么"，没说"用户拿这段文字干什么"**——这是 LLM 生成前最需要的一行意图信号
+4. **风格模块越界**——marketing 风格藏产品线规则（"游戏产品用玩家友好语言"）、professional 风格藏影像行业内容（"V60/V90/VPG400、IP68"）；产品线存在时这些被抑制成死代码，无产品线时又可能注错行业
+
+**四项改动**（全部在 `lib/prompt-constants.ts`）：
+
+| # | 改动 | 要点 |
+|---|------|------|
+| P1 | 市场语感按产品线分段注入 | `LANGUAGE_MARKET_NOTES` 20 语种拆 `{gaming, professional, consumer, shared}` 四段（**纯数据搬迁零新内容**）；新增 `PRODUCT_LINE_MARKET_SEGMENT` 映射（gaming_dimm/gaming_ssd/gaming_card→gaming，professional_imaging→professional，其余 4 条→consumer）；`getMarketNote(lang, productLine)` 只注入命中段+shared，无产品线/未映射注入全段（行为不变）。有产品线时 token 减 ~40% |
+| P2 | 6 场景各加一行 Success: | ecommerce「3 秒货架决策」/ technical_doc「工程师零歧义核对规格」/ operation_guide「首次用户独立完成」/ packaging「3 秒货架+法务审查」/ compliance_doc「目标市场法律滴水不漏」/ software_ui「第一眼定位功能」。**Success: 不在 suppressExpression 抑制列表**——意图信号与 style 语调指令不冲突 |
+| P3 | 风格越界清理 | marketing 20 语种删 2 条产品线规则（已由 P1 分段覆盖）；professional 20 语种删 2 条影像专属规则（V60/V90/VPG400、IP68——有产品线时本就死代码，无产品线时注错行业） |
+| P4 | 空 langOverrides 不填 | compliance_doc / software_ui 的 per-language 内容已在 LANG_SPECIFIC.compliance/rules——填了=重复=注意力稀释，空着才是正确状态（加注释说明） |
+
+**测试**：`tests/test-v109-prompt-attention.ts` 86 断言全绿（A 分段注入 20 + B 无产品线行为不变 7 + C 未映射回退 2 + D Success 注入/抑制边界 12 + E 风格越界清零 25 + F 20 语种完整性 20）。
+- ⚠️ **测试设计陷阱**：getStyleCard 聚合 5 个数据源，场景 langOverrides 与市场语感**共用词汇**（de "Preis-Leistung"、pt-BR "custo-benefício"、ko "프레임 방어" 场景约束也会注入）——分段断言须用 `marketNoteOnly()` 辅助函数（完整卡 − 产品调性 − 场景约束）隔离市场语感产物，不能对整卡断言"不含某段词汇"。
+- 全量回归：v10.5 (39) + v10.6 (46) + v10.7 (14) + v10.8 (21) 全绿；typecheck 双配置 + build 通过。
+
+---
 
 ### 2.0.0-pre v10.8 扩展检测语义移交校对（2026-08-03，长度代理误杀正常译文根治）
 
@@ -694,8 +816,8 @@ npx tsx tests/test-v106-misspelled-word.ts       # v10.6 疑似错词保留+回�
 
 **架构优化（见"五点一、架构复盘"，按收益/风险排序）**：
 1. ~~判定逻辑单一事实源 + 豁免中央注册表~~ **已完成 v10.0**（lib/lang-detect.ts + lib/keep-source.ts）
-2. 结构改进：~~管道阶段化 + 不变量审计~~ **已完成 v10.4** → Prompt 减肥（~2600行 prompt 稀释注意力）→ LLM 输出 schema 化（退役 `[N] text` 解析防御）
-3. ~~日志持久化~~ **已完成 v10.3**；剩余：⑤metrics UI 面板（finalizeMetrics 只 console.log）⑥detectTranslationExpansion 语义移交校对（v10.2 同型长度代理问题，反方向）
+2. 结构改进：~~管道阶段化 + 不变量审计~~ **已完成 v10.4** → ~~Prompt 减肥（~2600行 prompt 稀释注意力）~~ **v10.9 已做第一步**（市场语感分段注入 -40% token + 风格越界清理 + 场景 Success 意图行；剩余：模块归并/瘦身空间仍在）→ LLM 输出 schema 化（退役 `[N] text` 解析防御）
+3. ~~日志持久化~~ **已完成 v10.3**；剩余：⑤metrics UI 面板（finalizeMetrics 只 console.log）⑥~~detectTranslationExpansion 语义移交校对~~ **已完成 v10.8**
 
 **中期**：
 3. 指标收集器 UI 面板（当前只 console.log）

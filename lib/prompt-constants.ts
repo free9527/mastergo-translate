@@ -14,10 +14,11 @@
 //   7. GLOSSARY          — 术语对照表（当前批次出现的术语）
 //   8. OUTPUT            — 输出格式（含 ↵ literal 声明）
 //
-// v8.0 校对 LLM 接收的模块（proofreadBatch 组装）:
+// v8.0 校对 LLM 接收的模块（buildProofreadSystemPrompt 组装，v11.0 提取为纯函数）:
 //   1. PROOFREAD_SYSTEM_PROMPT  — CORE DIRECTIVE + CHECK 1-5 + OUTPUT FORMAT
 //   2. glossaryHint              — 术语对照表
-//   3. langBlock                 — 校验标准（renderLangForProofread）
+//   3. calibration               — 市场语感校准块（v11.0，与翻译同源同段，白名单+禁加词双边界）
+//   4. langBlock                 — 校验标准（renderLangForProofread）
 //   ⛔ 品类词不独立注入 — 已合并到 LANG_SPECIFIC 渲染中
 // ═══════════════════════════════════════════════════════════════
 
@@ -751,34 +752,168 @@ export function getProductLineTone(productLine: string | null, targetLang: strin
 // 职责: 补充 PRODUCT_LINE_TONE_GUIDES 中未涵盖的语种级市场特性。
 //       让 LLM 在翻译时以目标市场消费者视角调整表达策略。
 // 注入: getStyleCard() 在 STYLE 模块末尾注入（紧跟 productTone 之后）
+//
+// v10.9: 按产品线拆分为四段 — gaming / professional / consumer / shared。
+//        有产品线时只注入对应段+shared（避免翻电竞内存时收到消费级段落稀释注意力）；
+//        无产品线时注入全段（行为与 v10.8 之前一致）。
+//        全部内容均从 v10.8 整段原文拆分搬迁，零新内容创作。
 // ═══════════════════════════════════════════════════════════════
 
-const LANGUAGE_MARKET_NOTES: Record<string, string> = {
-  'zh-CN': `中国市场特性：游戏产品可使用电竞圈热词（"满血版""战未来""甜品级"），专业影像强调"生产力工具"定位，消费级产品突出"性价比""品质之选"。避免空洞口号，参数党友好。`,
-  'zh-TW': `台灣市場特性：遊戲產品用語偏日系（"電競""極致效能"），專業影像強調"職人""創作利器"，消費級偏好"小資""CP值"。整體語感比中國大陸更內斂雅致，少用誇張標點。`,
-  'ja': `日本市場特性：ゲーミングは欧米より控えめ（「ゲーム体験を向上」「快適プレイ」）、プロ向けは「安定稼働」「信頼性」重視、コンシューマー向けは「かんたん」「便利」。過度な誇張より実績·数値で訴求。「安心の5年保証」など保証·サポートを添えると好印象。`,
-  'ko': `한국 시장 특성: 게이밍 제품은 "프레임 방어""극한의 퍼포먼스" 등 성능 강조, 전문가 제품은 "신뢰성""안정성" 중심, 소비자 제품은 "가성비""실속형" 강조. 과장된 표현 자제하고 구체적 수치로 설득.`,
-  'fr': `Marché français : Éviter le marketing agressif. Gaming → ton passionné mais pas criard. Professionnel → élégance sobre, qualité de fabrication ("fabriqué pour durer"). Consommateur → rapport qualité-prix, simplicité d'utilisation. Mentions légales et garantie obligatoires.`,
-  'de': `Deutscher Markt: Gaming → technische Überlegenheit sachlich darstellen ("Overclocking-Speicher mit Samsung B-Die"). Professional → Präzision, Testsieger-Referenzen. Verbraucher → Preis-Leistung, Langlebigkeit. Keine Übertreibungen, lieber technische Details.`,
-  'es': `Mercado español: Gaming → tono juvenil pero no infantil, estilo streamer. Profesional → "herramienta de trabajo", fiable. Consumidor → cercano, práctico. Evitar anglicismos innecesarios.`,
-  'pt': `Mercado português: Tom sóbrio, evitar anglicismos. Gaming → "experiência de jogo", profissional → "ferramenta de trabalho". Consumidor → "uso diário", "essencial". Preferir termos técnicos em português.`,
-  'pt-BR': `Mercado brasileiro: Gaming → linguagem gamer brasileira ("game pesado", "rodar liso", "zerar lag"). Profissional → "ferramenta profissional", robustez. Consumidor → "custo-benefício", "dia a dia". Tom caloroso e próximo.`,
-  'it': `Mercato italiano: Gaming → tono energico ma elegante ("domina il gioco"). Professionale → "affidabilità", design italiano. Consumatore → semplice, qualità della vita. Cura per l'estetica del linguaggio.`,
-  'nl': `Nederlandse markt: Direct, no-nonsense. Gaming → "game-ervaring", technische specs. Professioneel → betrouwbaarheid. Consument → praktisch, "gebruiksgemak". Vermijd overdreven marketingtaal.`,
-  'pl': `Polski rynek: Gaming → entuzjastyczny ale rzeczowy ("wydajność w grach"). Profesjonalny → niezawodność, precyzja. Konsument → "codzienne użytkowanie", stosunek jakości do ceny.`,
-  'sv': `Svensk marknad: Återhållsam, saklig. Gaming → "spelprestanda" utan överdrift. Professionell → pålitlighet, hållbarhet. Konsument → enkelhet, "prisvärd". Svensk konsument uppskattar ärlighet framför hype.`,
-  'tr': `Türkiye pazarı: Gaming → "oyun performansı", genç ve dinamik ton. Profesyonel → güvenilirlik, dayanıklılık. Tüketici → "uygun fiyatlı", "günlük kullanım". Garanti süresi ve teknik destek vurgusu önemli.`,
-  'ru': `Российский рынок: Гейминг → техническое превосходство ("разгон", "низкие тайминги"). Профессиональное → надёжность, "рабочий инструмент". Потребительское → "доступная цена", простота. Избегать пустых слоганов, важны цифры.`,
-  'vi': `Thị trường Việt Nam: Gaming → ngôn ngữ game thủ Việt ("chiến game", "cân mọi tựa game", "mượt"). Chuyên nghiệp → "đáng tin cậy", "công cụ làm việc". Tiêu dùng → "giá tốt", "tiện lợi", "hàng ngày". Giọng điệu gần gũi, thân thiện.`,
-  'th': `ตลาดไทย: เกมมิ่ง → ภาษาเกมเมอร์ไทย ("เล่นลื่น", "แรงไม่มีสะดุด"). มืออาชีพ → เน้นความน่าเชื่อถือ. ผู้บริโภค → "คุ้มค่า", "ใช้งานง่าย". น้ำเสียงเป็นกันเอง ไม่เป็นทางการเกินไป`,
-  'id': `Pasar Indonesia: Gaming → bahasa gamer Indonesia ("nge-game", "anti lag", "performanya gila"). Profesional → "andal", "alat kerja". Konsumen → "harga terjangkau", "praktis", "sehari-hari". Nada santai dan akrab.`,
-  'ar': `السوق العربي: الألعاب → مصطلحات اللاعبين ("أداء قوي", "بدون تقطيع"). المنتجات الاحترافية → موثوقية، جودة عالية. المستهلك → "سعر مناسب"، "سهل الاستخدام". تجنب المبالغة، التركيز على القيمة والضمان.`,
-  'en': `US/Global market: Gaming → "dominate", "unleash", spec-driven bragging rights. Professional → "trusted by pros", reliability benchmarks. Consumer → "everyday", "made simple", aspirational but approachable. American English spelling throughout.`,
+export interface MarketNoteSegments {
+  gaming: string
+  professional: string
+  consumer: string
+  shared: string
 }
 
-/** Get the market note for a target language (target-language text, falls back to English) */
-function getMarketNote(targetLang: string): string {
-  return LANGUAGE_MARKET_NOTES[targetLang] || ''
+// v10.9: 产品线 → 市场语感段映射（8 条产品线 → 3 段）
+export const PRODUCT_LINE_MARKET_SEGMENT: Record<string, 'gaming' | 'professional' | 'consumer'> = {
+  gaming_dimm: 'gaming',
+  gaming_ssd: 'gaming',
+  gaming_card: 'gaming',
+  professional_imaging: 'professional',
+  pc_productivity: 'consumer',
+  consumer_cards: 'consumer',
+  portable_storage: 'consumer',
+  innovation_lifestyle: 'consumer',
+}
+
+const LANGUAGE_MARKET_NOTES: Record<string, MarketNoteSegments> = {
+  'zh-CN': {
+    gaming: `游戏产品可使用电竞圈热词（"满血版""战未来""甜品级"）`,
+    professional: `专业影像强调"生产力工具"定位`,
+    consumer: `消费级产品突出"性价比""品质之选"`,
+    shared: `避免空洞口号，参数党友好`,
+  },
+  'zh-TW': {
+    gaming: `遊戲產品用語偏日系（"電競""極致效能"）`,
+    professional: `專業影像強調"職人""創作利器"`,
+    consumer: `消費級偏好"小資""CP值"`,
+    shared: `整體語感比中國大陸更內斂雅致，少用誇張標點`,
+  },
+  'ja': {
+    gaming: `ゲーミングは欧米より控えめ（「ゲーム体験を向上」「快適プレイ」）`,
+    professional: `プロ向けは「安定稼働」「信頼性」重視`,
+    consumer: `コンシューマー向けは「かんたん」「便利」`,
+    shared: `過度な誇張より実績·数値で訴求。「安心の5年保証」など保証·サポートを添えると好印象`,
+  },
+  'ko': {
+    gaming: `게이밍 제품은 "프레임 방어""극한의 퍼포먼스" 등 성능 강조`,
+    professional: `전문가 제품은 "신뢰성""안정성" 중심`,
+    consumer: `소비자 제품은 "가성비""실속형" 강조`,
+    shared: `과장된 표현 자제하고 구체적 수치로 설득`,
+  },
+  'fr': {
+    gaming: `Gaming → ton passionné mais pas criard`,
+    professional: `Professionnel → élégance sobre, qualité de fabrication ("fabriqué pour durer")`,
+    consumer: `Consommateur → rapport qualité-prix, simplicité d'utilisation`,
+    shared: `Éviter le marketing agressif. Mentions légales et garantie obligatoires`,
+  },
+  'de': {
+    gaming: `Gaming → technische Überlegenheit sachlich darstellen ("Overclocking-Speicher mit Samsung B-Die")`,
+    professional: `Professional → Präzision, Testsieger-Referenzen`,
+    consumer: `Verbraucher → Preis-Leistung, Langlebigkeit`,
+    shared: `Keine Übertreibungen, lieber technische Details`,
+  },
+  'es': {
+    gaming: `Gaming → tono juvenil pero no infantil, estilo streamer`,
+    professional: `Profesional → "herramienta de trabajo", fiable`,
+    consumer: `Consumidor → cercano, práctico`,
+    shared: `Evitar anglicismos innecesarios`,
+  },
+  'pt': {
+    gaming: `Gaming → "experiência de jogo"`,
+    professional: `Profissional → "ferramenta de trabalho"`,
+    consumer: `Consumidor → "uso diário", "essencial"`,
+    shared: `Tom sóbrio, evitar anglicismos. Preferir termos técnicos em português`,
+  },
+  'pt-BR': {
+    gaming: `Gaming → linguagem gamer brasileira ("game pesado", "rodar liso", "zerar lag")`,
+    professional: `Profissional → "ferramenta profissional", robustez`,
+    consumer: `Consumidor → "custo-benefício", "dia a dia"`,
+    shared: `Tom caloroso e próximo`,
+  },
+  'it': {
+    gaming: `Gaming → tono energico ma elegante ("domina il gioco")`,
+    professional: `Professionale → "affidabilità", design italiano`,
+    consumer: `Consumatore → semplice, qualità della vita`,
+    shared: `Cura per l'estetica del linguaggio`,
+  },
+  'nl': {
+    gaming: `Gaming → "game-ervaring", technische specs`,
+    professional: `Professioneel → betrouwbaarheid`,
+    consumer: `Consument → praktisch, "gebruiksgemak"`,
+    shared: `Direct, no-nonsense. Vermijd overdreven marketingtaal`,
+  },
+  'pl': {
+    gaming: `Gaming → entuzjastyczny ale rzeczowy ("wydajność w grach")`,
+    professional: `Profesjonalny → niezawodność, precyzja`,
+    consumer: `Konsument → "codzienne użytkowanie", stosunek jakości do ceny`,
+    shared: ``,
+  },
+  'sv': {
+    gaming: `Gaming → "spelprestanda" utan överdrift`,
+    professional: `Professionell → pålitlighet, hållbarhet`,
+    consumer: `Konsument → enkelhet, "prisvärd"`,
+    shared: `Återhållsam, saklig. Svensk konsument uppskattar ärlighet framför hype`,
+  },
+  'tr': {
+    gaming: `Gaming → "oyun performansı", genç ve dinamik ton`,
+    professional: `Profesyonel → güvenilirlik, dayanıklılık`,
+    consumer: `Tüketici → "uygun fiyatlı", "günlük kullanım"`,
+    shared: `Garanti süresi ve teknik destek vurgusu önemli`,
+  },
+  'ru': {
+    gaming: `Гейминг → техническое превосходство ("разгон", "низкие тайминги")`,
+    professional: `Профессиональное → надёжность, "рабочий инструмент"`,
+    consumer: `Потребительское → "доступная цена", простота`,
+    shared: `Избегать пустых слоганов, важны цифры`,
+  },
+  'vi': {
+    gaming: `Gaming → ngôn ngữ game thủ Việt ("chiến game", "cân mọi tựa game", "mượt")`,
+    professional: `Chuyên nghiệp → "đáng tin cậy", "công cụ làm việc"`,
+    consumer: `Tiêu dùng → "giá tốt", "tiện lợi", "hàng ngày"`,
+    shared: `Giọng điệu gần gũi, thân thiện`,
+  },
+  'th': {
+    gaming: `เกมมิ่ง → ภาษาเกมเมอร์ไทย ("เล่นลื่น", "แรงไม่มีสะดุด")`,
+    professional: `มืออาชีพ → เน้นความน่าเชื่อถือ`,
+    consumer: `ผู้บริโภค → "คุ้มค่า", "ใช้งานง่าย"`,
+    shared: `น้ำเสียงเป็นกันเอง ไม่เป็นทางการเกินไป`,
+  },
+  'id': {
+    gaming: `Gaming → bahasa gamer Indonesia ("nge-game", "anti lag", "performanya gila")`,
+    professional: `Profesional → "andal", "alat kerja"`,
+    consumer: `Konsumen → "harga terjangkau", "praktis", "sehari-hari"`,
+    shared: `Nada santai dan akrab`,
+  },
+  'ar': {
+    gaming: `الألعاب → مصطلحات اللاعبين ("أداء قوي", "بدون تقطيع")`,
+    professional: `المنتجات الاحترافية → موثوقية، جودة عالية`,
+    consumer: `المستهلك → "سعر مناسب"، "سهل الاستخدام"`,
+    shared: `تجنب المبالغة، التركيز على القيمة والضمان`,
+  },
+  'en': {
+    gaming: `Gaming → "dominate", "unleash", spec-driven bragging rights`,
+    professional: `Professional → "trusted by pros", reliability benchmarks`,
+    consumer: `Consumer → "everyday", "made simple", aspirational but approachable`,
+    shared: `American English spelling throughout`,
+  },
+}
+
+/** Get the market note for a target language, segmented by product line.
+ *  v10.9: 有产品线且命中映射 → 只注入对应段+shared；无产品线/未命中 → 全段（行为不变）
+ *  v11.0: 提升为 export — 校对管道（buildProofreadSystemPrompt）注入同一段做词汇校准 */
+export function getMarketNote(targetLang: string, productLine?: string | null): string {
+  const segments = LANGUAGE_MARKET_NOTES[targetLang]
+  if (!segments) return ''
+  const segmentKey = productLine ? PRODUCT_LINE_MARKET_SEGMENT[productLine] : undefined
+  if (!segmentKey) {
+    // 无产品线（或未映射）→ 全段注入，保持历史行为
+    return [segments.gaming, segments.professional, segments.consumer, segments.shared]
+      .filter(Boolean).join('，')
+  }
+  return [segments[segmentKey], segments.shared].filter(Boolean).join('，')
 }
 
 // ============================================================
@@ -805,6 +940,7 @@ export const SCENE_CONSTRAINTS: Record<string, {
 }> = {
   ecommerce: {
     universal: [
+      'Success: Shoppers grasp the key benefit within 3 seconds of scanning; copy persuades without sounding translated',
       'Expression: Front-load selling points, use short sentences, highlight user experience benefits',
       'Expression: Find equivalent expressions in target language for source-specific phrases, avoid literal translation',
       'Expression: Advertising phrases and rhetorical questions allowed, keep product series names in UPPERCASE for brand recognition',
@@ -898,6 +1034,7 @@ export const SCENE_CONSTRAINTS: Record<string, {
 
   technical_doc: {
     universal: [
+      'Success: Engineers verify specs against the document with zero ambiguity; every value reads as a testable claim',
       'Format: Use ※N format for footnote markers (※1, ※2, ※3), placed immediately after values/terms',
       'Format: Table rows must correspond 1:1, no merging or splitting; preserve "-"/"N/A"/"TBD"/"Typ."/"Max."/"Min." as-is',
       'Format: Speed/capacity values must include test conditions when mentioned in source',
@@ -990,6 +1127,7 @@ export const SCENE_CONSTRAINTS: Record<string, {
 
   operation_guide: {
     universal: [
+      'Success: A first-time user completes each operation correctly without guessing or re-reading',
       'Format: Operation steps must correspond 1:1 strictly, no merging or splitting',
       'Format: WARNING/CAUTION/NOTE must preserve original hierarchy levels',
       'Expression: Operation guidance first — state "what to do" before "why"',
@@ -1069,6 +1207,7 @@ export const SCENE_CONSTRAINTS: Record<string, {
 
   packaging: {
     universal: [
+      'Success: Front copy wins the 3-second shelf decision; back copy survives legal review in the target market',
       'Format: Text must fit limited physical space — prefer the shortest accurate translation',
       'Format: Do NOT break compound words across lines (critical for DE/NL/PL/SV/FI)',
       'Format: Preserve __XXX_N__ markers, HTML tags, and ↵ line breaks exactly as-is',
@@ -1156,6 +1295,7 @@ export const SCENE_CONSTRAINTS: Record<string, {
 
   compliance_doc: {
     universal: [
+      'Success: The document is legally watertight in the target market — warranty, liability, and certification claims enforceable as written',
       'Format: Certification marks (CE/FCC/UL, etc.), warranty periods, contact information format must match source',
       'Format: Preserve __XXX_N__ markers, HTML tags, and ↵ line breaks exactly as-is',
       'Terminology: Legal terms and warranty clauses must be translated word-for-word, no paraphrasing or omission',
@@ -1166,6 +1306,7 @@ export const SCENE_CONSTRAINTS: Record<string, {
 
   software_ui: {
     universal: [
+      'Success: Users locate the feature and predict the result of a tap correctly on first sight',
       'Format: UI labels/buttons ≤15 characters must remain concise',
       'Format: Preserve __XXX_N__ markers and variable placeholders ({0}, %s) exactly as-is',
       'Terminology: Translations of the same feature must be consistent across different screens',
@@ -1178,6 +1319,8 @@ export const SCENE_CONSTRAINTS: Record<string, {
 // 获取场景约束（翻译阶段）
 // suppressExpression: 当 style 已明确设定时，抑制场景约束中的"表达/语调"行，
 //   避免与 Style Guide 的语调指令冲突（如 ecommerce "使用广告语" vs Standard "无夸大宣传"）
+// v10.9: Success: 行（使用成功场景）不在抑制列表 — 它传递"用户拿这段文字干什么"的意图，
+//   与 style 的语调指令不冲突，且这是 LLM 生成前最需要的一行意图信号。
 export function getSceneConstraints(scenePreset: string, targetLang: string, suppressExpression?: boolean): string {
   const groupId = SCENE_GROUP_MAP[scenePreset]
   if (!groupId) return ''
@@ -1185,9 +1328,9 @@ export function getSceneConstraints(scenePreset: string, targetLang: string, sup
   const config = SCENE_CONSTRAINTS[groupId]
   if (!config) return ''
 
-  // 当 style 已设定时，只保留格式/术语类约束，抑制语调/表达类约束
+  // 当 style 已设定时，只保留格式/术语/意图类约束，抑制语调/表达类约束
   // Expression: 前缀 = 语调类 → 与 Style Guide 职责重叠 → 抑制
-  // Format:/Terminology: 前缀 = 格式/术语类 → 始终注入
+  // Format:/Terminology:/Success: 前缀 = 格式/术语/意图类 → 始终注入
   const lines = suppressExpression
     ? config.universal.filter(l => !l.startsWith('Expression:'))
     : [...config.universal]
@@ -1335,88 +1478,66 @@ Core: Restrained premium, emphasizing stability, reliability, professional creat
 Rules:
 - Concise and calm sentences, targeting photographers, film crews, drone operators
 - Can pair with minimalist literary quality slogans (style: restrained premium, emphasizing craftsmanship and trust — express in target language, do NOT copy Japanese)
-- High-frequency use of imaging professional terminology: sustained write, RAW, 8K, outdoor extreme protection
-- Focus on professional value: V60/V90/VPG400 video ratings, IP68 protection, metal durable body
 - No hot-blooded, lightweight e-commerce language, no gaming terminology`,
     'zh-CN': `[风格·专业]
 核心：克制的高端感，强调稳定性、可靠性、专业创作信任感，无浮夸营销。
 规则：
 - 简洁沉稳的句式，面向摄影师、影视团队、无人机操作者
 - 可搭配极简文学质感标语（风格：克制高端，强调匠心与信任——用目标语言表达，不要照搬日式）
-- 高频使用影像专业术语：持续写入、RAW、8K、户外极端防护
-- 聚焦专业价值：V60/V90/VPG400 视频等级、IP68 防护、金属耐用机身
 - 无热血、轻量的电商语言，无游戏术语`,
     'zh-TW': `[風格·專業]
 核心：克制的高端感，強調穩定性、可靠性、專業創作信任感，無浮誇行銷。
 規則：
 - 簡潔沉穩的句式，面向攝影師、影視團隊、無人機操作者
 - 可搭配極簡文學質感標語（風格：克制高端，強調匠心與信任——用目標語言表達，不要照搬日式）
-- 高頻使用影像專業術語：持續寫入、RAW、8K、戶外極端防護
-- 聚焦專業價值：V60/V90/VPG400 視頻等級、IP68 防護、金屬耐用機身
 - 無熱血、輕量的電商語言，無遊戲術語`,
     'ja': `[スタイル·プロフェッショナル]
 核心：抑制されたプレミアム感、安定性、信頼性、プロフェッショナルな創作への信頼を強調、派手なマーケティングなし。
 ルール：
 - 簡潔で落ち着いた言い回し、写真家、フィルムクルー、ドローンオペレーターを対象
 - ミニマリスト的な文学的品質のスローガンと組み合わせ可能（スタイル：抑制されたプレミアム、職人技と信頼を強調——目標言語で表現、日本語をそのままコピーしない）
-- 画像処理の専門用語を頻繁に使用：持続書き込み、RAW、8K、屋外過酷環境保護
-- プロフェッショナルな価値に焦点：V60/V90/VPG400 ビデオ評価、IP68 保護、金属耐久性ボディ
 - 熱血的で軽量なEC言語なし、ゲーム用語なし`,
     'ko': `[스타일·프로페셔널]
 핵심: 절제된 프리미엄, 안정성, 신뢰성, 전문 크리에이티브 신뢰 강조, 화려한 마케팅 없음.
 규칙:
 - 간결하고 차분한 문장, 사진작가, 영화 팀, 드론 운영자 대상
 - 미니멀리즘 문학적 품질 슬로건과 조합 가능 (스타일: 절제된 프리미엄, 장인정신과 신뢰 강조 — 목표 언어로 표현, 일본어 복사 금지)
-- 이미징 전문 용어 고빈도 사용: 지속 쓰기, RAW, 8K, 야외 극한 보호
-- 전문 가치 강조: V60/V90/VPG400 비디오 등급, IP68 보호, 금속 내구성 바디
 - 열혈적이고 가벼운 이커머스 언어 없음, 게임 용어 없음`,
     'de': `[Stil·Professionell]
 Kern: Zurückhaltende Premium-Qualität, betont Stabilität, Zuverlässigkeit, professionelles kreatives Vertrauen, kein auffälliges Marketing.
 Regeln:
 - Präzise und ruhige Sätze, zielt auf Fotografen, Filmteams, Drohnenpiloten ab
 - Kann mit minimalistischen literarischen Qualitätsslogans kombiniert werden
-- Häufige Verwendung von Imaging-Fachbegriffen: nachhaltiges Schreiben, RAW, 8K, extremer Außenschutz
-- Fokus auf professionellen Wert: V60/V90/VPG400 Videobewertungen, IP68 Schutz, Metall-langlebiges Gehäuse
 - Keine heißblütige, leichte E-Commerce-Sprache, keine Gaming-Begriffe`,
     'fr': `[Style·Professionnel]
 Core : Premium retenu, mettant l'accent sur la stabilité, la fiabilité, la confiance créative professionnelle, pas de marketing tape-à-l'œil.
 Règles :
 - Phrases concises et calmes, ciblant photographes, équipes de tournage, opérateurs de drones
 - Peut s'associer à des slogans de qualité littéraire minimaliste
-- Utilisation fréquente de terminologie professionnelle d'imagerie : écriture soutenue, RAW, 8K, protection extrême en extérieur
-- Accent sur la valeur professionnelle : classifications vidéo V60/V90/VPG400, protection IP68, corps durable en métal
 - Pas de langage e-commerce sanglé et léger, pas de terminologie gaming`,
     'es': `[Estilo·Profesional]
 Núcleo: Premium contenido, enfatizando estabilidad, confiabilidad, confianza creativa profesional, sin marketing llamativo.
 Reglas:
 - Oraciones concisas y tranquilas, dirigidas a fotógrafos, equipos de filmación, operadores de drones
 - Puede combinarse con eslóganes de calidad literaria minimalista
-- Uso frecuente de terminología profesional de imagen: escritura sostenida, RAW, 8K, protección extrema en exteriores
-- Enfoque en el valor profesional: clasificaciones de video V60/V90/VPG400, protección IP68, cuerpo duradero de metal
 - Sin lenguaje de comercio electrónico ardiente y ligero, sin terminología gaming`,
     'pt': `[Estilo·Profissional]
 Núcleo: Premium contido, enfatizando estabilidade, confiabilidade, confiança criativa profissional, sem marketing chamativo.
 Regras:
 - Frases concisas e calmas, dirigidas a fotógrafos, equipas de filmagem, operadores de drones
 - Pode combinar-se com slogans de qualidade literária minimalista
-- Uso frequente de terminologia profissional de imagem: escrita sustentada, RAW, 8K, proteção extrema em exteriores
-- Foco no valor profissional: classificações de vídeo V60/V90/VPG400, proteção IP68, corpo durável de metal
 - Sem linguagem de comércio eletrónico ardente e leve, sem terminologia gaming`,
     'pt-BR': `[Estilo·Profissional]
 Núcleo: Premium contido, enfatizando estabilidade, confiabilidade, confiança criativa profissional, sem marketing chamativo.
 Regras:
 - Frases concisas e calmas, dirigidas a fotógrafos, equipes de filmagem, operadores de drones
 - Pode combinar-se com slogans de qualidade literária minimalista
-- Uso frequente de terminologia profissional de imagem: escrita sustentada, RAW, 8K, proteção extrema em exteriores
-- Foco no valor profissional: classificações de vídeo V60/V90/VPG400, proteção IP68, corpo durável de metal
 - Sem linguagem de comércio eletrônico ardente e leve, sem terminologia gaming`,
     'it': `[Stile·Professionale]
 Nucleo: Premium contenuto, enfatizzando stabilità, affidabilità, fiducia creativa professionale, senza marketing appariscente.
 Regole:
 - Frasi concise e calme, rivolte a fotografi, troupe cinematografiche, operatori di droni
 - Può essere abbinato a slogan di qualità letteraria minimalista
-- Uso frequente di terminologia professionale di imaging: scrittura sostenuta, RAW, 8K, protezione estrema in esterni
-- Focus sul valore professionale: classificazioni video V60/V90/VPG400, protezione IP68, corpo durevole in metallo
 - Senza linguaggio e-commerce caldo e leggero, senza terminologia gaming`,
     'nl': `[Stijl·Professioneel]
 Kern: Beheerste premium, benadrukt stabiliteit, betrouwbaarheid, professioneel creatief vertrouwen, geen opvallende marketing.
@@ -1424,71 +1545,54 @@ Regels:
 - Beknopte en kalme zinnen, gericht op fotografen, filmteams, drone-exploitanten
 - Kan gecombineerd worden met minimalistische literaire kwaliteitsslogans
 - Frequente professionele beeldterminologie: duurzaam schrijven, RAW, 8K, extreme buitenschutz
-- Focus op professionele waarde: V60/V90/VPG400 videobeoordelingen, IP68 bescherming, metalen duurzaam omhulsel
 - Geen bloedige, lichte e-commerce-taal, geen gaming-terminologie`,
     'pl': `[Styl·Profesjonalny]
 Rdzeń: Powściągliwy premium, podkreślający stabilność, niezawodność, profesjonalne zaufanie twórcze, bez krzykliwego marketingu.
 Zasady:
 - Zwięzłe i spokojne zdania, skierowane do fotografów, ekip filmowych, operatorów dronów
 - Może być połączone z minimalistycznymi sloganami jakości literackiej
-- Częste użycie profesjonalnej terminologii obrazowania: zrównoważony zapis, RAW, 8K, ekstremalna ochrona zewnętrzna
-- Nacisk na wartość profesjonalną: klasyfikacje wideo V60/V90/VPG400, ochrona IP68, metalowa trwała obudowa
 - Bez gorącego, lekkiego języka e-commerce, bez terminologii gamingowej`,
     'sv': `[Stil·Professionell]
 Kärna: Återhållen premium, betonar stabilitet, tillförlitlighet, professionellt kreativt förtroende, ingen iögonfallande marknadsföring.
 Regler:
 - Koncisa och lugna meningar, riktar sig till fotografer, filmteam, drönaroperatörer
 - Kan kombineras med minimalistiska slogans av litterär kvalitet
-- Frekvent användning av professionell bildterminologi: hållbar skrivning, RAW, 8K, extremt utomhusskydd
-- Fokus på professionellt värde: V60/V90/VPG400 videobetyg, IP68-skydd, metallhållbart hölje
 - Ingen blodig, lätt e-commerce-språk, ingen gaming-terminologi`,
     'tr': `[Stil·Profesyonel]
 Çekirdek: Dengeli premium, istikrar, güvenilirlik, profesyonel yaratıcı güveni vurgulayan, gösterişli pazarlama yok.
 Kurallar:
 - Kısa ve sakin cümleler, fotoğrafçılara, film ekiplerine, drone operatörlerine yönelik
 - Minimalist edebi kalite sloganlarıyla birleştirilebilir
-- Sık görüntüleme profesyonel terminolojisi kullanımı: sürdürülebilir yazma, RAW, 8K, aşırı dış ortam koruması
-- Profesyonel değere odaklanma: V60/V90/VPG400 video değerlendirmeleri, IP68 koruması, metal dayanıklı gövde
 - Ateşli, hafif e-ticaret dili yok, oyun terminolojisi yok`,
     'ru': `[Стиль·Профессиональный]
 Ядро: Сдержанный премиум, подчеркивающий стабильность, надежность, профессиональное творческое доверие, без броского маркетинга.
 Правила:
 - Лаконичные и спокойные предложения, ориентированные на фотографов, съемочные группы, операторов дронов
 - Может сочетаться с минималистичными слоганами литературного качества
-- Частое использование профессиональной терминологии обработки изображений: устойчивая запись, RAW, 8K, экстремальная защита на открытом воздухе
-- Фокус на профессиональной ценности: классификации видео V60/V90/VPG400, защита IP68, металлический прочный корпус
 - Без горячего, легкого языка электронной коммерции, без игровой терминологии`,
     'vi': `[Phong cách·Chuyên nghiệp]
 Cốt lõi: Cao cấp kiềm chế, nhấn mạnh sự ổn định, đáng tin cậy, niềm tin sáng tạo chuyên nghiệp, không tiếp thị phô trương.
 Quy tắc:
 - Câu ngắn gọn và bình tĩnh, hướng đến nhiếp ảnh gia, đoàn làm phim, người vận hành drone
 - Có thể kết hợp với khẩu hiệu chất lượng văn học tối giản
-- Sử dụng thường xuyên thuật ngữ chuyên nghiệp xử lý hình ảnh: ghi bền vững, RAW, 8K, bảo vệ cực đoan ngoài trời
-- Tập trung vào giá trị chuyên nghiệp: xếp hạng video V60/V90/VPG400, bảo vệ IP68, thân máy bền kim loại
 - Không ngôn ngữ thương mại điện tử nồng nhiệt và nhẹ, không thuật ngữ game`,
     'th': `[สไตล์·มืออาชีพ]
 แกนหลัก: พรีเมียมที่ควบคุมได้ เน้นความเสถียร ความน่าเชื่อถือ ความไว้วางใจในการสร้างสรรค์ระดับมืออาชีพ ไม่มีการตลาดที่ฉูดฉาด
 กฎ:
 - ประโยคกระชับและสงบ กำหนดเป้าหมายไปที่ช่างภาพ ทีมถ่ายทำ ผู้ปฏิบัติการโดรน
 - สามารถผสมผสานกับสโลแกนคุณภาพวรรณกรรมแบบมินิมอล
-- ใช้คำศัพท์เฉพาะทางด้านการถ่ายภาพบ่อยครั้ง: การเขียนอย่างยั่งยืน, RAW, 8K, การป้องกันสภาพแวดล้อมภายนอกที่รุนแรง
-- มุ่งเน้นคุณค่าระดับมืออาชีพ: การจัดอันดับวิดีโอ V60/V90/VPG400, การป้องกัน IP68, ตัวเครื่องโลหะที่ทนทาน
 - ไม่มีภาษาอีคอมเมิร์ซที่เร่าร้อนและเบา ไม่มีคำศัพท์เกม`,
     'id': `[Gaya·Profesional]
 Inti: Premium terkendali, menekankan stabilitas, keandalan, kepercayaan kreatif profesional, tanpa pemasaran yang mencolok.
 Aturan:
 - Kalimat ringkas dan tenang, ditujukan untuk fotografer, kru film, operator drone
 - Dapat dipasangkan dengan slogan kualitas sastra minimalis
-- Penggunaan terminologi pencitraan profesional yang sering: penulisan berkelanjutan, RAW, 8K, perlindungan ekstrem luar ruangan
-- Fokus pada nilai profesional: peringkat video V60/V90/VPG400, perlindungan IP68, bodi logam tahan lama
 - Tanpa bahasa e-commerce yang bersemangat dan ringan, tanpa terminologi gaming`,
     'ar': `[أسلوب·احترافي]
 الجوهر: متميز متزن، يؤكد على الاستقرار والموثوقية والثقة الإبداعية المهنية، بدون تسويق مبهرج.
 القواعد:
 - جمل موجزة وهادئة، موجهة للمصورين وأطقم التصوير ومشغلي الطائرات بدون طيار
 - يمكن دمجها مع شعارات جودة أدبية بسيطة
-- استخدام متكرر لمصطلحات التصوير المحترفة: الكتابة المستدامة، RAW، 8K، الحماية القصوى في الهواء الطلق
-- التركيز على القيمة المهنية: تصنيفات الفيديو V60/V90/VPG400، حماية IP68، هيكل معدني متين
 - بدون لغة تجارة إلكترونية حارة وخفيفة، بدون مصطلحات ألعاب`,
   },
   marketing: {
@@ -1497,160 +1601,120 @@ Core: E-commerce traffic-oriented, eye-catching, impactful, highlighting usage e
 Rules:
 - Youthful, light expression, downplay dry parameters, highlight usage pleasure
 - Allow advertising slogans, rhetorical questions, preserve product series uppercase English for brand recognition
-- Gaming products (dimm/ssd/card): Use gamer-friendly language that emphasizes performance benefits and eliminates pain points (e.g., "no more lag", "store everything")
-- Trendy lifestyle products: Focus on aesthetics, atmosphere, IP collaboration
 - Strong promotional feel, suitable for e-commerce homepage traffic, main image large text promotion`,
     'zh-CN': `[风格·营销]
 核心：电商引流导向，吸引眼球，有冲击力，突出使用体验提升，促进转化。
 规则：
 - 年轻化、轻量化表达，弱化枯燥参数，突出使用愉悦感
 - 允许广告语、反问句，保留产品系列大写英文以增强品牌识别
-- 游戏产品（内存/SSD/存储卡）：使用玩家友好语言，强调性能收益、消除痛点（如"告别卡顿""装下所有"）
-- 潮流生活产品：聚焦颜值、氛围、IP 联名
 - 强促销感，适合电商首页引流、主图大字推广`,
     'zh-TW': `[風格·行銷]
 核心：電商引流導向，吸引眼球，有衝擊力，突出使用體驗提升，促進轉化。
 規則：
 - 年輕化、輕量化表達，弱化枯燥參數，突出使用愉悅感
 - 允許廣告語、反問句，保留產品系列大寫英文以增強品牌識別
-- 遊戲產品（記憶體/SSD/記憶卡）：使用玩家友好語言，強調性能收益、消除痛點（如「告別卡頓」「裝下所有」）
-- 潮流生活產品：聚焦顏值、氛圍、IP 聯名
 - 強促銷感，適合電商首頁引流、主圖大字推廣`,
     'ja': `[スタイル·マーケティング]
 核心：ECトラフィック指向、目を引く、インパクトがある、使用体験の向上を強調、コンバージョン促進。
 ルール：
 - 若々しく軽い表現、乾いたパラメーターを控えめに、使用の楽しさを強調
 - 広告スローガン、修辞疑問を許可、製品シリーズの大文字英語を保持してブランド認識を強化
-- ゲーミング製品（DIMM/SSD/カード）：ゲーマーフレンドリーな言語を使用、パフォーマンスの利点を強調、痛点を解消（例：「ラグにさよなら」「すべてを保存」）
-- トレンドライフスタイル製品：美学、雰囲気、IPコラボレーションに焦点
 - 強いプロモーション感、ECホームページのトラフィック、メイン画像の大きなテキストプロモーションに適している`,
     'ko': `[스타일·마케팅]
 핵심: 이커머스 트래픽 지향, 눈길을 끄는, 임팩트 있는, 사용 경험 향상을 강조하여 전환 촉진.
 규칙:
 - 젊고 가벼운 표현, 건조한 파라미터는 약화, 사용 쾌감 강조
 - 광고 슬로건, 수사적 질문 허용, 제품 시리즈 대문자 영어 유지로 브랜드 인식 강화
-- 게임 제품 (DIMM/SSD/카드): 게이머 친화적 언어 사용, 성능 이점 강조, 통증 포인트 제거 (예: "지연 작별", "모두 저장")
-- 트렌디 라이프스타일 제품: 미학, 분위기, IP 콜라보레이션에 초점
 - 강력한 프로모션 느낌, 이커머스 홈페이지 트래픽, 메인 이미지 큰 텍스트 프로모션에 적합`,
     'de': `[Stil·Marketing]
 Kern: E-Commerce-Traffic-orientiert, auffällig, wirkungsvoll, hebt die Verbesserung der Nutzungserfahrung hervor, fördert Konversion.
 Regeln:
 - Jugendlicher, leichter Ausdruck, trockene Parameter heruntergespielt, hebt den Nutzungsspaß hervor
 - Werbeslogans, rhetorische Fragen erlaubt, Produktserien-Großbuchstaben für Markenbewusstsein beibehalten
-- Gaming-Produkte (DIMM/SSD/Karte): Gamer-freundliche Sprache, die Leistungsvorteile betont und Schmerzpunkte beseitigt (z.B. "kein Lag mehr", "alles speichern")
-- Trendige Lifestyle-Produkte: Fokus auf Ästhetik, Atmosphäre, IP-Zusammenarbeit
 - Starkes Werbegefühl, geeignet für E-Commerce-Homepage-Traffic, Hauptbild-Großtextwerbung`,
     'fr': `[Style·Marketing]
 Core : Orienté trafic e-commerce, accrocheur, percutant, mettant en valeur l'amélioration de l'expérience d'utilisation pour la conversion.
 Règles :
 - Expression jeune et légère, minimiser les paramètres arides, mettre en valeur le plaisir d'utilisation
 - Slogans publicitaires, questions rhétoriques autorisés, préserver les séries de produits en majuscules pour la reconnaissance de marque
-- Produits gaming (DIMM/SSD/carte) : Utiliser un langage gamer-friendly qui met en valeur les avantages de performance et élimine les points de douleur (ex : "fini le lag", "stockez tout")
-- Produits lifestyle tendance : Mettre l'accent sur l'esthétique, l'atmosphère, la collaboration IP
 - Forte sensation promotionnelle, adapté au trafic de page d'accueil e-commerce, promotion en grand texte d'image principale`,
     'es': `[Estilo·Marketing]
 Núcleo: Orientado al tráfico de comercio electrónico, llamativo, impactante, destacando la mejora de la experiencia de uso para la conversión.
 Reglas:
 - Expresión juvenil y ligera, minimizar parámetros áridos, destacar el placer de uso
 - Esloganes publicitarios, preguntas retóricas permitidas, preservar series de productos en mayúsculas para el reconocimiento de marca
-- Productos gaming (DIMM/SSD/tarjeta) : Usar lenguaje gamer-friendly que enfatice los beneficios de rendimiento y elimine puntos de dolor (ej : "no más lag", "almacena todo")
-- Productos lifestyle de moda : Enfocarse en estética, atmósfera, colaboración IP
 - Fuerte sensación promocional, adecuado para tráfico de página principal de comercio electrónico, promoción de texto grande de imagen principal`,
     'pt': `[Estilo·Marketing]
 Núcleo: Orientado ao tráfego de comércio eletrónico, chamativo, impactante, destacando a melhoria da experiência de utilização para conversão.
 Regras:
 - Expressão jovem e leve, minimizar parámetros áridos, destacar o prazer de utilização
 - Slogans publicitários, perguntas retóricas permitidas, preservar séries de produtos em maiúsculas para reconhecimento de marca
-- Produtos gaming (DIMM/SSD/cartão): Usar linguagem gamer-friendly que enfatize os benefícios de desempenho e elimine pontos de dor (ex: "chega de lag", "guarda tudo")
-- Produtos lifestyle de moda: Focar na estética, atmosfera, colaboração IP
 - Forte sensação promocional, adequado para tráfego de página principal de comércio eletrónico`,
     'pt-BR': `[Estilo·Marketing]
 Núcleo: Orientado ao tráfego de e-commerce, chamativo, impactante, destacando a melhoria da experiência de uso para conversão.
 Regras:
 - Expressão jovem e leve, minimizar parâmetros áridos, destacar o prazer de uso
 - Slogans publicitários, perguntas retóricas permitidas, preservar séries de produtos em maiúsculas para reconhecimento de marca
-- Produtos gaming (DIMM/SSD/cartão): Usar linguagem gamer-friendly que enfatize os benefícios de desempenho e elimine pontos de dor (ex: "chega de lag", "guarde tudo")
-- Produtos lifestyle da moda: Focar na estética, atmosfera, colaboração IP
 - Forte sensação promocional, adequado para tráfego de página principal de e-commerce`,
     'it': `[Stile·Marketing]
 Nucleo: Orientato al traffico e-commerce, accattivante, d'impatto, che evidenzia il miglioramento dell'esperienza d'uso per la conversione.
 Regole:
 - Espressione giovane e leggera, minimizzare i parametri aridi, evidenziare il piacere d'uso
 - Slogan pubblicitari, domande retoriche consentite, preservare le serie di prodotti in maiuscolo per il riconoscimento del marchio
-- Prodotti gaming (DIMM/SSD/scheda): Usare linguaggio gamer-friendly che evidenzi i vantaggi delle prestazioni ed elimini i punti di dolore (es: "basta lag", "archivia tutto")
-- Prodotti lifestyle di tendenza: Concentrarsi su estetica, atmosfera, collaborazione IP
 - Forte sensazione promozionale, adatto al traffico della homepage e-commerce`,
     'nl': `[Stijl·Marketing]
 Kern: E-commerce traffic-georiënteerd, opvallend, impactvol, het benadrukken van de verbetering van de gebruikerservaring voor conversie.
 Regels:
 - Jeugdige, lichte uitdrukking, droge parameters geminimaliseerd, gebruiksplezier benadrukt
 - Advertentieslogans, retorische vragen toegestaan, productserie-hoofdletters behouden voor merkherkenning
-- Gaming-producten (DIMM/SSD/kaart): Gamer-vriendelijke taal die prestatievoordelen benadrukt en pijnpunten elimineert (bijv. "geen lag meer", "sla alles op")
-- Trendy lifestyle-producten: Focus op esthetiek, sfeer, IP-samenwerking
 - Sterk promotioneel gevoel, geschikt voor e-commerce homepage verkeer`,
     'pl': `[Styl·Marketing]
 Rdzeń: Zorientowany na ruch e-commerce, przyciągający uwagę, wpływowy, podkreślający poprawę doświadczenia użytkowania dla konwersji.
 Zasady:
 - Młodzieżowa, lekka ekspresja, zminimalizowane suche parametry, podkreślona przyjemność użytkowania
 - Slogany reklamowe, pytania retoryczne dozwolone, zachowanie wielkich liter serii produktów dla rozpoznawalności marki
-- Produkty gamingowe (DIMM/SSD/karta): Język przyjazny graczom, podkreślający korzyści wydajności i eliminujący punkty bólu (np. "koniec z lagami", "przechowaj wszystko")
-- Trendy produkty lifestyle: Skupienie na estetyce, atmosferze, współpracy IP
 - Silne uczucie promocyjne, odpowiednie dla ruchu na stronie głównej e-commerce`,
     'sv': `[Stil·Marknadsföring]
 Kärna: E-handelstrafik-orienterad, iögonfallande, impactfull, framhäver förbättring av användarupplevelsen för konvertering.
 Regler:
 - Ungt, lätt uttryck, nedtonade torra parametrar, framhäver användningsglädje
 - Reklamslogans, retoriska frågor tillåtna, behåll produktseriens versaler för varumärkesigenkänning
-- Gaming-produkter (DIMM/SSD/kort): Använd gamer-vänligt språk som betonar prestandafördelar och eliminerar smärtpunkter (t.ex. "slipp lag", "lagra allt")
-- Trendiga lifestyle-produkter: Fokus på estetik, atmosfär, IP-samarbete
 - Stark marknadsföringskänsla, lämplig för e-handelns hemsidstrafik`,
     'tr': `[Stil·Pazarlama]
 Çekirdek: E-ticaret trafiği odaklı, dikkat çekici, etkili, dönüşüm için kullanım deneyimi iyileştirmesini vurgulayan.
 Kurallar:
 - Genç, hafif ifade, kuru parametreler minimize edilmiş, kullanım zevkini vurgulayan
 - Reklam sloganları, retorik sorulara izin, marka tanıma için ürün serisi büyük harflerinin korunması
-- Oyun ürünleri (DIMM/SSD/kart): Performans faydalarını vurgulayan ve ağrı noktalarını ortadan kaldıran oyuncu dostu dil (örn: "lag yok", "hepsini sakla")
-- Trend yaşam tarzı ürünleri: Estetik, atmosfer, IP işbirliğine odaklanma
 - Güçlü promosyon hissi, e-ticaret ana sayfa trafiği için uygun`,
     'ru': `[Стиль·Маркетинг]
 Ядро: Ориентированный на трафик электронной коммерции, привлекательный, впечатляющий, подчеркивающий улучшение пользовательского опыта для конверсии.
 Правила:
 - Молодёжное, лёгкое выражение, минимизировать сухие параметры, подчеркнуть удовольствие от использования
 - Рекламные слоганы, риторические вопросы разрешены, сохранять заглавные буквы серий продуктов для узнаваемости бренда
-- Игровые продукты (DIMM/SSD/карта): Использовать геймерский язык, подчёркивающий преимущества производительности (напр.: "хватит лагов", "храни всё")
-- Трендовые lifestyle продукты: Фокус на эстетике, атмосфере, IP-сотрудничестве
 - Сильное промо-ощущение, подходит для трафика главной страницы e-commerce`,
     'vi': `[Phong cách·Tiếp thị]
 Cốt lõi: Hướng đến lưu lượng thương mại điện tử, bắt mắt, ấn tượng, nhấn mạnh cải thiện trải nghiệm sử dụng để chuyển đổi.
 Quy tắc:
 - Diễn đạt trẻ trung, nhẹ nhàng, giảm thiểu thông số khô khan, nhấn mạnh niềm vui sử dụng
 - Khẩu hiệu quảng cáo, câu hỏi tu từ được phép, giữ chữ hoa chuỗi sản phẩm để nhận diện thương hiệu
-- Sản phẩm gaming (DIMM/SSD/thẻ): Sử dụng ngôn ngữ thân thiện với game thủ, nhấn mạnh lợi ích hiệu suất (ví dụ: "tạm biệt độ trễ", "lưu trữ tất cả")
-- Sản phẩm lifestyle hợp mốt: Tập trung vào thẩm mỹ, không khí, hợp tác IP
 - Cảm giác khuyến mãi mạnh mẽ, phù hợp lưu lượng trang chủ thương mại điện tử`,
     'th': `[สไตล์·การตลาด]
 แกนหลัก: มุ่งเน้นการจราจรอีคอมเมิร์ซ ดึงดูดสายตา มีผลกระทบ เน้นการปรับปรุงประสบการณ์การใช้งานเพื่อการแปลง
 กฎ:
 - การแสดงออกที่เยาว์วัยและเบา ลดพารามิเตอร์ที่แห้ง เน้นความสนุกในการใช้งาน
 - สโลแกนโฆษณา อนุญาตให้ใช้คำถามเชิงวาทกรรม รักษาตัวพิมพ์ใหญ่ของซีรีส์ผลิตภัณฑ์เพื่อจดจำแบรนด์
-- ผลิตภัณฑ์เกม (DIMM/SSD/การ์ด): ใช้ภาษาที่เป็นมิตรกับเกมเมอร์ เน้นข้อดีของประสิทธิภาพและขจัดจุดเจ็บปวด (เช่น: "ลาก่อนความแล็ก" "เก็บทุกอย่าง")
-- ผลิตภัณฑ์ไลฟ์สไตล์อินเทรนด์: มุ่งเน้นที่ความสวยงาม บรรยากาศ ความร่วมมือ IP
 - ความรู้สึกโปรโมชันที่แข็งแกร่ง เหมาะกับการจราจรหน้าหลักอีคอมเมิร์ซ`,
     'id': `[Gaya·Pemasaran]
 Inti: Berorientasi lalu lintas e-commerce, menarik, berdampak, menyoroti peningkatan pengalaman penggunaan untuk konversi.
 Aturan:
 - Ekspresi muda dan ringan, minimalkan parameter kering, soroti kesenangan penggunaan
 - Slogan iklan, pertanyaan retoris diizinkan, pertahankan huruf besar seri produk untuk pengenalan merek
-- Produk gaming (DIMM/SSD/kartu): Gunakan bahasa gamer-friendly yang menekankan manfaat kinerja dan menghilangkan titik nyeri (contoh: "tidak ada lagi lag", "simpan semuanya")
-- Produk lifestyle trendi: Fokus pada estetika, suasana, kolaborasi IP
 - Perasaan promosi yang kuat, cocok untuk lalu lintas beranda e-commerce`,
     'ar': `[أسلوب·تسويقي]
 الجوهر: موجه لحركة مرور التجارة الإلكترونية، جذاب، مؤثر، يبرز تحسين تجربة الاستخدام للتحويل.
 القواعد:
 - تعبير شبابي وخفيف، تقليل المعلمات الجافة، إبراز متعة الاستخدام
 - الشعارات الإعلانية، الأسئلة البلاغية مسموحة، الحفاظ على الأحرف الكبيرة لسلاسل المنتجات للتعرف على العلامة التجارية
-- منتجات الألعاب (DIMM/SSD/بطاقة): استخدام لغة صديقة للاعبين تؤكد على فوائد الأداء وتزيل نقاط الألم (مثال: "لا مزيد من التأخير"، "خزن كل شيء")
-- منتجات نمط الحياة العصرية: التركيز على الجمال والأجواء والتعاون مع IP
 - إحساس ترويجي قوي، مناسب لحركة مرور الصفحة الرئيسية للتجارة الإلكترونية`,
   },
 }
@@ -2073,6 +2137,71 @@ export function renderLangForProofread(
   return `\n[VALIDATION: ${targetLang}]\n${parts.join('\n')}`
 }
 
+/**
+ * v11.0: 校对 system prompt 组装（纯函数，从 proofreadBatch 提取，便于测试）。
+ * 模块顺序：MISSION → PROOFREAD_PROMPT → glossaryHint → calibration → langBlock
+ * calibration 置于 langBlock 之前——它是"不要误拦什么"的边界声明，应在检查清单之前建立。
+ */
+export function buildProofreadSystemPrompt(opts: {
+  targetLang: string
+  productLine: string | null
+  useEnInstruction: boolean
+  glossaryHint?: string
+}): string {
+  const { targetLang, productLine, useEnInstruction, glossaryHint = '' } = opts
+
+  const mission = IDENTITY_MISSION[targetLang] || IDENTITY_MISSION['en'] || ''
+  const missionBlock = mission ? `\n[MISSION·${targetLang}]\n${mission}\n` : ''
+  const proofreadPrompt = useEnInstruction ? PROOFREAD_SYSTEM_PROMPT : PROOFREAD_SYSTEM_PROMPT_ZH
+  const calibration = buildProofreadCalibration(targetLang, productLine, useEnInstruction)
+  const calibrationBlock = calibration ? `\n${calibration}\n` : ''
+  const langBlock = renderLangForProofread(targetLang, productLine)
+
+  return missionBlock + proofreadPrompt + glossaryHint + calibrationBlock + langBlock
+}
+
+// ═══════════════════════════════════════════════════════════════
+// v11.0: 校对市场语感校准块（buildProofreadCalibration）
+// ═══════════════════════════════════════════════════════════════
+// ── 为什么需要 ──
+//   翻译 prompt 注入了分段市场语感（getMarketNote），允许译文使用目标市场
+//   原生词汇（满血版/가성비/Preis-Leistung…）。校对若看不到这份参照，
+//   会把"故意使用的正确市场词"误当中式直译/不自然表达而拦下或改写 ——
+//   翻译和校对看到的世界不一致，v10.9 的红利被校对吃掉。
+// ── 双向边界（防止矫枉过正） ──
+//   ① 白名单校准：这些词是被允许的，不许拦（治误杀）
+//   ② 禁止加词：源文没有的促销/风味词，即使在市场语感清单里也必须拦（防加戏）
+//   ② 是关键——没有它，校准块会变成校对的"加戏许可证"（v10.2 同型病：好心信号被读成行动指令）
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * 生成校对用的市场语感校准块（与翻译同源同段）。
+ * @returns 空串（该语种无市场语感数据时）或完整的校准块文本（含双向边界指令）
+ */
+export function buildProofreadCalibration(
+  targetLang: string,
+  productLine: string | null,
+  useEnInstruction: boolean,
+): string {
+  const note = getMarketNote(targetLang, productLine)
+  if (!note) return ''
+
+  if (useEnInstruction) {
+    return [
+      `[MARKET CALIBRATION · ${targetLang}]`,
+      `Market-native expressions for this product line: ${note}`,
+      `- These expressions are APPROVED for this market — do NOT flag or rewrite them as unnatural or mistranslated.`,
+      `- However, flag any promotional/flavor word that has NO basis in the source text, even if it appears in this list. Calibration is a whitelist, not a license to embellish.`,
+    ].join('\n')
+  }
+  return [
+    `[市场语感校准 · ${targetLang}]`,
+    `本产品线允许使用的目标市场原生表达：${note}`,
+    `- 这些表达已获准使用——不得当作不自然或误译而拦截或改写。`,
+    `- 但源文中没有依据的促销/风味词，即使出现在以上清单中也必须拦下。校准是白名单，不是加戏许可证。`,
+  ].join('\n')
+}
+
 /** 从 CATEGORY_WORDS 数据源按语言和产品线动态生成品类词对照表 */
 function buildCategoryTerminology(targetLang: string, productLine?: string | null): string {
   const allowedWords = productLine
@@ -2353,7 +2482,8 @@ export function getStyleCard(
   }
 
   // 5. MARKET NOTE — 语种级市场表达习惯（目标语言文本）
-  const marketNote = getMarketNote(targetLang)
+  // v10.9: 按产品线分段注入（对应段+shared），无产品线时全段注入
+  const marketNote = getMarketNote(targetLang, productLine)
   if (marketNote) {
     const noteLabel = isCJKTarget(targetLang)
       ? '[市场语感 — 与上方通用语气冲突时以此为准]'

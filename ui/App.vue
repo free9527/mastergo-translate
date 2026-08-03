@@ -568,6 +568,8 @@ import { TRANSLATE_BATCH_SIZE, PROOFREAD_BATCH_SIZE, TOAST_DURATION_MS, CORRECTI
 import { convertStorageUnit } from '@lib/unit-convert'
 import { getAutoFontMapping } from '@lib/font-mapper'
 import { compressBatch, expandBatch } from '@lib/translation-memory'
+import { detectAdhocProductTerms, parseProductName } from '@lib/new-product-detect'
+import { generateProductNameTranslations, zhCNtoZhTW } from '@lib/product-name-generator'
 import { uiLog, getUiLogs, getUiLogVersion, clearUiLogs, formatUiLogs, receiveMainLog, restoreUiLogs, serializeUiLogs, UiLogEntry } from '@lib/ui-debug-log'
 
 // ============================================================
@@ -1347,6 +1349,36 @@ async function startTranslate() {
       }
     }
 
+    // ═══ v11.2: 未收录新产品名保护 — 检测 → 按命名规则生成译名 → 并入术语链 ═══
+    // 检测"整条独立出现+Lexar锚点+品类词"的未收录产品名（含®变体与纯型号形态），
+    // 按五槽位+语序模板生成当前目标语种译名并入本批次术语链 → S1 整条短路直接出厂形译文，
+    // LLM 不碰产品名（代码管形式/LLM 管语义：判定走形态门+锚点+品类指纹，翻译走命名规则）。
+    // 只对产品名生效；营销词/描述性文本不碰（形态门+锚点门+品类指纹门+新颖性门四重收紧）。
+    const adhocDetected = detectAdhocProductTerms(
+      items.value.map(it => it.sourceText),
+      glossaryMap,
+    )
+    const adhocTerms = adhocDetected.map(d => d.term)
+    // 预生成当前目标语种译名（纯查表，微秒级）；zh-TW 若生成器给出与 zh-CN 同形则走简繁转换兜底
+    const adhocTargetTranslations = new Map<string, string>()
+    for (const d of adhocDetected) {
+      const gen = generateProductNameTranslations(d.term, d.series)
+      let targetVal = gen.translations[targetLang.value] || d.term
+      if (targetLang.value === 'zh-TW' && targetVal === gen.translations['zh-CN']) {
+        targetVal = zhCNtoZhTW(targetVal)
+      }
+      adhocTargetTranslations.set(d.term, targetVal)
+      // 并入 full 视图（短路/遮蔽/合规锁）与 EN 视图（isUntranslatable/noTranslateTerms 同源）
+      glossaryMap.set(d.term, targetVal)
+      glossaryEnMap.set(d.term, d.term)
+      const ck = cleanKey(d.term)
+      if (ck.length >= 3 && !normalizedGlossaryMap.has(ck)) normalizedGlossaryMap.set(ck, targetVal)
+    }
+    if (adhocTerms.length > 0) {
+      uiLog('translate', `v11.2 新产品名保护: ${adhocTerms.map(t => `${t}→${adhocTargetTranslations.get(t)}`).join(' | ')}`)
+      showToast(`检测到 ${adhocTerms.length} 个未收录新产品名，已按命名规则生成译名: ${adhocTerms.slice(0, 3).join(', ')}${adhocTerms.length > 3 ? ' …' : ''}`, 'info')
+    }
+
 
   // 跨批次术语预扫描：找出全页高频术语，提前注入每个批次确保译文一致
   const allSourceTexts = items.value.map(it => it.sourceText)
@@ -1440,7 +1472,9 @@ async function startTranslate() {
   const cache = translationCache.value
   // 术语库hash：术语库更新后缓存自动失效
   const glossaryHash = glossary.value.map(g => g.source + '|' + (g.translations[targetLang.value] || '')).join(',').slice(0, 200).split('').reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0).toString(36)
-  const cacheKey = (text: string) => normalizeText(text) + '\x00' + targetLang.value + '\x00' + glossaryHash
+  // v11.1: 检测集合进缓存键 — 新产品名一旦被检测保护，旧的"未保护译文"缓存永不命中（防 v10.7 缓存复活）
+  const adhocHash = adhocTerms.slice().sort().join(',').slice(0, 200).split('').reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0).toString(36)
+  const cacheKey = (text: string) => normalizeText(text) + '\x00' + targetLang.value + '\x00' + glossaryHash + '\x00' + adhocHash
   let cacheHits = 0
   let failedBatches = 0
   const lastErrors: string[] = []
@@ -1464,16 +1498,17 @@ async function startTranslate() {
   let proofreadGlossaryMap: Map<string, string> | undefined
   let proofreadNormalizedMap: Map<string, string> | undefined
   if (proofreadEnabled) {
-    const { full, en } = buildGlossaryMaps()
-    proofreadGlossaryMap = full
+    // v11.1: 校对与翻译同源同世界 — 复用已并入新产品名的 glossaryMap/glossaryEnMap，
+    // 否则校对会把"翻译故意保留的新产品名"误当漏翻改掉（v11.0 双世界问题的新产品名版本）。
+    proofreadGlossaryMap = glossaryMap
     // v9.10: 校对路径也构建归一化查找表，供合规校验锁死术语（与翻译管道对齐）
     proofreadNormalizedMap = new Map<string, string>()
-    for (const [key, value] of full) {
+    for (const [key, value] of glossaryMap) {
       const ck = cleanKey(key)
       if (ck.length >= 3 && !proofreadNormalizedMap.has(ck)) proofreadNormalizedMap.set(ck, value)
     }
     proofreadGlossaryHint = buildTaskGlossaryHint(
-      en,
+      glossaryEnMap,
       llmConfig.value.scenePreset,
       items.value.map(it => it.sourceText),
     )
@@ -1826,6 +1861,31 @@ async function startTranslate() {
     }
   }
 
+  // ═══ v11.2: 新产品名静默入库（按规则生成 20 语种，长期保持）═══
+  // 检测到的未收录产品名，按五槽位+语序模板生成 20 语种译名，静默写入专属术语库。
+  // 入库 key = 整条原文去®（与 CSV 惯例一致：140 条全部无®，cleanKey 模糊匹配天然命中带®变体）。
+  // 只对产品名生效；系列/型号/规格全语种保留，品类词按 CSV 现状译法；中文营销名留空待补。
+  if (adhocDetected.length > 0) {
+    let addedCount = 0
+    for (const d of adhocDetected) {
+      const already = glossaryExclusive.value.some(g => g.source === d.term) ||
+        glossaryProducts.value.some(g => g.source === d.term)
+      if (already) continue
+      const gen = generateProductNameTranslations(d.term, d.series)
+      const translations: Record<string, string> = {}
+      for (const [lang, val] of Object.entries(gen.translations)) {
+        if (lang !== 'en') translations[lang] = val  // en = source 本身，不重复入库
+      }
+      glossaryExclusive.value.push({ source: d.term, translations })
+      addedCount++
+    }
+    if (addedCount > 0) {
+      saveGlossaryExclusive()
+      uiLog('translate', `v11.2 新产品名已静默入库 ${addedCount} 条（20 语种）: ${adhocTerms.slice(0, 5).join(', ')}${adhocTerms.length > 5 ? ' …' : ''}`)
+      showToast(`已按命名规则自动入库 ${addedCount} 个新产品名（20 语种），中文营销名待补`, 'success')
+    }
+  }
+
   // v8.4: 完成指标收集并显示报告
   const metrics = finalizeMetrics()
   if (metrics) {
@@ -1873,6 +1933,17 @@ async function startProofread() {
 
   // 提前构建术语库双视图，供校对后 enforceGlossaryTerms 兜底 + 合规校验使用
   const { full: glossaryMap, en: glossaryEnMap } = buildGlossaryMaps()
+  // v11.2: 独立校对路径同样并入新产品名的生成译名（可能绕过 startTranslate 直接校对）
+  // 与翻译路径同世界：full 视图并入当前目标语种译名，EN 视图并入原文（isUntranslatable 豁免）
+  for (const d of detectAdhocProductTerms(items.value.map(it => it.sourceText), glossaryMap)) {
+    const gen = generateProductNameTranslations(d.term, d.series)
+    let targetVal = gen.translations[targetLang.value] || d.term
+    if (targetLang.value === 'zh-TW' && targetVal === gen.translations['zh-CN']) {
+      targetVal = zhCNtoZhTW(targetVal)
+    }
+    glossaryMap.set(d.term, targetVal)
+    glossaryEnMap.set(d.term, d.term)
+  }
   // v9.10: 校对路径归一化查找表，供合规校验锁死术语（与翻译管道对齐）
   const proofreadNormalizedMap = new Map<string, string>()
   for (const [key, value] of glossaryMap) {

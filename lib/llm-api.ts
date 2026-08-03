@@ -10,9 +10,7 @@ import {
   CORE_PRINCIPLES_ZH,
   getStyleCard,
   renderLangForTranslate,
-  renderLangForProofread,
-  PROOFREAD_SYSTEM_PROMPT,
-  PROOFREAD_SYSTEM_PROMPT_ZH,
+  buildProofreadSystemPrompt,
   isCJKTarget,
 } from '@lib/prompt-constants'
 import { getFewShotExamples } from '@lib/few-shot-examples'
@@ -1747,24 +1745,24 @@ export async function proofreadBatch(
   }
 
   // ═══════════════════════════════════════════════════════════
-  // 校对 system prompt 组装
+  // 校对 system prompt 组装（v11.0: 委托 buildProofreadSystemPrompt 纯函数）
   // ═══════════════════════════════════════════════════════════
   // ROLE+CHECKLIST (PROOFREAD_SYSTEM_PROMPT) — 独立 QA 视角
   // GLOSSARY (glossaryHint)                 — 术语参照
+  // CALIBRATION (市场语感校准块)             — v11.0: 与翻译同源同段，白名单+禁加词双边界
   // LANG_SPECIFIC (renderLangForProofread)  — 品类词+rules+quality+compliance
   //
   // ⛔ 校对用独立的 PROOFREAD_SYSTEM_PROMPT（CORE DIRECTIVE + CHECK 1-4），不共享翻译规则
   // ⛔ 不注入 scene/tone/style — 翻译已负责风格，校对不重复
+  // v11.0: 市场语感除外——翻译被允许用的市场原生词，校对必须有同一份白名单，
+  //        否则会把正确翻译误当不自然表达拦下（两个 LLM 看到的世界必须一致）
   // ═══════════════════════════════════════════════════════════
-  const langBlock = renderLangForProofread(targetLang, productLine)
-  // v8.1: CJK 目标使用中文校对指令（与翻译指令语言策略一致）
-  const proofreadPrompt = isCJKTarget(targetLang) ? PROOFREAD_SYSTEM_PROMPT_ZH : PROOFREAD_SYSTEM_PROMPT
-
-  // v8.6: 校对prompt增加目标语言使命宣言，激活目标语义空间
-  const mission = IDENTITY_MISSION[targetLang] || IDENTITY_MISSION['en'] || ''
-  const missionBlock = mission ? `\n[MISSION·${targetLang}]\n${mission}\n` : ''
-
-  const systemPrompt = missionBlock + proofreadPrompt + glossaryHint + langBlock
+  const systemPrompt = buildProofreadSystemPrompt({
+    targetLang,
+    productLine,
+    useEnInstruction,
+    glossaryHint,
+  })
 
   const apiKey = config.proofreadApiKey || config.apiKey
   const apiUrl = config.proofreadApiUrl || config.apiUrl
