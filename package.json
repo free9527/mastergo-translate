@@ -12,12 +12,18 @@
     "typecheck:ui": "tsc --noEmit -p tsconfig.ui.json",
     "typecheck": "yarn typecheck:plugin && yarn typecheck:ui",
     "build:ui": "cross-env TARGET=ui vite build",
-    "build:main": "cross-env TARGET=main vite build"
+    "build:main": "cross-env TARGET=main vite build",
+    "test": "npm run test:v105 && npm run test:v106 && npm run test:v107",
+    "test:v105": "cross-env TS_NODE_COMPILER_OPTIONS=\"{\\\"module\\\":\\\"commonjs\\\",\\\"esModuleInterop\\\":true,\\\"skipLibCheck\\\":true,\\\"types\\\":[\\\"node\\\"]}\" ts-node -r tsconfig-paths/register tests/test-v105-model-list-exemption.ts",
+    "test:v106": "cross-env TS_NODE_COMPILER_OPTIONS=\"{\\\"module\\\":\\\"commonjs\\\",\\\"esModuleInterop\\\":true,\\\"skipLibCheck\\\":true,\\\"types\\\":[\\\"node\\\"]}\" ts-node -r tsconfig-paths/register tests/test-v106-misspelled-word.ts",
+    "test:v107": "cross-env TS_NODE_COMPILER_OPTIONS=\"{\\\"module\\\":\\\"commonjs\\\",\\\"esModuleInterop\\\":true,\\\"skipLibCheck\\\":true,\\\"types\\\":[\\\"node\\\"]}\" ts-node -r tsconfig-paths/register tests/test-v107-cache-glossary-compliance.ts"
   },
   "devDependencies": {
     "@types/node": "^17.0.21",
     "@vitejs/plugin-vue": "^2.2.4",
     "cross-env": "^7.0.3",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
     "typescript": "^6.0.3",
     "vite": "^2.8.6",
     "vite-plugin-singlefile": "^0.7.1",

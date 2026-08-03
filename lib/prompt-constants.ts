@@ -2248,6 +2248,11 @@ export const CORE_PRINCIPLES = `[CORE PRINCIPLES]
    Placeholders (__XXX_N__), HTML tags, and ↵ markers preserved exactly as-is.
    ↵ is a LITERAL character marker, NOT a line break — output it as the characters "↵".
    ⛔ Category precision: "Read speed" and "Write speed" are distinct — never interchange them.
+   ⛔ MISSPELLED WORDS: If a single word appears to be a misspelling or an unrecognized
+      proper noun (not in the glossary, not a valid word in any language), do NOT
+      transliterate it, do NOT guess its meaning, do NOT invent a translation —
+      keep the EXACT original spelling. Preserving the original is always better
+      than guessing. (e.g., "Panasionic" → keep "Panasionic", never "帕納西奧尼克")
 
 3. NATURAL EXPRESSION — Sound like a native speaker wrote it, not a translation.
    Perfect grammar, spelling, punctuation. Technical specs in industry-standard terms.
@@ -2266,6 +2271,10 @@ export const CORE_PRINCIPLES_ZH = `[核心原则]
    数字、容量、速度值原样保留。占位符(__XXX_N__)、HTML标签、↵标记原样保留。
    ↵ 是字面字符标记，不是换行指令 — 请输出字符 "↵"，不要转为真实换行。
    ⛔ 品类精度："读取速度"和"写入速度"含义不同 — 严禁互换。
+   ⛔ 疑似错词：若某个单词疑似拼写错误或是无法识别的专有名词（不在术语库、
+      不构成任何语言的合法词），不要音译、不要猜测词义、不要编造译名 ——
+      原样保留源文拼写。保留原形永远优于猜测。
+      （例如 "Panasionic" → 保留 "Panasionic"，绝不译成 "帕納西奧尼克"）
 
 3. 【自然】用地道的目的语表达，不是翻译腔。
    语法、拼写、标点完全正确。技术参数用行业标准表达。营销文案用本地化表达。

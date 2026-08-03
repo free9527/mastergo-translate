@@ -1,7 +1,7 @@
 # 项目交接文档
 
-**日期**: 2026-07-31  
-**版本**: v10.2  
+**日期**: 2026-08-03  
+**版本**: v10.7  
 **项目**: Lexar 翻译插件（MasterGo 插件）
 
 ---
@@ -32,9 +32,106 @@ MasterGo 设计工具插件，将 Lexar 产品设计稿从英文翻译成 20 个
 
 ---
 
-## 二、当前版本（v10.4）
+## 二、当前版本（v10.7）
 
-### 2.0 v10.4 管道阶段化 + 不变量审计（2026-08-01，v9.11 结构性根因止血）
+### 2.0 v10.7 缓存术语库合规校验（2026-08-03，翻译缓存闭环缺口修复）
+
+**问题**（TW→TW 实机日志）：术语库条目 `Lexar® Professional SILVER PLUS SDXC™ UHS-I 記憶卡` 被输出为 `Lexar®專業級 SILVER PLUS SDXC™ UHS-I 記憶卡`（`Professional`→`專業級`）。日志只有 scan/apply，零 translate/proofread——错误译文非本次 LLM 产出。
+
+**根因**（两次会话叠加）：
+1. **早先会话**：该条目当时是漏翻状态（v10.x 修三层漏翻检测之前）→ 进校对 → 校对 LLM 违反术语库把 `Professional` 润色成 `專業級` → v9.10 术语合规校验**理论上**应兜住但偶发漏网 → 错误译文写入**跨会话持久化翻译缓存**（`translationCache`，按 `源文+目标语言+术语库hash` 做 key）
+2. **本次会话**：扫描到同一文本 → 缓存命中 → 直接套用错误译文 → 术语库短路（`normalizedGlossaryMap` 整条命中）和缓存是**平级分支**，缓存优先 → 短路未执行 → 错误复活
+
+**核心缺口**：翻译/校对管道的术语合规校验（v9.10）只管"本次新产生的译文"，**缓存读取路径没有任何术语校验**——它假设"缓存里的都是好译文"，但旧版本 bug 或校对偶发漏网会污染缓存并永久复活。
+
+**修复**（四层防御，用户拍板"可靠性最重要"）：
+
+| 层 | 改动 | 位置 | 要点 |
+|---|------|------|------|
+| 缓存读取校验 | `isDirtyCache` 加第 4 条：源文整条命中术语库但缓存值 ≠ 术语库目标值 → 弃用并重新翻译 | ui/App.vue:1517 | 与 v9.10 同维度（`cleanKey` 归一化），但语义不同：不抛脏缓存，而是**强制重新走翻译管道**（触发术语库短路，零 LLM 调用） |
+| 启动全量清洗 | `TRANSLATION_CACHE_LOADED` 追加术语库合规清洗：同维度删除存量违规缓存 | ui/App.vue:2957 | 一次性清掉历史污染；用户下次启动插件自动生效 |
+| 用户修正豁免 | corrections 里的手动修正译文优先于术语库值（最高优先级） | ui/App.vue:1517 + 2957 | 避免"启动清洗删了术语库违规缓存，但用户之前手动改的译文被误杀" |
+| 校对日志升级 | `proofreadBatch` 术语合规校验日志从 `debugWarn`（依赖 DEBUG_MODE）升级为 `console.warn`（默认可见） | lib/llm-api.ts:1860 | 未来再漏网时可追溯，不再静默 |
+
+**关键决策**：
+1. **缓存校验放在读取时而非写入时**——写入时校验无法拦截"旧版本已写入的脏缓存"；读取时校验 + 启动清洗组合覆盖存量+增量。
+2. **用户修正 > 术语库值**——术语库是默认值，用户手动改过的译文是最终意图；清洗/校验都豁免 corrections 记录。
+3. **20 语言通吃**——`cleanKey` 是语言无关的文本归一化（大小写/连字符/®™©/空白不敏感），非拉丁目标（ja/ko/zh/ru/ar/th）同样生效。
+4. **不推翻 v9.10/v10.6**——缓存校验是**补充**而非替代；翻译/校对管道的合规校验继续兜底新译文，缓存校验兜底旧译文。
+
+**测试**：`tests/test-v107-cache-glossary-compliance.ts` 14/14（A 脏缓存拒用+重新翻译短路 5 + B 用户修正豁免 3 + C 启动清洗逻辑 4 + D 20 语种 cleanKey 等价性 2）；v10.6 回归 46/46；v10.5 回归 39/39；typecheck 双配置 + build 通过（main.js 289.61 KiB）。
+
+**测试基建**：`package.json` 新增 `npm test` 命令（`test:v105/v106/v107`），本地安装 `ts-node` + `tsconfig-paths`，解决 Windows 下 `--compiler-options` JSON 解析问题（改用 `cross-env TS_NODE_COMPILER_OPTIONS`）。
+
+---
+
+### 2.0.0 v10.6 疑似错词保留 + 回退兜底（2026-08-01，错词不翻不猜不音译不自动改）
+
+**问题**（zh-CN→zh-TW 实机日志）：源稿错别字 `Panasionic` 匹配不上术语库（`panasionic ≠ panasonic`）→ 进 LLM 被音译成 `帕納西奧尼克` 上画布。错词被翻成诡异词是物料事故。
+
+**用户关键洞察**：错别字是**通用现象**，品牌名只是恰好撞上。`Spede`/`Transfser` 同样会被 LLM 自由发挥——这跟是不是品牌名无关。因此不能围绕"品牌名匹配"头疼医头。
+
+**宏观方向（用户拍板：站在 LLM 视角）**：判"什么是错词"需要多语言词表，代码做不到（20 语言要 20 套词典），但 **LLM 天然内建多语言语感**。所以**判定权交给 LLM（prompt 规则），代码只做最保守的回退硬兜底**。对齐 CAT 工具（Trados/memoQ）行业标准：错词不翻、不猜、不音译、**不自动改**（用户明确否决"差一个字母自动替换成 Panasonic"的编辑距离方案——怕引入新 bug）。
+
+**改动**：
+
+| 层 | 改动 | 位置 | 要点 |
+|---|------|------|------|
+| prompt 层（主，软约束） | CORE_PRINCIPLES / CORE_PRINCIPLES_ZH 第 2 条【忠实】加"疑似错词保留原形"硬规则 | lib/prompt-constants.ts | "不音译、不猜测词义、不编造译名，原样保留源文拼写；保留原形永远优于猜测"，附 Panasionic→帕納西奧尼克 反例。LLM 用内建多语言语感判错词，**20 语言通吃**，零新增判定代码 |
+| 代码兜底层（硬） | 新增 `revertMisspelledWordTranslation` | lib/llm-api.ts | LLM 万一没忍住翻了（音译成非拉丁文字），兜回源文原形 + 进待确认（untranslatedIndices）|
+
+**代码兜底 5 重保守约束**（全部命中才回退，宁可漏不可误）：
+1. 源文单个拉丁词（无空格/标点/数字），长度 ≥6 —— 只碰"单词"
+2. 源文不在术语库（key/value，大小写无关）—— 已收录品牌走 LOCK 不兜底
+3. 源文不被 isUntranslatable 豁免（型号/单位/品牌词已有归属）—— 不重复拦截
+4. 译文 ≠ 源文（LLM 确实改了）
+5. 译文含非拉丁字符（音译/意译铁证）—— **仅非拉丁目标有此硬信号；拉丁目标直接跳过**（拉丁→拉丁猜测无法与合法翻译形式区分，归校对 LLM 语义裁决）
+
+**关键决策（正反论证）**：
+1. **判定权在 LLM 不在代码**——"什么是错词"需多语言词表，代码做不到；LLM 内建语感，一条 prompt 规则 20 语言通用。这正是"LLM 管语义"的延伸：**LLM 也管"错词识别"这种需要语言感的判断**。
+2. **代码兜底只回退不替换**——零编辑距离/零词典/零自动改，规避用户担忧的"差一个字母改错"风险。最坏结果 = 合法词被保留+提示，人工确认即可，不会造成物料事故。
+3. **兜底调用点在 S7f 之后**——若放在 S7 检测前，回退为源文（src===trans）会被漏翻检测二次拦截触发无效重试。
+4. **拉丁目标不兜底**——`Panasionic→某拉丁词`无法与合法翻译区分，硬回退会误伤；交给校对 CHECK。
+
+**测试**：`tests/test-v106-misspelled-word.ts` 34/34（A prompt 规则注入中英双语 6 + B 正反样例 4 + C 端到端 Panasionic→帕納西奧尼克回退+独立通道 5 + D 20 语种：拉丁 de 不兜底/ja/ko/zh-CN/ru/ar/th 均兜底且与漏翻区分 19）；全量回归全绿；typecheck 双配置 + build 通过（dist/index.html 710.26 KiB）。
+
+**v10.6.1 补充（同日，用户反馈"提示是翻译失败⚠️漏翻"语义错位）**：疑似错词被复用的"漏翻"通道标成了"翻译失败"——它是源稿疑似拼错，不是翻译失败。改为**独立待确认类别**：
+- translateBatch 新增 `misspelledIndices` 输出参数（疑似错词走独立通道，不进 untranslatedIndices）
+- App.vue 新增 `misspelledIds` ref + pendingItems 加 `type:'misspelled'` + "疑似拼写错误"徽章/横幅计数/待确认项"请核对源稿"前缀
+- **关键修复**：v9.11 最终安全网会把回退为源文的疑似错词（src===trans）二次判漏翻进 untranslatedIndices，与 misspelledIds 双通道混淆——安全网豁免 misspelledIndices 已标记的索引
+- UI 状态管理：startTranslate/clearItems 清空 misspelledIds；skipPendingItem/retranslateSingle 清除该 id
+
+### 2.0.1 v10.5 型号/单位豁免 + 检测层豁免（2026-08-01，误报清零 + 消灭无效兜底 API 空转）
+
+**问题**（zh-CN→zh-TW 实机日志）：一批"漏翻"全是误报——
+- 相机型号列表（`EOS R5 / ...`、`A1 / A7M4 / ...`、`X-H2S / ...`、`E-M1-Mark-II`）本不该翻，LLM 原样回显是**正确行为**，但 `isUntranslatable` 白名单只认 Lexar 自有型号（BRAND_GRADE_RE），`MODEL_CAPACITY_RE` 又是"整条"正则匹配不上多行/带斜杠列表 → 误判漏翻 → 每条空转 4 次兜底 API 后标红；
+- `MB/s*` 裸单位无数字开头落不穿 `NUM_UNIT_RE`（`^[\d,.]+` 强制数字开头）→ 误判漏翻；
+- `detectTruncatedTexts` 对型号列表误报截断（zh 目标只查 CJK 字符），且 S7b-trunc 对"重试后仍截断"执行 `result[j]=''`（静默清空无标记）；
+- 源稿错别字 `Panasionic` 被 LLM 纠正为 `Panasonic`（术语库值）后，最终安全网的"必须含 CJK 字符"脚本校验仍误报漏翻。
+
+**"之前没这个问题"的真相**：不是新 bug。以前这些条目 LLM 原样返回后静默过了（用户无感知）；v9.5 三层检测 + v9.11 最终安全网把它们抓出来标红。检测变灵敏了，但"第三方型号/裸单位/库值纠正"这三个豁免类别没跟上。
+
+**改动**（全部在 lib/llm-api.ts，纯代码确定性豁免，符合"代码管形式/LLM管语义"总原则）：
+
+| # | 改动 | 位置 | 要点 |
+|---|------|------|------|
+| 1 | 型号/型号列表豁免 `isModelListOrCode` | isUntranslatable 规则 2.6 | 按 `/`/换行切段；单段=含数字+大写占比≥50%（覆盖 E-M1-Mark-II）；多段=每段皆型号形态（含数字且大写≥50%，或全大写）。不误判 `4K/8K video recording`（小写词为主）/`SUPER FAST SPEED`（无数字） |
+| 2 | 裸单位豁免 `PURE_UNIT_RE` | isUntranslatable 规则 2 后 | `/^(GB|MB|TB|KB|MB\/s|GB\/s|TB\/s|MHz|GHz|TBW)\*?$/i`，去尾 `*` 后匹配。**不动 NUM_UNIT_RE**（v8.7 教训：不扩已有规则宽松度） |
+| 3 | 截断检测跳过不可翻译条目 | detectTruncatedTexts | 空值检查**之后**加 `if (isUntranslatable(src)) continue`（空译文仍触发重试）。堵死 S7b-trunc 静默清空型号列表的洞 |
+| 4 | 脚本校验豁免术语库已知值 | detectUntranslatedText | 译文归一化 ∈ glossaryMap 值集合 → 跳过 ja/ko/cjk 三处脚本校验。**只管脚本校验，不管 src===trans**（错别字原样回显仍被抓走纠正链） |
+
+**关键决策**：
+1. **豁免在检测层不在 prompt 层**——型号/单位是形式可判定的，代码在 S1 前拦住，不进 LLM 也不进兜底链（符合 arch-review"代码管形式"原则）。
+2. **改动 4 用"值集合"而非"key 匹配"**——源文是错别字（Panasionic）匹配不上 key，但译文被 LLM 纠正后命中术语库值，此时应认可"库内正确拼写"是合规结果。
+3. **不动 MAX_AGGRESSIVE_RETRIES=3 / 术语匹配逻辑**——改动 1 落地后型号列表根本不进兜底链，上限失去相关场景；错别字匹配不上术语库是正确设计。
+
+**测试**：`tests/test-v105-model-list-exemption.ts` 33/33（A 型号正/反样例 13 + B 裸单位 6 + C 截断豁免 4 + D 脚本校验库值豁免 5 + E 端到端队列 mock 5——**E4 断言型号列表回显仅首调 1 次 API、零重试零漏翻上报**）；全量回归全绿（v10.4 17 / v10.3 22 / v10.2 38 / v10.0 21 / v9.11 21 / v9.9+9.10 33 / v9.8 10 / v9.7 9 / 同语系 21 / v8.7 26 / 术语遮蔽 80）；typecheck 双配置 + build 通过（dist/index.html 707.08 KiB / main.js 289.61 KiB）。
+
+**排障记录**（测试先行暴露的两个断言设计问题，非生产代码 bug）：
+- C4 初版用 `'Another list A7M4/...'` 含小写功能词段，被规则正确判为非型号列表 → 改用纯型号段（EOS 系列）。
+- D5 初版源文 `'高速传输 极致体验'` 含简体特征字（传），在 zh-TW 目标下被 s2t 特征字校验**先行**拦截，根本走不到脚本校验 → 改用 ja 目标 + 纯拉丁源文直达脚本校验路径。
+
+### 2.0.2 v10.4 管道阶段化 + 不变量审计（2026-08-01，v9.11 结构性根因止血）
 
 **问题**：`translateBatch` 922 行单函数、`result[]` 23 处赋值（12 处集中在异常兜底链单点写入）。v9.11 漏翻静默 bug 的根因就是这个结构——中间检测点的 result 快照被后续兜底链覆盖，无任何机制能发现。当时靠"最终安全网"补丁治标，结构问题还在。
 
@@ -53,7 +150,7 @@ MasterGo 设计工具插件，将 Lexar 产品设计稿从英文翻译成 20 个
 
 **测试**：`tests/test-v104-pipeline-audit.ts` 17/17（正常路径零告警 + S1-S8 阶段日志齐全 + 顽固漏翻全兜底链审计零告警 + 术语短路路径零告警 + 阶段日志计数正确）；全量回归全绿（v10.3 22 / v10.2 38 / v10.0 21 / v9.11 21 / v9.9+9.10 33 / v9.8 10 / v9.7 9 / v9.5 40 / 同语系 21 / v8.7 26 / 术语遮蔽 80）；typecheck 双配置 + build 通过；dist/index.html 含 auditStage + 阶段日志（v10.4 改动在 UI 线程包，dist/main.js 不含——translateBatch 由 UI 线程 import）。
 
-### 2.0.1 v10.3 日志持久化 + 主线程跨线程可见（2026-08-01，优化方向 ④）
+### 2.0.3 v10.3 日志持久化 + 主线程跨线程可见（2026-08-01，优化方向 ④）
 
 **问题**：①诊断日志（ui-debug-log 内存环形缓冲）插件关闭即丢，实机 bug 只能靠用户复述；②主线程（扫描/应用/撤销/字体替换）行为完全不可见，诊断面板只有 UI 线程日志。
 
@@ -70,7 +167,7 @@ MasterGo 设计工具插件，将 Lexar 产品设计稿从英文翻译成 20 个
 
 **测试**：`tests/test-v103-log-persistence.ts` 22/22；全量回归全绿；typecheck + build 通过；dist/main.js + dist/index.html 均含 3 个新消息类型。
 
-### 2.0.2 v10.2 截断误杀根治（2026-07-31，确立"代码管形式/LLM管语义"原则）
+### 2.0.4 v10.2 截断误杀根治（2026-07-31，确立"代码管形式/LLM管语义"原则）
 
 **问题**：实机日志 16:33——pt→ja `Resistente a altas temperaturas`（31字符）LLM 首调即翻对 `高温に強い`（6字符），却被 `detectTruncatedTexts` 判"截断"（比例 0.19 < 0.25 阈值），统一重试→激进重试→子兜底连环空耗后标记失败；同批 `Resistente a baixas temperaturas` 同命。另：诊断日志"复制日志"按钮在 MasterGo iframe 中失效（clipboard API 不可用）。
 
@@ -503,7 +600,7 @@ v8.7 设计"激进失败→保留原文不标记，交给校对 LLM 判断"，�
 | 文件 | 职责 |
 |------|------|
 | `lib/prompt-constants.ts` | 提示词常量（STYLE_GUIDES、LANG_SPECIFIC、PRODUCT_LINE_TONE_GUIDES、SCENE_CONSTRAINTS、CORE_PRINCIPLES、PROOFREAD_SYSTEM_PROMPT） |
-| `lib/llm-api.ts` | LLM 调用 + 翻译/校对管道 + 重试逻辑 + v9.5 三层漏翻检测 + v9.9 术语合规校验 + v9.10 双视图分发 + v9.11 批次级标注/untranslatedIndices/最终安全网 + v10.0 re-export lang-detect（兼容层）+ v10.2 截断判定（脚本存在性）+ 子兜底守卫 + 诊断日志埋点 + **v10.4 管道阶段化(S1-S8)+auditStage 不变量审计** |
+| `lib/llm-api.ts` | LLM 调用 + 翻译/校对管道 + 重试逻辑 + v9.5 三层漏翻检测 + v9.9 术语合规校验 + v9.10 双视图分发 + v9.11 批次级标注/untranslatedIndices/最终安全网 + v10.0 re-export lang-detect（兼容层）+ v10.2 截断判定（脚本存在性）+ 子兜底守卫 + 诊断日志埋点 + v10.4 管道阶段化(S1-S8)+auditStage 不变量审计 + v10.5 型号/裸单位豁免(isModelListOrCode/PURE_UNIT_RE)+截断跳过不可翻译+脚本校验豁免术语库已知值 + **v10.6 revertMisspelledWordTranslation 疑似错词回退兜底** |
 | `lib/lang-detect.ts` | v10.0 语言检测单一事实源（三套检测/词表/字符集分类/同语系对，detectSingleTextLanguage 死代码已修为委托批次级）+ **v10.2 TARGET_SCRIPT_PATTERNS** |
 | `lib/keep-source.ts` | **v10.0 豁免中央注册表**（shouldKeepSource/isSameLanguageExempt，F3b 三重守卫迁入） |
 | `lib/post-process.ts` | 译后处理（enforceGlossaryTerms、detectBrandInjection、restoreTrademarkSymbols、detectTranslationExpansion、cleanKey） |
@@ -527,6 +624,8 @@ v8.7 设计"激进失败→保留原文不标记，交给校对 LLM 判断"，�
 | `tests/test-v911-non-en-source.ts` | **v9.11 非英源文漏翻闭环（21 断言：F1 标注/F2 激进指令/F3 漏翻上报/F3b 拉丁豁免）** |
 | `tests/test-v100-arch-consolidation.ts` | v10.0 判定逻辑收口（21 断言：re-export 同一引用 + 死代码修复 + 注册表三重守卫） |
 | `tests/test-v102-truncation-fix.ts` | **v10.2 截断误杀根治（38 断言：脚本存在性判定 + 真截断检出 + 拉丁 0.15 分支 + 20 语种一致性）** |
+| `tests/test-v105-model-list-exemption.ts` | **v10.5 型号/裸单位豁免（39 断言：A 型号正反样例 + B 裸单位 + C 截断豁免 + D 脚本校验库值豁免 + E 端到端零重试 + F 20 语种普遍性）** |
+| `tests/test-v106-misspelled-word.ts` | **v10.6 疑似错词保留+回退兜底（27 断言：A prompt 规则中英双语 + B 正反样例 + C 端到端音译回退+待确认 + D 20 语种拉丁不兜底/非拉丁兜底）** |
 
 ---
 
@@ -549,6 +648,8 @@ npx tsx tests/test-v100-arch-consolidation.ts    # v10.0 判定逻辑收口 21 �
 npx tsx tests/test-v102-truncation-fix.ts        # v10.2 截断误杀根治 38 断言
 npx tsx tests/test-v103-log-persistence.ts       # v10.3 日志持久化+跨线程 22 断言
 npx tsx tests/test-v104-pipeline-audit.ts        # v10.4 管道阶段化+不变量审计 17 断言
+npx tsx tests/test-v105-model-list-exemption.ts  # v10.5 型号/裸单位豁免+检测层豁免 39 断言（含 F 段 20 语种普遍性）
+npx tsx tests/test-v106-misspelled-word.ts       # v10.6 疑似错词保留+回退兜底+独立待确认类别 34 断言（prompt 规则+非拉丁兜底+20 语种+漏翻通道区分）
 ```
 
 **铁律**：每次改代码后必须执行 `npm run typecheck` + `npm run build`。build 过 ≠ tsc 过。

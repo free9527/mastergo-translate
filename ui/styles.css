@@ -846,6 +846,23 @@ body {
   letter-spacing: 0;
 }
 
+/* v10.6: 疑似拼写错误（与漏翻区分——非翻译失败，是源稿疑似错词，提示核对源稿） */
+.misspelled-badge {
+  font-size: var(--text-caption);
+  background: #5856d6;
+  color: #fff;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.misspelled-tag {
+  color: #5856d6;
+  font-weight: 600;
+  margin-right: 2px;
+}
+
 /* v8.9: 占位符残留 */
 .text-item.has-placeholder {
   border-color: #ff3b30;

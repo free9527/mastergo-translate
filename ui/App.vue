@@ -114,7 +114,7 @@
           <span class="pending-text">
             {{ pendingItems.filter(p => p.type === 'error').length }} 条错误，
             {{ pendingItems.filter(p => p.type === 'placeholder').length }} 条占位符，
-            {{ pendingItems.filter(p => p.type === 'untranslated').length }} 条漏翻待确认
+            {{ pendingItems.filter(p => p.type === 'untranslated').length }} 条漏翻待确认<template v-if="pendingItems.some(p => p.type === 'misspelled')">，{{ pendingItems.filter(p => p.type === 'misspelled').length }} 条疑似拼写错误</template>
           </span>
           <svg class="chevron" :class="{ open: showPendingList }" width="12" height="12" viewBox="0 0 12 12"><path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
         </div>
@@ -128,7 +128,9 @@
         </div>
         <div class="pending-list" v-if="showPendingList">
           <div class="pending-item" v-for="p in pendingItems" :key="p.item.nodeIds[0]" :class="p.type">
-            <div class="pending-item-source">{{ p.item.sourceText.slice(0, 40) }}{{ p.item.sourceText.length > 40 ? '...' : '' }}</div>
+            <div class="pending-item-source">
+              <span v-if="p.type === 'misspelled'" class="misspelled-tag">疑似拼写错误，请核对源稿：</span>{{ p.item.sourceText.slice(0, 40) }}{{ p.item.sourceText.length > 40 ? '...' : '' }}
+            </div>
             <div class="pending-item-trans">{{ p.item.translatedText.slice(0, 40) }}{{ p.item.translatedText.length > 40 ? '...' : '' }}</div>
             <div class="pending-item-actions">
               <button class="btn btn-xs btn-tinted" @click="editPendingItem(p.item)">编辑</button>
@@ -263,6 +265,7 @@
             <div class="item-label">
               译文
               <span class="error-badge" v-if="translateErrors.has(item.nodeIds[0])">翻译失败</span>
+              <span class="misspelled-badge" v-if="misspelledIds.has(item.nodeIds[0])">疑似拼写错误</span>
               <span class="placeholder-badge" v-if="hasPlaceholderResidue(item.translatedText)">⚠️ 占位符</span>
               <span class="untranslated-badge" v-if="showUntranslatedBadge(item)">⚠️ 漏翻</span>
               <span class="proof-badge" v-if="item.corrected">校正</span>
@@ -558,7 +561,7 @@ import { sendMsgToPlugin } from '@messages/ui-sender'
 import { parseCSVRow, csvEncodeCell } from '@lib/parse-csv'
 import { formatCJKSpace } from '@lib/format-text'
 import { postProcessTranslation, restoreTrademarkSymbols, restoreStorageUnitFormatting, enforceGlossaryTerms, detectTranslationExpansion, sanitizeLineBreaks, cleanKey } from '@lib/post-process'
-import { translateBatch, proofreadBatch, fetchWithRetry, isProofreadScriptMismatch, detectTruncatedTexts, STYLE_PRESETS, SCENE_PRESETS, detectProductLine, buildTaskGlossaryHint, isUntranslatable, classifyNecessity, getTargetScript, hasFunctionWords, hasSimplifiedOnlyChars, hasTraditionalOnlyChars } from '@lib/llm-api'
+import { translateBatch, proofreadBatch, fetchWithRetry, isProofreadScriptMismatch, detectTruncatedTexts, STYLE_PRESETS, SCENE_PRESETS, detectProductLine, buildTaskGlossaryHint, isUntranslatable, isSuspectMisspelledWord, classifyNecessity, getTargetScript, hasFunctionWords, hasSimplifiedOnlyChars, hasTraditionalOnlyChars } from '@lib/llm-api'
 import { startMetricsCollection, recordBatchMetrics, recordProofreadMetrics, finalizeMetrics, formatMetricsReport, createBatchTimer } from '@lib/metrics'
 import { DEFAULT_GLOSSARY_PRODUCTS_CSV } from '@lib/default-glossary'
 import { TRANSLATE_BATCH_SIZE, PROOFREAD_BATCH_SIZE, TOAST_DURATION_MS, CORRECTION_THRESHOLD, makeFontKey, parseFontKey, normalizeText } from '@lib/constants'
@@ -585,8 +588,10 @@ const glossaryMapForUi = computed(() => buildGlossaryMaps().full)
  * 且任一响应式变化触发全模板重渲染时 48 卡×3 次全量重跑。
  * 键含源文/译文/目标语言/术语库规模，任一变化自动失效。 */
 const untranslatedBadgeCache = new Map<string, boolean>()
-function showUntranslatedBadge(item: { sourceText: string; translatedText: string }): boolean {
+function showUntranslatedBadge(item: { sourceText: string; translatedText: string; nodeIds?: string[] }): boolean {
   if (item.sourceText !== item.translatedText) return false
+  // v10.6.2: 疑似错词已单独标记"疑似拼写错误"，不再叠加"⚠️ 漏翻"徽章
+  if (item.nodeIds?.[0] && misspelledIds.value.has(item.nodeIds[0])) return false
   const key = item.sourceText + '' + targetLang.value + '' + glossaryProducts.value.length + '/' + glossaryExclusive.value.length
   const cached = untranslatedBadgeCache.get(key)
   if (cached !== undefined) return cached
@@ -600,6 +605,9 @@ function computeUntranslatedBadge(item: { sourceText: string; translatedText: st
 
   // 第一层：不可翻译 → 不显示
   if (isUntranslatable(item.sourceText, glossaryMapForUi.value)) return false
+
+  // v10.6.2: 疑似错词形态（拉丁单词，非术语库，非已豁免类别）→ LLM 保留原形是正确行为，不算漏翻
+  if (isSuspectMisspelledWord(item.sourceText, glossaryMapForUi.value)) return false
 
   // 逐条 necessity 分类（与后端 detectUntranslatedText 三层架构一致）
   const necessity = classifyNecessity(item.sourceText, targetLang.value)
@@ -635,10 +643,12 @@ function hasPlaceholderResidue(text: string): boolean {
 
 /** v8.9: 待确认条目 — 三类阻塞问题 */
 const pendingItems = computed(() => {
-  const errors: Array<{ item: typeof items.value[0]; type: 'error' | 'placeholder' | 'untranslated' }> = []
+  const errors: Array<{ item: typeof items.value[0]; type: 'error' | 'placeholder' | 'untranslated' | 'misspelled' }> = []
   for (const item of items.value) {
     if (appliedNodeIds.value.has(item.nodeIds[0])) continue // 已应用的不参与
-    if (translateErrors.value.has(item.nodeIds[0])) {
+    if (misspelledIds.value.has(item.nodeIds[0])) {
+      errors.push({ item, type: 'misspelled' })
+    } else if (translateErrors.value.has(item.nodeIds[0])) {
       errors.push({ item, type: 'error' })
     } else if (hasPlaceholderResidue(item.translatedText)) {
       errors.push({ item, type: 'placeholder' })
@@ -676,6 +686,8 @@ const undoCount = ref(0)
 const cancelFlag = ref(false)
 const failedNodeIds = ref<string[]>([])
 const translateErrors = ref<Set<string>>(new Set())
+/** v10.6: 疑似拼写错误的 nodeId 集合 — 源稿疑似错词被保留原形，与"翻译失败"区分标记 */
+const misspelledIds = ref<Set<string>>(new Set())
 /** AI 校对标记的歧义词汇 — 应加入术语库 source 列，用户后续补充翻译 */
 const suggestedGlossaryTerms = ref<string[]>([])
 /** 已被手动应用过的 nodeId 集合，批量应用时自动跳过 */
@@ -1102,6 +1114,7 @@ function onTransInputBlur(item: TextItem) {
 function resetWorkState() {
   items.value = []
   translateErrors.value = new Set()
+  misspelledIds.value = new Set()
   failedNodeIds.value = []
   appliedNodeIds.value = new Set()
   retranslatingIds.value = new Set()
@@ -1307,6 +1320,7 @@ async function startTranslate() {
   translating.value = true
   cancelFlag.value = false
   translateErrors.value = new Set()
+  misspelledIds.value = new Set()
   translateProgress.value = { current: 0, total: 0 }
 
   // 目标语言切换后需要重新翻译：清空所有旧译文和校对状态
@@ -1497,6 +1511,17 @@ async function startTranslate() {
             if (targetLang.value !== 'en' && hit.trim().toLowerCase() === sourceText.trim().toLowerCase()) return true
             // 3. v7.5.7: 源文有®/™/©但缓存结果没有 = 旧版本商标恢复缺陷
             if (/[®™©]/.test(sourceText) && !/[®™©]/.test(hit)) return true
+            // 4. v10.7: 源文整条命中术语库但缓存译文 ≠ 术语库目标值 = 旧校对漏网脏缓存
+            //    与 isDirtyCache 同构，但语义不同：不抛脏缓存，而是弃用并强制重新翻译
+            const expected = normalizedGlossaryMap.get(cleanKey(sourceText))
+            if (expected) {
+              // v10.7: 修正层豁免 — 用户手动修正过的译文优先于术语库值（最高优先级）
+              //        避免"启动清洗删了术语库违规缓存，但用户之前手动改的译文被误杀"
+              const hasUserCorrection = corrections.value.some(c =>
+                c.source === sourceText && c.targetLang === targetLang.value && c.correctedTranslation === hit
+              )
+              if (!hasUserCorrection && hit !== expected) return true
+            }
             return false
           }
           const uncachedIndices: number[] = []
@@ -1521,7 +1546,9 @@ async function startTranslate() {
             const { uniqueTexts, expandData } = compressBatch(uncachedTexts)
             // v9.11: 收集管道最终仍漏翻（保留原文）的唯一条目 → 标记翻译失败（进待确认）
             const uniqueUntranslated = new Set<number>()
-            const uniqueResult = await translateBatch(uniqueTexts, targetLang.value, glossaryMap, llmConfig.value, sourceLang.value === 'auto' ? undefined : sourceLang.value, pageName.value || undefined, fileName.value || undefined, crossBatchTerms, taskGlossaryHint, normalizedGlossaryMap, false, false, glossaryEnMap, uniqueUntranslated)
+            // v10.6: 收集疑似错词（保留原形）的唯一条目 → 单独标记"疑似拼写错误"（与漏翻区分）
+            const uniqueMisspelled = new Set<number>()
+            const uniqueResult = await translateBatch(uniqueTexts, targetLang.value, glossaryMap, llmConfig.value, sourceLang.value === 'auto' ? undefined : sourceLang.value, pageName.value || undefined, fileName.value || undefined, crossBatchTerms, taskGlossaryHint, normalizedGlossaryMap, false, false, glossaryEnMap, uniqueUntranslated, uniqueMisspelled)
             // 将模板译文展开回原始文本
             const expandedResult = expandBatch(uniqueResult, expandData, uncachedTexts.length)
             // v9.11: 唯一模板索引 → 展开后索引（同源文复制项共享同一模板译文，同样视为漏翻）
@@ -1529,6 +1556,13 @@ async function startTranslate() {
             for (const u of uniqueUntranslated) {
               for (let x = 0; x < expandedResult.length; x++) {
                 if (expandedResult[x] !== undefined && expandedResult[x] === uniqueResult[u]) expandedUntranslated.add(x)
+              }
+            }
+            // v10.6: 疑似错词模板索引 → 展开后索引（同源文复制项同样标记）
+            const expandedMisspelled = new Set<number>()
+            for (const u of uniqueMisspelled) {
+              for (let x = 0; x < expandedResult.length; x++) {
+                if (expandedResult[x] !== undefined && expandedResult[x] === uniqueResult[u]) expandedMisspelled.add(x)
               }
             }
             // v7.5.7: 追踪关键文本在各环节的值
@@ -1551,6 +1585,11 @@ async function startTranslate() {
             for (const x of expandedUntranslated) {
               const batchIdx = uncachedIndices[x]
               if (batchIdx !== undefined) translateErrors.value.add(batch[batchIdx].nodeIds[0])
+            }
+            // v10.6: 疑似错词条目索引 → 本批次条目索引（单独标记，不进 translateErrors）
+            for (const x of expandedMisspelled) {
+              const batchIdx = uncachedIndices[x]
+              if (batchIdx !== undefined) misspelledIds.value.add(batch[batchIdx].nodeIds[0])
             }
           } else {
             translated = cachedResult as string[]
@@ -2675,6 +2714,8 @@ async function retranslateSingle(item: TextItem) {
     const glossaryMap = buildGlossaryMaps().full
     // v9.11: 收集管道最终仍漏翻的条目 — 模型顽固保留原文时不再静默成功
     const untranslated = new Set<number>()
+    // v10.6: 收集疑似错词（保留原形）→ 单独标记，不算翻译失败
+    const misspelled = new Set<number>()
     const results = await translateBatch(
       [item.sourceText],
       targetLang.value,
@@ -2685,8 +2726,14 @@ async function retranslateSingle(item: TextItem) {
       fileName.value || undefined,
       undefined, undefined, undefined, false, false, undefined,
       untranslated,
+      misspelled,
     )
-    if (untranslated.size > 0) {
+    if (misspelled.has(0)) {
+      // v10.6: 疑似错词 → 保留原形 + 单独标记（非翻译失败，提示核对源稿）
+      item.translatedText = item.sourceText
+      misspelledIds.value.add(id)
+      showToast('源文疑似拼写错误，已保留原形，请核对源稿', 'warning')
+    } else if (untranslated.size > 0) {
       // v9.11: 兜底链全失败 → 保留原文 + 标记失败（待确认可见 + 可重翻）
       item.translatedText = item.sourceText
       translateErrors.value.add(id)
@@ -2702,6 +2749,7 @@ async function retranslateSingle(item: TextItem) {
         appliedNodeIds.value.delete(nid)
       }
       translateErrors.value.delete(id)
+      misspelledIds.value.delete(id)
       showToast('已重新翻译', 'success')
     } else {
       // v9.11: 空结果也标记失败（此前只弹 toast，条目状态不变，用户无处可查）
@@ -2766,6 +2814,7 @@ function skipPendingItem(item: TextItem) {
   for (const nid of item.nodeIds) {
     appliedNodeIds.value.add(nid)
   }
+  misspelledIds.value.delete(item.nodeIds[0])
   showToast('已跳过该条目', 'info')
 }
 
@@ -2918,21 +2967,45 @@ onMounted(() => {
 
       case PluginMessage.TRANSLATION_CACHE_LOADED: {
         const rawCache = (data as Record<string, string>) || {}
-        // v7.5.6: 启动时清理脏缓存（旧版本bug残留：__XXX_N__占位符 + 英文=源文）
+        // v10.7: 启动时全量清洗 — 除旧版脏缓存（占位符/英文回退）外，
+        //        追加"术语库合规"清洗：源文整条命中术语库但缓存值 ≠ 术语库目标值 → 删除
+        //        解决 v10.6 及更早版本校对偶发漏网导致错误译文被缓存复活的闭环缺口
+        const { full: glossaryMapForPurge } = buildGlossaryMaps()
+        const normalizedGlossaryMapForPurge = new Map<string, string>()
+        for (const [key, value] of glossaryMapForPurge) {
+          const ck = cleanKey(key)
+          if (ck.length >= 3 && !normalizedGlossaryMapForPurge.has(ck)) {
+            normalizedGlossaryMapForPurge.set(ck, value)
+          }
+        }
         let purged = 0
+        let glossaryPurged = 0
         for (const [key, val] of Object.entries(rawCache)) {
           if (/__[A-Z]+_\d+__/.test(val)) { delete rawCache[key]; purged++; continue }
-          // 解析key获取源文：格式 normalizeText(source) + \x00 + targetLang + \x00 + glossaryHash
           const srcEnd = key.indexOf('\x00')
           if (srcEnd > 0) {
             const sourceText = key.slice(0, srcEnd)
+            // 旧版英文回退脏缓存
             if (sourceText && val.trim().toLowerCase() === sourceText.trim().toLowerCase()) {
-              delete rawCache[key]; purged++
+              delete rawCache[key]; purged++; continue
+            }
+            // v10.7: 术语库合规清洗（跨语言：cleanKey 对大小写/连字符/®™©/空白不敏感）
+            //        用户手动修正过的译文优先于术语库值（最高优先级），不参与清洗
+            const expected = normalizedGlossaryMapForPurge.get(cleanKey(sourceText))
+            if (expected) {
+              const hasUserCorrection = corrections.value.some(c =>
+                c.source === sourceText && c.targetLang === targetLang.value && c.correctedTranslation === val
+              )
+              if (!hasUserCorrection && val !== expected) {
+                delete rawCache[key]
+                glossaryPurged++
+                console.warn('[translate] ⛔ 术语库合规缓存清洗:', sourceText.slice(0, 50), '→', val.slice(0, 40), '已删除（应为:', expected.slice(0, 40), ')')
+              }
             }
           }
         }
-        if (purged > 0) {
-          console.warn(`[translate] 启动清理了 ${purged} 条脏缓存`)
+        if (purged > 0 || glossaryPurged > 0) {
+          console.warn(`[translate] 启动清理了 ${purged} 条脏缓存 + ${glossaryPurged} 条术语库违规缓存`)
           sendMsgToPlugin(UIMessage.SAVE_TRANSLATION_CACHE, rawCache)
         }
         translationCache.value = rawCache

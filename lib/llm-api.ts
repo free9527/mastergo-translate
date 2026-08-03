@@ -521,13 +521,23 @@ export function buildSystemPrompt(params: {
     ? '\n[上下文] 同一设计文件中的独立 UI 字符串。逐条独立翻译。相同源文术语在条目间保持译文一致。遇到多义词（如 Drive=硬盘/驱动）时，优先采用存储行业的默认术语。'
     : '\n[CONTEXT] Independent UI strings from the same design file. Translate each entry independently. When the same source term appears across entries, use the same target term. If a term is ambiguous without context (e.g., "Drive" = storage device vs. vehicle motion), default to the storage-industry interpretation.'
 
+  // ── BRAND/PRODUCT NAMES (instruction language) ──
+  // v10.6.2: 品牌/产品线词不直译 —— Lexar 官方各语言市场统一用英文产品名
+  // （"Lexar Professional SILVER PLUS" 在繁中/日/韩/德法官网都是英文原名）。
+  // LLM 容易把 Professional/GOLD/ARMOR 等英文词直译成"專業級/金色/装甲"（2026-08-03 实机
+  // zh-TW 把 "Lexar Professional" 译成 "Lexar專業級"）。同语系转换场景（zh-CN→zh-TW）
+  // 源文是中文，LLM 更容易把嵌入的英文产品词一并翻译。
+  const brandNameRule = isZhInstruction
+    ? '\n[品牌与产品名] Lexar 品牌名、产品线词、型号、等级词（Lexar / Professional / SILVER / GOLD / DIAMOND / PLAY / ARMOR / ARES / THOR / BLUE / PRO / PLUS / MAX / NM / NQ / NS / EQ / PSSD / CFexpress / microSD / SDXC / SDHC / UHS / VPG 及所有具体型号）全球统一保留英文原形，绝不直译、不音译、不意译（如 Professional ≠ "專業級/professionnel/プロフェッショナル"）。源文是中文且包含这些英文词时，英文部分原样保留、只转换中文部分。'
+    : '\n[BRAND & PRODUCT NAMES] Lexar brand names, product-line words, model numbers, and grade words (Lexar / Professional / SILVER / GOLD / DIAMOND / PLAY / ARMOR / ARES / THOR / BLUE / PRO / PLUS / MAX / NM / NQ / NS / EQ / PSSD / CFexpress / microSD / SDXC / SDHC / UHS / VPG and all specific model codes) are used in their original English form in every locale. NEVER translate, transliterate, or paraphrase them (Professional ≠ "專業級 / professionnel / プロフェッショナル"). When the source is in another language and embeds these English words, keep the English words verbatim and translate only the rest.'
+
   // ── OUTPUT (instruction language) ──
   const outputFormat = isZhInstruction
     ? `\n[输出格式]\n格式："[N] 译文" — 每行一条。纯文本，无 markdown，无解释。\n⛔ ↵ 是字面字符标记，不是换行指令 — 输出字符 "↵"，不要转为真实换行。\n→ 开始翻译：`
     : `\n[OUTPUT]\nFormat: "[N] translated text" — one line per item. Plain text only.\n⛔ The ↵ symbol is a LITERAL CHARACTER, NOT a line break — output it as the characters "↵".\nDo not wrap translations in quotation marks unless the source text itself is quoted.\n→ Output translations now:`
 
-  // ── Assembly: IDENTITY → PRINCIPLES → MISSION → STYLE → FEWSHOT → LANG_RULES → CONTEXT → GLOSSARY → OUTPUT ──
-  return `${role}\n\n${principles}\n\n[MISSION·${targetLang}]\n${mission}${styleCard}${fewShotBlock}${langBlock_str}${contextHint}${glossaryBlock}${outputFormat}`
+  // ── Assembly: IDENTITY → PRINCIPLES → MISSION → STYLE → FEWSHOT → LANG_RULES → CONTEXT → BRAND → GLOSSARY → OUTPUT ──
+  return `${role}\n\n${principles}\n\n[MISSION·${targetLang}]\n${mission}${styleCard}${fewShotBlock}${langBlock_str}${contextHint}${brandNameRule}${glossaryBlock}${outputFormat}`
 }
 
 // ============================================================
@@ -625,6 +635,7 @@ export async function translateBatch(
   forceTranslate = false,
   glossaryEnMap?: Map<string, string>,  // v9.10: EN 视图，供 isUntranslatable 豁免（防全语言视图误判豁免 R5）
   untranslatedIndices?: Set<number>,    // v9.11: 输出参数 — 最终仍漏翻（保留原文）的条目索引，供 UI 标记翻译失败
+  misspelledIndices?: Set<number>,      // v10.6: 输出参数 — 疑似错词被回退保留原形的条目索引，供 UI 单独标记"疑似拼写错误"（与漏翻区分）
 ): Promise<string[]> {
   // ═══════════════════════════════════════════════════════════
   // S1: 预处理（产出 texts 变体，不动 result）
@@ -1165,10 +1176,26 @@ ${texts.map((t, i) => `${i + 1}. "${t.slice(0, 100)}"`).join('\n')}
       }
 
       if (retriedUntranslated.size > 0) {
-        debugWarn(
-          `[translateBatch] ${retriedUntranslated.size} 条漏翻重试后仍未翻译，执行激进逐条翻译`,
-          [...retriedUntranslated].map(j => ({ idx: j, text: texts[j].slice(0, 80) })),
-        )
+        // v10.6.2: 激进兜底前拦截疑似错词 —— LLM 已两次原样保留（首调+统一重试），
+        // 源文是拉丁单词、目标是非拉丁脚本时，src===trans 最可能是"LLM 遵守错词保留规则"。
+        // 继续激进兜底只会空转 API（v8.4 MAX_AGGRESSIVE_RETRIES 的同类教训），
+        // 直接走 misspelledIndices 独立通道（与 S7f/S8 的回退路径共用一个出口）。
+        for (const j of [...retriedUntranslated]) {
+          if (isSuspectMisspelledWord(texts[j], glossaryMap) && getTargetScript(targetLang) !== 'latin' && result[j] === texts[j]) {
+            retriedUntranslated.delete(j)
+            misspelledIndices?.add(j)
+            uiLog('translate', `疑似错词拦截（LLM两次原样保留，跳过激进兜底）: "${texts[j].slice(0, 50)}"`)
+          }
+        }
+        if (retriedUntranslated.size > 0) {
+          debugWarn(
+            `[translateBatch] ${retriedUntranslated.size} 条漏翻重试后仍未翻译，执行激进逐条翻译`,
+            [...retriedUntranslated].map(j => ({ idx: j, text: texts[j].slice(0, 80) })),
+          )
+        }
+      }
+
+      if (retriedUntranslated.size > 0) {
 
         // ═══════════════════════════════════════════════════════════
         // v7.4 三层兜底：LLM 重试失败后，不再回退到英文源文
@@ -1518,10 +1545,18 @@ DO NOT return the source text unchanged. Output ONLY the translation, no explana
               // 且用户完全无感知（画布上仍是源文、无任何标记）。可靠性优先：
               // 漏翻必须进 translateErrors → 待确认红条 + 阻塞批量应用 + 一键重翻。
               result[j] = texts[j]
-              untranslatedIndices?.add(j)
-              uiLog('translate', `⚠️ 兜底链全部失败，保留原文并标记: "${texts[j].slice(0, 50)}"`)
+              // v10.6.2: 疑似错词（拉丁单词，LLM 音译后又被激进兜底纠正回原文）
+              // 走 misspelledIndices 独立通道，不标"翻译失败"（v10.6 只堵了 S8 安全网一处，
+              // 漏了 S7f 这个入口——2026-08-03 实机 Panasionic 案例）
+              if (isSuspectMisspelledWord(texts[j], glossaryMap) && getTargetScript(targetLang) !== 'latin') {
+                misspelledIndices?.add(j)
+                uiLog('translate', `疑似错词进独立通道（激进兜底回原文）: "${texts[j].slice(0, 50)}"`)
+              } else {
+                untranslatedIndices?.add(j)
+                uiLog('translate', `⚠️ 兜底链全部失败，保留原文并标记: "${texts[j].slice(0, 50)}"`)
+              }
               debugWarn(
-                `[translateBatch] 术语库兜底失败，保留原文（标记漏翻）: "${texts[j].slice(0, 50)}"`,
+                `[translateBatch] 术语库兜底失败，保留原文: "${texts[j].slice(0, 50)}"`,
               )
             }
           }
@@ -1530,6 +1565,16 @@ DO NOT return the source text unchanged. Output ONLY the translation, no explana
       }
     }
   }
+
+  // v10.6: 疑似错词兜底（在 S7 全部检测/重试之后，避免回退为源文被二次拦截）。
+  // 判定权在 LLM（prompt 规则利用多语言语感，20 语言通吃），此处仅硬兜底铁证路径——
+  // LLM 万一没忍住把疑似错词音译/意译成非拉丁文字（Panasionic→帕納西奧尼克），兜回源文原形。
+  // 仅非拉丁目标有此硬信号；拉丁目标跳过（拉丁→拉丁猜测无法与合法翻译形式区分，归校对 LLM）。
+  // 零编辑距离/零词典/零自动替换——只回退保留，不猜测正确拼写，规避用户担忧的新匹配风险。
+  const misspelledReverted = revertMisspelledWordTranslation(texts, result, glossaryMap, targetLang)
+  // v10.6: 疑似错词走独立 misspelledIndices 通道（UI 单独标记"疑似拼写错误"），
+  // 不进 untranslatedIndices——它不是"翻译失败"，是"源稿疑似拼错"，语义须区分（用户反馈）。
+  for (const idx of misspelledReverted) misspelledIndices?.add(idx)
 
   // v7.5.4: 最终商标符号兜底 — 确保管道中任何步骤都不会丢失 ®™©
   result = restoreTrademarkSymbols(texts, result)
@@ -1564,11 +1609,17 @@ DO NOT return the source text unchanged. Output ONLY the translation, no explana
   // 中间任何一环漏报，用户都完全无感知（画布仍是源文、无待确认、无标记）。
   // 此处对最终结果统一兜底：任何漏翻条目都通过 untranslatedIndices 暴露给 UI。
   // 该检测同时覆盖重试路径（_isRetry=true 时外层函数会继续走完此处）。
+  // v10.6: 疑似错词（已回退保留原形）豁免——它不是漏翻，是有意保留源文并单独标记，
+  // 安全网若把它再判漏翻，会与 misspelledIds 双通道混淆（实测 zh-TW 目标 src===trans 触发安全网）。
   if (untranslatedIndices) {
     const finalUntranslated = detectUntranslatedText(texts, result, targetLang, glossaryMap, detectedSource, glossaryEnMap)
-    for (const idx of finalUntranslated) untranslatedIndices.add(idx)
-    if (!_isRetry && finalUntranslated.size > 0) {
-      uiLog('translate', `最终安全网检出漏翻 ${finalUntranslated.size} 条: ${[...finalUntranslated].map(j => `[${j}]${texts[j].slice(0, 40)}`).join(' | ')}`)
+    for (const idx of finalUntranslated) {
+      if (misspelledIndices?.has(idx)) continue  // 疑似错词已单独标记，不重复判漏翻
+      untranslatedIndices.add(idx)
+    }
+    const reportedCount = [...finalUntranslated].filter(idx => !misspelledIndices?.has(idx)).length
+    if (!_isRetry && reportedCount > 0) {
+      uiLog('translate', `最终安全网检出漏翻 ${reportedCount} 条: ${[...finalUntranslated].filter(idx => !misspelledIndices?.has(idx)).map(j => `[${j}]${texts[j].slice(0, 40)}`).join(' | ')}`)
     }
     if (untranslatedIndices.size > 0) {
       uiLog('translate', `上报漏翻索引: ${[...untranslatedIndices].join(',')}`)
@@ -1799,15 +1850,17 @@ export async function proofreadBatch(
   const proofreadSourceTexts = items.map(it => it.sourceText)
   resultTexts = enforceGlossaryTerms(proofreadSourceTexts, resultTexts, glossaryMap, new Set())
 
-  // v9.10: 校对路径术语合规校验（与 translateBatch 对齐）
-  // 校对 LLM 可能把正确译文改成非术语库译法；整条命中术语库 → 译文锁死为术语库值
+  // v10.7: 术语合规校验日志升级 — 用户要求"可靠性最重要"，debugWarn 依赖 DEBUG_MODE，
+  //        默认关闭导致现场无法追溯。改为始终输出 warn（不影响功能，仅增加可观测性）。
   if (normalizedGlossaryMap) {
     for (let i = 0; i < resultTexts.length; i++) {
       if (!(proofreadSourceTexts[i] || '').trim()) continue
       const expected = normalizedGlossaryMap.get(cleanKey(proofreadSourceTexts[i]))
       if (expected && resultTexts[i] !== expected) {
-        debugWarn('[proofreadBatch] 术语合规校验：整条命中术语库但译文不符，已锁定为术语库值', {
-          source: proofreadSourceTexts[i].slice(0, 60), was: resultTexts[i].slice(0, 60), fixed: expected.slice(0, 60),
+        console.warn('[proofreadBatch] ⛔ 术语合规校验：整条命中术语库但译文不符，已锁定为术语库值', {
+          source: proofreadSourceTexts[i].slice(0, 60),
+          was: resultTexts[i].slice(0, 60),
+          fixed: expected.slice(0, 60),
         })
         resultTexts[i] = expected
       }
@@ -1940,6 +1993,11 @@ export function detectTruncatedTexts(
       truncatedIndices.add(i)
       continue
     }
+    // v10.5: 不可翻译条目（型号/单位/品牌等）跳过截断判定 ——
+    // 根因：zh 目标只查"译文是否含 CJK 字符"，型号列表纯拉丁 → 误报截断；
+    // 更危险的是 S7b-trunc 对"重试后仍截断"执行 result[j]=''（静默清空无标记），
+    // 型号列表此前是靠漏翻兜底链才被救回。形式不可翻译的条目本就不该做完整性判定。
+    if (isUntranslatable(src)) continue
     // 短源文跳过后续检测（但空结果已在上面捕获）
     if (src.length < MIN_SOURCE_LEN) continue
 
@@ -1968,6 +2026,88 @@ export function detectTruncatedTexts(
 // ============================================================
 
 /**
+ * v10.6: 疑似错词兜底 — LLM 把"本该保留原形的疑似错词"翻成了别的东西时，回退为源文原形。
+ *
+ * 设计哲学（与用户对齐，对齐 CAT 工具行业标准）：错词不翻、不猜、不音译、不自动改。
+ * 判定权在 LLM（prompt 规则利用其多语言语感，20 语言通吃），此处只是硬兜底——
+ * LLM 万一没忍住翻了（音译成 CJK 等），代码兜回原形，不让"诡异译文"上画布。
+ *
+ * 判定（全部满足才回退，宁可漏不可误）：
+ *   1. 源文是单个拉丁词（无空格/标点/数字），长度 ≥6 —— 只碰"单词"
+ *   2. 源文不在术语库（key/value 均不含，大小写无关）—— 已收录品牌走 LOCK 不兜底
+ *   3. 源文不被 isUntranslatable 豁免（型号/单位/品牌词已有归属）—— 不重复拦截
+ *   4. 译文 ≠ 源文 —— LLM 确实做了改动（没改动=遵守了规则，无需兜底）
+ *   5. 译文含非拉丁字符（CJK/西里尔等）—— 即"音译/意译成了别的文字"，这是唯一硬信号
+ *
+ * 注意：纯拉丁译文（如 en 目标或 LLM 用另一拉丁词猜测）不在此兜底——
+ * 拉丁→拉丁的"猜测"无法与"合法翻译"区分（形式不可判），交给校对 LLM 语义裁决。
+ * 本兜底只管"拉丁源词 → 非拉丁译文"这条铁证路径（Panasionic→帕納西奧尼克）。
+ */
+// 拉丁单疑似错词：无空格/标点/数字的纯字母单词，长度≥6（Panasionic/Spede/Transfser）
+const SUSPECT_MISSPELLED_WORD_RE = /^[A-Za-z]{6,}$/
+
+/**
+ * v10.6.2: 疑似错词形态判定器（模块级，供漏翻检测/兜底链/回退兜底/UI 徽章共用）。
+ *
+ * 背景（2026-08-03 实机日志）：en→zh-TW 的 `Panasionic` 被判"翻译失败⚠️漏翻"而非
+ * "疑似拼写错误"。根因：untranslatedIndices 有三个写入入口（S7f Layer 3 / S8 剩余 /
+ * S8 安全网豁免），v10.6 只豁免了 S8 安全网一处；且 LLM 遵守 prompt 规则原样保留时，
+ * 错词形态（拉丁源→拉丁同文译文）根本走不到 revertMisspelledWordTranslation 的
+ * "译文含非拉丁字符"铁证分支——保留原形是正确行为，却被漏翻链全程拦截空转 4 次 API。
+ *
+ * 本判定器把"疑似错词形态"抽成单一口径，在各入口前置豁免（对齐 v10.5 型号豁免模式：
+ * 错词形态根本不进漏翻检测/兜底链，而不是走完链再回退）。
+ * 5 重约束与 revertMisspelledWordTranslation 完全同构（仅去掉"译文"两条件——它判形态）：
+ *   1. 单个拉丁词 ≥6（SUSPECT_MISSPELLED_WORD_RE）
+ *   2. 不在术语库（key/value，大小写无关）——已收录品牌走 LOCK
+ *   3. 不被 isUntranslatable 豁免（型号/单位/品牌词已有归属）——不重复拦截
+ * 宁可漏不可误：任一不满足返回 false，走正常漏翻链。
+ */
+export function isSuspectMisspelledWord(src: string, glossaryMap?: Map<string, string>): boolean {
+  const s = (src || '').trim()
+  if (!SUSPECT_MISSPELLED_WORD_RE.test(s)) return false
+  if (glossaryMap && glossaryMap.size > 0) {
+    const key = normalizeGlossaryKey(s)
+    for (const [k, v] of glossaryMap.entries()) {
+      if (normalizeGlossaryKey(k) === key || normalizeGlossaryKey(v) === key) return false
+    }
+  }
+  if (isUntranslatable(s, glossaryMap)) return false
+  return true
+}
+
+function revertMisspelledWordTranslation(
+  texts: string[],
+  result: string[],
+  glossaryMap: Map<string, string>,
+  targetLang: string,
+): Set<number> {
+  const reverted = new Set<number>()
+  const script = getTargetScript(targetLang)
+  // 仅非拉丁目标才有"音译成别种文字"的硬信号；拉丁目标无此信号，直接跳过
+  if (script === 'latin') return reverted
+
+  for (let i = 0; i < texts.length; i++) {
+    const src = (texts[i] || '').trim()
+    const trans = (result[i] || '').trim()
+    if (!src || !trans) continue
+    // 1-3. 疑似错词形态（单词≥6 / 非术语库 / 非已豁免类别）— 委托 isSuspectMisspelledWord 单一口径
+    if (!isSuspectMisspelledWord(src, glossaryMap)) continue
+    // 4. LLM 做了改动
+    if (trans === src) continue
+    // 5. 译文含非拉丁字符（音译/意译铁证）
+    if (!/[^\x00-\x7F]/.test(trans)) continue
+
+    // 全部命中 → 回退为源文原形
+    result[i] = texts[i]
+    reverted.add(i)
+    uiLog('translate', `疑似错词回退保留原形: "${src}" (译文"${trans.slice(0, 30)}"已回退，请核对源稿)`)
+    debugWarn(`[translateBatch] 疑似错词被LLM翻译，已回退保留原形`, { idx: i, source: src, was: trans.slice(0, 60) })
+  }
+  return reverted
+}
+
+/**
  * 检测文本是否不需要翻译（品牌名/技术缩写/存储容量等全球统一表达）。
  * 核心原则：纯产品名（无上下文）→ 不翻译是正确的；有上下文（动词、介词、描述性文本）→ 必须翻译
  */
@@ -1990,6 +2130,42 @@ const DOLLAR_SUFFIX_RE = /^[\d,.]+\s*[$]$/i
 const K_SUFFIX_RE = /^[\d,]+\s*K\s*(IOPS|iops)?$/i
 const TBW_RE = /^[\d,]+\s*TBW\*?$/i
 const MODEL_CAPACITY_RE = /^[A-Z]+\d{2,4}[A-Z]*(\s+(PRO|MAX|PLUS|ELITE|ULTRA|PREMIUM|EVO|EXTREME))?(\s+\d+[TGMK]B\*?)?$/i
+// v10.5: 裸单位豁免 — "MB/s*" / "GB/s" / "TBW" 等无数字纯单位。
+// NUM_UNIT_RE 要求数字开头（^[\d,.]+），裸单位落不穿（2026-08-01 实机日志："MB/s*" 被判漏翻空转整条兜底链）。
+const PURE_UNIT_RE = /^(GB|MB|TB|KB|MB\/s|GB\/s|TB\/s|MHz|GHz|TBW)\*?$/i
+
+/**
+ * v10.5: 第三方产品型号/型号列表豁免（相机兼容列表等场景）。
+ *
+ * 根因（2026-08-01 实机日志）："EOS R5 / EOS R6 / ..." "A1 / A7M4 / ..." 等友商相机
+ * 型号列表全球统一、本不该翻，LLM 原样回显是正确行为。但 isUntranslatable 的白名单
+ * 只覆盖 Lexar 自有型号（BRAND_GRADE_RE），MODEL_CAPACITY_RE 又是"整条"正则，
+ * 多行/带斜杠的列表匹配不上 → 全部误判漏翻 → 每条空转 4 次兜底 API 后标红。
+ *
+ * 判定（仅认拉丁字符集，CJK/西里尔等文本天然不匹配）：
+ *   单段：含数字 + 大写字母占比 ≥50%（如 E-M1-Mark-II）
+ *   多段（按 / 或换行切分）：每段都是型号形态（含数字且大写占比≥50%，或全大写）
+ * 不误判样例：'4K/8K video recording'（小写词为主）、'SUPER FAST SPEED'（无数字）、
+ *   'Read/write speed 2050MB/s'（小写词为主）。
+ */
+function isModelListOrCode(s: string): boolean {
+  const segs = s.split(/\/|\n/).map(x => x.trim()).filter(Boolean)
+  if (segs.length === 0) return false
+  const isModelish = (seg: string): boolean => {
+    if (!/^[A-Za-z0-9\s\-*.®™©]+$/.test(seg)) return false
+    const letters = seg.replace(/[^A-Za-z]/g, '')
+    if (letters.length === 0) return false
+    const upper = letters.replace(/[^A-Z]/g, '').length
+    const upperRatio = upper / letters.length
+    if (/\d/.test(seg) && upperRatio >= 0.5) return true
+    if (upperRatio === 1) return true
+    return false
+  }
+  if (segs.length === 1) {
+    return /\d/.test(segs[0]) && isModelish(segs[0])
+  }
+  return segs.every(isModelish)
+}
 
 // TECH_ABBREVS 已合并到 TECH_TERM_EXEMPT（见上方）
 
@@ -2119,9 +2295,14 @@ export function isUntranslatable(s: string, glossaryMap?: Map<string, string>): 
   if (DOLLAR_SUFFIX_RE.test(sNoStar)) return true
   if (K_SUFFIX_RE.test(sNoStar)) return true
   if (TBW_RE.test(sNoStar)) return true
+  // v10.5: 裸单位（MB/s*、GB/s、TBW 等无数字纯单位）
+  if (PURE_UNIT_RE.test(sNoStar)) return true
 
   // 2.5 产品型号 + 可选容量（NM1090 PRO 4TB, NM790 2TB, D40E 1TB 等）— 全球统一
   if (MODEL_CAPACITY_RE.test(s)) return true
+
+  // 2.6 第三方产品型号/型号列表（EOS R5 / ..., A1 / A7M4 / ..., E-M1-Mark-II 等）— 全球统一
+  if (isModelListOrCode(s)) return true
 
   // 3. 纯技术缩写（SSD, USB, NVMe, PCIe 等）— 全球统一
   const words = s.toLowerCase().replace(/[®™©]/g, '').trim().split(/\s+/)
@@ -2380,6 +2561,18 @@ export function detectUntranslatedText(
   // （如某语言列 src===tgt 的同形日常词），导致真漏翻被豁免掩盖。未提供 en 视图时回退 glossaryMap（向后兼容）。
   const untranslatableGlossary = glossaryEnMap || glossaryMap
 
+  // v10.5: 术语库已知值集合（归一化）——脚本校验豁免用。
+  // 场景：源稿错别字（Panasionic）被 LLM 纠正为术语库值（Panasonic）后，
+  // 译文纯拉丁、在 zh 目标下会被"必须含 CJK 字符"的脚本校验误报漏翻。
+  // 术语库值是用户钦定的正确结果，命中即视为合规，不再做脚本校验。
+  // 注意：只豁免脚本校验，不豁免 src===trans 判定（错别字原样回显仍会被抓、走纠正链）。
+  const knownGlossaryValues = new Set<string>()
+  if (glossaryMap) {
+    for (const v of glossaryMap.values()) {
+      knownGlossaryValues.add(normalizeGlossaryKey(v))
+    }
+  }
+
   for (let i = 0; i < sourceTexts.length; i++) {
     const src = sourceTexts[i] || ''
     const trans = translatedTexts[i] || ''
@@ -2393,6 +2586,15 @@ export function detectUntranslatedText(
 
     // 第一层：不可翻译 → 跳过（v9.10: 仅 EN 视图豁免）
     if (isUntranslatable(src, untranslatableGlossary)) continue
+
+    // v10.6.2: 疑似错词豁免 — 拉丁源→拉丁同文译文（LLM 按 prompt 规则保留错词原形）
+    // 在形式上与漏翻完全不可区分，必须前置豁免，否则错词走完漏翻兜底链空转 API 后
+    // 被标"翻译失败⚠️漏翻"（2026-08-03 实机 Panasionic 案例；详见 translateBatch 头注）
+    if (
+      isSuspectMisspelledWord(src, glossaryMap) &&
+      getScriptClass(src) === 'latin' && getTargetScript(targetLang) === 'latin' &&
+      src === trans
+    ) continue
 
     // v9.11→v10.0: 同源拉丁语言豁免已收口至 keep-source 注册表 isSameLanguageExempt（三重守卫注释见该模块）
     if (isSameLanguageExempt(src, { targetLang, batchSources: sourceTexts })) continue
@@ -2420,20 +2622,22 @@ export function detectUntranslatedText(
 
         // v9.8: 目标字符集校验 — 译文必须包含目标语言字符，否则判漏翻
         // 解决"LLM 微调源语言后返回"（如葡语→葡语加标点）绕过 normalize 比对的问题
+        // v10.5: 译文命中术语库已知值（如错别字被纠正为库内正确拼写）→ 豁免脚本校验
         const targetScript = getTargetScript(targetLang)
-        if (targetScript === 'ja' && !/[぀-ゟ゠-ヿ一-鿿]/.test(trans)) {
+        const transIsKnownGlossaryValue = knownGlossaryValues.has(normalizeGlossaryKey(trans))
+        if (!transIsKnownGlossaryValue && targetScript === 'ja' && !/[぀-ゟ゠-ヿ一-鿿]/.test(trans)) {
           debugWarn(
             `[detectUntranslatedText] 目标字符集校验漏翻：ja 目标译文不含日文字符`,
             { idx: i, source: src.slice(0, 80), translation: trans.slice(0, 80) }
           )
           untranslatedIndices.add(i)
-        } else if (targetScript === 'ko' && !/[가-힯]/.test(trans)) {
+        } else if (!transIsKnownGlossaryValue && targetScript === 'ko' && !/[가-힯]/.test(trans)) {
           debugWarn(
             `[detectUntranslatedText] 目标字符集校验漏翻：ko 目标译文不含韩文字符`,
             { idx: i, source: src.slice(0, 80), translation: trans.slice(0, 80) }
           )
           untranslatedIndices.add(i)
-        } else if (targetScript === 'cjk' && !/[一-鿿]/.test(trans)) {
+        } else if (!transIsKnownGlossaryValue && targetScript === 'cjk' && !/[一-鿿]/.test(trans)) {
           debugWarn(
             `[detectUntranslatedText] 目标字符集校验漏翻：zh 目标译文不含中文字符`,
             { idx: i, source: src.slice(0, 80), translation: trans.slice(0, 80) }
