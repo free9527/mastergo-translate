@@ -688,6 +688,8 @@ const failedNodeIds = ref<string[]>([])
 const translateErrors = ref<Set<string>>(new Set())
 /** v10.6: 疑似拼写错误的 nodeId 集合 — 源稿疑似错词被保留原形，与"翻译失败"区分标记 */
 const misspelledIds = ref<Set<string>>(new Set())
+/** v10.8: 译文显著超长的 nodeId 集合 — 长度异常信号透出给校对层作 hint（不自动截断） */
+const expansionIds = ref<Set<string>>(new Set())
 /** AI 校对标记的歧义词汇 — 应加入术语库 source 列，用户后续补充翻译 */
 const suggestedGlossaryTerms = ref<string[]>([])
 /** 已被手动应用过的 nodeId 集合，批量应用时自动跳过 */
@@ -1115,6 +1117,7 @@ function resetWorkState() {
   items.value = []
   translateErrors.value = new Set()
   misspelledIds.value = new Set()
+  expansionIds.value = new Set()
   failedNodeIds.value = []
   appliedNodeIds.value = new Set()
   retranslatingIds.value = new Set()
@@ -1321,6 +1324,7 @@ async function startTranslate() {
   cancelFlag.value = false
   translateErrors.value = new Set()
   misspelledIds.value = new Set()
+  expansionIds.value = new Set()
   translateProgress.value = { current: 0, total: 0 }
 
   // 目标语言切换后需要重新翻译：清空所有旧译文和校对状态
@@ -1548,7 +1552,9 @@ async function startTranslate() {
             const uniqueUntranslated = new Set<number>()
             // v10.6: 收集疑似错词（保留原形）的唯一条目 → 单独标记"疑似拼写错误"（与漏翻区分）
             const uniqueMisspelled = new Set<number>()
-            const uniqueResult = await translateBatch(uniqueTexts, targetLang.value, glossaryMap, llmConfig.value, sourceLang.value === 'auto' ? undefined : sourceLang.value, pageName.value || undefined, fileName.value || undefined, crossBatchTerms, taskGlossaryHint, normalizedGlossaryMap, false, false, glossaryEnMap, uniqueUntranslated, uniqueMisspelled)
+            // v10.8: 收集译文显著超长的唯一条目 → 透出给校对层作长度异常 hint（不自动截断）
+            const uniqueExpansion = new Set<number>()
+            const uniqueResult = await translateBatch(uniqueTexts, targetLang.value, glossaryMap, llmConfig.value, sourceLang.value === 'auto' ? undefined : sourceLang.value, pageName.value || undefined, fileName.value || undefined, crossBatchTerms, taskGlossaryHint, normalizedGlossaryMap, false, false, glossaryEnMap, uniqueUntranslated, uniqueMisspelled, uniqueExpansion)
             // 将模板译文展开回原始文本
             const expandedResult = expandBatch(uniqueResult, expandData, uncachedTexts.length)
             // v9.11: 唯一模板索引 → 展开后索引（同源文复制项共享同一模板译文，同样视为漏翻）
@@ -1563,6 +1569,13 @@ async function startTranslate() {
             for (const u of uniqueMisspelled) {
               for (let x = 0; x < expandedResult.length; x++) {
                 if (expandedResult[x] !== undefined && expandedResult[x] === uniqueResult[u]) expandedMisspelled.add(x)
+              }
+            }
+            // v10.8: 超长信号模板索引 → 展开后索引（同源文复制项同样透出给校对）
+            const expandedExpansion = new Set<number>()
+            for (const u of uniqueExpansion) {
+              for (let x = 0; x < expandedResult.length; x++) {
+                if (expandedResult[x] !== undefined && expandedResult[x] === uniqueResult[u]) expandedExpansion.add(x)
               }
             }
             // v7.5.7: 追踪关键文本在各环节的值
@@ -1590,6 +1603,11 @@ async function startTranslate() {
             for (const x of expandedMisspelled) {
               const batchIdx = uncachedIndices[x]
               if (batchIdx !== undefined) misspelledIds.value.add(batch[batchIdx].nodeIds[0])
+            }
+            // v10.8: 超长信号条目索引 → 本批次条目索引（透出给校对层，不进 translateErrors）
+            for (const x of expandedExpansion) {
+              const batchIdx = uncachedIndices[x]
+              if (batchIdx !== undefined) expansionIds.value.add(batch[batchIdx].nodeIds[0])
             }
           } else {
             translated = cachedResult as string[]
@@ -1691,6 +1709,11 @@ async function startTranslate() {
                 const pStart = p + pk * PROOFREAD_BATCH_SIZE
                 if (pStart >= waveItems.length) break
                 const pBatch = waveItems.slice(pStart, pStart + PROOFREAD_BATCH_SIZE)
+                // v10.8: 本批内译文显著超长的条目索引 → 透出给校对作长度异常 hint
+                const pExpansionFlags = new Set<number>()
+                for (let pj = 0; pj < pBatch.length; pj++) {
+                  if (expansionIds.value.has(pBatch[pj].nodeIds[0])) pExpansionFlags.add(pj)
+                }
                 proofPromises.push((async () => {
                   try {
                     const batchResults = await proofreadBatch(
@@ -1702,6 +1725,7 @@ async function startTranslate() {
                       fileName.value || undefined,
                       proofreadGlossaryHint,
                       proofreadNormalizedMap,
+                      pExpansionFlags,
                     )
                     for (let j = 0; j < pBatch.length; j++) {
                       const proofed = batchResults[j]
@@ -1880,6 +1904,11 @@ async function startProofread() {
         const batchStart = i + k * PROOFREAD_BATCH_SIZE
         if (batchStart >= total || cancelFlag.value) break
         const batch = toCheck.slice(batchStart, batchStart + PROOFREAD_BATCH_SIZE)
+        // v10.8: 本批内译文显著超长的条目索引 → 透出给校对作长度异常 hint
+        const expansionFlags = new Set<number>()
+        for (let bj = 0; bj < batch.length; bj++) {
+          if (expansionIds.value.has(batch[bj].nodeIds[0])) expansionFlags.add(bj)
+        }
 
         concurrentBatchPromises.push((async () => {
           if (cancelFlag.value) return
@@ -1893,6 +1922,7 @@ async function startProofread() {
               fileName.value || undefined,
               proofreadGlossaryHint,
               proofreadNormalizedMap,
+              expansionFlags,
             )
             for (let j = 0; j < batch.length; j++) {
               const proofed = batchResults[j]
@@ -2331,13 +2361,15 @@ async function retryFailedTranslations() {
       const { uniqueTexts, expandData } = compressBatch(texts)
       // v9.11: 收集管道最终仍漏翻的唯一条目 → 标记翻译失败（进待确认，可再次重翻）
       const uniqueUntranslated = new Set<number>()
+      // v10.8: 收集译文显著超长的唯一条目 → 透出给校对层（重翻场景同样保留信号）
+      const uniqueExpansion = new Set<number>()
       const uniqueResult = await translateBatch(
         uniqueTexts, targetLang.value, glossaryMap, llmConfig.value,
         sourceLang.value === 'auto' ? undefined : sourceLang.value,
         pageName.value || undefined, fileName.value || undefined,
         crossBatchTerms, taskGlossaryHint,
         undefined, false, false, glossaryEnMap,
-        uniqueUntranslated,
+        uniqueUntranslated, undefined, uniqueExpansion,
       )
       const expandedResult = expandBatch(uniqueResult, expandData, texts.length)
       for (let j = 0; j < batch.length; j++) {
@@ -2348,6 +2380,14 @@ async function retryFailedTranslations() {
         for (let j = 0; j < expandedResult.length; j++) {
           if (expandedResult[j] !== undefined && expandedResult[j] === uniqueResult[u]) {
             translateErrors.value.add(batch[j].nodeIds[0])
+          }
+        }
+      }
+      // v10.8: 超长信号透出（重翻场景，同源文复制项同样透出给校对）
+      for (const u of uniqueExpansion) {
+        for (let j = 0; j < expandedResult.length; j++) {
+          if (expandedResult[j] !== undefined && expandedResult[j] === uniqueResult[u]) {
+            expansionIds.value.add(batch[j].nodeIds[0])
           }
         }
       }
@@ -2716,6 +2756,8 @@ async function retranslateSingle(item: TextItem) {
     const untranslated = new Set<number>()
     // v10.6: 收集疑似错词（保留原形）→ 单独标记，不算翻译失败
     const misspelled = new Set<number>()
+    // v10.8: 收集译文显著超长信号 → 透出给校对层（不自动截断）
+    const expansion = new Set<number>()
     const results = await translateBatch(
       [item.sourceText],
       targetLang.value,
@@ -2727,7 +2769,11 @@ async function retranslateSingle(item: TextItem) {
       undefined, undefined, undefined, false, false, undefined,
       untranslated,
       misspelled,
+      expansion,
     )
+    if (expansion.has(0)) {
+      expansionIds.value.add(id)
+    }
     if (misspelled.has(0)) {
       // v10.6: 疑似错词 → 保留原形 + 单独标记（非翻译失败，提示核对源稿）
       item.translatedText = item.sourceText

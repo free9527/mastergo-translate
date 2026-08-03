@@ -2416,6 +2416,10 @@ Fix ALL objective errors. Do NOT make subjective changes.
   a distinct information element from the source is completely missing in the translation
   (e.g., source says "resistant to high temperatures AND dust-proof" but the translation
   covers only the temperature part).
+- EXPANSION NOTE (v10.8): Some entries carry a "notably longer than the source" warning.
+  Length ≠ error: many target languages naturally run longer than English. Treat the warning
+  as a prompt to double-check for source-absent additions only — if the translation is
+  faithful and natural, keep it as-is; do NOT shorten merely because it is long.
 
 [CHECK 2: MEANING & NATURALNESS]
 - Factual errors: Fix wrong numbers, specs, or features.
@@ -2516,6 +2520,9 @@ export const PROOFREAD_SYSTEM_PROMPT_ZH = `[角色]
   译文比源文短得多往往是正确的——拉丁语→日/韩/中文天然收缩 3-5 倍。
   仅当源文中的某个独立信息要素在译文中完全缺失时才判截断（reason 漏翻），
   例如源文为"耐高温且防尘"，译文只覆盖了温度部分。
+- 超长提示（v10.8）：部分条目带有"译文显著长于源文"的警告。
+  长≠错——许多目标语言天然比英文长。该警告仅是提醒复核是否添加了源文没有的信息；
+  若译文语义忠实、表达自然，请保持原样，不要仅因为长就精简。
 
 [检查2: 语义与自然度]
 - 事实错误：修正错误的数字、规格或功能描述。

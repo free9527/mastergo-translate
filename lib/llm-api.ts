@@ -636,6 +636,7 @@ export async function translateBatch(
   glossaryEnMap?: Map<string, string>,  // v9.10: EN 视图，供 isUntranslatable 豁免（防全语言视图误判豁免 R5）
   untranslatedIndices?: Set<number>,    // v9.11: 输出参数 — 最终仍漏翻（保留原文）的条目索引，供 UI 标记翻译失败
   misspelledIndices?: Set<number>,      // v10.6: 输出参数 — 疑似错词被回退保留原形的条目索引，供 UI 单独标记"疑似拼写错误"（与漏翻区分）
+  expansionIndices?: Set<number>,       // v10.8: 输出参数 — 译文显著超长的条目索引，透出给校对层作长度异常 hint（不再自动截断）
 ): Promise<string[]> {
   // ═══════════════════════════════════════════════════════════
   // S1: 预处理（产出 texts 变体，不动 result）
@@ -1049,18 +1050,23 @@ ${texts.map((t, i) => `${i + 1}. "${t.slice(0, 100)}"`).join('\n')}
   // 首字母大写
   result = result.map(t => capitalizeFirstLetter(t))
 
-  // 译文扩展检测：检测 LLM 是否异常扩展了译文（最后一道防线）
+  // 译文扩展检测（v10.8 起：只检测不截断，长度信号透出给校对层语义裁决）
+  // 长度≠加戏（de/pt/fr 天然长 50-90%），自动截断会把合法详尽译文切成半截句上画布。
+  // 代码只量化"是否显著超长"，透出 expandedIndices 供校对 hint；裁决权移交校对 LLM。
   const expansionResult = detectTranslationExpansion(texts, result, targetLang)
   if (expansionResult.expandedIndices.size > 0) {
-    debugWarn(
-      `[translateBatch] 检测到 ${expansionResult.expandedIndices.size} 条异常扩展译文，已自动截断`,
+    console.warn(
+      `[translateBatch] ⚠️ 检测到 ${expansionResult.expandedIndices.size} 条译文显著超长（已透出给校对裁决，不自动截断）`,
       [...expansionResult.expandedIndices].map(j => ({
+        idx: j,
         source: texts[j].slice(0, 50),
-        original: result[j].slice(0, 80),
-        fixed: expansionResult.texts[j].slice(0, 80),
+        translated: result[j].slice(0, 80),
+        lengthRatio: (expansionResult.ratios.get(j) ?? 0).toFixed(2),
       })),
     )
-    result = expansionResult.texts
+    if (expansionIndices) {
+      for (const j of expansionResult.expandedIndices) expansionIndices.add(j)
+    }
   }
 
   // v7.5.5: 批次内重复译文检测 — 仅警告，不回退源文！
@@ -1674,6 +1680,7 @@ export async function proofreadBatch(
   fileName?: string,
   taskGlossaryHint?: string,
   normalizedGlossaryMap?: Map<string, string>,  // v9.10: 校对路径合规校验用（与翻译管道对齐）
+  expansionFlags?: Set<number>,                 // v10.8: 译文显著超长的条目索引（长度异常信号，供 CHECK 1 语义裁决）
 ): Promise<ProofreadResult[]> {
   const sourceTexts = items.map(it => it.sourceText)
   // v9.3: 批次级源语言判定（校对后漏翻检测用，治 pt→pt-BR 拉丁源文恒判 'en' 的死代码）
@@ -1721,7 +1728,14 @@ export async function proofreadBatch(
     const srcLang = detectedProofreadSource
     // 行首 * 替换为 ※，避免 LLM 将其解析为 markdown 列表标记
     const escapedSource = proofTmStrippedSources[i].replace(/^\*\s*/, '※ ')
-    return `[${i + 1}] (${srcLang}→${targetLang}) ${escapedSource}\n${transLabel}：${maskedTranslations[i]}`
+    // v10.8: 长度异常提示 — 翻译管道检测到译文显著超长（形式信号），透出给校对做语义裁决。
+    //        中性措辞：明确"长≠错"，合法详尽译文应保持原样，避免诱导 LLM 过度改写。
+    const expansionNote = (expansionFlags && expansionFlags.has(i))
+      ? (useEnInstruction
+          ? '\n⚠️ Note: This translation is notably longer than the source. Verify whether it adds information absent from the source. If it is faithful and natural, keep it as-is; only tighten it if it contains source-absent additions.'
+          : '\n⚠️ 提示：本条译文显著长于源文。请确认是否添加了源文没有的信息。若语义忠实、表达自然，请保持原样；仅当含有源文没有的添加内容时才精简。')
+      : ''
+    return `[${i + 1}] (${srcLang}→${targetLang}) ${escapedSource}\n${transLabel}：${maskedTranslations[i]}${expansionNote}`
   }).join('\n\n')
 
   // ⛔ 校对环节术语反补全闭环：术语 hint 的 label 不含反补全指令，

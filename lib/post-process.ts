@@ -650,13 +650,19 @@ export function postProcessBatch(texts: string[], lang: string): string[] {
 }
 
 // ============================================================
-// 译文扩展检测
+// 译文扩展检测（v10.8 起：纯检测，不再自动截断）
 // 检测 LLM 是否在译文中添加了原文没有的内容（异常扩展）
-// 返回标记了异常扩展的译文数组 + 异常索引集合
+// v10.8: 代码只量化"是否显著超长"（形式信号），不做语义裁决、不修改译文。
+//        长度≠加戏（de/pt/fr 天然长 50-90%），自动截断会把合法详尽译文切成半截句上画布。
+//        信号上移校对层，由 LLM 判"真加戏→改写 / 合法详尽→放行"（代码管形式/LLM管语义）。
 // ============================================================
 export interface ExpansionResult {
+  /** v10.8: 原样返回输入译文，不再做任何截断修改（保留字段仅为兼容签名） */
   texts: string[]
+  /** 显著超长的条目索引（供校对层作为长度异常 hint） */
   expandedIndices: Set<number>
+  /** 每条命中条目的长度比（translatedLen/sourceLen），供校对 hint 量化展示 */
+  ratios: Map<number, number>
 }
 
 // 各语言相对英语的自然膨胀率（翻译行业经验值）
@@ -679,13 +685,13 @@ const LANG_EXPANSION_RATIO: Record<string, number> = {
 }
 
 /**
- * 检测并修复译文异常扩展。
+ * 检测译文异常扩展（v10.8 起：只检测，不修改译文）。
  *
  * 规则：
  * - 按目标语言设置动态阈值（CJK 1.2-1.3x，欧洲语言 1.5-1.9x）
  * - 短源文（<10字符）使用 2x 安全余量，常规文本用 1.4x 安全余量
- * - 安全检查：如果译文包含源文中的数字或连续大写字母（品牌名），跳过截断
- * - 检测到异常扩展时：尝试从译文中提取核心信息，在词/句边界截断
+ * - 安全豁免：如果译文包含源文中的数字（技术参数合法翻译），不标记
+ * - v10.8: 命中不再截断，只把索引+长度比透出，由校对 LLM 结合语义裁决
  */
 export function detectTranslationExpansion(
   sourceTexts: string[],
@@ -693,10 +699,12 @@ export function detectTranslationExpansion(
   targetLang?: string,
 ): ExpansionResult {
   const expandedIndices = new Set<number>()
+  const ratios = new Map<number, number>()
 
-  const result = translatedTexts.map((translated, i) => {
+  for (let i = 0; i < translatedTexts.length; i++) {
+    const translated = translatedTexts[i]
     const source = sourceTexts[i] || ''
-    if (!source || !translated) return translated
+    if (!source || !translated) continue
 
     const sourceLen = source.length
     const translatedLen = translated.length
@@ -707,54 +715,18 @@ export function detectTranslationExpansion(
     const threshold = sourceLen < 10 ? ratio * 2.0 : ratio * 1.4
 
     if (translatedLen > sourceLen * threshold) {
-      // 安全检查：如果译文包含源文中的数字，说明是合法翻译（如技术参数），不应截断
-      // 品牌注入由 detectBrandInjection 负责，此处不检查
+      // 安全豁免：译文包含源文数字 = 技术参数合法翻译，不标记
       const sourceNumbers = source.match(/\d+/g) || []
       const hasSourceNumbers = sourceNumbers.some(n => translated.includes(n))
-
-      if (hasSourceNumbers) {
-        // 合法翻译（包含源文数字），不截断
-        return translated
-      }
+      if (hasSourceNumbers) continue
 
       expandedIndices.add(i)
-
-      // 尝试修复：提取译文的核心部分
-      // 策略：取译文的开头部分（约源文长度 × 2），在词/句边界截断
-      const maxLen = Math.max(Math.ceil(sourceLen * 2), 10)
-
-      // 尝试在句号处截断
-      const firstSentence = translated.slice(0, maxLen)
-      const sentenceEnd = Math.max(
-        firstSentence.lastIndexOf('。'),
-        firstSentence.lastIndexOf('. '),
-        firstSentence.lastIndexOf('！'),
-        firstSentence.lastIndexOf('？'),
-      )
-
-      if (sentenceEnd > maxLen * 0.5) {
-        return translated.slice(0, sentenceEnd + 1)
-      }
-
-      // 尝试在逗号/空格处截断
-      const wordBoundary = Math.max(
-        firstSentence.lastIndexOf('，'),
-        firstSentence.lastIndexOf(', '),
-        firstSentence.lastIndexOf(' '),
-      )
-
-      if (wordBoundary > maxLen * 0.5) {
-        return translated.slice(0, wordBoundary)
-      }
-
-      // 硬截断
-      return translated.slice(0, maxLen)
+      ratios.set(i, translatedLen / sourceLen)
     }
+  }
 
-    return translated
-  })
-
-  return { texts: result, expandedIndices }
+  // v10.8: 原样返回输入译文，不做任何截断修改
+  return { texts: translatedTexts, expandedIndices, ratios }
 }
 
 // ============================================================
