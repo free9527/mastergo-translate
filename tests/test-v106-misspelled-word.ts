@@ -224,11 +224,11 @@ async function main() {
   out.push('F. v10.6.2 品牌/产品名不直译 prompt 规则注入（中英双语）')
   out.push('═'.repeat(60))
 
-  const promptZh = buildSystemPrompt({ targetLang: 'zh-TW', langBlock: '', styleCard: '', fewShotBlock: '' })
+  const promptZh = buildSystemPrompt({ targetLang: 'zh-TW', langBlock: '', styleCard: '', fewShotBlock: '', includeRemediation: true })  // v11.5: BRAND 段移到重试层，测试显式开注入
   assert(/品牌与产品名/.test(promptZh), 'F1 zh 指令含品牌产品名规则')
   assert(/Professional/.test(promptZh) && /SILVER/.test(promptZh), 'F2 zh 规则列产品线词')
   assert(/專業級/.test(promptZh), 'F3 zh 规则含反例（專業級）')
-  const promptEn = buildSystemPrompt({ targetLang: 'de', langBlock: '', styleCard: '', fewShotBlock: '' })
+  const promptEn = buildSystemPrompt({ targetLang: 'de', langBlock: '', styleCard: '', fewShotBlock: '', includeRemediation: true })  // v11.5 同上
   assert(/BRAND & PRODUCT NAMES/.test(promptEn), 'F4 en 指令含品牌产品名规则')
   assert(/Professional/.test(promptEn) && /NEVER translate/.test(promptEn), 'F5 en 规则含品牌词+禁止直译')
 

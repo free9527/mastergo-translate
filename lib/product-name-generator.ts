@@ -148,14 +148,38 @@ const VI_KEEP_ENGLISH_CATEGORIES = new Set(['Reader', 'Enclosure', 'Hub'])
 const CATEGORY_KEYS = Object.keys(CATEGORY_TRANSLATIONS)
   .sort((a, b) => b.length - a.length) // 最长优先（Solid State Dual Drive > Portable SSD > SSD）
 
-/** 从英文产品名识别品类（末尾/词边界匹配，最长优先）。返回 null 表示无品类词。 */
+/**
+ * 从英文产品名识别品类（末尾/词边界匹配，最长优先）。返回 null 表示无品类词。
+ *
+ * v11.4 大小写不敏感化 + 品名语境守卫：
+ *   - 第一遍官方写法精确匹配（大小写敏感）直通——既有行为零变化
+ *   - 第二遍大小写不敏感匹配，命中时（源文写法与 canonical 不一致，如小写 card）：
+ *     守卫 1：命中须落在文本结尾（最后一个词）——CSV 140 条实证品类词恒结尾，
+ *       'Insert card into slot'（card 在中间）/ 'SD card reader'（双词连用）排除
+ *     守卫 2：前一个 token 含大写字母或数字——品名形态信号
+ *       （Lexar/系列/型号/规格必含；'fast ssd'/'old card' 全小写描述排除）
+ *   - 返回 canonical key（'Card' 非 'card'），下游 CATEGORY_TRANSLATIONS 查询不受影响
+ */
 export function detectCategory(enName: string): string | null {
   for (const cat of CATEGORY_KEYS) {
-    const re = new RegExp(`\\b${cat.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`)
-    if (re.test(enName)) {
+    const escaped = cat.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    // 第一遍：官方写法精确匹配（大小写敏感）——既有行为完全不变
+    if (new RegExp(`\\b${escaped}\\b`).test(enName)) {
       // 排除 "SSD" 命中 "Portable SSD"/"SSD Enclosure" 里的 SSD
       if (cat === 'SSD' && /\bPortable SSD\b/.test(enName)) continue
       if (cat === 'SSD' && /\bSSD\s+(Enclosure|Hub|Reader)\b/.test(enName)) continue
+      return cat
+    }
+    // 第二遍：大小写不敏感匹配 + 品名语境守卫（v11.4）
+    const ciRe = new RegExp(`\\b${escaped}\\b`, 'i')
+    const match = ciRe.exec(enName)
+    if (match) {
+      // 守卫 1：品类词须为文本最后一个词（词边界保证无 trailing 标点粘连）
+      const rest = enName.slice(match.index + match[0].length).trim()
+      if (rest !== '') continue
+      // 守卫 2：前一个 token 须含大写字母或数字（品名形态信号）
+      const before = enName.slice(0, match.index).trim().split(/\s+/).pop() ?? ''
+      if (!/[A-Z0-9]/.test(before)) continue
       return cat
     }
   }
@@ -197,7 +221,9 @@ export function generateProductNameTranslations(
 
   // 拆分：品类词之外的部分（Lexar + 系列 + 型号/规格），全语种保留
   // core = enName 去掉品类词，去多余空格
-  const catRe = new RegExp(`\\s*\\b${category.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b\\s*`)
+  // v11.4: i flag —— detectCategory 大小写不敏感命中后，源文中的实际写法（小写 card）
+  //   也必须剥掉，否则 core 残留品类词导致译名重复（"Lexar nCARD NM card 存储卡"）
+  const catRe = new RegExp(`\\s*\\b${category.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b\\s*`, 'i')
   const core = enName.replace(catRe, ' ').replace(/\s+/g, ' ').trim()
 
   for (const lang of TARGET_LANGS) {

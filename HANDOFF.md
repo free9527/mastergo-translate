@@ -1,7 +1,7 @@
 # 项目交接文档
 
-**日期**: 2026-08-03  
-**版本**: v11.2.1  
+**日期**: 2026-08-05  
+**版本**: v11.6（v11.5 20 语种全量实机验证已闭环）  
 **项目**: Lexar 翻译插件（MasterGo 插件）
 
 ---
@@ -32,7 +32,190 @@ MasterGo 设计工具插件，将 Lexar 产品设计稿从英文翻译成 20 个
 
 ---
 
-## 二、当前版本（v11.2.1）
+## 二、当前版本（v11.6，含 v11.5 验证收口）
+
+### 2.0.0-pre v11.5 Prompt 减肥——补救指令移到重试层（2026-08-05，架构复盘方向 #4 落地）
+
+**背景**：架构复盘（arch-review-2026-07）指出 prompt 存在**正反馈循环**：prompt 越长 → 模型注意力稀释 → 首调失败率升 → 加代码防线/加 prompt 补救条款 → prompt 更长。v9.x-v11.x 每个版本的实机事故都以"往 prompt 塞一条修复条款"止血，首调全程背负所有历史事故的补救文本（实测 CORE_PRINCIPLES 25 行中 11 行是⛔补救 + BRAND ~500 字符 + commonErrors 5-8 行 ≈ 30%）。
+
+**方案**（四层：瘦身 → 按需注入 → 重试瘦身 → 校对瘦身）：
+
+| # | 改动 | 位置 | 要点 |
+|---|------|------|------|
+| 1 | CORE_PRINCIPLES 拆 LEAN + REMEDIATION | prompt-constants.ts | LEAN（三原则主干+占位符保留——结构性要求不搬）首调保留；REMEDIATION（⛔补全产品名+⛔品类精度+⛔错词 7 行）重试层注入；旧常量=组合形式（兼容引用点零回归） |
+| 2 | BRAND 段移出首调 | llm-api.ts buildSystemPrompt | 新增 `includeRemediation` 参数，首调不传 → 省 ~500 字符；安全依据：术语遮蔽+enforceGlossaryTerms+校对 CHECK 2 三重兜底 |
+| 3 | commonErrors 条件注入 | renderLangForTranslate | 新增 `includeCommonErrors` 参数（默认 true 兼容）；首调传 false——常见错误对照表是补救型历史事故表，重试时拿着对照表才有针对性；rules/compliance 保留首调 |
+| 4 | 统一重试瘦身 + 全量补救 | llm-api.ts forceTranslate 分支 | 不再"首调全文+[RETRY] 追加"（~95行最重），改"精简骨架（无 styleCard/fewShot）+ 补救全量回归（BRAND/补全/品类精度/错词/commonErrors）"（~40行，减60%+） |
+| 5 | 校对 VARIANT_CHECKS + EXPANSION_NOTE 条件化 | prompt-constants.ts + buildProofreadSystemPrompt | 变体专项检查仅 zh-CN↔zh-TW/pt↔pt-BR 变体对注入（其余语种省 10 行死文本）；超长提示仅 expansionFlags 非空时注入（v10.8 先例上移到 system prompt 层） |
+
+**效果**：首调 core+brand 从 2175 字符减到 1008 字符（**-54%**）；首调整体（含 commonErrors）减 25-35%；统一重试 prompt 减 60%+。
+
+**关键架构观察**：激进重试已是 7 行精简 prompt（llm-api.ts:1341+）且工作良好——"重试用瘦身 prompt"有工程先例；本次把同样思路推广到统一重试层，并按需注入补救条款实现"按需补救"而非"全程背负"。
+
+**测试**：`tests/test-v115-prompt-diet.ts` 41/41（A 首调瘦身 17 断言含 **20 语种全覆盖** rules 保留/commonErrors 剔除/重试回归 + B 重试补救回归 6 + C 校对条件注入 11 + D 规模回归 2 + E 旧常量兼容 5）；全量回归 15 文件全绿（v9.9+v9.10 33 + v10.0 21 + v10.2 38 + v10.3 22 + v10.4 17 + v10.5 39 + v10.6 46 + v10.7 14 + v10.8 21 + v10.9 86 + v11.0 91 + v11.1 42 + v11.2 48 + v11.3 18 + v11.4 26）；typecheck 双配置 + build 通过。
+
+**已知遗留（诚实声明）**：首调成功率升/降**无法单元测试闭环验证**——只能实机跑量观察首调漏翻率/待确认率（v10.3 日志持久化已具备观测能力）；若某语种（如 zh-TW 同语系场景）首调品牌直译率明显上升，可单语种把 BRAND 段加回首调（粒度可控）。OUTPUT 段 ↵/引号 4 行未搬（收益/风险比不划算）；prompt 模块化注册表（数据表懒加载）留待后续。
+
+**实机验证（2026-08-05，已通过）**：`tests/test-v115-live-translation.ts`（gpt-5.5 真实 API + 真实术语库 140 条 + 真实 CSV 素材）两条产品线 27 格 × 4 语种（zh-CN/zh-TW/ja/de）全管道：首调异常 0、漏翻 0、品牌直译 0、占位符残留 0。PLAY PRO microSD 12 格全绿；NM1090 PRO 15 格抓到 2 个非 v11.5 问题（见 v11.6）。
+
+---
+
+### 2.0.0-pre v11.6 术语库差异提示（2026-08-05，实机测试发现的 UX 盲区修复）
+
+**背景**：NM1090 PRO 实机测试中，`Lexar Professional NM1090 PRO PCIe 5.0 NVMe M.2 2280 SSD` 被标"疑似拼写错误"——但译文**正确**（=术语库官方 zh-CN 值 `...PCIe Gen5X4 NVMe固态硬盘`，术语库有意本地化改写写法）。用户看到"疑似拼写错误，请核对源稿"会误以为源稿有错，实际是术语库差异。
+
+**修复**（UI 提示层，不动 v10.6 判定器）：
+- `isGlossaryDivergedItem`（App.vue）：源文含术语库 key（≥12 字符产品名级）+ 译文含对应值 + key≠value → 新增 `glossaryDiverged` 待确认类型
+- 橙色非阻塞提示"术语库差异提示（译文与源文写法不同，来自术语库官方值）"，不阻塞批量应用（hasPendingBlockingIssue 排除），排 pendingItems 最末（优先级最低不遮挡真问题）
+- 条目弱化为 75% 不透明度（非阻塞观感）
+
+**不改 v10.6 判定器的理由**：`isSuspectMisspelledWord` 在 lib/llm-api.ts（管道层），UI 的 glossaryMap 在 App.vue——管道层豁免需要传入"该条被术语库校准"的上下文，跨层传参复杂；且该条目确实值得用户知晓（术语库值与源文写法不同），只是"疑似拼写错误"的措辞不对。UI 层提示既保留信息又消除误导。
+
+**实机测试另一发现（已确认非 bug）**：源文 `Microsoft DirectStorage3` 是**源稿真实笔误**（产品名是 DirectStorage，"3"是源文自带），我方译文忠实保留——不是 LLM 加戏。
+
+---
+
+### 2.0.0-pre v11.5-followup 20 语种全量实机验证（2026-08-05，v11.5 唯一未闭环假设验证通过）
+
+**背景**：v11.5 已知遗留"首调成功率升/降无法单元测试闭环验证"，此前仅 zh-CN/zh-TW/ja/de 4 语种实机。本次把 `test-v115-live-translation.ts` 扩展到 20 语种能力并跑完剩余 15 个语种（en→en 同语言管道非验证对象跳过）。
+
+**脚本扩展**（`tests/test-v115-live-translation.ts`，新增 `--strict` 与 `--concurrency N`）：
+- brand 检测全语种化：zh-CN/zh-TW/ja 保留官方同形 pattern（專業級/プロフェッショナル）；**ko/ru/th/ar 等非拉丁语种无官方同形 pattern**（这些语言 "Professional" 保留英文是术语库官方行为），strict 模式下逐条标注"⚠无检测pattern，0≠无问题"（诚实声明检测盲区）
+- 拉丁语系→拉丁语系新增"疑似整行未翻"检测：沿用 v10.6 判定器精神降噪——短行（<15 token）/含数字（规格行）/术语库覆盖（isGlossaryCoveredInTest 同逻辑）豁免，只标记长营销行整行未翻
+- en 自动跳过；`--concurrency N` 语种级并行（N=4 实测 15 语种 ~7 分钟）
+
+**结果（NM1090 PRO 15 格 × 15 语种 = 225 次首调，加此前 4 语种合计 20 语种 300 次首调）**：
+
+| 指标 | 15 语种合计 | 说明 |
+|---|---|---|
+| 首调异常 | **0** | v11.5 减肥后 20 语种首调可靠性实证 |
+| 漏翻（最终） | **0** | |
+| 品牌直译 | **0** | ko/ru/th/ar 为人工抽查产品名条目确认（术语库官方值原样保留） |
+| 占位符残留 | **0** | |
+| 与源文相同 | **0** | |
+| 疑似整行未翻（拉丁语系新检测） | **0** | 降噪设计零误报 |
+| 校对修改 | 36 条 / 225 格（16%） | fr 6 / th 5 / nl 4 / pl 4 / pt 3 / ru 3 / id 3 / ar 3 / ko 2 / es 2 / tr 2 / it 1 / vi 1 / sv 0 / pt-BR 0 |
+
+**校对修改性质抽查**（确认真修正非误改）：fr 数字千分位空格（14 000 Mo/s）+% 前空格（200 %）+ TB→To 法语单位——真本地化修正；nl 单位与数字间空格（4TB→4 TB）——真书写规范修正；th 标点 3/5——泰文标点规范。**校对闭环在 15 个新语种全部正常工作，无误改迹象**。
+
+**已知噪声（非 bug）**：ru 2 条"疑似错词"标记——误报（Кэш DRAM/6-нм контроллер 是俄语正确写法，拉丁技术词混入西里尔文本触发 v10.6 启发式；与 NM1090 PRO 此前"术语库差异"同型：判定器形式信号 vs 术语/语言现实的落差，UI 层 v11.6 提示已覆盖类似场景）。
+
+**结论**：v11.5 Prompt 减肥在 **20 语种全量**下无质量回退——首调异常 0/300。唯一未实机验证假设闭环。剩余检测盲区（诚实声明）：ko/ru/th/ar 品牌直译无形式检测手段（依赖术语库遮蔽+人工抽查）；非拉丁语种的"整行未翻"无对应检测（拉丁语系专属启发式）。
+
+---
+
+### 2.0.0-pre v11.4 产品名检测大小写形态统一修复（2026-08-05，根因修复：detectCategory 大小写敏感 + 系列名 camelCase 形态）
+
+**背景**：用户指出 nCard 已停产，单纯为 nCARD 打补丁没有意义——要找"这类问题"的根因。探索发现代码库 **5 个品类词数据源大小写策略不一致**，`detectCategory` 是唯一大小写敏感的匹配（其余全是 cleanKey 归一化或 `/i` flag），系列名首字母大写规则拒绝品牌 camelCase 形态（nCARD/eSeries）。这是形态判定的系统性盲区：CSV 140 条仅 1 条小写品类词（nCARD，Huawei 合作品牌遗留），但**未来新品/设计稿手写变体**（`Lexar NQ790 ssd`）同类问题必然重现。
+
+**根因（三个耦合缺陷）**：
+1. `detectCategory` 大小写敏感（product-name-generator.ts 无 `i` flag）——小写 `card` 不匹配 `\bCard\b` → 品类指纹门失败 → v11.2 代码检测 + v11.3 LLM 兜底双跳过
+2. 同文件 core-strip 正则继承同样缺陷——只修检测不修剥离会导致译名重复品类词
+3. 系列名首字母大写规则（new-product-detect.ts `/^[A-Z]/`）——`nCARD` 小写 `n` 被拒
+
+**修复**（用户拍板：极小改动 + 品名语境守卫防误伤）：
+
+| # | 改动 | 位置 | 要点 |
+|---|------|------|------|
+| 1 | `detectCategory` 双遍匹配 | product-name-generator.ts | 第一遍官方写法精确匹配**直通**（既有行为零变化）；第二遍大小写不敏感匹配 + **品名语境守卫**（命中须在文本结尾 + 前一 token 含大写/数字）——`Insert card into slot`（card 在句中）/ `card reader`（双词连用）不误伤 |
+| 2 | core-strip 正则 i flag | product-name-generator.ts | 剥掉源文实际写法的小写品类词，防译名重复（"Lexar nCARD NM card 存储卡"） |
+| 3 | 系列名允许 camelCase 品牌形态 | new-product-detect.ts | `/^[a-z][A-Z]/`（nCARD/eSeries——小写首字母+大写第二字母是商标形态）；`pro`/`fast` 全小写普通词仍被拒 |
+
+**守卫设计**（v11.4 核心决策）：大小写不一致命中时（源文 `card` vs canonical `Card`），要求 ①品类词是文本最后一个词（CSV 140 条实证品类词恒结尾）②前一 token 含大写字母或数字（品名形态信号：Lexar/系列/型号/规格必含）。官方写法命中（完全一致）直通无守卫——**既有 140 条 + v11.2/v11.3 全部用例零影响**。
+
+**测试**：`tests/test-v114-case-insensitive-category.ts` 26/26（A detectCategory 8 + B core-strip 3 + C camelCase 5 + D nCARD 端到端 4 + E 回归 6）；v113 两测试文件同步更新（nCARD 断言从"裸奔"翻转为"已检出"）；全量回归 12 文件全绿；typecheck 双配置 + build 通过（dist/index.html 725.36 KiB / main.js 289.61 KiB）。
+
+**已知遗留（诚实声明）**：`Lexar E300 ssd enclosure` 这类"混合大小写双品类词连用"形态守卫 1 拦截（大小写命中不在结尾）——该形态既非官方写法也非品名形态，走正常翻译可接受；5 个品类词数据源统一（结构性改进）留待后续。
+
+---
+
+### 2.0.0-pre v11.3 LLM 兜底产品名检测（2026-08-05，代码判定失败时 LLM 解析兜底 + 待确认入库）
+
+**背景**：v11.2/v11.2.1 纯代码判定能覆盖绝大多数产品名形态，但真实新品 `Lexar SUPER PCIe Gen5x4 NVMe SSD` 被 `DESCRIPTIVE_WORDS`（防 "Lexar Fast" 误保护的营销词表）误杀——SUPER 恰好是合法的系列名。这类"营销词 vs 系列名"的判定本质需要语义理解，代码用静态词表必然有边界。
+
+**用户决策**（2026-08-05）：你是 LLM，按你的理解来，我们要的是**可靠性**。
+
+**方案**（三层架构，代码与 LLM 各司其职）：
+
+```
+第一层：代码检测（v11.2 不变）—— 五门判定，零误判
+        ↓ 判定失败（parseProductName valid:false）
+第二层：LLM 兜底（v11.3 新增）—— 语义解析"是不是产品名？系列名是什么？"
+        ↓ 结构化 JSON 输出 → 代码形式校验 → 代码渲染 20 语种
+第三层：人工确认（v8.9 pendingItems）—— 不静默入库，待确认后显式入库
+```
+
+**核心原则**：LLM 输出**结构化 JSON**（isProductName/series/model），**不输出译名**——译名由代码渲染（五槽位+语序模板+品类译法表），保证 20 语种风格统一。
+
+**三重收窄触发条件**（`detectFallbackCandidates`，可靠性优先）：
+1. **强锚点**：含 `Lexar®`（® 是"完整产品名"强信号，设计稿常态写法）
+2. **品类指纹**：`detectCategory ≠ null`（规则文档严格界定的 11 个核心品类词）
+3. **代码判定失败**：`parseProductName` 返回 null 或 valid:false
+
+**不触发**（保持现状，不放宽）：
+- 无 Lexar® 锚点（纯系列名如 "MUSE Portable SSD"）→ 人工确认通道
+- 未知品类词（"Memory Stick" 不在 11 词表）→ 人工确认通道
+- parseProductName 成功（正常检出路径已覆盖）
+
+**LLM 解析**（`parseProductNameWithLLM`）：
+- **双 prompt**（EN/ZH 按指令语言路由）：`PRODUCT_NAME_PARSE_PROMPT` / `PRODUCT_NAME_PARSE_PROMPT_ZH`——ROLE 是 Lexar 产品名分析器，RULES 明确"系列名（THOR/ARES/PLAY/MUSE/SUPER/VELOCIS）是专有名词不翻译；描述词（Fast/High/Speed）不是系列名"
+- **结构化 JSON 输出**：`{"isProductName":boolean,"series":string,"model":string}`，temperature=0.1
+- **代码形式校验**（防 LLM 编造）：
+  1. isProductName 必须是 boolean（防解析失败）
+  2. series 必须是源文子串或空串（防 LLM 编造不存在的系列名）
+  3. model 必须是源文子串或空串（防 LLM 编造型号）
+  4. series 不在 DESCRIPTIVE_CHECK 集合（fast/high/speed/new/ultra-fast/ultrafast——防 LLM 把描述词判为系列名）
+  - 任何校验失败或异常 → 返回 null（放弃保护，走正常管道）
+
+**入库策略**（v10.7 教训：LLM 参与的产物走显式通道）：
+- **不静默入库**：LLM 判定为产品名后，生成 20 语种译名 → 当前目标语种并入 glossaryMap（S1 短路当前批次）+ 写入 `llmFallbackTerms` 待确认集合 → UI 显示"新品名待确认（LLM 辅助识别）"→ 用户点击"确认入库"后才写入 glossaryExclusive
+- **放弃保护**：LLM 判 isProductName=false 或校验失败 → 日志记录"放弃保护，走正常管道"→ 不标记待确认（让 LLM 正常翻译/校对处理）
+
+**改动**：
+
+| 文件 | 改动 |
+|---|---|
+| `lib/prompt-constants.ts` | 新增 `PRODUCT_NAME_PARSE_PROMPT` / `PRODUCT_NAME_PARSE_PROMPT_ZH`（含 5 个示例，关键对比：SUPER→true vs Fast→false） |
+| `lib/new-product-detect.ts` | 新增 `detectFallbackCandidates`（三重收窄触发 + 新颖性门） |
+| `lib/llm-api.ts` | 新增 `parseProductNameWithLLM`（LLM 解析 + 四重代码校验 + 异常兜底返回 null） |
+| `ui/App.vue` | startTranslate 集成第二层兜底 + `llmFallbackTerms` ref + `confirmLlmFallbackTerm` 显式入库 + pendingItems 新增 `llmFallback` 类型（最先检查） + skipPendingItem/retranslateSingle 清理 |
+| `ui/styles.css` | `.llm-fallback-tag` + `.pending-item.llmFallback` 样式（蓝色边框 #007aff，与错误红/漏翻黄/校对绿区分） |
+
+**核心语义验证**（`tests/test-v113-llm-fallback.ts` 18/18）：
+- **A 组（7 断言）触发条件**：SUPER 触发 / MUSE 不触发（代码已检出）/ 无 Lexar® 不触发 / 未知品类词不触发 / 已收录不触发 / 营销文案不触发 / 无品类词不触发
+- **B 组（2 断言）校验逻辑**：parseProductNameWithLLM 函数存在 + 校验在函数内部（需集成测试）
+- **C 组（4 断言）端到端**：
+  - C1 SUPER：触发兜底 → 代码渲染 fr `SSD Lexar SUPER PCIe Gen5x4 NVMe` / zh-CN `Lexar SUPER PCIe Gen5x4 NVMe 固态硬盘`
+  - C2 Fast：触发兜底（代码判描述词失败）→ LLM 应判 isProductName=false → 放弃保护（集成测试覆盖）
+  - C3 nCARD：不触发兜底（detectCategory 不识别小写 card）→ 人工确认通道
+  - C4 正常路径检出后兜底不触发
+- **D 组（3 断言）回归**：v11.2 检测/生成不受影响 + SUPER 代码路径拒绝但兜底触发
+
+**全量回归**：v9.9+v9.10 (33) + v10.0 (21) + v10.2 (38) + v10.5 (39) + v10.6 (46) + v10.7 (14) + v10.8 (21) + v10.9 (86) + v11.0 (91) + v11.1 (42) + v11.2 (48) 全绿；typecheck 双配置 + build 通过（dist/index.html 725.13 KiB / main.js 289.61 KiB）。
+
+**已知遗留（诚实声明）**：
+- ~~**nCARD 小写系列名走人工确认**——`detectCategory('NM card')` 不识别小写 card（CATEGORY_KEYS `\bCard\b` 大小写敏感），如需覆盖要把品类词表扩展到大小写不敏感，但那是改 v11.2 检测逻辑，本次不动~~ **v11.4 已修复**（detectCategory 双遍匹配 + camelCase 系列名放宽）
+- **B2-B6 校验逻辑需集成测试覆盖**——单元测试验证了触发条件与函数存在性，但 series 非源文子串/model 编造/DESCRIPTIVE_CHECK 等校验逻辑在 parseProductNameWithLLM 内部，需 mock XHR 集成测试覆盖（当前 18 断言已覆盖核心语义）
+
+**设计决策记录**：
+1. **LLM 不输出译名**——20 语种风格统一是 v11.2 核心收益，LLM 只做"是不是产品名/系列名是什么"的语义判断，渲染交给代码
+2. **三重收窄触发**——不为捞"疑似产品名"放宽形态门；无锚点/未知品类词走人工确认（同 ARES→战神 不可自动继承的决策）
+3. **待确认入库非静默**——v10.7 教训：LLM 参与的产物（缓存/译文/产品名）必须走显式通道，静默入库 = 永久污染风险
+4. **校验失败放弃保护**——最坏结果 = 回到 v11.2 之前的状态（LLM 自由翻译），不会引入新风险
+
+---
+
+### 2.0.0-pre v11.2.2 修复新产品名入库短路场景漏入库（2026-08-04，零 API 调用时入库块被跳过）
+
+**问题**：单条产品名被 `normalizedGlossaryMap` 短路、零 API 时 startTranslate 提前 return（`apiTotal===0 && autoSkipped===total`），尾部入库块被跳过——检测到了新品名但没入库，下次扫描还会重复检测。
+
+**修复**（`ui/App.vue`）：抽 `persistAdhocProductNames()` 纯函数，两处调用：
+1. `apiTotal===0` 提前 return 前——零 API 场景也入库
+2. 正常走完到尾部——混合场景（部分短路+部分已译）也覆盖
+
+**测试**：E 段 6 断言（短路场景检测/入库 key/cleanKey 一致/already 判重/19 语种）；48/48 通过；typecheck 双 config + build 全绿。
+
+---
 
 ### 2.0.0-pre v11.2.1 全品线扫描缺口修复（2026-08-03，真实产品名误杀清零 + 已知系列新子型号入库）
 
@@ -690,6 +873,10 @@ v8.7 设计"激进失败→保留原文不标记，交给校对 LLM 判断"，�
 
 测试的脚本化响应队列按调用次数顺序消费。改判定逻辑会改变异常集构成 → 统一重试条数变化 → 队列错位，残留响应串行污染后续场景（C5 消费到 C4 的残留响应）。**判定逻辑改动后测试失败，先核对 mock 队列与新调用序列是否对齐，再怀疑代码。**
 
+### 坑 14: 营销词表静态边界必然误杀合法系列名（v11.3）
+
+`DESCRIPTIVE_WORDS` 防 "Lexar Fast" 误保护，但 SUPER 恰好是合法系列名——静态词表无法区分"营销形容词"vs"系列名"（语义判定）。**代码用静态词表做语义判定必然有边界；LLM 内建多语言语感，结构化 JSON 输出 + 代码形式校验（子串/描述词检查）可在可靠性优先前提下兜住边界。**
+
 ---
 
 ## 五点一、架构复盘（2026-07-31，v9.11 之后）
@@ -747,10 +934,12 @@ v8.7 设计"激进失败→保留原文不标记，交给校对 LLM 判断"，�
 
 | 文件 | 职责 |
 |------|------|
-| `lib/prompt-constants.ts` | 提示词常量（STYLE_GUIDES、LANG_SPECIFIC、PRODUCT_LINE_TONE_GUIDES、SCENE_CONSTRAINTS、CORE_PRINCIPLES、PROOFREAD_SYSTEM_PROMPT） |
-| `lib/llm-api.ts` | LLM 调用 + 翻译/校对管道 + 重试逻辑 + v9.5 三层漏翻检测 + v9.9 术语合规校验 + v9.10 双视图分发 + v9.11 批次级标注/untranslatedIndices/最终安全网 + v10.0 re-export lang-detect（兼容层）+ v10.2 截断判定（脚本存在性）+ 子兜底守卫 + 诊断日志埋点 + v10.4 管道阶段化(S1-S8)+auditStage 不变量审计 + v10.5 型号/裸单位豁免(isModelListOrCode/PURE_UNIT_RE)+截断跳过不可翻译+脚本校验豁免术语库已知值 + **v10.6 revertMisspelledWordTranslation 疑似错词回退兜底** |
+| `lib/prompt-constants.ts` | 提示词常量（STYLE_GUIDES、LANG_SPECIFIC、PRODUCT_LINE_TONE_GUIDES、SCENE_CONSTRAINTS、CORE_PRINCIPLES、PROOFREAD_SYSTEM_PROMPT、**v11.3 PRODUCT_NAME_PARSE_PROMPT/ZH LLM 产品名解析**） |
+| `lib/llm-api.ts` | LLM 调用 + 翻译/校对管道 + 重试逻辑 + v9.5 三层漏翻检测 + v9.9 术语合规校验 + v9.10 双视图分发 + v9.11 批次级标注/untranslatedIndices/最终安全网 + v10.0 re-export lang-detect（兼容层）+ v10.2 截断判定（脚本存在性）+ 子兜底守卫 + 诊断日志埋点 + v10.4 管道阶段化(S1-S8)+auditStage 不变量审计 + v10.5 型号/裸单位豁免(isModelListOrCode/PURE_UNIT_RE)+截断跳过不可翻译+脚本校验豁免术语库已知值 + v10.6 revertMisspelledWordTranslation 疑似错词回退兜底 + **v11.3 parseProductNameWithLLM LLM 兜底产品名解析** |
 | `lib/lang-detect.ts` | v10.0 语言检测单一事实源（三套检测/词表/字符集分类/同语系对，detectSingleTextLanguage 死代码已修为委托批次级）+ **v10.2 TARGET_SCRIPT_PATTERNS** |
 | `lib/keep-source.ts` | **v10.0 豁免中央注册表**（shouldKeepSource/isSameLanguageExempt，F3b 三重守卫迁入） |
+| `lib/new-product-detect.ts` | **v11.2/v11.3 新产品名检测**（五槽位解析 parseProductName + 五门判定 detectAdhocProductTerms + v11.3 LLM 兜底触发 detectFallbackCandidates）+ **v11.4 系列名 camelCase 品牌形态（nCARD/eSeries）** |
+| `lib/product-name-generator.ts` | **v11.2 产品名 20 语种生成**（五槽位渲染 + CATEGORY_TRANSLATIONS 品类译法表 + WORD_ORDER 语序模板 + detectCategory 品类指纹）+ **v11.4 detectCategory 双遍匹配（大小写不敏感+品名语境守卫）+ core-strip i flag** |
 | `lib/post-process.ts` | 译后处理（enforceGlossaryTerms、detectBrandInjection、restoreTrademarkSymbols、detectTranslationExpansion、cleanKey） |
 | `lib/entity-masker.ts` | 实体/术语遮蔽（maskGlossaryTerms → maskEntities 顺序 v9.2） |
 | `lib/glossary-filter.ts` | 术语过滤（filterRelevantGlossary、normalizeForMatch） |
@@ -759,7 +948,7 @@ v8.7 设计"激进失败→保留原文不标记，交给校对 LLM 判断"，�
 | `lib/text-normalizer.ts` | 文本预处理（Unicode NFC、全角→半角、零宽字符、↵保护） |
 | `lib/default-glossary.ts` | 默认术语库（140 产品名 + 189 专属术语） |
 | `lib/main.ts` | 插件主线程（扫描/appliedTexts 快照/undoAll 三方对比/selectionchange/**fixRegisterSymbolFont v9.6**） |
-| `ui/App.vue` | UI 主组件（流程编排、sticky 操作区、待确认机制、busyPhase、computeUntranslatedBadge v9.5、**buildGlossaryMaps 双视图 v9.10**） |
+| `ui/App.vue` | UI 主组件（流程编排、sticky 操作区、待确认机制、busyPhase、computeUntranslatedBadge v9.5、buildGlossaryMaps 双视图 v9.10、**v11.2 新产品名检测/生成/入库 + v11.3 LLM 兜底集成 + llmFallbackTerms 待确认**） |
 | `ui/styles.css` | 全部样式（Apple 设计令牌、深色覆盖、.footer v9.3 恢复） |
 | `ui/ui.ts` | UI 挂载入口 |
 | `tests/test-untranslated-v3.ts` | **v9.5 三层漏翻检测全量回归（40 用例）** |
@@ -774,6 +963,10 @@ v8.7 设计"激进失败→保留原文不标记，交给校对 LLM 判断"，�
 | `tests/test-v102-truncation-fix.ts` | **v10.2 截断误杀根治（38 断言：脚本存在性判定 + 真截断检出 + 拉丁 0.15 分支 + 20 语种一致性）** |
 | `tests/test-v105-model-list-exemption.ts` | **v10.5 型号/裸单位豁免（39 断言：A 型号正反样例 + B 裸单位 + C 截断豁免 + D 脚本校验库值豁免 + E 端到端零重试 + F 20 语种普遍性）** |
 | `tests/test-v106-misspelled-word.ts` | **v10.6 疑似错词保留+回退兜底（27 断言：A prompt 规则中英双语 + B 正反样例 + C 端到端音译回退+待确认 + D 20 语种拉丁不兜底/非拉丁兜底）** |
+| `tests/test-v112-product-name-v2.ts` | **v11.2/v11.2.1/v11.2.2 新产品名全生命周期（48 断言：A 检测 22 + B 生成并入 6 + C 入库语义 6 + D NF100 端到端 8 + E 短路场景入库 6）** |
+| `tests/test-v113-llm-fallback.ts` | **v11.3 LLM 兜底产品名检测（18 断言：A 触发条件 7 + B 校验逻辑 2 + C 端到端 SUPER/Fast/nCARD/正常路径 4 + D v11.2 回归 3）** |
+| `tests/test-v113-exposed-product-names.ts` | v11.3 裸奔产品名分类验证（6 断言：C1 SUPER 误杀 / C2 MUSE 检出 / V1 nCARD **v11.4 起已检出** / V2-V4 不触发场景） |
+| `tests/test-v114-case-insensitive-category.ts` | **v11.4 大小写形态统一（26 断言：A detectCategory 双遍匹配+守卫 8 + B core-strip 3 + C camelCase 系列 5 + D nCARD 端到端 4 + E 回归 6）** |
 
 ---
 
@@ -798,6 +991,9 @@ npx tsx tests/test-v103-log-persistence.ts       # v10.3 日志持久化+跨线�
 npx tsx tests/test-v104-pipeline-audit.ts        # v10.4 管道阶段化+不变量审计 17 断言
 npx tsx tests/test-v105-model-list-exemption.ts  # v10.5 型号/裸单位豁免+检测层豁免 39 断言（含 F 段 20 语种普遍性）
 npx tsx tests/test-v106-misspelled-word.ts       # v10.6 疑似错词保留+回退兜底+独立待确认类别 34 断言（prompt 规则+非拉丁兜底+20 语种+漏翻通道区分）
+npx tsx tests/test-v112-product-name-v2.ts       # v11.2/v11.2.1/v11.2.2 新产品名全生命周期 48 断言（检测/生成/入库/端到端/短路场景）
+npx tsx tests/test-v113-llm-fallback.ts          # v11.3 LLM 兜底产品名检测 18 断言（触发条件/SUPER 端到端/Fast 拒绝/v11.2 回归）
+npx tsx tests/test-v114-case-insensitive-category.ts  # v11.4 大小写形态统一 26 断言（detectCategory 双遍匹配+守卫/core-strip/camelCase 系列/nCARD 端到端）
 ```
 
 **铁律**：每次改代码后必须执行 `npm run typecheck` + `npm run build`。build 过 ≠ tsc 过。
@@ -811,8 +1007,9 @@ npx tsx tests/test-v106-misspelled-word.ts       # v10.6 疑似错词保留+回�
 2. 实机验证 v10.3/v10.4：跑一批翻译 → 诊断日志面板应看到 S1→S8 阶段轨迹 + 主线程 [main:scan]/[main:apply] 事件；关闭重开插件 → 应看到"── 恢复上次会话日志（N 条）──"分隔标记
 3. 实机验证 v9.9/v9.10：pt-BR 自动检测 → ja 产品名走短路出术语库值；非电商场景营销术语不注入；校对改错术语时被合规校验拉回
 4. 实机验证 v9.6：Avenir 字体的 `Lexar®` 文本，不翻译直接应用 + 字体替换后，® 是否都显示为 HarmonyOS 样式
-5. ~~提交代码~~ **已提交 5df3af2 + 已推 GitHub**（v9.5-v10.2，2026-07-31）
-6. ~~R7 决策~~（已拍板 2026-07-31：现状即规则——去符号匹配，®™ 由源文驱动恢复，CSV 不携带符号，无需改代码）
+5. 实机验证 v11.3：扫描含 `Lexar® SUPER PCIe Gen5x4 NVMe SSD` 的设计稿 → 应触发 LLM 兜底 → 待确认区显示"新品名待确认（LLM 辅助识别）"→ 点击"确认入库"后写入专属术语库；扫描含 `Lexar® Fast SSD` 的设计稿 → 应触发兜底但 LLM 判 isProductName=false → 放弃保护走正常管道
+6. ~~提交代码~~ **已提交 5df3af2 + 已推 GitHub**（v9.5-v10.2，2026-07-31）；**v11.3 待提交**
+7. ~~R7 决策~~（已拍板 2026-07-31：现状即规则——去符号匹配，®™ 由源文驱动恢复，CSV 不携带符号，无需改代码）
 
 **架构优化（见"五点一、架构复盘"，按收益/风险排序）**：
 1. ~~判定逻辑单一事实源 + 豁免中央注册表~~ **已完成 v10.0**（lib/lang-detect.ts + lib/keep-source.ts）
@@ -867,4 +1064,4 @@ User Message：`[N] ({srcLang}→{targetLang}) source\nTrans：translation`
 
 ---
 
-**最后更新**: 2026-07-31
+**最后更新**: 2026-08-05

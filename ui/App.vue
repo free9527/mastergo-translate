@@ -114,7 +114,7 @@
           <span class="pending-text">
             {{ pendingItems.filter(p => p.type === 'error').length }} 条错误，
             {{ pendingItems.filter(p => p.type === 'placeholder').length }} 条占位符，
-            {{ pendingItems.filter(p => p.type === 'untranslated').length }} 条漏翻待确认<template v-if="pendingItems.some(p => p.type === 'misspelled')">，{{ pendingItems.filter(p => p.type === 'misspelled').length }} 条疑似拼写错误</template>
+            {{ pendingItems.filter(p => p.type === 'untranslated').length }} 条漏翻待确认<template v-if="pendingItems.some(p => p.type === 'misspelled')">，{{ pendingItems.filter(p => p.type === 'misspelled').length }} 条疑似拼写错误</template><template v-if="pendingItems.some(p => p.type === 'llmFallback')">，{{ pendingItems.filter(p => p.type === 'llmFallback').length }} 条新品名待确认</template><template v-if="pendingItems.some(p => p.type === 'glossaryDiverged')">，{{ pendingItems.filter(p => p.type === 'glossaryDiverged').length }} 条术语库差异提示</template>
           </span>
           <svg class="chevron" :class="{ open: showPendingList }" width="12" height="12" viewBox="0 0 12 12"><path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
         </div>
@@ -129,10 +129,11 @@
         <div class="pending-list" v-if="showPendingList">
           <div class="pending-item" v-for="p in pendingItems" :key="p.item.nodeIds[0]" :class="p.type">
             <div class="pending-item-source">
-              <span v-if="p.type === 'misspelled'" class="misspelled-tag">疑似拼写错误，请核对源稿：</span>{{ p.item.sourceText.slice(0, 40) }}{{ p.item.sourceText.length > 40 ? '...' : '' }}
+              <span v-if="p.type === 'misspelled'" class="misspelled-tag">疑似拼写错误，请核对源稿：</span><span v-else-if="p.type === 'llmFallback'" class="llm-fallback-tag">新品名待确认（LLM 辅助识别）：</span><span v-else-if="p.type === 'glossaryDiverged'" class="glossary-diverged-tag">术语库差异提示（译文与源文写法不同，来自术语库官方值）：</span>{{ p.item.sourceText.slice(0, 40) }}{{ p.item.sourceText.length > 40 ? '...' : '' }}
             </div>
             <div class="pending-item-trans">{{ p.item.translatedText.slice(0, 40) }}{{ p.item.translatedText.length > 40 ? '...' : '' }}</div>
             <div class="pending-item-actions">
+              <button v-if="p.type === 'llmFallback'" class="btn btn-xs btn-primary" @click="confirmLlmFallbackTerm(p.item)">确认入库</button>
               <button class="btn btn-xs btn-tinted" @click="editPendingItem(p.item)">编辑</button>
               <button class="btn btn-xs btn-plain" @click="skipPendingItem(p.item)">跳过</button>
             </div>
@@ -568,8 +569,9 @@ import { TRANSLATE_BATCH_SIZE, PROOFREAD_BATCH_SIZE, TOAST_DURATION_MS, CORRECTI
 import { convertStorageUnit } from '@lib/unit-convert'
 import { getAutoFontMapping } from '@lib/font-mapper'
 import { compressBatch, expandBatch } from '@lib/translation-memory'
-import { detectAdhocProductTerms, parseProductName } from '@lib/new-product-detect'
+import { detectAdhocProductTerms, detectFallbackCandidates, parseProductName } from '@lib/new-product-detect'
 import { generateProductNameTranslations, zhCNtoZhTW } from '@lib/product-name-generator'
+import { parseProductNameWithLLM } from '@lib/llm-api'
 import { uiLog, getUiLogs, getUiLogVersion, clearUiLogs, formatUiLogs, receiveMainLog, restoreUiLogs, serializeUiLogs, UiLogEntry } from '@lib/ui-debug-log'
 
 // ============================================================
@@ -643,12 +645,15 @@ function hasPlaceholderResidue(text: string): boolean {
   return /__[A-Z]+_\d+__/.test(text)
 }
 
-/** v8.9: 待确认条目 — 三类阻塞问题 */
+/** v8.9: 待确认条目 — 三类阻塞问题 + v11.3 LLM 兜底新品名 + v11.6 术语库差异提示（非阻塞） */
 const pendingItems = computed(() => {
-  const errors: Array<{ item: typeof items.value[0]; type: 'error' | 'placeholder' | 'untranslated' | 'misspelled' }> = []
+  const errors: Array<{ item: typeof items.value[0]; type: 'error' | 'placeholder' | 'untranslated' | 'misspelled' | 'llmFallback' | 'glossaryDiverged' }> = []
   for (const item of items.value) {
     if (appliedNodeIds.value.has(item.nodeIds[0])) continue // 已应用的不参与
-    if (misspelledIds.value.has(item.nodeIds[0])) {
+    // v11.3: LLM 兜底检出的新品名（整条原文在 llmFallbackTerms 中）
+    if (llmFallbackTerms.value.has(item.sourceText.trim().replace(/[®™©]/g, ''))) {
+      errors.push({ item, type: 'llmFallback' })
+    } else if (misspelledIds.value.has(item.nodeIds[0])) {
       errors.push({ item, type: 'misspelled' })
     } else if (translateErrors.value.has(item.nodeIds[0])) {
       errors.push({ item, type: 'error' })
@@ -656,13 +661,39 @@ const pendingItems = computed(() => {
       errors.push({ item, type: 'placeholder' })
     } else if (showUntranslatedBadge(item)) {
       errors.push({ item, type: 'untranslated' })
+    } else if (isGlossaryDivergedItem(item)) {
+      // v11.6: 术语库值与源文写法差异大（如 PCIe 5.0→Gen5X4）——译文本身正确（=术语库官方值），
+      // 提示用户差异来源，非阻塞警告（排最后：优先级最低，不遮挡真问题）
+      errors.push({ item, type: 'glossaryDiverged' })
     }
   }
   return errors
 })
 
-/** v8.9: 是否有阻塞批量应用的问题 */
-const hasPendingBlockingIssue = computed(() => pendingItems.value.length > 0)
+/** v8.9: 是否有阻塞批量应用的问题（v11.6: glossaryDiverged 是提示非阻塞，不计入） */
+const hasPendingBlockingIssue = computed(() =>
+  pendingItems.value.some(p => p.type !== 'glossaryDiverged')
+)
+
+/**
+ * v11.6: 术语库差异提示判定——译文中命中的术语库值与源文对应 key 差异大（术语库有意本地化改写）。
+ * 实机案例（2026-08-05 NM1090 PRO）：key 含 "PCIe 5.0"，值写 "PCIe Gen5X4"——术语库有意为之，
+ * 译文正确但被 v10.6 错词判定误标"疑似拼写错误"。该标记会让用户误以为源稿有错。
+ * 判定：源文含术语库 key + 译文含对应值 + key≠值（有实质差异）→ true。
+ */
+function isGlossaryDivergedItem(item: typeof items.value[0]): boolean {
+  const src = item.sourceText.trim()
+  const trans = item.translatedText.trim()
+  if (!src || !trans || src === trans) return false
+  const map = glossaryMapForUi.value
+  for (const [key, value] of map) {
+    if (key === value) continue                    // 值=key 无差异，不提示
+    if (key.length < 12) continue                  // 短 key（单词级）差异是常态，只提示产品名级长 key
+    if (src.includes(key) && trans.includes(value)) return true
+  }
+  return false
+}
+
 const translationCache = ref<Record<string, string>>({})
 const llmConfig = ref<LLMConfig>({ apiKey: '', apiUrl: '', model: '', translationStyle: 'standard', translationStyleCustom: '', scenePreset: 'ecommerce', enableProofread: false, proofreadApiKey: '', proofreadApiUrl: '', proofreadModel: '' })
 
@@ -692,6 +723,8 @@ const translateErrors = ref<Set<string>>(new Set())
 const misspelledIds = ref<Set<string>>(new Set())
 /** v10.8: 译文显著超长的 nodeId 集合 — 长度异常信号透出给校对层作 hint（不自动截断） */
 const expansionIds = ref<Set<string>>(new Set())
+/** v11.3: LLM 兜底检出的新产品名（待确认入库）— key=整条原文，value={translations, series} */
+const llmFallbackTerms = ref<Map<string, { translations: Record<string, string>; series: string }>>(new Map())
 /** AI 校对标记的歧义词汇 — 应加入术语库 source 列，用户后续补充翻译 */
 const suggestedGlossaryTerms = ref<string[]>([])
 /** 已被手动应用过的 nodeId 集合，批量应用时自动跳过 */
@@ -1120,6 +1153,7 @@ function resetWorkState() {
   translateErrors.value = new Set()
   misspelledIds.value = new Set()
   expansionIds.value = new Set()
+  llmFallbackTerms.value = new Map()  // v11.3: 清空 LLM 兜底待确认集合
   failedNodeIds.value = []
   appliedNodeIds.value = new Set()
   retranslatingIds.value = new Set()
@@ -1354,6 +1388,7 @@ async function startTranslate() {
   translateErrors.value = new Set()
   misspelledIds.value = new Set()
   expansionIds.value = new Set()
+  llmFallbackTerms.value = new Map()  // v11.3: 清空 LLM 兜底待确认集合
   translateProgress.value = { current: 0, total: 0 }
 
   // 目标语言切换后需要重新翻译：清空所有旧译文和校对状态
@@ -1404,6 +1439,45 @@ async function startTranslate() {
     if (adhocTerms.length > 0) {
       uiLog('translate', `v11.2 新产品名保护: ${adhocTerms.map(t => `${t}→${adhocTargetTranslations.get(t)}`).join(' | ')}`)
       showToast(`检测到 ${adhocTerms.length} 个未收录新产品名，已按命名规则生成译名: ${adhocTerms.slice(0, 3).join(', ')}${adhocTerms.length > 3 ? ' …' : ''}`, 'info')
+    }
+
+    // ═══ v11.3: LLM 兜底 — 代码判定失败但强锚点+品类词指纹成立的候选 ═══
+    // 触发条件（三重收窄）：Lexar® 锚点 + detectCategory≠null + parseProductName 失败
+    // LLM 只做"是不是产品名+系列名是什么"的判断（结构化 JSON），代码做形式校验后渲染译名。
+    // 入库降格为【待确认】，不静默——LLM 参与的产物走显式通道（v10.7 教训）。
+    const fallbackCandidates = detectFallbackCandidates(
+      items.value.map(it => it.sourceText),
+      glossaryMap,
+    )
+    if (fallbackCandidates.length > 0) {
+      uiLog('translate', `v11.3 LLM兜底候选: ${fallbackCandidates.map(c => c.term).join(' | ')}`)
+      for (const candidate of fallbackCandidates) {
+        const llmParsed = await parseProductNameWithLLM(candidate.term, targetLang.value, llmConfig.value)
+        if (llmParsed && llmParsed.isProductName) {
+          // 校验通过 → 代码渲染 20 语种译名 → 待确认入库（不静默）
+          const gen = generateProductNameTranslations(candidate.term, llmParsed.series)
+          const translations: Record<string, string> = {}
+          for (const [lang, val] of Object.entries(gen.translations)) {
+            if (lang !== 'en') translations[lang] = val
+          }
+          // 并入本批次术语链（S1 短路），但不静默入库——进待确认让用户确认后再入库
+          let targetVal = gen.translations[targetLang.value] || candidate.term
+          if (targetLang.value === 'zh-TW' && targetVal === gen.translations['zh-CN']) {
+            targetVal = zhCNtoZhTW(targetVal)
+          }
+          glossaryMap.set(candidate.term, targetVal)
+          glossaryEnMap.set(candidate.term, candidate.term)
+          const ck = cleanKey(candidate.term)
+          if (ck.length >= 3 && !normalizedGlossaryMap.has(ck)) normalizedGlossaryMap.set(ck, targetVal)
+          // 标记待确认：翻译完成后进 pendingItems，用户确认后才入库
+          llmFallbackTerms.value.set(candidate.term, { translations, series: llmParsed.series })
+          uiLog('translate', `v11.3 LLM兜底检出: "${candidate.term}" → series="${llmParsed.series}"，待确认入库`)
+          showToast(`检测到新产品名 "${candidate.term}"（LLM 辅助识别），翻译后请确认入库`, 'info')
+        } else {
+          // LLM 判非产品名或校验失败 → 放弃保护，走正常管道
+          uiLog('translate', `v11.3 LLM兜底放弃: "${candidate.term}"（${llmParsed ? '判非产品名' : '解析/校验失败'}）`)
+        }
+      }
     }
 
 
@@ -1897,6 +1971,14 @@ async function startTranslate() {
   // 入库 key = 整条原文去®（与 CSV 惯例一致：140 条全部无®，cleanKey 模糊匹配天然命中带®变体）。
   // 只对产品名生效；系列/型号/规格全语种保留，品类词按 CSV 现状译法；中文营销名留空待补。
   persistAdhocProductNames(adhocDetected)
+
+  // ═══ v11.3: LLM 兜底检出的新产品名 → 待确认入库（不静默）═══
+  // LLM 参与的产物走显式通道（v10.7 教训：写进持久层的东西无校验 = 污染永久化）。
+  // 用户确认后才写入专属库；翻译阶段已并入本批次术语链（S1 短路），首轮即厂形译文。
+  if (llmFallbackTerms.value.size > 0) {
+    uiLog('translate', `v11.3 LLM兜底待确认: ${[...llmFallbackTerms.value.keys()].join(' | ')}`)
+    // 待确认 UI 由 pendingItems 计算属性处理（见下方 type: 'llmFallback'）
+  }
 
   // v8.4: 完成指标收集并显示报告
   const metrics = finalizeMetrics()
@@ -2879,6 +2961,9 @@ async function retranslateSingle(item: TextItem) {
       }
       translateErrors.value.delete(id)
       misspelledIds.value.delete(id)
+      // v11.3: 重翻后从 LLM 兜底待确认集合移除（已确认/已跳过/已重翻）
+      const termKey = item.sourceText.trim().replace(/[®™©]/g, '')
+      llmFallbackTerms.value.delete(termKey)
       showToast('已重新翻译', 'success')
     } else {
       // v9.11: 空结果也标记失败（此前只弹 toast，条目状态不变，用户无处可查）
@@ -2944,7 +3029,34 @@ function skipPendingItem(item: TextItem) {
     appliedNodeIds.value.add(nid)
   }
   misspelledIds.value.delete(item.nodeIds[0])
+  // v11.3: 跳过 LLM 兜底新品名 → 从待确认集合移除（不入库）
+  const termKey = item.sourceText.trim().replace(/[®™©]/g, '')
+  if (llmFallbackTerms.value.has(termKey)) {
+    llmFallbackTerms.value.delete(termKey)
+    uiLog('translate', `v11.3 LLM兜底新品名跳过（不入库）: "${termKey}"`)
+  }
   showToast('已跳过该条目', 'info')
+}
+
+/** v11.3: 确认入库 LLM 兜底检出的新品名 */
+function confirmLlmFallbackTerm(item: TextItem) {
+  const termKey = item.sourceText.trim().replace(/[®™©]/g, '')
+  const entry = llmFallbackTerms.value.get(termKey)
+  if (!entry) return
+  // 写入专属术语库（与 v11.2 静默入库同路径，但这里是显式确认）
+  const already = glossaryExclusive.value.some(g => g.source === termKey) ||
+    glossaryProducts.value.some(g => g.source === termKey)
+  if (!already) {
+    glossaryExclusive.value.push({ source: termKey, translations: entry.translations })
+    saveGlossaryExclusive()
+    uiLog('translate', `v11.3 LLM兜底新品名已确认入库: "${termKey}"（20 语种）`)
+    showToast(`已将 "${termKey}" 加入专属术语库（20 语种）`, 'success')
+  }
+  llmFallbackTerms.value.delete(termKey)
+  // 标记为已应用（不再阻塞）
+  for (const nid of item.nodeIds) {
+    appliedNodeIds.value.add(nid)
+  }
 }
 
 // ============================================================

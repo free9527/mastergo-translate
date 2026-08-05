@@ -194,6 +194,8 @@ export function parseProductName(text: string): ParsedProductName | null {
 
   // 系列串约束：1-4 个 token；允许单字母修饰 token（X/Z/Pro 子型号后缀），其余 ≥2 字符；
   // 首字母大写或全大写（连字符系列如 High-Endurance 按整体判定）
+  // v11.4: 放宽品牌小写 camelCase 形态（nCARD/eSeries——首字母小写+第二字母大写是
+  //   商标形态不是普通小写词；'pro'/'fast' 全小写普通词仍被拒）
   // v11.2.1: 系列串尾部容量 token 视为规格，剥离后重新判定（"TITAN 2TB" → "TITAN"）
   while (seriesTokens.length > 0 && CAPACITY_TOKEN_RE.test(stripTrademark(seriesTokens[seriesTokens.length - 1]))) {
     seriesTokens.pop()
@@ -207,7 +209,10 @@ export function parseProductName(text: string): ParsedProductName | null {
     if (bare.length < 2 && !/^[A-Z]$/.test(bare)) {
       return { anchor, series: seriesTokens.join(' '), modelLed, valid: false }
     }
-    if (!/^[A-Z]/.test(bare)) return { anchor, series: seriesTokens.join(' '), modelLed, valid: false }
+    // v11.4: 首字母大写 OR 品牌 camelCase（小写首字母+大写第二字母，如 nCARD/eSeries）
+    if (!/^[A-Z]/.test(bare) && !/^[a-z][A-Z]/.test(bare)) {
+      return { anchor, series: seriesTokens.join(' '), modelLed, valid: false }
+    }
   }
   // 单 token 且为纯描述词 → 拒绝（"Lexar Fast" 不该保护）
   if (seriesTokens.length === 1 && DESCRIPTIVE_WORDS.has(stripTrademark(seriesTokens[0]).toLowerCase())) {
@@ -295,4 +300,78 @@ export function detectAdhocProductTermStrings(
   glossaryMap: Map<string, string>,
 ): string[] {
   return detectAdhocProductTerms(texts, glossaryMap).map(t => t.term)
+}
+
+// ═══════════════════════════════════════════════════════════════
+// v11.3: LLM 兜底检测 — 代码判定失败但强锚点+品类词指纹成立的候选
+// ═══════════════════════════════════════════════════════════════
+
+/** LLM 兜底候选（代码 parseProductName 失败/valid:false，但可能仍是产品名） */
+export interface FallbackCandidate {
+  /** 整条原文（去®） */
+  term: string
+  /** 命中的文本索引 */
+  hitIndices: number[]
+}
+
+/**
+ * 检测需要 LLM 兜底解析的候选产品名。
+ *
+ * 触发条件（三重收窄，可靠性优先）：
+ *   1. 强锚点：含 Lexar®（® 是"完整产品名"强信号，设计稿常态写法）
+ *   2. 品类指纹：detectCategory ≠ null（规则文档严格界定的 11 个核心品类词）
+ *   3. 代码判定失败：parseProductName 返回 null 或 valid:false
+ *
+ * 不触发（保持现状，不放宽）：
+ *   - 无 Lexar® 锚点（纯系列名如 "MUSE Portable SSD"）→ 人工确认通道
+ *   - 未知品类词（"Memory Stick" 不在 11 词表）→ 人工确认通道
+ *   - parseProductName 成功（正常检出路径已覆盖）
+ *
+ * @param texts       批次全部源文
+ * @param glossaryMap 术语库 full 视图（用于新颖性判断）
+ */
+export function detectFallbackCandidates(
+  texts: string[],
+  glossaryMap: Map<string, string>,
+): FallbackCandidate[] {
+  // 预建术语库 cleanKey 集合（keys + values），新颖性门用
+  const glossaryKeys = new Set<string>()
+  for (const [k, v] of glossaryMap.entries()) {
+    glossaryKeys.add(cleanKey(k))
+    if (v) glossaryKeys.add(cleanKey(v))
+  }
+
+  const found = new Map<string, FallbackCandidate>()
+  texts.forEach((text, i) => {
+    const trimmed = text.trim()
+    if (!trimmed) return
+
+    // 触发条件 1：强锚点 — 含 Lexar®（® 是强信号；不带®的 Lexar 不触发，保持保守）
+    if (!/Lexar®/.test(trimmed)) return
+
+    // 触发条件 2：品类指纹 — 必须含规则文档严格界定的核心品类词
+    if (!detectCategory(trimmed)) return
+
+    // 触发条件 3：代码判定失败 — parseProductName 返回 null 或 valid:false
+    const parsed = parseProductName(trimmed)
+    if (parsed && parsed.valid) return  // 代码已成功解析，不需要 LLM 兜底
+
+    // 新颖性门：整条已在术语库 → 跳过（与 detectAdhocProductTerms 同逻辑）
+    const term = stripTrademark(trimmed).replace(/\s+/g, ' ').trim()
+    const ck = cleanKey(term)
+    if (glossaryKeys.has(ck)) return
+    let substringHit = false
+    for (const gk of glossaryKeys) {
+      if (gk.includes(ck)) { substringHit = true; break }
+    }
+    if (substringHit) return
+
+    if (found.has(ck)) {
+      found.get(ck)!.hitIndices.push(i)
+    } else {
+      found.set(ck, { term, hitIndices: [i] })
+    }
+  })
+
+  return [...found.values()]
 }

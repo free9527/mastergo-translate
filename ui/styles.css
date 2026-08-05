@@ -462,6 +462,7 @@ body {
 .pending-item.error { border-left: 3px solid #ff3b30; }
 .pending-item.placeholder { border-left: 3px solid #ff3b30; }
 .pending-item.untranslated { border-left: 3px solid #ffa500; }
+.pending-item.llmFallback { border-left: 3px solid #007aff; }
 .pending-item-source {
   flex: 1; min-width: 0;
   color: var(--label-2);
@@ -861,6 +862,24 @@ body {
   color: #5856d6;
   font-weight: 600;
   margin-right: 2px;
+}
+
+/* v11.3: LLM 兜底新品名待确认 */
+.llm-fallback-tag {
+  color: #007aff;
+  font-weight: 600;
+  margin-right: 2px;
+}
+
+/* v11.6: 术语库差异提示（非阻塞警告——译文正确=术语库官方值，仅提示差异来源） */
+.glossary-diverged-tag {
+  color: #ff9f0a;
+  font-weight: 600;
+  margin-right: 2px;
+}
+/* v11.6: 术语库差异提示条目整体弱化为非阻塞观感 */
+.pending-item.glossaryDiverged {
+  opacity: 0.75;
 }
 
 /* v8.9: 占位符残留 */

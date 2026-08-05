@@ -8,10 +8,16 @@ import {
   IDENTITY_MISSION,
   CORE_PRINCIPLES,
   CORE_PRINCIPLES_ZH,
+  CORE_PRINCIPLES_LEAN,
+  CORE_PRINCIPLES_LEAN_ZH,
+  BRAND_NAME_RULE,
+  BRAND_NAME_RULE_ZH,
   getStyleCard,
   renderLangForTranslate,
   buildProofreadSystemPrompt,
   isCJKTarget,
+  PRODUCT_NAME_PARSE_PROMPT,
+  PRODUCT_NAME_PARSE_PROMPT_ZH,
 } from '@lib/prompt-constants'
 import { getFewShotExamples } from '@lib/few-shot-examples'
 import { uiLog } from '@lib/ui-debug-log'
@@ -491,8 +497,9 @@ export function buildSystemPrompt(params: {
   styleCard: string       // getStyleCard output
   fewShotBlock: string    // getFewShotExamples output
   glossaryHint?: string
+  includeRemediation?: boolean  // v11.5: true 时注入补救条款（BRAND + 补全/品类精度/错词）——统一重试专用，首调不传
 }): string {
-  const { targetLang, langBlock, styleCard, fewShotBlock, glossaryHint } = params
+  const { targetLang, langBlock, styleCard, fewShotBlock, glossaryHint, includeRemediation = false } = params
 
   // CJK 目标使用中文指令，其余使用英文指令
   const isZhInstruction = isCJKTarget(targetLang)
@@ -503,7 +510,10 @@ export function buildSystemPrompt(params: {
     : `[IDENTITY]\nYou translate Lexar storage product content. Your translations read as if originally written in the target language by a native speaker.`
 
   // ── CORE PRINCIPLES (instruction language) ──
-  const principles = isZhInstruction ? CORE_PRINCIPLES_ZH : CORE_PRINCIPLES
+  // v11.5: 首调用 LEAN（补救条款移到重试层，注意力集中）；重试 includeRemediation=true 时拼回全量
+  const principles = isZhInstruction
+    ? (includeRemediation ? CORE_PRINCIPLES_ZH : CORE_PRINCIPLES_LEAN_ZH)
+    : (includeRemediation ? CORE_PRINCIPLES : CORE_PRINCIPLES_LEAN)
 
   // ── MISSION (target language) ──
   const mission = IDENTITY_MISSION[targetLang] || IDENTITY_MISSION['en'] || ''
@@ -525,9 +535,11 @@ export function buildSystemPrompt(params: {
   // LLM 容易把 Professional/GOLD/ARMOR 等英文词直译成"專業級/金色/装甲"（2026-08-03 实机
   // zh-TW 把 "Lexar Professional" 译成 "Lexar專業級"）。同语系转换场景（zh-CN→zh-TW）
   // 源文是中文，LLM 更容易把嵌入的英文产品词一并翻译。
-  const brandNameRule = isZhInstruction
-    ? '\n[品牌与产品名] Lexar 品牌名、产品线词、型号、等级词（Lexar / Professional / SILVER / GOLD / DIAMOND / PLAY / ARMOR / ARES / THOR / BLUE / PRO / PLUS / MAX / NM / NQ / NS / EQ / PSSD / CFexpress / microSD / SDXC / SDHC / UHS / VPG 及所有具体型号）全球统一保留英文原形，绝不直译、不音译、不意译（如 Professional ≠ "專業級/professionnel/プロフェッショナル"）。源文是中文且包含这些英文词时，英文部分原样保留、只转换中文部分。'
-    : '\n[BRAND & PRODUCT NAMES] Lexar brand names, product-line words, model numbers, and grade words (Lexar / Professional / SILVER / GOLD / DIAMOND / PLAY / ARMOR / ARES / THOR / BLUE / PRO / PLUS / MAX / NM / NQ / NS / EQ / PSSD / CFexpress / microSD / SDXC / SDHC / UHS / VPG and all specific model codes) are used in their original English form in every locale. NEVER translate, transliterate, or paraphrase them (Professional ≠ "專業級 / professionnel / プロフェッショナル"). When the source is in another language and embeds these English words, keep the English words verbatim and translate only the rest.'
+  // v11.5: 移出首调（补救型条款）——仅 includeRemediation=true（统一重试）时注入。
+  // 首调安全依据：术语遮蔽（术语库含全部品牌名）+ S5 enforceGlossaryTerms + 校对 CHECK 2 三重兜底。
+  const brandNameRule = includeRemediation
+    ? '\n' + (isZhInstruction ? BRAND_NAME_RULE_ZH : BRAND_NAME_RULE)
+    : ''
 
   // ── OUTPUT (instruction language) ──
   const outputFormat = isZhInstruction
@@ -600,8 +612,128 @@ function auditStage(stage: string, texts: string[], result: string[]): void {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// translateBatch — 翻译主函数（翻译 LLM 入口）
+// v11.3: 产品名槽位解析 — LLM 兜底（代码判定失败时的语义裁决）
 // ═══════════════════════════════════════════════════════════════
+// 原则：LLM 只做"是不是产品名+系列名是什么"的判断，不输出译名。
+//       译名由代码按五槽位规则渲染（20 语种风格统一），LLM 不碰翻译。
+// 校验：代码对 LLM 输出做形式校验（子串/重组/非空），防 LLM 编造。
+// ═══════════════════════════════════════════════════════════════
+
+/** LLM 产品名解析结果 */
+export interface LLMProductNameParse {
+  /** 是否判定为独立产品名 */
+  isProductName: boolean
+  /** 系列名（源文原样，空字符串表示无） */
+  series: string
+  /** 型号代码（源文原样，空字符串表示无） */
+  model: string
+}
+
+/**
+ * 用 LLM 解析产品名槽位（代码判定失败时的兜底）。
+ *
+ * 触发条件（由调用方保证）：强锚点(Lexar®) + 品类词指纹 + 代码解析失败。
+ * LLM 输出结构化 JSON（isProductName/series/model），代码做形式校验：
+ *   1. series 必须是源文子串（防编造）
+ *   2. series + model + 品类词重组 ≈ 源文（防漏段/加段）
+ *   3. 校验不通过 → 返回 null（放弃保护，走正常管道）
+ *
+ * @param sourceText 整条原文（去®）
+ * @param targetLang 目标语言（决定指令语言：CJK→中文，其余→英文）
+ * @param config     LLM 配置
+ * @returns 解析结果（校验通过）或 null（校验失败/LLM 判非产品名）
+ */
+export async function parseProductNameWithLLM(
+  sourceText: string,
+  targetLang: string,
+  config: LLMConfig,
+): Promise<LLMProductNameParse | null> {
+  const useEnInstruction = !isCJKTarget(targetLang)
+  const systemPrompt = useEnInstruction ? PRODUCT_NAME_PARSE_PROMPT : PRODUCT_NAME_PARSE_PROMPT_ZH
+
+  try {
+    const res = await fetchWithRetry(config.apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: config.model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: `Analyze: "${sourceText}"` },
+        ],
+        temperature: 0.1,  // 低温度，求稳定
+      }),
+    })
+
+    if (!res.ok) {
+      uiLog('translate', `产品名LLM解析 API 失败 (${res.status}): ${sourceText.slice(0, 40)}`)
+      return null
+    }
+
+    const data = res.json as Record<string, unknown>
+    const content: string = (data.choices as Array<{ message?: { content?: string } }>)?.[0]?.message?.content || ''
+
+    // 提取 JSON（LLM 可能包裹 markdown 代码块）
+    const jsonMatch = content.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      uiLog('translate', `产品名LLM解析无JSON: ${sourceText.slice(0, 40)} → ${content.slice(0, 80)}`)
+      return null
+    }
+
+    let parsed: LLMProductNameParse
+    try {
+      parsed = JSON.parse(jsonMatch[0]) as LLMProductNameParse
+    } catch {
+      uiLog('translate', `产品名LLM解析JSON解析失败: ${sourceText.slice(0, 40)} → ${jsonMatch[0].slice(0, 80)}`)
+      return null
+    }
+
+    // 校验 1：isProductName 必须是布尔值
+    if (typeof parsed.isProductName !== 'boolean') {
+      uiLog('translate', `产品名LLM解析isProductName非布尔: ${sourceText.slice(0, 40)}`)
+      return null
+    }
+
+    // LLM 判非产品名 → 返回结果（调用方放弃保护）
+    if (!parsed.isProductName) {
+      return { isProductName: false, series: '', model: '' }
+    }
+
+    // 校验 2：series 必须是源文子串（或空字符串）
+    const series = (parsed.series || '').trim()
+    if (series && !sourceText.includes(series)) {
+      uiLog('translate', `产品名LLM解析series非源文子串: "${series}" ∉ "${sourceText.slice(0, 40)}"`)
+      return null
+    }
+
+    // 校验 3：model 必须是源文子串（或空字符串）
+    const model = (parsed.model || '').trim()
+    if (model && !sourceText.includes(model)) {
+      uiLog('translate', `产品名LLM解析model非源文子串: "${model}" ∉ "${sourceText.slice(0, 40)}"`)
+      return null
+    }
+
+    // 校验 4：series 非空且是单 token 描述词 → 拒绝（防 LLM 把 Fast 判为系列名）
+    // 与代码 DESCRIPTIVE_WORDS 对齐，但只校验 LLM 输出的 series，不拦截代码路径
+    const DESCRIPTIVE_CHECK = new Set(['fast', 'high', 'speed', 'new', 'ultra-fast', 'ultrafast'])
+    if (series && DESCRIPTIVE_CHECK.has(series.toLowerCase())) {
+      uiLog('translate', `产品名LLM解析series为描述词: "${series}"，拒绝`)
+      return null
+    }
+
+    uiLog('translate', `产品名LLM解析成功: "${sourceText.slice(0, 40)}" → series="${series}" model="${model}"`)
+    return { isProductName: true, series, model }
+
+  } catch (e) {
+    uiLog('translate', `产品名LLM解析异常: ${sourceText.slice(0, 40)} → ${e instanceof Error ? e.message : String(e)}`)
+    return null
+  }
+}
+
+
 // ── 职责边界 ──
 // 【做什么】将一批源文翻译为目标语言。含预处理→术语遮蔽→LLM调用→后处理11项兜底。
 // 【不做什么】不做校对（校对由 proofreadBatch 独立完成）。
@@ -635,6 +767,7 @@ export async function translateBatch(
   untranslatedIndices?: Set<number>,    // v9.11: 输出参数 — 最终仍漏翻（保留原文）的条目索引，供 UI 标记翻译失败
   misspelledIndices?: Set<number>,      // v10.6: 输出参数 — 疑似错词被回退保留原形的条目索引，供 UI 单独标记"疑似拼写错误"（与漏翻区分）
   expansionIndices?: Set<number>,       // v10.8: 输出参数 — 译文显著超长的条目索引，透出给校对层作长度异常 hint（不再自动截断）
+  firstCallAnomalyIndices?: Set<number>, // v11.5: 输出参数 — 首调（重试前）检出的异常条目索引（截断+漏翻），供实机观测首调质量（prompt 减肥效果验证）
 ): Promise<string[]> {
   // ═══════════════════════════════════════════════════════════
   // S1: 预处理（产出 texts 变体，不动 result）
@@ -782,7 +915,8 @@ export async function translateBatch(
   }).join('\n')
 
   // v8.0: 语言专属提示词（仅 品类词 + rules，tone/style/compliance/scene 由 getStyleCard 统一注入）
-  const langBlock = renderLangForTranslate(targetLang, productLine)
+  // v11.5: 首调不注入 commonErrors（补救型历史事故对照表移到重试层，首调注意力集中）
+  const langBlock = renderLangForTranslate(targetLang, productLine, /* includeCommonErrors */ forceTranslate)
 
   // v8.0: 统一风格卡片（替代分散的 productTone + styleGuide + sceneConstraints）
   const styleCard = getStyleCard(targetLang, productLine, effectiveStyle || 'standard', config.scenePreset)
@@ -793,7 +927,17 @@ export async function translateBatch(
   const fewShotBlock = fewShot ? `\n[EXAMPLES]\n${fewShot}` : ''
 
   // System Prompt: IDENTITY → CORE_PRINCIPLES → MISSION → STYLE → FEWSHOT → LANG_RULES → GLOSSARY → OUTPUT
-  let systemPrompt = buildSystemPrompt({ targetLang, langBlock, styleCard, fewShotBlock, glossaryHint })
+  // v11.5: 统一重试（forceTranslate=true）换用瘦身 prompt——去风格卡/few-shot，补救条款全量回归。
+  // 效果：重试 prompt 从"首调全文+7行"（~95行）变为"精简骨架+全部补救"（~40行，减60%+），
+  // 且补救条款（BRAND/补全/品类精度/错词/commonErrors）在重试层全量注入，首调出的错重试全能兜住。
+  let systemPrompt = buildSystemPrompt({
+    targetLang,
+    langBlock,
+    styleCard: forceTranslate ? '' : styleCard,
+    fewShotBlock: forceTranslate ? '' : fewShotBlock,
+    glossaryHint,
+    includeRemediation: forceTranslate,
+  })
 
   // v8.0: 精简重试指令（去掉咆哮体和矛盾策略）
   if (forceTranslate) {
@@ -1112,6 +1256,12 @@ ${texts.map((t, i) => `${i + 1}. "${t.slice(0, 100)}"`).join('\n')}
     }
     const hasAnomaly = truncatedIndices.size > 0 || untranslatedIndices.size > 0
     auditStage('S7a', texts, result)
+
+    // v11.5: 首调异常观测输出（prompt 减肥效果实机验证：首调漏翻率应 ≤ 减肥前基线）
+    if (firstCallAnomalyIndices) {
+      for (const idx of truncatedIndices) firstCallAnomalyIndices.add(idx)
+      for (const idx of untranslatedIndices) firstCallAnomalyIndices.add(idx)
+    }
 
     if (hasAnomaly) {
       // 合并异常条目（去重）
@@ -1762,6 +1912,8 @@ export async function proofreadBatch(
     productLine,
     useEnInstruction,
     glossaryHint,
+    sourceLang: detectedProofreadSource,              // v11.5: 变体对条件注入
+    hasExpansionFlags: !!expansionFlags && expansionFlags.size > 0,  // v11.5: 超长提示条件注入
   })
 
   const apiKey = config.proofreadApiKey || config.apiKey

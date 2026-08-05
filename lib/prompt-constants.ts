@@ -2100,13 +2100,14 @@ export const LANG_SPECIFIC: Record<string, LangBlock> = {
 export function renderLangForTranslate(
   targetLang: string,
   productLine?: string | null,
+  includeCommonErrors = true,  // v11.5: 首调传 false——常见错误对照表是补救型内容，移到重试层按需注入
 ): string {
   const block = LANG_SPECIFIC[targetLang]
   if (!block) return ''
 
   const categoryBlock = buildCategoryTerminology(targetLang, productLine)
 
-  const parts = [categoryBlock, block.rules, block.commonErrors].filter(Boolean)
+  const parts = [categoryBlock, block.rules, includeCommonErrors ? block.commonErrors : ''].filter(Boolean)
   if (parts.length === 0) return ''
 
   return `\n[${targetLang} Guidelines]\n${parts.join('\n')}`
@@ -2147,8 +2148,10 @@ export function buildProofreadSystemPrompt(opts: {
   productLine: string | null
   useEnInstruction: boolean
   glossaryHint?: string
+  sourceLang?: string          // v11.5: 变体对判定（zh-CN↔zh-TW / pt↔pt-BR 时注入 VARIANT_CHECKS）
+  hasExpansionFlags?: boolean  // v11.5: true 时注入 EXPANSION_NOTE（expansionFlags 非空才有意义）
 }): string {
-  const { targetLang, productLine, useEnInstruction, glossaryHint = '' } = opts
+  const { targetLang, productLine, useEnInstruction, glossaryHint = '', sourceLang, hasExpansionFlags = false } = opts
 
   const mission = IDENTITY_MISSION[targetLang] || IDENTITY_MISSION['en'] || ''
   const missionBlock = mission ? `\n[MISSION·${targetLang}]\n${mission}\n` : ''
@@ -2157,7 +2160,18 @@ export function buildProofreadSystemPrompt(opts: {
   const calibrationBlock = calibration ? `\n${calibration}\n` : ''
   const langBlock = renderLangForProofread(targetLang, productLine)
 
-  return missionBlock + proofreadPrompt + glossaryHint + calibrationBlock + langBlock
+  // v11.5: 变体专项检查仅变体对注入（其余语种省 10 行死文本）
+  const variantPairs = new Set(['zh-CN|zh-TW', 'zh-TW|zh-CN', 'pt|pt-BR', 'pt-BR|pt'])
+  const variantBlock = sourceLang && variantPairs.has(`${sourceLang}|${targetLang}`)
+    ? '\n' + (useEnInstruction ? PROOFREAD_VARIANT_CHECKS : PROOFREAD_VARIANT_CHECKS_ZH)
+    : ''
+
+  // v11.5: 超长提示仅 expansionFlags 命中时注入（平时是死文本）
+  const expansionBlock = hasExpansionFlags
+    ? '\n' + (useEnInstruction ? PROOFREAD_EXPANSION_NOTE : PROOFREAD_EXPANSION_NOTE_ZH)
+    : ''
+
+  return missionBlock + proofreadPrompt + variantBlock + expansionBlock + glossaryHint + calibrationBlock + langBlock
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2362,7 +2376,14 @@ export function isCJKTarget(targetLang: string): boolean {
 // ═══════════════════════════════════════════════════════════════
 
 /** English version — for non-CJK targets (16 languages) */
-export const CORE_PRINCIPLES = `[CORE PRINCIPLES]
+// ═══════════════════════════════════════════════════════════════
+// v11.5: Prompt 减肥 — core 拆分为 LEAN（首调）+ REMEDIATION（重试层按需注入）
+// 架构复盘方向 #4：补救指令移到重试层，主 prompt 缩短 → 首调注意力集中。
+// 每条搬出的补救线都有代码兜底（enforceGlossaryTerms/revertMisspelledWord/
+// unmask 模糊还原 + auditStage + pendingItems），双保护变单代码保护，净损失≈0。
+// ═══════════════════════════════════════════════════════════════
+
+export const CORE_PRINCIPLES_LEAN = `[CORE PRINCIPLES]
 
 1. TRANSLATE ALL MEANING — Translate everything that carries meaning.
    Only keep these in original form: brand names (Lexar, AMD, Intel) and
@@ -2370,44 +2391,56 @@ export const CORE_PRINCIPLES = `[CORE PRINCIPLES]
    standard terms specified in the language guidelines below — do NOT default
    to keeping English abbreviations.
    Rule of thumb: if the text has verbs, adjectives, or adverbs → it is descriptive → translate it.
-   ⛔ NEVER "complete" partial product names — only translate what the source actually says.
 
 2. FAITHFUL TO SOURCE — No additions, no omissions, no fabricated specs.
    Numbers, capacities, speed values preserved verbatim.
    Placeholders (__XXX_N__), HTML tags, and ↵ markers preserved exactly as-is.
    ↵ is a LITERAL character marker, NOT a line break — output it as the characters "↵".
-   ⛔ Category precision: "Read speed" and "Write speed" are distinct — never interchange them.
-   ⛔ MISSPELLED WORDS: If a single word appears to be a misspelling or an unrecognized
-      proper noun (not in the glossary, not a valid word in any language), do NOT
-      transliterate it, do NOT guess its meaning, do NOT invent a translation —
-      keep the EXACT original spelling. Preserving the original is always better
-      than guessing. (e.g., "Panasionic" → keep "Panasionic", never "帕納西奧尼克")
 
 3. NATURAL EXPRESSION — Sound like a native speaker wrote it, not a translation.
    Perfect grammar, spelling, punctuation. Technical specs in industry-standard terms.
    Marketing copy in local idiom. Short UI labels stay concise. Match [STYLE] below.`
 
-/** Chinese version — for CJK targets (zh-CN, zh-TW, ja, ko) */
-export const CORE_PRINCIPLES_ZH = `[核心原则]
+export const CORE_PRINCIPLES_REMEDIATION = `⛔ NEVER "complete" partial product names — only translate what the source actually says.
+⛔ Category precision: "Read speed" and "Write speed" are distinct — never interchange them.
+⛔ MISSPELLED WORDS: If a single word appears to be a misspelling or an unrecognized
+   proper noun (not in the glossary, not a valid word in any language), do NOT
+   transliterate it, do NOT guess its meaning, do NOT invent a translation —
+   keep the EXACT original spelling. Preserving the original is always better
+   than guessing. (e.g., "Panasionic" → keep "Panasionic", never "帕納西奧尼克")`
+
+export const CORE_PRINCIPLES_LEAN_ZH = `[核心原则]
 
 1. 【全翻】所有承载含义的文本都必须翻译。
    仅保留原文：品牌名(Lexar, AMD, Intel)、型号代码(NM790, D40E, ARES)。
    行业术语请使用下方各语种指南中指定的目标语言标准术语——不要默认保留英文缩写。
    判断标准：含动词/形容词/副词的句子 → 描述性文本 → 必须翻译。
-   ⛔ 严禁"补全"不完整的产品名 — 源文写什么就翻译什么。
 
 2. 【忠实】严格忠于源文。不加内容、不删信息、不编造规格。
    数字、容量、速度值原样保留。占位符(__XXX_N__)、HTML标签、↵标记原样保留。
    ↵ 是字面字符标记，不是换行指令 — 请输出字符 "↵"，不要转为真实换行。
-   ⛔ 品类精度："读取速度"和"写入速度"含义不同 — 严禁互换。
-   ⛔ 疑似错词：若某个单词疑似拼写错误或是无法识别的专有名词（不在术语库、
-      不构成任何语言的合法词），不要音译、不要猜测词义、不要编造译名 ——
-      原样保留源文拼写。保留原形永远优于猜测。
-      （例如 "Panasionic" → 保留 "Panasionic"，绝不译成 "帕納西奧尼克"）
 
 3. 【自然】用地道的目的语表达，不是翻译腔。
    语法、拼写、标点完全正确。技术参数用行业标准表达。营销文案用本地化表达。
    短 UI 标签保持简洁。匹配 [风格] 部分的受众期待。`
+
+export const CORE_PRINCIPLES_REMEDIATION_ZH = `⛔ 严禁"补全"不完整的产品名 — 源文写什么就翻译什么。
+⛔ 品类精度："读取速度"和"写入速度"含义不同 — 严禁互换。
+⛔ 疑似错词：若某个单词疑似拼写错误或是无法识别的专有名词（不在术语库、
+   不构成任何语言的合法词），不要音译、不要猜测词义、不要编造译名 ——
+   原样保留源文拼写。保留原形永远优于猜测。
+   （例如 "Panasionic" → 保留 "Panasionic"，绝不译成 "帕納西奧尼克"）`
+
+// v11.5: 旧常量保留为 LEAN + REMEDIATION 组合（兼容既有引用点，零回归）
+export const CORE_PRINCIPLES = CORE_PRINCIPLES_LEAN + '\n' + CORE_PRINCIPLES_REMEDIATION
+
+export const CORE_PRINCIPLES_ZH = CORE_PRINCIPLES_LEAN_ZH + '\n' + CORE_PRINCIPLES_REMEDIATION_ZH
+
+// v11.5: BRAND 段移出首调（补救型指令，v10.6.2 事故修复条款）——重试层按需注入。
+// 首调安全依据：术语遮蔽（术语库含全部品牌名）+ S5 enforceGlossaryTerms + 校对 CHECK 2 三重兜底。
+export const BRAND_NAME_RULE = `[BRAND & PRODUCT NAMES] Lexar brand names, product-line words, model numbers, and grade words (Lexar / Professional / SILVER / GOLD / DIAMOND / PLAY / ARMOR / ARES / THOR / BLUE / PRO / PLUS / MAX / NM / NQ / NS / EQ / PSSD / CFexpress / microSD / SDXC / SDHC / UHS / VPG and all specific model codes) are used in their original English form in every locale. NEVER translate, transliterate, or paraphrase them (Professional ≠ "專業級 / professionnel / プロフェッショナル"). When the source is in another language and embeds these English words, keep the English words verbatim and translate only the rest.`
+
+export const BRAND_NAME_RULE_ZH = `[品牌与产品名] Lexar 品牌名、产品线词、型号、等级词（Lexar / Professional / SILVER / GOLD / DIAMOND / PLAY / ARMOR / ARES / THOR / BLUE / PRO / PLUS / MAX / NM / NQ / NS / EQ / PSSD / CFexpress / microSD / SDXC / SDHC / UHS / VPG 及所有具体型号）全球统一保留英文原形，绝不直译、不音译、不意译（如 Professional ≠ "專業級/professionnel/プロフェッショナル"）。源文是中文且包含这些英文词时，英文部分原样保留、只转换中文部分。`
 
 
 // ═══════════════════════════════════════════════════════════════
@@ -2546,10 +2579,6 @@ Fix ALL objective errors. Do NOT make subjective changes.
   a distinct information element from the source is completely missing in the translation
   (e.g., source says "resistant to high temperatures AND dust-proof" but the translation
   covers only the temperature part).
-- EXPANSION NOTE (v10.8): Some entries carry a "notably longer than the source" warning.
-  Length ≠ error: many target languages naturally run longer than English. Treat the warning
-  as a prompt to double-check for source-absent additions only — if the translation is
-  faithful and natural, keep it as-is; do NOT shorten merely because it is long.
 
 [CHECK 2: MEANING & NATURALNESS]
 - Factual errors: Fix wrong numbers, specs, or features.
@@ -2569,17 +2598,6 @@ Fix ALL objective errors. Do NOT make subjective changes.
   the same in both source and target language (e.g., "Drone" → "Drone" in Portuguese,
   "Tablet" → "Tablet" in German, "Hotel" → "Hotel" in French). These are CORRECT
   translations, not untranslated text.
-- VARIANT-SPECIFIC CHECKS (target variant differs from source variant):
-  * Simplified→Traditional Chinese (zh-CN→zh-TW): Ensure converted characters use
-    Traditional forms. Some words are written identically in both variants (e.g., "高速"
-    is correct in Traditional), but contextually preferred vocabulary may differ
-    (e.g., "数据" vs "資料" — prefer the Traditional market term when context requires it).
-  * Traditional→Simplified Chinese (zh-TW→zh-CN): Ensure converted characters use
-    Simplified forms. Same rule: identical-looking words are acceptable, but prefer
-    Simplified market vocabulary when context requires it.
-  * European→Brazilian Portuguese (pt→pt-BR): Ensure Brazilian market vocabulary
-    (e.g., "ficheiro" → "arquivo", "ecrã" → "tela"). Identical spelling is acceptable
-    only when both variants genuinely share the same word.
 - VERY SHORT TEXT (1-2 words): If the text is extremely short and lacks grammatical
   context, use your judgment based on the surrounding batch context. If uncertain,
   prefer to translate rather than keep the source.
@@ -2650,9 +2668,6 @@ export const PROOFREAD_SYSTEM_PROMPT_ZH = `[角色]
   译文比源文短得多往往是正确的——拉丁语→日/韩/中文天然收缩 3-5 倍。
   仅当源文中的某个独立信息要素在译文中完全缺失时才判截断（reason 漏翻），
   例如源文为"耐高温且防尘"，译文只覆盖了温度部分。
-- 超长提示（v10.8）：部分条目带有"译文显著长于源文"的警告。
-  长≠错——许多目标语言天然比英文长。该警告仅是提醒复核是否添加了源文没有的信息；
-  若译文语义忠实、表达自然，请保持原样，不要仅因为长就精简。
 
 [检查2: 语义与自然度]
 - 事实错误：修正错误的数字、规格或功能描述。
@@ -2671,14 +2686,6 @@ export const PROOFREAD_SYSTEM_PROMPT_ZH = `[角色]
 - 例外（不标记）：跨语言同形词 — 在源语言和目标语言中拼写相同的词
   （如 "Drone" → "Drone" 在葡萄牙语中，"Tablet" → "Tablet" 在德语中，
   "Hotel" → "Hotel" 在法语中）。这些是正确的翻译，不是漏翻。
-- 变体专项检查（源文与目标为不同语言变体）：
-  * 简体→繁体（zh-CN→zh-TW）：确保转换后的字符使用繁体形式。部分词汇简繁同形
-    （如"高速"在繁体中也是正确写法），但上下文要求时优先使用繁体市场词汇
-    （如"数据"→"資料"）。
-  * 繁体→简体（zh-TW→zh-CN）：确保转换后的字符使用简体形式。同理，简繁同形词
-    可接受，但上下文要求时优先使用简体市场词汇。
-  * 欧葡→巴葡（pt→pt-BR）：确保使用巴西市场词汇
-    （如 "ficheiro"→"arquivo"，"ecrã"→"tela"）。拼写相同仅当两变体确实共用该词时可接受。
 - 极短文本（1-2 个词）：若文本极短且缺乏语法上下文，根据批次上下文判断。
   不确定时，优先翻译而非保留源文。
 - 判定树：(1) 含动词/形容词/介词？→ 必须翻译。
@@ -2727,3 +2734,102 @@ JSON Schema:
 [{"i":1,"text":"读取速度最高可达 __PRD_0__ MB/s","reason":"语法错误","ambiguous":[]}]
 
 → 审查以下译文并输出 JSON 数组：`
+
+// ═══════════════════════════════════════════════════════════════
+// v11.5: 校对条件注入块（从 PROOFREAD_SYSTEM_PROMPT/ZH 抽出，按需注入）
+// - VARIANT_CHECKS：仅 (zh-CN↔zh-TW / pt↔pt-BR) 变体对注入，其余语种省 10 行
+// - EXPANSION_NOTE：仅 expansionFlags 非空时注入（命中率为个位数百分比，平时是死文本）
+// ═══════════════════════════════════════════════════════════════
+
+export const PROOFREAD_VARIANT_CHECKS = `[VARIANT-SPECIFIC CHECKS] (target variant differs from source variant)
+* Simplified→Traditional Chinese (zh-CN→zh-TW): Ensure converted characters use
+  Traditional forms. Some words are written identically in both variants (e.g., "高速"
+  is correct in Traditional), but contextually preferred vocabulary may differ
+  (e.g., "数据" vs "資料" — prefer the Traditional market term when context requires it).
+* Traditional→Simplified Chinese (zh-TW→zh-CN): Ensure converted characters use
+  Simplified forms. Same rule: identical-looking words are acceptable, but prefer
+  Simplified market vocabulary when context requires it.
+* European→Brazilian Portuguese (pt→pt-BR): Ensure Brazilian market vocabulary
+  (e.g., "ficheiro" → "arquivo", "ecrã" → "tela"). Identical spelling is acceptable
+  only when both variants genuinely share the same word.`
+
+export const PROOFREAD_VARIANT_CHECKS_ZH = `[变体专项检查]（源文与目标为不同语言变体）：
+* 简体→繁体（zh-CN→zh-TW）：确保转换后的字符使用繁体形式。部分词汇简繁同形
+  （如"高速"在繁体中也是正确写法），但上下文要求时优先使用繁体市场词汇
+  （如"数据"→"資料"）。
+* 繁体→简体（zh-TW→zh-CN）：确保转换后的字符使用简体形式。同理，简繁同形词
+  可接受，但上下文要求时优先使用简体市场词汇。
+* 欧葡→巴葡（pt→pt-BR）：确保使用巴西市场词汇
+  （如 "ficheiro"→"arquivo"，"ecrã"→"tela"）。拼写相同仅当两变体确实共用该词时可接受。`
+
+export const PROOFREAD_EXPANSION_NOTE = `[EXPANSION NOTE] Some entries carry a "notably longer than the source" warning.
+Length ≠ error: many target languages naturally run longer than English. Treat the warning
+as a prompt to double-check for source-absent additions only — if the translation is
+faithful and natural, keep it as-is; do NOT shorten merely because it is long.`
+
+export const PROOFREAD_EXPANSION_NOTE_ZH = `[超长提示] 部分条目带有"译文显著长于源文"的警告。
+长≠错——许多目标语言天然比英文长。该警告仅是提醒复核是否添加了源文没有的信息；
+若译文语义忠实、表达自然，请保持原样，不要仅因为长就精简。`
+// ═══════════════════════════════════════════════════════════════
+// v11.3: 产品名槽位解析 Prompt — LLM 兜底（代码判定失败时的语义裁决）
+// 原则：LLM 只做"是不是产品名+系列名是什么"的判断，不输出译名。
+//       译名由代码按五槽位规则渲染（20 语种风格统一），LLM 不碰翻译。
+// ═══════════════════════════════════════════════════════════════
+
+/** 英文版 — 非 CJK 目标语言指令 */
+export const PRODUCT_NAME_PARSE_PROMPT = `[ROLE]
+You are a Lexar product name analyzer. Your ONLY job is to determine whether a text is a standalone Lexar product name, and if so, extract its series name and model code.
+
+[RULES]
+1. A standalone product name contains: Lexar brand + optional series name + optional model code + category word (SSD/Card/Reader/Memory/etc).
+2. Series names (e.g., THOR, ARES, PLAY, SILVER, GOLD, BLUE, MUSE, SUPER, VELOCIS) are NOT translated — they are proper nouns.
+3. Model codes (e.g., NM790, NF100, SL500, EQ790) are NOT translated.
+4. Category words (SSD, Card, Reader, Memory, Flash Drive, Hub, Enclosure) ARE translated by the system — you do NOT translate them.
+5. Descriptive adjectives (Fast, High, Speed, New, Ultra-Fast) are NOT series names — they are marketing words.
+6. If the text contains verbs, prepositions, or sentence structure → it is NOT a standalone product name.
+
+[OUTPUT FORMAT]
+Output ONLY a valid JSON object. No other text.
+{
+  "isProductName": <boolean>,
+  "series": "<string, series name as-is from source, empty string if none>",
+  "model": "<string, model code as-is from source, empty string if none>"
+}
+
+Examples:
+- "Lexar SUPER PCIe Gen5x4 NVMe SSD" → {"isProductName":true,"series":"SUPER","model":""}
+- "Lexar Fast SSD" → {"isProductName":false,"series":"","model":""}  (Fast is a descriptive adjective)
+- "Lexar MUSE Portable SSD" → {"isProductName":true,"series":"MUSE","model":""}
+- "Lexar NF100 2.5-inch SATA III SSD" → {"isProductName":true,"series":"","model":"NF100"}
+- "Get the Lexar SSD today" → {"isProductName":false,"series":"","model":""}  (contains verb)
+
+⛔ CRITICAL: RAW JSON ONLY — no markdown, no explanations, no code blocks.`
+
+/** 中文版 — CJK 目标语言指令（zh-CN/zh-TW/ja/ko） */
+export const PRODUCT_NAME_PARSE_PROMPT_ZH = `[角色]
+你是 Lexar 产品名分析器。你的唯一任务是判断一条文本是否为独立的 Lexar 产品名，如果是，提取其系列名和型号代码。
+
+[规则]
+1. 独立产品名包含：Lexar 品牌 + 可选系列名 + 可选型号代码 + 品类词（SSD/Card/Reader/Memory 等）。
+2. 系列名（如 THOR、ARES、PLAY、SILVER、GOLD、BLUE、MUSE、SUPER、VELOCIS）不翻译——它们是专有名词。
+3. 型号代码（如 NM790、NF100、SL500、EQ790）不翻译。
+4. 品类词（SSD、Card、Reader、Memory、Flash Drive、Hub、Enclosure）由系统翻译——你不需要翻译。
+5. 描述性形容词（Fast、High、Speed、New、Ultra-Fast）不是系列名——它们是营销词。
+6. 如果文本包含动词、介词或句子结构 → 它不是独立产品名。
+
+[输出格式]
+仅输出合法的 JSON 对象。不要输出其他任何文本。
+{
+  "isProductName": <布尔值>,
+  "series": "<字符串，源文中的系列名原样，无则空字符串>",
+  "model": "<字符串，源文中的型号代码原样，无则空字符串>"
+}
+
+示例：
+- "Lexar SUPER PCIe Gen5x4 NVMe SSD" → {"isProductName":true,"series":"SUPER","model":""}
+- "Lexar Fast SSD" → {"isProductName":false,"series":"","model":""}  （Fast 是描述性形容词）
+- "Lexar MUSE Portable SSD" → {"isProductName":true,"series":"MUSE","model":""}
+- "Lexar NF100 2.5-inch SATA III SSD" → {"isProductName":true,"series":"","model":"NF100"}
+- "Get the Lexar SSD today" → {"isProductName":false,"series":"","model":""}  （含动词）
+
+⛔ 关键：纯 JSON——不要 markdown，不要解释，不要代码块。`
