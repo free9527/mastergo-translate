@@ -1,7 +1,7 @@
 # 项目交接文档
 
-**日期**: 2026-08-05  
-**版本**: v11.6（v11.5 20 语种全量实机验证已闭环）  
+**日期**: 2026-08-13  
+**版本**: v11.9  
 **项目**: Lexar 翻译插件（MasterGo 插件）
 
 ---
@@ -30,11 +30,95 @@ MasterGo 设计工具插件，将 Lexar 产品设计稿从英文翻译成 20 个
 
 **现有 prompt 各模块与六维的对应关系**（评审时对照）：一→CORE_PRINCIPLES #2 + detectBrandInjection/validateNumbers；二→IDENTITY_MISSION + LANGUAGE_MARKET_NOTES + LANG_SPECIFIC（**v11.0 起翻译与校对双端闭环**：翻译经 getStyleCard 注入分段市场语感，校对经 buildProofreadCalibration 注入同源同段白名单）；三→CATEGORY_WORDS + glossaryHint + enforceGlossaryTerms；四→PRODUCT_LINE_TONE_GUIDES + STYLE_GUIDES + SCENE_CONSTRAINTS（翻译端）；五→OUTPUT format + restoreTrademarkSymbols/capitalizeFirstLetter；六→LANG_SPECIFIC.compliance + SCENE_CONSTRAINTS.compliance_doc。
 
+### 1.2 工作准则（协作铁律，2026-08-13 用户定）
+
+1. **拿到需求先沟通，不动手** — 先与用户确认需求与要解决的问题；缺少信息就问，**不脑补不存在的东西**。
+2. **先定根因与解法，再定执行计划** — 双方分析出根因和解决办法后，才制定执行计划、才写代码。
+3. **改完必测** — 测试脚本 + `npm run typecheck` + `npm run build`（build 过 ≠ tsc 过）。
+4. **想闭环** — 每次修改都要想：能否与其他功能模块闭环（不制造新的短路/豁免/兜底缺口）。
+
 ---
 
-## 二、当前版本（v11.6，含 v11.5 验证收口）
+## 二、当前版本（v11.9）
 
-### 2.0.0-pre v11.5 Prompt 减肥——补救指令移到重试层（2026-08-05，架构复盘方向 #4 落地）
+### v11.9 第三方型号内置化 + 术语库合并升级（2026-08-13，v11.8 结构性风险收口）
+
+**背景（v11.8 留下的结构风险）**：v11.8 把第三方型号保护做成术语库 CSV 的 16 条 identity 行——防线有效，但**承重墙放错了位置**：术语库 CSV 是用户可替换/可精简的数据，用户一旦更新术语库（删第三方词条保持"纯 Lexar"），S1 短路 / S2 遮蔽 / 漏翻豁免三层防线**静默失效**，且无任何告警。用户决策："第三方品牌内置到代码里，后续术语库更新更纯粹"——按推荐方案 B 实施（内置 = 16 事故词条 + 高频兼容场景型号预先收录；UI 加只读展示区）。
+
+**方案（四层改动）**：
+
+| # | 改动 | 文件 |
+|---|------|------|
+| 1 | **第三方词条下沉代码内置层**：`BUILTIN_THIRD_PARTY_ENTRIES`（119 条 = 16 事故词条 + 103 高频型号：iPhone 15-17 系/iPad/MacBook/AirPods Pro、Galaxy S23-S25/Z Fold/Flip/Tab/Buds、DJI Osmo/Mavic/Mini/Air/RS/Inspire/Mic、GoPro/Insta360、Sony A7/ZV/WH-1000XM5、Canon EOS R/Nikon Z、Logitech MX/G PRO、Razer、Keychron、Switch）。identity 语义用通配键 `translations['*']` 表达（免 20 列 CSV 运行时解析）——`{source, translations: {'*': source}}` | `lib/third-party-models.ts`（新增） |
+| 2 | **buildGlossaryMaps 三方合并**：内置第三方 ∪ 用户产品名 ∪ 用户专属；内置**先于**用户词条注册（Map first-wins = 撞 key 内置胜出）。内置只进内存、不进 clientStorage——用户删/换 CSV 不再削弱防线（兜底核心）。**行为变化**：此前用户库同 key 后写覆盖先写，现 first-wins——双库内部 source 唯一无影响；跨库同 key 现产品名库优先（products 在前，合理） | `ui/App.vue` buildGlossaryMaps |
+| 3 | **专属 CSV 纯化**：删除 16 行第三方 identity 词条（205→189），重跑 merge 重新生成 default-glossary.ts；GLOSSARY_VERSION 5→6。此后版本号只管用户双库，内置层随代码发布 | `术语素材/Lexar术语库_专属.csv` + `lib/default-glossary.ts` + `lib/constants.ts` |
+| 4 | **合并升级取代整体覆盖**（v11.8 升级警告的根治）：版本升级时默认词条优先 + 用户自定义词条按 `source.trim().toLowerCase()` diff 保留追加；**版本戳写回**——修复 v11.8 及以前「升级分支从不写回 STORAGE_KEY_GLOSSARY_VERSION → 每次启动重复走升级」的既有 bug。抽 `lib/glossary-store.ts` 纯函数（loadGlossaryWithMerge / saveGlossaryWithVersion / mergeGlossaryOnUpgrade），插件线程与 UI save 封装双端委托，保证戳与内容永不失配 | `lib/glossary-store.ts`（新增）+ `lib/main.ts` |
+
+**UI**：术语库面板新增第三个只读灰化子块「内置·第三方型号（N 条）」（词条列表可滚动审计）；section-count 含内置数；hint 补"内置第三方型号由代码保护，不受替换影响"。
+
+**收录红线（宁漏勿滥）**：只收具体型号形态（多词+数字/专有 token）；裸词仅已发生事故的 Steam（同 PLAY/Honor 先例）。初版曾误收裸词 Flip/Neo，被测试 A4 断言（高危裸词清单）当场抓出删除——**遮蔽是子串匹配，裸词 = 大面积过遮蔽**。`GoPro MAX` 这类型号化用法保留（大写占比+数字类形态同 v10.5 判定直觉）。
+
+**测试**：`tests/test-v119-builtin-third-party.ts` 58/58（A 内置完整性 5：含裸词红线断言；B CSV 纯化 2；C 合并优先级 3：用户库恶意冲突值被内置压制；D 三层防线全走内置层 24：豁免/遮蔽往返/长度优先/S1 短路 E2E；E 合并升级 12：自定义保留/同 key 覆盖/normKey/版本戳写回/启动幂等/空存量回落/save 写戳；F 回归 2）。回归：v10.5 39/39、v9.9+v9.10 33/33、mask-all-langs 80/80、v10.7 14/14、v11.7 245/245 全绿；typecheck 双配置 + build 通过。
+
+**时点测试失效说明**：`tests/test-v118-third-party-model-names.ts` A/B/C 段依赖"16 词条在专属 CSV"的 v11.8 时点数据，v11.9 纯化后整体失效（28 处）——文件头已加演进注释，三层防线现行回归以 v11.9 测试 D 段为准；v118 的 D/E 段（不依赖 CSV 词条位置）仍有效。
+
+---
+
+## 二点五、历史版本（v11.8 及以前）
+
+### v11.8 第三方型号/设备名保护（2026-08-13，实机 en→de 事故根治）
+
+**背景（实机 bug，20 语种通病，非德语独有）**：第三方品牌设备/型号名被 LLM 加戏或直译——"Luna Ultra"→"Kameramodell: Luna Ultra"；"Pocket 4P / ... / Action 6"→"Kameramodelle: ..."；"Mavic 4 Pro / Mavic 3 / Mavic 2 Pro"→"Drohnenmodelle: ..."；"Antigravity A1"→"Drohne Antigravity A1"；"Osmo 360"→"Kamera Osmo 360"；"Legion Go"/"Steam Deck"/"ROG ALLY"/"G Cloud"→"Handheld-Konsole ..."；bare "Steam"→"Dampf"。用户定调：**产品型号不应被翻译**，20 语种同规则。
+
+**三条独立根因**：
+- **A. isModelListOrCode 结构性豁免不了无数字纯文本型号**（Mavic 3 大写占比 1/5 等全不命中，只有 ROG ALLY 全大写命中）——无形式特征可抓。
+- **B. v10.5 豁免只是漏翻判定层**：不遮蔽、不进 prompt；LLM 加戏后译文≠源文 → 漏翻检测不触发 → 豁免防重试 → 加戏译文干净落地。
+- **C. LEAN prompt 原则 1 只举 Lexar 型号例**，无第三方判定标准 → LLM 行为漂移。
+
+**方案（零检测/豁免代码改动 + 一处遮蔽层 bug 修复）**：
+
+| # | 改动 | 文件 |
+|---|------|------|
+| 1 | **词表 identity 行 ×16**（src===target 21 列全同形）一石三鸟：S1 整条短路 + S2 译中遮蔽（`__GLOSSARY_N__`）+ 漏翻豁免（isUntranslatable 规则1/lemma）。词条：Steam Deck、Legion Go、ROG ALLY、G Cloud、Osmo 360、Antigravity A1、Luna Ultra、Pocket 4P、Pocket 4、Pocket 3、Pocket 2、Action 6、Mavic 4 Pro、Mavic 3、Mavic 2 Pro、Steam | `术语素材/Lexar术语库_专属.csv`（189→205）+ merge 重新生成 `lib/default-glossary.ts` |
+| 2 | **prompt LEAN/LEAN_ZH 原则 1 各 +1 句**：第三方设备/型号名同样属于型号，原样保留，不得在其前添加品类词或前缀（"Kameramodell:"/"Drohne"/"Handheld-Konsole" 等反例）——承载残余缺口：遮蔽防"词条被改"不防"占位符前加前缀" | `lib/prompt-constants.ts` |
+| 3 | **GLOSSARY_VERSION 4→5** 存量静默升级 | `lib/constants.ts:29` |
+| 4 | **maskGlossaryTerms 位置漂移 bug 修复**（潜在既有 bug，由列表形态 identity 词条暴露）：占位符替换使 cleanKey 空间收缩慢于原文空间（9 字符术语→14 字符 `__GLOSSARY_0__`，cleanKey 后仅 10 字符），连续遮蔽列表第 3 个起 offset 期望位置超前实测 Δ=−9 > 容差 5 → 正则候选全被拒 → 术语静默漏遮蔽漏翻。修复 = 懒惰重匹配：`!found` 时在当前 cleanKey 空间**向后**重定位该术语（向后=防误锚已遮蔽前缀造成无限循环），命中则把漂移吸收进 offset 并重锚期望原点后重试一次（`mi--`）。v7.5.1 预遮蔽场景行为不变（indexOf 找不到掩码内术语明文，落到原有 stillExists 分支） | `lib/entity-masker.ts` maskGlossaryTerms |
+
+**取舍与护栏**：bare "Steam" 收录理由 = 已发生实机事故（→Dampf），且 PLAY/Rode/Honor 裸词行同型风险已被项目接受；长度降序保证 "Steam Deck" 先匹配不被切；不收 bare Pocket/Action/Legion/Luna/Go（高频普通词=大面积过遮蔽，宁漏勿滥）；不改 isModelListOrCode/PRODUCT_CODE_RE（放宽阈值会把 "Ultra HD" 类描述短语误判为型号）。
+
+**⚠️ 升级警告（GLOSSARY_VERSION 4→5）**：首次启动会**整体覆盖** clientStorage 术语库（含产品名库）——用户在 UI 里手动添加/修改过的自定义词条会被冲掉。同 v4 升级的既有行为。升级前若有自定义词条请先导出备份，升级后再导入。
+
+**测试**：`tests/test-v118-third-party-model-names.ts` 46/46（A 豁免 21 断言：16 词条+lemma 复数+3 反样例；B 遮蔽往返 12：双词嵌入/长度优先/Pocket 列表 5 占位符/同词两处独立遮蔽；C S1 短路 E2E 6：identity 行原文落地、零重试、零漏翻、真实句照翻；D 回归护栏 3；E prompt 断言 2）；回归 v10.5 39/39、v9.9+v9.10 33/33、mask-all-langs 80/80（4 场景×20 语种——entity-masker 改动关键回归面）；typecheck 双配置 + build 通过。
+
+---
+
+## 二点五、历史版本（v11.7 及以前）
+
+### v11.7 品类词 3 源统一为 CATEGORY_WORDS 单一事实源（2026-08-05，v11.4 遗留收口）
+
+**背景**：v11.4 修复 detectCategory 大小写敏感时，发现代码库存在多个品类词数据源各自漂移。本次统一剩余 3 个"值漂移"源：
+
+| # | 源 | 职责 | 统一前问题 |
+|---|---|---|---|
+| ① | `prompt-constants.CATEGORY_WORDS` | prompt 品类词对照表（注入 LANG_SPECIFIC） | 无 en 列 |
+| ② | `product-name-generator.CATEGORY_TRANSLATIONS` | 产品名 20 语种生成 | 本地副本，与 ① 50 处值漂移（en 列缺失 + 7 条译法不同） |
+| ③ | `glossary-filter.isCategoryWord` | 品类词豁免（不重复注入） | 硬编码 19 词含 **7 个幽灵词**（SDXC Card/microSDXC Card/CFexpress Card/CompactFlash Card/Card Reader/Memory Card/USB Stick——从未在术语库出现，占位无匹配） |
+
+**方案**（单一事实源 +  override 模式）：
+- `CATEGORY_WORDS` 升级为 `CategoryWordEntry`：含全部 20 语言（新增 en 列）+ 可选 `productName` override 字段——产品名生成译法与 prompt 对照译法不同的词条（7 条：SSD ru/vi、Desktop Memory zh-CN、Flash Drive ja/ko、Dual Drive 全语种、Solid State Dual Drive 拉丁语系 15 语种）
+- ② 删本地 `CATEGORY_TRANSLATIONS`，改 `categoryTranslation()` 从 `CATEGORY_WORDS` 派生（override 优先）
+- ③ `isCategoryWord` 从 `Object.keys(CATEGORY_WORDS)` 派生（11 词），幽灵词剔除
+- `buildCategoryTerminology` 排除 `productName` 字段（Record 类型不外泄到 prompt 对照表）
+
+**关键设计决策**：Desktop Memory zh-CN override = `台式电脑内存`（非 `台式机内存条`）——与术语库 CSV 全 12 条台式内存一致；prompt 对照保留 `台式机内存条`（注入 LANG_SPECIFIC 用），两者职责不同故并存。
+
+**测试**：`tests/test-v117-category-unify.ts` 244/244（A 结构 223 + B 生成保真 10 + C prompt 纯净 7 + D 派生 3 + E CSV 一致性 2——B 断言 override 命中=删前 generator 值，防"统一=改值"）；全量回归 17 文件全绿（v9.9-v11.5 共 609 断言）；typecheck 双配置 + build 通过。
+
+**收益**：新增品类词只改 `CATEGORY_WORDS` 一处；幽灵词豁免消除（若 `SDXC Card` 未来进术语库会被正常注入而非误豁免）；v11.4"5 源不一致"结构坑收口。
+
+---
+
+### v11.5 Prompt 减肥——补救指令移到重试层（2026-08-05，架构复盘方向 #4 落地）
 
 **背景**：架构复盘（arch-review-2026-07）指出 prompt 存在**正反馈循环**：prompt 越长 → 模型注意力稀释 → 首调失败率升 → 加代码防线/加 prompt 补救条款 → prompt 更长。v9.x-v11.x 每个版本的实机事故都以"往 prompt 塞一条修复条款"止血，首调全程背负所有历史事故的补救文本（实测 CORE_PRINCIPLES 25 行中 11 行是⛔补救 + BRAND ~500 字符 + commonErrors 5-8 行 ≈ 30%）。
 
@@ -60,7 +144,7 @@ MasterGo 设计工具插件，将 Lexar 产品设计稿从英文翻译成 20 个
 
 ---
 
-### 2.0.0-pre v11.6 术语库差异提示（2026-08-05，实机测试发现的 UX 盲区修复）
+### v11.6 术语库差异提示（2026-08-05，实机测试发现的 UX 盲区修复）
 
 **背景**：NM1090 PRO 实机测试中，`Lexar Professional NM1090 PRO PCIe 5.0 NVMe M.2 2280 SSD` 被标"疑似拼写错误"——但译文**正确**（=术语库官方 zh-CN 值 `...PCIe Gen5X4 NVMe固态硬盘`，术语库有意本地化改写写法）。用户看到"疑似拼写错误，请核对源稿"会误以为源稿有错，实际是术语库差异。
 
@@ -75,7 +159,7 @@ MasterGo 设计工具插件，将 Lexar 产品设计稿从英文翻译成 20 个
 
 ---
 
-### 2.0.0-pre v11.5-followup 20 语种全量实机验证（2026-08-05，v11.5 唯一未闭环假设验证通过）
+### v11.5-followup 20 语种全量实机验证（2026-08-05，v11.5 唯一未闭环假设验证通过）
 
 **背景**：v11.5 已知遗留"首调成功率升/降无法单元测试闭环验证"，此前仅 zh-CN/zh-TW/ja/de 4 语种实机。本次把 `test-v115-live-translation.ts` 扩展到 20 语种能力并跑完剩余 15 个语种（en→en 同语言管道非验证对象跳过）。
 
@@ -104,7 +188,7 @@ MasterGo 设计工具插件，将 Lexar 产品设计稿从英文翻译成 20 个
 
 ---
 
-### 2.0.0-pre v11.4 产品名检测大小写形态统一修复（2026-08-05，根因修复：detectCategory 大小写敏感 + 系列名 camelCase 形态）
+### v11.4 产品名检测大小写形态统一修复（2026-08-05，根因修复：detectCategory 大小写敏感 + 系列名 camelCase 形态）
 
 **背景**：用户指出 nCard 已停产，单纯为 nCARD 打补丁没有意义——要找"这类问题"的根因。探索发现代码库 **5 个品类词数据源大小写策略不一致**，`detectCategory` 是唯一大小写敏感的匹配（其余全是 cleanKey 归一化或 `/i` flag），系列名首字母大写规则拒绝品牌 camelCase 形态（nCARD/eSeries）。这是形态判定的系统性盲区：CSV 140 条仅 1 条小写品类词（nCARD，Huawei 合作品牌遗留），但**未来新品/设计稿手写变体**（`Lexar NQ790 ssd`）同类问题必然重现。
 
@@ -129,7 +213,7 @@ MasterGo 设计工具插件，将 Lexar 产品设计稿从英文翻译成 20 个
 
 ---
 
-### 2.0.0-pre v11.3 LLM 兜底产品名检测（2026-08-05，代码判定失败时 LLM 解析兜底 + 待确认入库）
+### v11.3 LLM 兜底产品名检测（2026-08-05，代码判定失败时 LLM 解析兜底 + 待确认入库）
 
 **背景**：v11.2/v11.2.1 纯代码判定能覆盖绝大多数产品名形态，但真实新品 `Lexar SUPER PCIe Gen5x4 NVMe SSD` 被 `DESCRIPTIVE_WORDS`（防 "Lexar Fast" 误保护的营销词表）误杀——SUPER 恰好是合法的系列名。这类"营销词 vs 系列名"的判定本质需要语义理解，代码用静态词表必然有边界。
 
@@ -205,7 +289,7 @@ MasterGo 设计工具插件，将 Lexar 产品设计稿从英文翻译成 20 个
 
 ---
 
-### 2.0.0-pre v11.2.2 修复新产品名入库短路场景漏入库（2026-08-04，零 API 调用时入库块被跳过）
+### v11.2.2 修复新产品名入库短路场景漏入库（2026-08-04，零 API 调用时入库块被跳过）
 
 **问题**：单条产品名被 `normalizedGlossaryMap` 短路、零 API 时 startTranslate 提前 return（`apiTotal===0 && autoSkipped===total`），尾部入库块被跳过——检测到了新品名但没入库，下次扫描还会重复检测。
 
@@ -217,7 +301,7 @@ MasterGo 设计工具插件，将 Lexar 产品设计稿从英文翻译成 20 个
 
 ---
 
-### 2.0.0-pre v11.2.1 全品线扫描缺口修复（2026-08-03，真实产品名误杀清零 + 已知系列新子型号入库）
+### v11.2.1 全品线扫描缺口修复（2026-08-03，真实产品名误杀清零 + 已知系列新子型号入库）
 
 **背景**：v11.2 上线后用 52 个全品线形态用例（CSV 140 条变体 + 假想新品 + 用户提供的 2 个真实新品）扫描，发现 7 个真实产品名被解析器误杀、1 个语义缺口导致已知系列新子型号不入库。
 
@@ -244,7 +328,7 @@ MasterGo 设计工具插件，将 Lexar 产品设计稿从英文翻译成 20 个
 
 ---
 
-### 2.0.0-pre v11.2 新产品名宏观方案（2026-08-03，代码/LLM 各司其职 + 整条入库 + 生成译名首轮并入）
+### v11.2 新产品名宏观方案（2026-08-03，代码/LLM 各司其职 + 整条入库 + 生成译名首轮并入）
 
 **背景**：v11.1 用真实产品名 `Lexar® NF100 2.5-inch SATA III SSD` 复盘暴露两个致命缺陷——® 把锚点门整体打死（`lexar® ≠ lexar`，设计稿常态写法全部失效）；系列名被当成必填槽（CSV 42/140 是纯型号形态无系列名，NF100/NM790/ES3 全被拒之门外）。用户拍板宏观方向：充分利用代码和 LLM 的特性，两者结合各自守住边界。
 
@@ -275,7 +359,7 @@ MasterGo 设计工具插件，将 Lexar 产品设计稿从英文翻译成 20 个
 
 ---
 
-### 2.0.0-pre v11.1 新产品名检测+20语种生成（2026-08-03，初版——已被 v11.2 取代，仅留档追溯）
+### v11.1 新产品名检测+20语种生成（2026-08-03，初版——已被 v11.2 取代，仅留档追溯）
 
 **背景**：术语库未收录的新产品名（THOR Ultra/VELOCIS）裸奔进 LLM，可能被翻译/音译污染 20 语种。
 
@@ -289,7 +373,7 @@ MasterGo 设计工具插件，将 Lexar 产品设计稿从英文翻译成 20 个
 
 ---
 
-### 2.0.0-pre v11.0 校对市场语感校准（2026-08-03，翻译↔校对上下文闭环）
+### v11.0 校对市场语感校准（2026-08-03，翻译↔校对上下文闭环）
 
 **背景**：用户重申最终目标——"匹配目标语言国家语言习惯和产品对应人群与使用场景，同时保证可靠性：不漏翻、不加戏、意思与原文一致，适配 20 个语种"。对照六维评审表发现：维度二（本地化表达）的模块（IDENTITY_MISSION + LANGUAGE_MARKET_NOTES + LANG_SPECIFIC）中，**市场语感只注入了翻译，没注入校对**——校对把翻译故意使用的正确市场原生词（满血版/가성비/Preis-Leistung）误当"不自然表达"拦下，v10.9 的分段红利被校对吃掉。翻译和校对看到的世界不一致，闭环只闭了长度信号（v10.8）和术语库两个通道。
 

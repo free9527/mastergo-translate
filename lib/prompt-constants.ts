@@ -2223,10 +2223,11 @@ function buildCategoryTerminology(targetLang: string, productLine?: string | nul
     : FALLBACK_CATEGORY_WORDS
 
   const lines: string[] = []
-  for (const [en, map] of Object.entries(CATEGORY_WORDS)) {
+  for (const [en, entry] of Object.entries(CATEGORY_WORDS)) {
     if (!allowedWords.includes(en)) continue
-    const translated = map[targetLang]
-    if (translated && translated !== en) {
+    // v11.7: entry 含 productName override 字段（Record 类型），须排除——只取语种直值
+    const translated = entry[targetLang]
+    if (typeof translated === 'string' && translated && translated !== en) {
       lines.push(`  ${en} → ${translated}`)
     }
   }
@@ -2243,30 +2244,46 @@ function buildCategoryTerminology(targetLang: string, productLine?: string | nul
 // ============================================================
 
 // ═══════════════════════════════════════════════════════════════
-// 数据源: CATEGORY_WORDS — 品类词多语言对照表
+// 数据源: CATEGORY_WORDS — 品类词多语言对照表（v11.7 单一事实源）
 // ═══════════════════════════════════════════════════════════════
-// 职责: 纯数据，10品类词×20语言的对照表
+// 职责: 纯数据，11 品类词 × 20 语言的对照表
 // 注入: ⛔ 不直接注入 prompt。由 LANG_SPECIFIC 渲染时按需读取
 // 边界: ⛔ 不是独立注入模块，只是数据源
 //       ⛔ 不写规则，只存对照数据
+// v11.7 统一（消除 v11.4 同类结构坑）：
+//   - 此前 3 个品类词数据源各自漂移：本表（prompt 对照）/
+//     product-name-generator.CATEGORY_TRANSLATIONS（产品名生成，含 en 列+生成特定译法）/
+//     glossary-filter.isCategoryWord（硬编码 19 词含 7 个幽灵词）
+//   - 本表现在含 en 列 + 可选 productName override（产品名生成译法与 prompt 对照译法
+//     不同的词条，如 Dual Drive 全语种生成走 Flash Drive 简化译法）
+//   - glossary-filter 从本表 Object.keys 派生（幽灵词 SDXC Card 等 7 个从未匹配，剔除）
+//   - product-name-generator 删本地 CATEGORY_TRANSLATIONS，改为 import 本表
 // ═══════════════════════════════════════════════════════════════
 
-export const CATEGORY_WORDS: Record<string, Record<string, string>> = {
+export interface CategoryWordEntry {
+  /** 20 语种 prompt 对照译法（注入 LANG_SPECIFIC 品类词对照表用） */
+  [lang: string]: string | Record<string, string> | undefined
+  /** 产品名生成译法 override——仅当与 prompt 对照译法不同时存在（产品名生成按 CSV 现状归纳） */
+  productName?: Record<string, string>
+}
+
+export const CATEGORY_WORDS: Record<string, CategoryWordEntry> = {
   'SSD': {
     'zh-CN': '固态硬盘', 'zh-TW': '固態硬碟', 'ja': 'SSD', 'ko': 'SSD',
     'fr': 'SSD', 'de': 'SSD', 'es': 'Unidad de estado sólido (SSD)',
     'pt': 'SSD Interno', 'pt-BR': 'SSD Interno', 'it': 'SSD',
     'ru': 'SSD', 'vi': 'Ổ SSD', 'th': 'SSD ภายใน', 'id': 'SSD Internal',
     'ar': 'SSD داخلي', 'nl': 'Interne SSD', 'pl': 'Dysk SSD wewnętrzny',
-    'sv': 'Intern SSD', 'tr': 'Dahili SSD',
+    'sv': 'Intern SSD', 'tr': 'Dahili SSD', 'en': 'SSD',
+    productName: { 'ru': 'Внутренний SSD', 'vi': 'Ổ Cứng SSD' },
   },
   'Portable SSD': {
-    'zh-CN': '移动固态硬盘', 'zh-TW': '行動固態硬碟', 'ja': 'ポータブルSSD', 'ko': '휴대용 SSD',
+    'zh-CN': '移动固态硬盘', 'zh-TW': '行動固態硬碟', 'ja': 'ポータブルSSD', 'ko': '휴의용 SSD',
     'fr': 'SSD portable', 'de': 'Tragbare SSD', 'es': 'SSD portátil',
     'pt': 'SSD Portátil', 'pt-BR': 'SSD Portátil', 'it': 'SSD portatile',
     'ru': 'Портативный SSD', 'vi': 'SSD Di Động', 'th': 'SSD แบบพกพา', 'id': 'SSD Portabel',
     'ar': 'SSD محمول', 'nl': 'Draagbare SSD', 'pl': 'Przenośny dysk SSD',
-    'sv': 'Portabel SSD', 'tr': 'Taşınabilir SSD',
+    'sv': 'Portabel SSD', 'tr': 'Taşınabilir SSD', 'en': 'Portable SSD',
   },
   'Desktop Memory': {
     'zh-CN': '台式机内存条', 'zh-TW': '桌上型電腦記憶體', 'ja': 'デスクトップメモリ', 'ko': '데스크탑 메모리',
@@ -2276,7 +2293,8 @@ export const CATEGORY_WORDS: Record<string, Record<string, string>> = {
     'vi': 'Bộ Nhớ Máy Tính Để Bàn', 'th': 'แรมคอมพิวเตอร์ตั้งโต๊ะ', 'id': 'RAM Desktop',
     'ar': 'ذاكرة RAM لأجهزة الكمبيوتر المكتبية', 'nl': 'RAM-geheugen voor desktop',
     'pl': 'Pamięć RAM do komputera stacjonarnego', 'sv': 'Arbetsminne för stationär dator',
-    'tr': 'Masaüstü RAM',
+    'tr': 'Masaüstü RAM', 'en': 'Desktop Memory',
+    productName: { 'zh-CN': '台式电脑内存' },  // 与术语库 CSV 全 12 条台式内存一致
   },
   'Laptop Memory': {
     'zh-CN': '笔记本电脑内存', 'zh-TW': '筆記型電腦記憶體', 'ja': 'ラップトップメモリ', 'ko': '랩탑 메모리',
@@ -2286,7 +2304,7 @@ export const CATEGORY_WORDS: Record<string, Record<string, string>> = {
     'vi': 'Bộ Nhớ Máy Tính Xách Tay', 'th': 'แรมโน้ตบุ๊ก', 'id': 'RAM Laptop',
     'ar': 'ذاكرة RAM لأجهزة الكمبيوتر المحمولة', 'nl': 'RAM-geheugen voor laptop',
     'pl': 'Pamięć RAM do laptopa', 'sv': 'Arbetsminne för bärbar dator',
-    'tr': 'Laptop RAM',
+    'tr': 'Laptop RAM', 'en': 'Laptop Memory',
   },
   'Flash Drive': {
     'zh-CN': '闪存盘', 'zh-TW': '隨身碟', 'ja': 'USBメモリ', 'ko': 'USB 메모리',
@@ -2294,23 +2312,41 @@ export const CATEGORY_WORDS: Record<string, Record<string, string>> = {
     'pt': 'Pen USB', 'pt-BR': 'Pen Drive', 'it': 'Unità flash',
     'ru': 'USB-флеш-накопитель', 'vi': 'Flash Drive', 'th': 'แฟลชไดร์ฟ', 'id': 'Flashdisk',
     'ar': 'محرك فلاش USB', 'nl': 'USB-stick', 'pl': 'Pendrive',
-    'sv': 'USB-minne', 'tr': 'USB Bellek',
+    'sv': 'USB-minne', 'tr': 'USB Bellek', 'en': 'Flash Drive',
+    productName: { 'ja': 'フラッシュドライブ', 'ko': 'Flash Drive' },  // CSV 现状：ko 保留英文
   },
   'Dual Drive': {
-    'zh-CN': '双接口U盘', 'zh-TW': '雙接頭隨身碟', 'ja': 'デュアルドライブ', 'ko': '듀얼 드라이브',
-    'fr': 'Clé USB double interface', 'de': 'Dual-USB-Stick', 'es': 'Unidad flash de doble interfaz',
-    'pt': 'Pen USB Dupla Interface', 'pt-BR': 'Pen Drive Dupla Interface', 'it': 'Unità flash a doppia interfaccia',
-    'ru': 'USB-накопитель с двумя разъёмами', 'vi': 'USB Hai Đầu', 'th': 'แฟลชไดร์ฟสองพอร์ต', 'id': 'Flashdisk Dual Interface',
-    'ar': 'محرك فلاش ثنائي الواجهة', 'nl': 'Dual-USB-stick', 'pl': 'Pendrive z dwoma złączami',
-    'sv': 'USB-minne med dubbla gränssnitt', 'tr': 'Çift Arayüzlü USB Bellek',
+    'zh-CN': '闪存盘', 'zh-TW': '隨身碟', 'ja': 'フラッシュドライブ', 'ko': 'Flash Drive',
+    'fr': 'Clé USB', 'de': 'USB-Stick', 'es': 'Unidad flash',
+    'pt': 'Pen USB', 'pt-BR': 'Pen Drive', 'it': 'Unità flash',
+    'ru': 'USB-флеш-накопитель', 'vi': 'Flash Drive', 'th': 'แฟลชไดร์ฟ', 'id': 'Flashdisk',
+    'ar': 'محرك فلاش USB', 'nl': 'USB-stick', 'pl': 'Pendrive',
+    'sv': 'USB-minne', 'tr': 'USB Bellek', 'en': 'Dual Drive',
+    // 产品名生成：Dual Drive 全语种走 Flash Drive 简化译法（CSV 现状）
+    productName: {
+      'zh-CN': '闪存盘', 'zh-TW': '隨身碟', 'ja': 'フラッシュドライブ', 'ko': 'Flash Drive',
+      'fr': 'Clé USB', 'de': 'USB-Stick', 'es': 'Unidad flash',
+      'pt': 'Pen USB', 'pt-BR': 'Pen Drive', 'it': 'Unità flash',
+      'ru': 'USB-флеш-накопитель', 'vi': 'Flash Drive', 'th': 'แฟลชไดร์ฟ', 'id': 'Flashdisk',
+      'ar': 'محرك فلاش USB', 'nl': 'USB-stick', 'pl': 'Pendrive',
+      'sv': 'USB-minne', 'tr': 'USB Bellek', 'en': 'Dual Drive',
+    },
   },
   'Solid State Dual Drive': {
     'zh-CN': '固态U盘', 'zh-TW': '固態隨身碟', 'ja': 'ソリッドステートデュアルドライブ', 'ko': '솔리드 스테이트 듀얼 드라이브',
-    'fr': 'Clé USB SSD double interface', 'de': 'SSD-Dual-USB-Stick', 'es': 'Unidad flash SSD de doble interfaz',
-    'pt': 'Pen USB SSD Dupla Interface', 'pt-BR': 'Pen Drive SSD Dupla Interface', 'it': 'Unità flash SSD a doppia interfaccia',
-    'ru': 'SSD-накопитель с двумя разъёмами', 'vi': 'USB SSD Hai Đầu', 'th': 'โซลิดสเตทแฟลชไดร์ฟสองพอร์ต', 'id': 'SSD Flashdisk Dual Interface',
-    'ar': 'محرك أقراص صلب ثنائي الواجهة', 'nl': 'SSD Dual-USB-stick', 'pl': 'Pendrive SSD z dwoma złączami',
-    'sv': 'SSD USB-minne med dubbla gränssnitt', 'tr': 'SSD Çift Arayüzlü USB Bellek',
+    'fr': 'Clé USB SSD', 'de': 'SSD-USB-Stick', 'es': 'Unidad flash SSD',
+    'pt': 'Pen USB SSD', 'pt-BR': 'Pen Drive SSD', 'it': 'Unità flash SSD',
+    'ru': 'SSD USB-флеш-накопитель', 'vi': 'Flash Drive SSD', 'th': 'โซลิดสเตทแฟลชไดร์ฟ', 'id': 'SSD Flashdisk',
+    'ar': 'محرك فلاش SSD', 'nl': 'SSD USB-stick', 'pl': 'Pendrive SSD',
+    'sv': 'SSD USB-minne', 'tr': 'SSD USB Bellek', 'en': 'Solid State Dual Drive',
+    // 产品名生成：CSV 现状译法（与 prompt 对照在 fr/de/es/pt/pt-BR/ru/it/vi/th/id/ar/nl/pl/sv/tr 不同）
+    productName: {
+      'fr': 'Clé USB SSD', 'de': 'SSD-USB-Stick', 'es': 'Unidad flash SSD',
+      'pt': 'Pen USB SSD', 'pt-BR': 'Pen Drive SSD', 'it': 'Unità flash SSD',
+      'ru': 'SSD USB-флеш-накопитель', 'vi': 'Flash Drive SSD', 'th': 'โซลิดสเตทแฟลชไดร์ฟ',
+      'id': 'SSD Flashdisk', 'ar': 'محرك فلاش SSD', 'nl': 'SSD USB-stick',
+      'pl': 'Pendrive SSD', 'sv': 'SSD USB-minne', 'tr': 'SSD USB Bellek',
+    },
   },
   'Card': {
     'zh-CN': '存储卡', 'zh-TW': '記憶卡', 'ja': 'カード', 'ko': '카드',
@@ -2318,7 +2354,7 @@ export const CATEGORY_WORDS: Record<string, Record<string, string>> = {
     'pt': 'Cartão', 'pt-BR': 'Cartão', 'it': 'Scheda',
     'ru': 'Карта памяти', 'vi': 'Thẻ', 'th': 'เมมโมรี่การ์ด', 'id': 'Kartu Memori',
     'ar': 'بطاقة ذاكرة', 'nl': 'Geheugenkaart', 'pl': 'Karta pamięci',
-    'sv': 'Minneskort', 'tr': 'Hafıza Kartı',
+    'sv': 'Minneskort', 'tr': 'Hafıza Kartı', 'en': 'Card',
   },
   'Reader': {
     'zh-CN': '读卡器', 'zh-TW': '讀卡機', 'ja': 'リーダー', 'ko': '리더',
@@ -2326,7 +2362,7 @@ export const CATEGORY_WORDS: Record<string, Record<string, string>> = {
     'pt': 'Leitor', 'pt-BR': 'Leitor', 'it': 'Lettore',
     'ru': 'Картридер', 'vi': 'Reader', 'th': 'การ์ดรีดเดอร์', 'id': 'Card Reader',
     'ar': 'قارئ بطاقات', 'nl': 'Kaartlezer', 'pl': 'Czytnik kart',
-    'sv': 'Kortläsare', 'tr': 'Kart Okuyucu',
+    'sv': 'Kortläsare', 'tr': 'Kart Okuyucu', 'en': 'Reader',
   },
   'Enclosure': {
     'zh-CN': '硬盘盒', 'zh-TW': '硬碟盒', 'ja': 'ケース', 'ko': '케이스',
@@ -2334,7 +2370,7 @@ export const CATEGORY_WORDS: Record<string, Record<string, string>> = {
     'pt': 'Caixa', 'pt-BR': 'Case', 'it': 'Custodia',
     'ru': 'Корпус', 'vi': 'Enclosure', 'th': 'กล่อง', 'id': 'Casing',
     'ar': 'علبة', 'nl': 'Behuizing', 'pl': 'Obudowa',
-    'sv': 'Kabinett', 'tr': 'Kutusu',
+    'sv': 'Kabinett', 'tr': 'Kutusu', 'en': 'Enclosure',
   },
   'Hub': {
     'zh-CN': '扩展坞', 'zh-TW': '擴充埠', 'ja': 'ハブ', 'ko': '허브',
@@ -2342,7 +2378,7 @@ export const CATEGORY_WORDS: Record<string, Record<string, string>> = {
     'pt': 'Hub', 'pt-BR': 'Hub', 'it': 'Hub',
     'ru': 'Хаб', 'vi': 'Hub', 'th': 'ฮับ', 'id': 'Hub',
     'ar': 'موزع', 'nl': 'Hub', 'pl': 'Hub',
-    'sv': 'Hubb', 'tr': 'Hub',
+    'sv': 'Hubb', 'tr': 'Hub', 'en': 'Hub',
   },
 }
 
@@ -2387,7 +2423,11 @@ export const CORE_PRINCIPLES_LEAN = `[CORE PRINCIPLES]
 
 1. TRANSLATE ALL MEANING — Translate everything that carries meaning.
    Only keep these in original form: brand names (Lexar, AMD, Intel) and
-   model codes (NM790, D40E, ARES). For industry terms, use the target-language
+   model codes (NM790, D40E, ARES). Third-party device and model names
+   (Steam Deck, Mavic 3, Legion Go, ROG ALLY) are also model codes: keep
+   them exactly as-is, and do NOT add category words or prefixes
+   (no "Kameramodell:", "Drohne", "Handheld-Konsole" etc.) before them.
+   For industry terms, use the target-language
    standard terms specified in the language guidelines below — do NOT default
    to keeping English abbreviations.
    Rule of thumb: if the text has verbs, adjectives, or adverbs → it is descriptive → translate it.
@@ -2413,6 +2453,8 @@ export const CORE_PRINCIPLES_LEAN_ZH = `[核心原则]
 
 1. 【全翻】所有承载含义的文本都必须翻译。
    仅保留原文：品牌名(Lexar, AMD, Intel)、型号代码(NM790, D40E, ARES)。
+   第三方设备/型号名(Steam Deck, Mavic 3, Legion Go, ROG ALLY)同样属于型号：
+   原样保留，且不得在其前添加品类词或前缀(如"相机型号：""无人机""掌机"等)。
    行业术语请使用下方各语种指南中指定的目标语言标准术语——不要默认保留英文缩写。
    判断标准：含动词/形容词/副词的句子 → 描述性文本 → 必须翻译。
 

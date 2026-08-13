@@ -25,8 +25,8 @@ export const API_RETRY_DELAY_MS = 1000
 // 翻译缓存上限（超出后删旧留新）
 export const MAX_CACHE_SIZE = 500
 
-// 术语库版本号（更新 default-glossary.ts 后手动 +1，旧版自动覆盖升级）
-export const GLOSSARY_VERSION = 4  // 2026-07-07: Lexar术语库_专属.csv 全量更新
+// 术语库版本号（更新 default-glossary.ts 后手动 +1；v11.9 起升级改为合并升级保留用户自定义）
+export const GLOSSARY_VERSION = 6  // 2026-08-13: v11.9 第三方型号下沉代码内置层（CSV 专属库 -16）+ 合并升级
 
 // UI 超时（仅用于 toast 消失等非关键逻辑）
 export const TOAST_DURATION_MS = 2500

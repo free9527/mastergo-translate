@@ -365,15 +365,20 @@ export function maskGlossaryTerms(
     let result = text
     // 记录每次替换后的偏移量变化
     let offset = 0
+    // v11.9.1: 每个 match 最多重匹配一次（终止性不变量——无界 mi-- 曾致 UI 死循环）
+    const retried = new Set<number>()
 
-    for (const m of matches) {
+    for (let mi = 0; mi < matches.length; mi++) {
+      const m = matches[mi]
       // 构建宽松正则：
       // 1. 每个字母/数字后允许商标符号®™©
-      // 2. 空格变为灵活空白（允许任意空白）
+      // 2. 空格与连字符/下划线统一为「分隔符通用符」[\s\-_]*（v11.9.1：cleanKey 把 [-_]
+      //    归一为空格，若正则仍字面要求 '-' 或 '\s*'，文本写 'Osmo-360'/'ZV E10'/
+      //    'MX_Master_3S' 时永远匹配不上 → 进重匹配死循环；两侧对齐 = 根治）
       const escaped = m.source.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
       const flexible = escaped
         .replace(/([a-zA-Z0-9])/g, '$1[®™©]*')  // 字母/数字后允许商标符号
-        .replace(/ /g, '\\s*')                     // 空格变为灵活空白
+        .replace(/ |\\[-_]|-/g, '[\\s\\-_]*')    // 空格/转义与字面连字符/下划线 → 分隔符通用符（与 cleanKey 归一化对齐）
       const regex = new RegExp(flexible, 'gi')
 
       let found = false
@@ -388,7 +393,12 @@ export function maskGlossaryTerms(
         const tolerance = m.source.length < 5 ? 3 : 5
         if (Math.abs(estimatedCleanPos - expectedPos) <= tolerance) {
           const placeholder = `__${prefix}_${counter}__`
-          termMap.set(placeholder, m.target)
+          // v11.9.1: termMap 值按词条性质分流——
+          //   identity 词条（target===source，如内置第三方型号）：还原文本侧实际写法
+          //     （用户写 Osmo-360 就还 Osmo-360，遮蔽只拦 LLM 不擅自规范字形）；
+          //   翻译词条（target!==source，如 pt→ja）：还原术语库目标语译文
+          //     （v9.9 防线3：遮蔽 = 强制执行术语库译法）。
+          termMap.set(placeholder, m.target === m.source ? execResult[0] : m.target)
           result = result.slice(0, execResult.index) + placeholder + result.slice(execResult.index + execResult[0].length)
           offset += placeholder.length - execResult[0].length
           counter++
@@ -397,7 +407,32 @@ export function maskGlossaryTerms(
         }
       }
 
-      if (!found) {
+      // v11.8: 懒惰重匹配 — 占位符替换会使 cleanKey 空间收缩（如 9 字符术语 → 14 字符
+      // "__GLOSSARY_0__" 但 cleanKey 后仅 "glossary 0" 10 字符），连续遮蔽列表中第 3 个
+      // 起的术语位置漂移超出容差（实测 Δ=-9 > 5），正则扫描耗尽 → 整条遮蔽失败漏翻。
+      // 修复：失败时在当前 cleanKey 空间向后重定位该术语（向后=防误锚已遮蔽前缀造成
+      // 无限循环），命中则把漂移吸收进 offset 并重试一次。
+      // v11.9.1 事故修复（点击翻译卡死）：
+      //   ① 原实现 mi-- 无重试上界——cleanKey 归一化把 [-_]→空格，而柔性正则把空格→\s*、
+      //      连字符保持字面：文本写 Osmo-360（术语 Osmo 360）或 ZV E10（术语 ZV-E10）时，
+      //      cleanKey 命中但正则永远无候选，retryIdx 恒 !== -1 → 同步死循环冻结 UI。
+      //      ③ 连字符/下划线灵活化（上方）根治「正则无候选」；retried 集合保证即使再有
+      //      未预见形态也最多重试一次，循环必然终止（结构性不变量）。
+      //   ② 原实现「offset += retryIdx - (m.start + offset)」与「m.start = retryIdx」叠加 =
+      //      期望原点双重计算（2·retryIdx - oldStart），漂移场景要靠第二次重匹配才收敛——
+      //      与上界冲突。现只吸收进 offset、不再重锚 m.start，一次重匹配即收敛。
+      // 安全依据：cleanKey 匹配收集阶段已有重叠防护；掩码文本形态固定（正则可控），
+      // 与 v7.5.1 "掩码遮蔽导致正则失败" 场景同样落在 !found 分支，重定位搜不到掩码
+      // 内的术语明文 → 行为不变。
+      if (!found && !retried.has(mi)) {
+        retried.add(mi)
+        const ck = cleanKeyForMask(m.source)
+        const retryIdx = cleanKeyForMask(result).indexOf(ck)
+        if (retryIdx !== -1) {
+          offset += retryIdx - (m.start + offset)  // 漂移（含负值）吸收进 offset（不重锚 m.start）
+          mi--                                     // 重试当前术语一次（进入正常容差判定）
+          continue
+        }
         // v7.5.1: 术语可能已被 maskPreservedTerms 遮蔽为 __PRD_N__ 或 __TRM_N__，
         // 导致 cleanKey 匹配到但原始文本中已被替换。此时 enforceGlossaryTerms 兜底即可，无需报警。
         // 仅当术语确实仍存在于 result 中时才报警（说明是真正的匹配失败）。

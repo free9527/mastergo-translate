@@ -7,7 +7,7 @@
  *
  * 五槽位：品牌 Lexar + [Professional] + 系列名 + 型号/规格 + 品类词
  *   - 系列名/型号/规格：全语种原样保留（规则文档"系列命名保留、硬件原生参数不翻译"）
- *   - 品类词：按 CATEGORY_TRANSLATIONS 查译法 × 按 WORD_ORDER 套语序模板
+ *   - 品类词：按 CATEGORY_WORDS（v11.7 单一事实源）查译法 × 按 WORD_ORDER 套语序模板
  *
  * 中文营销名槽位：一律留空（ARES→战神/THOR→雷神 内部不一致、Air→小轻块为特例，
  *   均不可安全自动继承；由用户日后补全）。
@@ -43,99 +43,25 @@ const WORD_ORDER: Record<string, 'prefix' | 'suffix'> = {
 //   - ko/vi 的 Flash Drive 保留英文
 //   - vi/id 的 Reader/Enclosure/Hub 保留英文
 // ═══════════════════════════════════════════════════════════════
-const CATEGORY_TRANSLATIONS: Record<string, Record<string, string>> = {
-  'SSD': {
-    'zh-CN': '固态硬盘', 'zh-TW': '固態硬碟', 'ja': 'SSD', 'ko': 'SSD',
-    'fr': 'SSD', 'de': 'SSD', 'es': 'Unidad de estado sólido (SSD)',
-    'pt': 'SSD Interno', 'pt-BR': 'SSD Interno', 'ru': 'Внутренний SSD',
-    'it': 'SSD', 'vi': 'Ổ Cứng SSD', 'th': 'SSD ภายใน', 'id': 'SSD Internal',
-    'ar': 'SSD داخلي', 'nl': 'Interne SSD', 'pl': 'Dysk SSD wewnętrzny',
-    'sv': 'Intern SSD', 'tr': 'Dahili SSD', 'en': 'SSD',
-  },
-  'Portable SSD': {
-    'zh-CN': '移动固态硬盘', 'zh-TW': '行動固態硬碟', 'ja': 'ポータブルSSD', 'ko': '휴대용 SSD',
-    'fr': 'SSD portable', 'de': 'Tragbare SSD', 'es': 'SSD portátil',
-    'pt': 'SSD Portátil', 'pt-BR': 'SSD Portátil', 'ru': 'Портативный SSD',
-    'it': 'SSD portatile', 'vi': 'SSD Di Động', 'th': 'SSD แบบพกพา', 'id': 'SSD Portabel',
-    'ar': 'SSD محمول', 'nl': 'Draagbare SSD', 'pl': 'Przenośny dysk SSD',
-    'sv': 'Portabel SSD', 'tr': 'Taşınabilir SSD', 'en': 'Portable SSD',
-  },
-  'Desktop Memory': {
-    'zh-CN': '台式电脑内存', 'zh-TW': '桌上型電腦記憶體', 'ja': 'デスクトップメモリ', 'ko': '데스크탑 메모리',
-    'fr': 'Mémoire pour ordinateur de bureau', 'de': 'Desktop Arbeitsspeicher',
-    'es': 'Memoria de sobremesa', 'pt': 'Memória RAM para Desktop', 'pt-BR': 'Memória RAM para Desktop',
-    'ru': 'Оперативная память для ПК', 'it': 'Memoria per Desktop',
-    'vi': 'Bộ Nhớ Máy Tính Để Bàn', 'th': 'แรมคอมพิวเตอร์ตั้งโต๊ะ', 'id': 'RAM Desktop',
-    'ar': 'ذاكرة RAM لأجهزة الكمبيوتر المكتبية', 'nl': 'RAM-geheugen voor desktop',
-    'pl': 'Pamięć RAM do komputera stacjonarnego', 'sv': 'Arbetsminne för stationär dator',
-    'tr': 'Masaüstü RAM', 'en': 'Desktop Memory',
-  },
-  'Laptop Memory': {
-    'zh-CN': '笔记本电脑内存', 'zh-TW': '筆記型電腦記憶體', 'ja': 'ラップトップメモリ', 'ko': '랩탑 메모리',
-    'fr': 'Mémoire pour ordinateur portable', 'de': 'Laptop Arbeitsspeicher',
-    'es': 'Memoria para portátil', 'pt': 'Memória RAM para Portátil', 'pt-BR': 'Memória RAM para Notebook',
-    'ru': 'Оперативная память для ноутбука', 'it': 'Memoria per Laptop',
-    'vi': 'Bộ Nhớ Máy Tính Xách Tay', 'th': 'แรมโน้ตบุ๊ก', 'id': 'RAM Laptop',
-    'ar': 'ذاكرة RAM لأجهزة الكمبيوتر المحمولة', 'nl': 'RAM-geheugen voor laptop',
-    'pl': 'Pamięć RAM do laptopa', 'sv': 'Arbetsminne för bärbar dator',
-    'tr': 'Laptop RAM', 'en': 'Laptop Memory',
-  },
-  'Flash Drive': {
-    'zh-CN': '闪存盘', 'zh-TW': '隨身碟', 'ja': 'フラッシュドライブ', 'ko': 'Flash Drive',
-    'fr': 'Clé USB', 'de': 'USB-Stick', 'es': 'Unidad flash',
-    'pt': 'Pen USB', 'pt-BR': 'Pen Drive', 'ru': 'USB-флеш-накопитель',
-    'it': 'Unità flash', 'vi': 'Flash Drive', 'th': 'แฟลชไดร์ฟ', 'id': 'Flashdisk',
-    'ar': 'محرك فلاش USB', 'nl': 'USB-stick', 'pl': 'Pendrive',
-    'sv': 'USB-minne', 'tr': 'USB Bellek', 'en': 'Flash Drive',
-  },
-  'Dual Drive': {
-    'zh-CN': '闪存盘', 'zh-TW': '隨身碟', 'ja': 'フラッシュドライブ', 'ko': 'Flash Drive',
-    'fr': 'Clé USB', 'de': 'USB-Stick', 'es': 'Unidad flash',
-    'pt': 'Pen USB', 'pt-BR': 'Pen Drive', 'ru': 'USB-флеш-накопитель',
-    'it': 'Unità flash', 'vi': 'Flash Drive', 'th': 'แฟลชไดร์ฟ', 'id': 'Flashdisk',
-    'ar': 'محرك فلاش USB', 'nl': 'USB-stick', 'pl': 'Pendrive',
-    'sv': 'USB-minne', 'tr': 'USB Bellek', 'en': 'Dual Drive',
-  },
-  'Solid State Dual Drive': {
-    'zh-CN': '固态U盘', 'zh-TW': '固態隨身碟', 'ja': 'ソリッドステートデュアルドライブ', 'ko': '솔리드 스테이트 듀얼 드라이브',
-    'fr': 'Clé USB SSD', 'de': 'SSD-USB-Stick', 'es': 'Unidad flash SSD',
-    'pt': 'Pen USB SSD', 'pt-BR': 'Pen Drive SSD', 'ru': 'SSD USB-флеш-накопитель',
-    'it': 'Unità flash SSD', 'vi': 'Flash Drive SSD', 'th': 'โซลิดสเตทแฟลชไดร์ฟ', 'id': 'SSD Flashdisk',
-    'ar': 'محرك فلاش SSD', 'nl': 'SSD USB-stick', 'pl': 'Pendrive SSD',
-    'sv': 'SSD USB-minne', 'tr': 'SSD USB Bellek', 'en': 'Solid State Dual Drive',
-  },
-  'Card': {
-    'zh-CN': '存储卡', 'zh-TW': '記憶卡', 'ja': 'カード', 'ko': '카드',
-    'fr': 'Carte', 'de': 'Karte', 'es': 'Tarjeta',
-    'pt': 'Cartão', 'pt-BR': 'Cartão', 'ru': 'Карта памяти',
-    'it': 'Scheda', 'vi': 'Thẻ', 'th': 'เมมโมรี่การ์ด', 'id': 'Kartu Memori',
-    'ar': 'بطاقة ذاكرة', 'nl': 'Geheugenkaart', 'pl': 'Karta pamięci',
-    'sv': 'Minneskort', 'tr': 'Hafıza Kartı', 'en': 'Card',
-  },
-  'Reader': {
-    'zh-CN': '读卡器', 'zh-TW': '讀卡機', 'ja': 'リーダー', 'ko': '리더',
-    'fr': 'Lecteur', 'de': 'Lesegerät', 'es': 'Lector',
-    'pt': 'Leitor', 'pt-BR': 'Leitor', 'ru': 'Картридер',
-    'it': 'Lettore', 'vi': 'Reader', 'th': 'การ์ดรีดเดอร์', 'id': 'Card Reader',
-    'ar': 'قارئ بطاقات', 'nl': 'Kaartlezer', 'pl': 'Czytnik kart',
-    'sv': 'Kortläsare', 'tr': 'Kart Okuyucu', 'en': 'Reader',
-  },
-  'Enclosure': {
-    'zh-CN': '硬盘盒', 'zh-TW': '硬碟盒', 'ja': 'ケース', 'ko': '케이스',
-    'fr': 'Boîtier', 'de': 'Gehäuse', 'es': 'Receptáculo',
-    'pt': 'Caixa', 'pt-BR': 'Case', 'ru': 'Корпус',
-    'it': 'Custodia', 'vi': 'Enclosure', 'th': 'กล่อง', 'id': 'Casing',
-    'ar': 'علبة', 'nl': 'Behuizing', 'pl': 'Obudowa',
-    'sv': 'Kabinett', 'tr': 'Kutusu', 'en': 'Enclosure',
-  },
-  'Hub': {
-    'zh-CN': '扩展坞', 'zh-TW': '擴充埠', 'ja': 'ハブ', 'ko': '허브',
-    'fr': 'Hub', 'de': 'Hub', 'es': 'Concentrador',
-    'pt': 'Hub', 'pt-BR': 'Hub', 'ru': 'Хаб',
-    'it': 'Hub', 'vi': 'Hub', 'th': 'ฮับ', 'id': 'Hub',
-    'ar': 'موزع', 'nl': 'Hub', 'pl': 'Hub',
-    'sv': 'Hubb', 'tr': 'Hub', 'en': 'Hub',
-  },
+// v11.7: 本地 CATEGORY_TRANSLATIONS 已删除——统一从 prompt-constants.CATEGORY_WORDS 派生。
+// 产品名生成译法（与 prompt 对照译法不同的词条）走 entry.productName override。
+// 差异对照（删前 generator 值 → 现 override 值）：
+//   SSD ru Внутренний SSD / vi Ổ Cứng SSD（prompt 对照为 SSD / Ổ SSD）
+//   Desktop Memory zh-CN 台式电脑内存（prompt 对照为 台式机内存条）
+//   Flash Drive ja フラッシュドライブ / ko Flash Drive（prompt 对照为 USBメモリ / USB メモリ）
+//   Dual Drive 全语种 → Flash Drive 简化译法（prompt 对照为独立 Dual Drive 译法）
+//   Solid State Dual Drive 拉丁语系 15 语种 → CSV 现状简化译法
+
+/**
+ * 取品类词译法：产品名生成优先 entry.productName override，其次语种直值。
+ * v11.7 从 CATEGORY_WORDS 单一事实源读取。
+ */
+function categoryTranslation(category: string, lang: string): string {
+  const entry = CATEGORY_WORDS[category]
+  if (!entry) return category
+  if (entry.productName && entry.productName[lang]) return entry.productName[lang]
+  const v = entry[lang]
+  return typeof v === 'string' && v ? v : category
 }
 
 // 越南语特例：内置 SSD / Card 前置，Portable SSD 后置，外设全保留英文
@@ -145,7 +71,7 @@ const VI_KEEP_ENGLISH_CATEGORIES = new Set(['Reader', 'Enclosure', 'Hub'])
 // ═══════════════════════════════════════════════════════════════
 // 品类识别
 // ═══════════════════════════════════════════════════════════════
-const CATEGORY_KEYS = Object.keys(CATEGORY_TRANSLATIONS)
+const CATEGORY_KEYS = Object.keys(CATEGORY_WORDS)
   .sort((a, b) => b.length - a.length) // 最长优先（Solid State Dual Drive > Portable SSD > SSD）
 
 /**
@@ -158,7 +84,7 @@ const CATEGORY_KEYS = Object.keys(CATEGORY_TRANSLATIONS)
  *       'Insert card into slot'（card 在中间）/ 'SD card reader'（双词连用）排除
  *     守卫 2：前一个 token 含大写字母或数字——品名形态信号
  *       （Lexar/系列/型号/规格必含；'fast ssd'/'old card' 全小写描述排除）
- *   - 返回 canonical key（'Card' 非 'card'），下游 CATEGORY_TRANSLATIONS 查询不受影响
+ *   - 返回 canonical key（'Card' 非 'card'），下游 CATEGORY_WORDS 查询不受影响
  */
 export function detectCategory(enName: string): string | null {
   for (const cat of CATEGORY_KEYS) {
@@ -233,7 +159,7 @@ export function generateProductNameTranslations(
       continue
     }
 
-    const catTranslated = CATEGORY_TRANSLATIONS[category][lang] || category
+    const catTranslated = categoryTranslation(category, lang)
 
     // 语序
     let order: 'prefix' | 'suffix' = WORD_ORDER[lang] || 'suffix'

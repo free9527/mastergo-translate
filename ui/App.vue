@@ -496,7 +496,7 @@
           <div class="adv-sub-head" @click="showGlossary = !showGlossary">
             <svg class="chevron" :class="{ open: showGlossary }" width="12" height="12" viewBox="0 0 12 12"><path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
             <span>术语库</span>
-            <span class="section-count">{{ glossaryProducts.length + glossaryExclusive.length }}</span>
+            <span class="section-count">{{ glossaryProducts.length + glossaryExclusive.length + builtinThirdParty.length }}</span>
           </div>
           <div class="adv-sub-body" v-if="showGlossary">
             <div class="glossary-sub">
@@ -521,7 +521,14 @@
                 <input ref="glossaryExclusiveInput" type="file" accept=".csv" style="display:none" @change="handleGlossaryExclusiveUpload" />
               </div>
             </div>
-            <p class="glossary-hint">"替换"上传将完全覆盖对应术语库，而非合并。</p>
+            <div class="glossary-sub glossary-builtin">
+              <div class="glossary-sub-head">
+                <span class="glossary-sub-title">内置·第三方型号</span>
+                <span class="glossary-sub-count">{{ builtinThirdParty.length }} 条</span>
+              </div>
+              <div class="glossary-builtin-list">{{ builtinThirdParty.map(b => b.source).join('、') }}</div>
+            </div>
+            <p class="glossary-hint">"替换"上传将完全覆盖对应术语库，而非合并。内置第三方型号由代码保护，不受替换影响。</p>
           </div>
         </div>
 
@@ -565,6 +572,7 @@ import { postProcessTranslation, restoreTrademarkSymbols, restoreStorageUnitForm
 import { translateBatch, proofreadBatch, fetchWithRetry, isProofreadScriptMismatch, detectTruncatedTexts, STYLE_PRESETS, SCENE_PRESETS, detectProductLine, buildTaskGlossaryHint, isUntranslatable, isSuspectMisspelledWord, classifyNecessity, getTargetScript, hasFunctionWords, hasSimplifiedOnlyChars, hasTraditionalOnlyChars } from '@lib/llm-api'
 import { startMetricsCollection, recordBatchMetrics, recordProofreadMetrics, finalizeMetrics, formatMetricsReport, createBatchTimer } from '@lib/metrics'
 import { DEFAULT_GLOSSARY_PRODUCTS_CSV } from '@lib/default-glossary'
+import { BUILTIN_THIRD_PARTY_ENTRIES } from '@lib/third-party-models'
 import { TRANSLATE_BATCH_SIZE, PROOFREAD_BATCH_SIZE, TOAST_DURATION_MS, CORRECTION_THRESHOLD, makeFontKey, parseFontKey, normalizeText } from '@lib/constants'
 import { convertStorageUnit } from '@lib/unit-convert'
 import { getAutoFontMapping } from '@lib/font-mapper'
@@ -584,6 +592,8 @@ const sourceLang = ref('auto')
 const glossaryProducts = shallowRef<GlossaryEntry[]>([])
 const glossaryExclusive = shallowRef<GlossaryEntry[]>([])
 const glossary = computed(() => [...glossaryProducts.value, ...glossaryExclusive.value])
+/** v11.9: 内置第三方型号（代码内置层，只读）——UI 展示用，独立于用户双库 */
+const builtinThirdParty = BUILTIN_THIRD_PARTY_ENTRIES
 /** 术语库映射（响应式），供 UI 层漏翻检测复用，避免重复构建 */
 const glossaryMapForUi = computed(() => buildGlossaryMaps().full)
 
@@ -1316,13 +1326,21 @@ interface GlossaryMaps {
  * v9.9 无条件注册全部语言列 key（匹配任意源语言，含 auto 检测）。
  * v9.10 拆分双视图：full 供匹配，en 供判断 —— 修复场景过滤/豁免/不翻判断误用全语言视图
  * 导致的 R1(营销术语污染 prompt)/R4(跨语言同形词整句不翻)/R5(漏翻误判豁免)。
+ * v11.9 三方合并：内置第三方型号（代码内置，先于用户词条注册 = 撞 key 内置优先）∪
+ * 用户产品名 ∪ 用户专属。内置层只进内存不进 clientStorage——用户删除/替换 CSV
+ * 不再削弱 S1 短路 / S2 遮蔽 / 漏翻豁免三层防线（v11.8 词条下沉的兜底核心）。
  */
 function buildGlossaryMaps(): GlossaryMaps {
-  // EN 视图：仅 EN source（分类器 isMarketingTerm/isComplianceTerm 是 EN 精确匹配，只认这个）
-  const en = new Map<string, string>()
+  // 内置第三方型号（identity：通配键 '*' 对任意目标语言注册）
+  const builtin = new Map<string, string>()
+  for (const b of BUILTIN_THIRD_PARTY_ENTRIES) {
+    builtin.set(b.source, b.translations['*'] || b.source)
+  }
+  // EN 视图：内置优先，再叠用户库 EN source（first-wins：内置撞 key 胜出）
+  const en = new Map<string, string>(builtin)
   for (const g of glossary.value) {
     const t = g.translations[targetLang.value]
-    if (t) en.set(g.source, t)
+    if (t && !en.has(g.source)) en.set(g.source, t)
   }
   // 全语言视图：EN 优先，再补其他语言列（先到者胜，撞 key 行为确定 + 观测）
   const full = new Map<string, string>(en)

@@ -1,9 +1,10 @@
 import { PluginMessage, UIMessage, TextItem, LLMConfig, GlossaryEntry, TranslationCorrection } from '@messages/types'
 import { sendMsgToUI } from '@messages/main-sender'
-import { STORAGE_KEY_GLOSSARY_VERSION, STORAGE_KEY_GLOSSARY_PRODUCTS, STORAGE_KEY_GLOSSARY_EXCLUSIVE, STORAGE_KEY_SETTINGS, STORAGE_KEY_ORIGINALS, STORAGE_KEY_APPLIED, STORAGE_KEY_TRANSLATION_CACHE, STORAGE_KEY_CORRECTIONS, STORAGE_KEY_UI_LOGS, CORRECTION_THRESHOLD, UI_WIDTH, UI_HEIGHT, MAX_CACHE_SIZE, MAX_SCAN_NODES, GLOSSARY_VERSION, makeFontKey, DEBUG_MODE } from '@lib/constants'
+import { STORAGE_KEY_GLOSSARY_PRODUCTS, STORAGE_KEY_GLOSSARY_EXCLUSIVE, STORAGE_KEY_SETTINGS, STORAGE_KEY_ORIGINALS, STORAGE_KEY_APPLIED, STORAGE_KEY_TRANSLATION_CACHE, STORAGE_KEY_CORRECTIONS, STORAGE_KEY_UI_LOGS, CORRECTION_THRESHOLD, UI_WIDTH, UI_HEIGHT, MAX_CACHE_SIZE, MAX_SCAN_NODES, GLOSSARY_VERSION, makeFontKey, DEBUG_MODE } from '@lib/constants'
 import { collectTextNodes, mergeDuplicates } from '@lib/text-collector'
 import { exportCSV, importCSV } from '@lib/csv-handler'
 import { DEFAULT_GLOSSARY_PRODUCTS_CSV, DEFAULT_GLOSSARY_EXCLUSIVE_CSV } from '@lib/default-glossary'
+import { loadGlossaryWithMerge, saveGlossaryWithVersion } from '@lib/glossary-store'
 import { parseCSVRow } from '@lib/parse-csv'
 
 // DEBUG 日志辅助函数
@@ -545,28 +546,21 @@ function parseDefaultGlossaryProducts(): GlossaryEntry[] {
 }
 
 async function loadGlossaryProducts(): Promise<GlossaryEntry[]> {
-  // 版本检测：内置术语库更新后自动覆盖旧版
-  const storedVersion = await mg.clientStorage.getAsync(STORAGE_KEY_GLOSSARY_VERSION)
-  if (storedVersion == null || storedVersion < GLOSSARY_VERSION) {
-    const defaults = parseDefaultGlossaryProducts()
-    if (defaults.length > 0) {
-      await mg.clientStorage.setAsync(STORAGE_KEY_GLOSSARY_PRODUCTS, defaults)
-    }
-    return defaults
-  }
-
-  const fromLocal = await mg.clientStorage.getAsync(STORAGE_KEY_GLOSSARY_PRODUCTS)
-  if (fromLocal && fromLocal.length > 0) return fromLocal
-
-  const defaults = parseDefaultGlossaryProducts()
-  if (defaults.length > 0) {
-    await mg.clientStorage.setAsync(STORAGE_KEY_GLOSSARY_PRODUCTS, defaults)
-  }
-  return defaults
+  // v11.9: 合并升级（保留用户自定义词条）+ 版本戳写回（修复重复升级既有 bug）
+  return loadGlossaryWithMerge(
+    mg.clientStorage,
+    STORAGE_KEY_GLOSSARY_PRODUCTS,
+    parseDefaultGlossaryProducts,
+    GLOSSARY_VERSION,
+    (customCount) => {
+      mg.clientStorage.setAsync(STORAGE_KEY_TRANSLATION_CACHE, {})
+      mainLog('glossary', `术语库升级合并（产品名）：自定义 ${customCount} 条已保留`)
+    },
+  )
 }
 
 async function saveGlossaryProducts(entries: GlossaryEntry[]): Promise<void> {
-  await mg.clientStorage.setAsync(STORAGE_KEY_GLOSSARY_PRODUCTS, entries)
+  await saveGlossaryWithVersion(mg.clientStorage, STORAGE_KEY_GLOSSARY_PRODUCTS, entries, GLOSSARY_VERSION)
   await mg.clientStorage.setAsync(STORAGE_KEY_TRANSLATION_CACHE, {})
   const json = JSON.stringify(entries)
   for (const page of mg.document.children) {
@@ -585,28 +579,21 @@ function parseDefaultGlossaryExclusive(): GlossaryEntry[] {
 }
 
 async function loadGlossaryExclusive(): Promise<GlossaryEntry[]> {
-  // 版本检测：内置术语库更新后自动覆盖旧版
-  const storedVersion = await mg.clientStorage.getAsync(STORAGE_KEY_GLOSSARY_VERSION)
-  if (storedVersion == null || storedVersion < GLOSSARY_VERSION) {
-    const defaults = parseDefaultGlossaryExclusive()
-    if (defaults.length > 0) {
-      await mg.clientStorage.setAsync(STORAGE_KEY_GLOSSARY_EXCLUSIVE, defaults)
-    }
-    return defaults
-  }
-
-  const fromLocal = await mg.clientStorage.getAsync(STORAGE_KEY_GLOSSARY_EXCLUSIVE)
-  if (fromLocal && fromLocal.length > 0) return fromLocal
-
-  const defaults = parseDefaultGlossaryExclusive()
-  if (defaults.length > 0) {
-    await mg.clientStorage.setAsync(STORAGE_KEY_GLOSSARY_EXCLUSIVE, defaults)
-  }
-  return defaults
+  // v11.9: 合并升级（保留用户自定义词条）+ 版本戳写回（修复重复升级既有 bug）
+  return loadGlossaryWithMerge(
+    mg.clientStorage,
+    STORAGE_KEY_GLOSSARY_EXCLUSIVE,
+    parseDefaultGlossaryExclusive,
+    GLOSSARY_VERSION,
+    (customCount) => {
+      mg.clientStorage.setAsync(STORAGE_KEY_TRANSLATION_CACHE, {})
+      mainLog('glossary', `术语库升级合并（专属）：自定义 ${customCount} 条已保留`)
+    },
+  )
 }
 
 async function saveGlossaryExclusive(entries: GlossaryEntry[]): Promise<void> {
-  await mg.clientStorage.setAsync(STORAGE_KEY_GLOSSARY_EXCLUSIVE, entries)
+  await saveGlossaryWithVersion(mg.clientStorage, STORAGE_KEY_GLOSSARY_EXCLUSIVE, entries, GLOSSARY_VERSION)
   await mg.clientStorage.setAsync(STORAGE_KEY_TRANSLATION_CACHE, {})
   const json = JSON.stringify(entries)
   for (const page of mg.document.children) {

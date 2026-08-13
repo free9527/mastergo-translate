@@ -1294,6 +1294,16 @@ body {
 .glossary-sub-count { font-size: var(--text-caption); color: var(--label-2); }
 .glossary-hint { font-size: var(--text-caption); color: var(--label-3); margin: 4px 0 0; line-height: 1.4; }
 
+/* v11.9: 内置第三方型号（只读，弱化展示） */
+.glossary-builtin { opacity: 0.65; }
+.glossary-builtin-list {
+  font-size: var(--text-caption);
+  color: var(--label-3);
+  line-height: 1.5;
+  max-height: 72px;
+  overflow: auto;
+}
+
 /* v10.1: 诊断日志面板 */
 .diag-log-view {
   max-height: 220px;

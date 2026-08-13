@@ -3,6 +3,8 @@
  * 替代之前的全量注入，减少 prompt token 浪费并提高术语命中精度
  */
 
+import { CATEGORY_WORDS } from '@lib/prompt-constants'
+
 export interface GlossaryMap {
   [source: string]: string
 }
@@ -45,16 +47,15 @@ function stemEnglish(word: string): string {
  * 判断术语是否为品类词（产品品类名称）
  * 品类词在产品名文本中不应被翻译，因为产品名整体保留英文
  * v8.6: 品类词已在 [LANG_RULES] 的品类词对照表中注入，跳过以避免重复
+ * v11.7: 从 CATEGORY_WORDS 单一事实源派生（原硬编码 19 词含 7 个幽灵词——
+ *   SDXC Card/microSDXC Card/CFexpress Card/CompactFlash Card/Card Reader/
+ *   Memory Card/USB Stick 从未在术语库出现，占位无匹配；Solid State Drive
+ *   不在 CATEGORY_WORDS 中故不再豁免，若有该术语进术语库会被正常注入）
  */
+const CATEGORY_WORD_SET = new Set(Object.keys(CATEGORY_WORDS))
+
 function isCategoryWord(term: string): boolean {
-  const CATEGORY_WORDS = new Set([
-    'SSD', 'Portable SSD', 'Flash Drive', 'Dual Drive', 'Card',
-    'SDXC Card', 'microSDXC Card', 'CFexpress Card', 'CompactFlash Card',
-    'Desktop Memory', 'Laptop Memory', 'Reader', 'Card Reader',
-    'Enclosure', 'Hub', 'Solid State Dual Drive',
-    'Solid State Drive', 'Memory Card', 'USB Stick',
-  ])
-  return CATEGORY_WORDS.has(term.trim())
+  return CATEGORY_WORD_SET.has(term.trim())
 }
 
 /**
