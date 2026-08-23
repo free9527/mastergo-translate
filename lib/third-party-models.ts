@@ -21,7 +21,7 @@
 import { GlossaryEntry } from '@messages/types'
 
 /** 内置第三方型号名（全语言 identity：任何目标语言下都原样保留） */
-const BUILTIN_THIRD_PARTY_TERMS: string[] = [
+const BUILTIN_THIRD_PARTY_TERMS_INTERNAL: string[] = [
   // ── v11.8 实机事故词条（原专属 CSV identity 行，v11.9 下沉）──
   'Steam Deck', 'Legion Go', 'ROG ALLY', 'G Cloud',
   'Osmo 360', 'Antigravity A1', 'Luna Ultra',
@@ -76,11 +76,108 @@ const BUILTIN_THIRD_PARTY_TERMS: string[] = [
   'BlackWidow V4 Pro', 'DeathAdder V3 Pro', 'Viper V3 Pro',
   'Huntsman V3 Pro', 'Basilisk V3 Pro', 'Blade 16',
   'Keychron K2', 'Keychron K8', 'Keychron Q1',
+  // ── v11.13 实机兼容列表补录（2026-08-14 用户兼容性列表事故）──
+  // 收录原则同上：形态规则（含数字型号/型号列表）接不住的才靠收录兜底。
+  // 'MAX 360' 不收——BRAND_GRADE_RE 的 \bMAX\b 已短路豁免（Lexar 等级词）。
+  // 'Bones' / 'Switch NS' / 裸 'Mini' 不进本表——无数字裸词进遮蔽表会子串过遮蔽
+  //   （遮蔽匹配无词边界，'Mini' 会切碎 'Mini 3 Pro' 既有词条），
+  //   由下方整词豁免名单承接（只豁免不遮蔽）；'Mini' 作为列表段由
+  //   isModelListOrCode 的配套段名单（BUILTIN_MODEL_SEGMENT_SET）承接。
+  'Hero11 Black', 'Hero10 Black', 'Mavic Pro', 'Mavic Mini', 'Mini 5 Pro', 'Mini2',
+  'Mini 3 Pro',
+  'Avata 360', 'Lito 1', 'Lito X1',
 ]
+
+/**
+ * 整词豁免名单（v11.13）：整条文本精确匹配命中即豁免翻译。
+ *
+ * 与 BUILTIN_THIRD_PARTY_TERMS 的关键区别：本名单【不进遮蔽表】。
+ * 收录的都是裸品牌词/无数字短型号（DJI/GoPro/Nintendo/Bones/Switch NS…），
+ * 若进遮蔽表做子串匹配，正文里每一次提及都会被遮蔽，大面积过遮蔽、挤占遮蔽配额。
+ * 但实机兼容性列表中它们常以【独立文本节点】出现（整条文本就是这个词），
+ * 此时整词匹配豁免零过遮蔽风险。
+ *
+ * 接入点：isUntranslatable（S1 短路 + 漏翻豁免）+ isSuspectMisspelledWord
+ * （Nintendo/Lenovo/Logitech 形态上踩中 /^[A-Za-z]{6,}$/ 疑似错词，须前置豁免）。
+ *
+ * 收录原则（事故驱动，宁漏勿滥）：
+ *   ✅ 已发生实机事故的裸品牌词，按事故补录
+ *   ⛔ 不预先铺开词典（Sony/Canon…未出事故不收）
+ *   ⛔ 过短/多义 token 不收（'X2' 是影像格式名；裸 X5/X4/X3/X2 靠 isModelListOrCode
+ *      形态规则豁免即可，无需收录）
+ */
+const BUILTIN_THIRD_PARTY_WHOLE_TEXT_TERMS: string[] = [
+  // v11.13 实机事故裸品牌（2026-08-14 兼容性列表）
+  'DJI', 'GoPro', 'Insta360', 'Nintendo', 'Lenovo', 'ASUS', 'Logitech',
+  // 无数字型号形态（isModelListOrCode 单段要求含数字，永远接不住）
+  'Bones',
+  // 收录即遮蔽会切碎既有词条的型号（子串嵌套：'Hero 7 Black' ⊂ 'Hero 7 Black'…
+  // 无嵌套但遮蔽有连带风险——'Hero 7' 已在遮蔽表，'Hero 7 Black' 整词豁免即可）
+  'Hero 7 Black',
+]
+
+/**
+ * 整词豁免判断：整条文本（归一化后）精确命中名单。
+ * 归一化与 normalizeGlossaryKey 同口径：小写 + 去 ®™© + 去首尾空白。
+ */
+const WHOLE_TEXT_EXEMPT_SET = new Set(
+  BUILTIN_THIRD_PARTY_WHOLE_TEXT_TERMS.map(t =>
+    t.toLowerCase().replace(/[®™©]/g, '').trim()
+  )
+)
+
+/**
+ * v11.13: 裸品牌词加入遮蔽表——兼容性列表/正文中提及第三方品牌时，
+ * 遮蔽为 __GLOSSARY_N__ 强制保留原文写法，这正是要的效果（品牌名任何语言都不译）。
+ * ⚠️ 覆盖风险（有意为之的取舍，可靠性优先）：裸品牌词进遮蔽表后，正文中所有
+ * 提及（'I use a GoPro camera'）都会被遮蔽保留原文。品牌名遮蔽"保留"永远是对的；
+ * 子串嵌套由 maskGlossaryTerms 长度降序 + 重叠防护保证先锚长词
+ * （'GoPro Hero 13 Black' 先锚 'Hero 13 Black'，剩余 'GoPro' 再锚——不切碎）。
+ * v11.9 的'宁漏勿滥'针对的是【无事故预先铺开】；v11.13 这批词全部实机事故驱动。
+ * ⛔ 遮蔽表与整词豁免的边界（名单即边界，改一处必须同步另一处）：
+ *   - 只豁免不遮蔽：Bones / Hero 7 Black（切碎既有词条/子串风险）
+ *   - 只豁免+遮蔽：DJI/GoPro/Insta360/Nintendo/Lenovo/ASUS/Logitech（裸品牌）
+ *   - 只进段名单（不豁免不遮蔽）：Mini / Switch NS（无数字裸词段，切碎既有词条）
+ */
+const MASK_ONLY_WHOLE_TEXT = new Set([
+  'DJI', 'GoPro', 'Insta360', 'Nintendo', 'Lenovo', 'ASUS', 'Logitech',
+])
+const BUILTIN_THIRD_PARTY_TERMS_COMBINED: string[] = [
+  ...BUILTIN_THIRD_PARTY_TERMS_INTERNAL,
+  ...BUILTIN_THIRD_PARTY_WHOLE_TEXT_TERMS.filter(t => MASK_ONLY_WHOLE_TEXT.has(t)),
+]
+
+/**
+ * 型号段名单（v11.13）：只用于 isModelListOrCode 的段判定，不进遮蔽表、
+ * 不做整词豁免。收录的是兼容性列表中实际出现的【无数字裸词段】——
+ * isModelListOrCode 单段规则要求含数字或全大写，永远接不住它们。
+ * 风险边界：段名单只在【整条文本全是型号段】的列表语境生效，
+ * 正文子串/单条文本不受影响（'Mini' 单条仍不豁免——无数字形态规则接不住，
+ * 但实机列表中它永远与兄弟型号同段出现）。
+ */
+const BUILTIN_MODEL_SEGMENT_SET: Set<string> = new Set(
+  ['Mini', 'Switch NS'].map(t => t.toLowerCase().replace(/[®™©]/g, '').trim())
+)
+
+/** 段判定专用：归一化段是否命中型号段名单 */
+export function isBuiltinModelSegment(seg: string): boolean {
+  const key = (seg || '').toLowerCase().replace(/[®™©]/g, '').trim()
+  return key.length > 0 && BUILTIN_MODEL_SEGMENT_SET.has(key)
+}
+
+export function isBuiltinThirdPartyWholeText(text: string): boolean {
+  const key = (text || '').toLowerCase().replace(/[®™©]/g, '').trim()
+  return key.length > 0 && WHOLE_TEXT_EXEMPT_SET.has(key)
+}
 
 /** 展开为 GlossaryEntry（全语言 identity：translations 全列 = source） */
 function identityEntry(source: string): GlossaryEntry {
   return { source, translations: { '*': source } }
+}
+
+/** 归一化 key（与 normalizeGlossaryKey 同口径：小写 + 去®™© + trim） */
+function normKey(s: string): string {
+  return s.toLowerCase().replace(/[®™©]/g, '').trim()
 }
 
 /**
@@ -89,4 +186,16 @@ function identityEntry(source: string): GlossaryEntry {
  * 对任意目标语言注册（该键永不等于真实语言代码，不会与自然 key 冲突）。
  */
 export const BUILTIN_THIRD_PARTY_ENTRIES: GlossaryEntry[] =
-  BUILTIN_THIRD_PARTY_TERMS.map(identityEntry)
+  BUILTIN_THIRD_PARTY_TERMS_COMBINED.map(identityEntry)
+
+/**
+ * 内置词条全集归一化 key（遮蔽表 ∪ 整词豁免名单）。
+ * 供 isUntranslatable 豁免查询 与 isModelListOrCode 段判定——
+ * 收录（无论遮蔽表还是豁免名单）即钦定型号的形态认证。
+ */
+export const BUILTIN_THIRD_PARTY_ALL_KEYS: Set<string> = new Set(
+  [
+    ...BUILTIN_THIRD_PARTY_TERMS_COMBINED,
+    ...BUILTIN_THIRD_PARTY_WHOLE_TEXT_TERMS,
+  ].map(normKey)
+)

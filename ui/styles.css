@@ -882,6 +882,40 @@ body {
   opacity: 0.75;
 }
 
+/* v11.12: 平台违禁词（合规提示非翻译错误——橙色系，与 untranslated 橙 #ffa500 区隔用深橙 #e8890c） */
+.prohibited-badge {
+  font-size: var(--text-caption);
+  background: #e8890c;
+  color: #fff;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.prohibited-tag {
+  color: #e8890c;
+  font-weight: 600;
+  margin-right: 2px;
+}
+/* v11.12: 违禁词待确认条目弱化为非阻塞观感（与 glossaryDiverged 同策略） */
+.pending-item.prohibitedSrc,
+.pending-item.prohibitedTrans {
+  border-left: 3px solid #e8890c;
+  opacity: 0.75;
+}
+
+/* v11.12+: 术语库锁定违禁词（术语库官方值命中，只提示不改写——描边徽章与实心区分） */
+.prohibited-badge.locked {
+  background: transparent;
+  color: #e8890c;
+  border: 1px solid #e8890c;
+}
+.pending-item.prohibitedLocked {
+  border-left: 3px dashed #e8890c;
+  opacity: 0.75;
+}
+
 /* v8.9: 占位符残留 */
 .text-item.has-placeholder {
   border-color: #ff3b30;

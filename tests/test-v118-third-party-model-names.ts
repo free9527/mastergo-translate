@@ -42,6 +42,7 @@
 import { translateBatch, isUntranslatable } from '../lib/llm-api'
 import { maskGlossaryTerms, unmaskGlossaryTerms } from '../lib/entity-masker'
 import { DEFAULT_GLOSSARY_EXCLUSIVE_CSV } from '../lib/default-glossary'
+import { BUILTIN_THIRD_PARTY_ENTRIES } from '../lib/third-party-models'
 import { CORE_PRINCIPLES_LEAN, CORE_PRINCIPLES_LEAN_ZH } from '../lib/prompt-constants'
 import { GLOSSARY_VERSION } from '../lib/constants'
 import { clearUiLogs } from '../lib/ui-debug-log'
@@ -101,17 +102,14 @@ const config: LLMConfig = {
 const emptyGlossary = new Map<string, string>()
 
 /** 从生成的专属 CSV 构建 de 目标视图（模拟 ui/App.vue buildGlossaryMaps 全语言 key 注册） */
+// v11.9 起：第三方词条已从专属 CSV 下沉为代码内置层（lib/third-party-models.ts），
+// DEFAULT_GLOSSARY_EXCLUSIVE_CSV 不再含这 16 条。测试词表改为「内置层 de 视图」——
+// identity 词条 de 值 === source。语义不变：仍验证豁免/遮蔽往返，只是数据源从
+// 用户 CSV 换成内置层（v11.9 内置化的本意：防线不再依赖用户 CSV）。
 function buildDeGlossaryMap(): Map<string, string> {
   const map = new Map<string, string>()
-  const lines = DEFAULT_GLOSSARY_EXCLUSIVE_CSV.split('\n').filter(l => l.trim())
-  const header = lines[0].split(',')
-  const deIdx = header.indexOf('de')
-  assert(deIdx > 0, 'SETUP de 列存在', `header=${header.slice(0, 5).join('/')}`)
-  for (const line of lines.slice(1)) {
-    const cols = line.split(',')
-    const src = cols[0]?.trim()
-    const de = cols[deIdx]?.trim()
-    if (src && de) map.set(src, de)
+  for (const e of BUILTIN_THIRD_PARTY_ENTRIES) {
+    map.set(e.source, e.translations['*'])  // identity：de 值 === source
   }
   return map
 }

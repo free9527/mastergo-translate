@@ -160,12 +160,17 @@ out.push('═'.repeat(60))
   const nonIdentity = BUILTIN_THIRD_PARTY_ENTRIES.filter(b => b.translations['*'] !== b.source)
   assert(nonIdentity.length === 0, 'A3 内置层全 identity（* 值 === source）', nonIdentity.map(b => b.source).join(','))
   // 无高危裸词（宁漏勿滥红线；v11.9 初版曾误收 Flip/Neo 被本断言抓出后删除）
+  // v11.13 起收录口径更新：裸【品牌】词（GoPro/Nintendo/Insta360…实机事故驱动）
+  // 进遮蔽表属有意为之——品牌名任何语言都不译，遮蔽即正确；本断言仍锁
+  // 【产品裸词/通用词】（Pocket/Action/Mini/Air…切碎既有词条、过遮蔽重灾区）。
   const bareRisks = ['Pocket', 'Action', 'Legion', 'Luna', 'Air', 'Mini', 'Max', 'Flip', 'Neo', 'Go', 'Ultra', 'Pro', 'Mic', 'Hero', 'Black', 'Ace', 'Switch']
   const leaked = bareRisks.filter(w => sources.has(w))
   assert(leaked.length === 0, 'A4 无高危裸词收录（宁漏勿滥）', leaked.join(','))
   // 子串嵌套护栏（遮蔽无边界保护）：新词条不得是既有词条的子串——
   // 短词在 cleanKey 收集阶段会遮蔽长词条目内部，LLM 看到被切碎的占位符后可能重排/漏还原。
   // 已知豁免：v11.8/v11.9 及本次补录的型号世代组合（事故词条在库，回归测试锁行为）。
+  // v11.13 追加：裸品牌词（GoPro/Insta360/Nintendo…）与"品牌+型号"整词天然嵌套——
+  // 遮蔽长度降序+重叠防护先锚长词，剩余短品牌词再锚，不切碎；品牌遮蔽=保留原文永远正确。
   const KNOWN_NESTED = new Set([
     'Mavic 3', 'Action 4', 'Air 3', 'Ace Pro', 'Ace Pro 2', 'Action 3', 'Action 5 Pro',
     'FX3', 'RS 4', 'Steam', 'Hero 9', 'Hero 8', 'Hero 7', 'Hero 13', 'Hero 12', 'Hero 11',
@@ -173,6 +178,8 @@ out.push('═'.repeat(60))
     'ROG ALLY', 'Pocket 4', 'Pocket 3', 'iPhone 17', 'iPhone 17 Pro', 'iPhone 16', 'iPhone 16 Pro',
     'iPhone 15', 'iPhone 15 Pro', 'Galaxy S25', 'Galaxy S24', 'Galaxy S23', 'Galaxy Buds3',
     'Insta360 GO 3', 'Insta360 Ace Pro',
+    // v11.13 裸品牌嵌套（品牌+型号整词）：遮蔽先长后短不切碎，属安全嵌套
+    'GoPro', 'Insta360', 'Nintendo', 'Mini 3',
   ])
   const sorted = [...sources].sort((a, b) => a.length - b.length)
   const nested: string[] = []
@@ -184,10 +191,11 @@ out.push('═'.repeat(60))
   }
   assert(nested.length === 0, 'A6 新增词条无子串嵌套（防切碎既有型号）', nested.join(','))
   // identity 收录 vs 同形源文豁免的对冲验证（v11.10 决策依据，防未来误改）：
-  // 'GO 4' 全大写+数字，不在词表也走 isModelListOrCode 豁免；'Hero 7 Black' 因 Black
-  // 全小写使大写占比 3/5=0.6 < 1 且不 >=0.5+数字同段，不豁免——必须靠词表收录兜底。
+  // 'GO 4' 全大写+数字，不在词表也走 isModelListOrCode 豁免；
+  // 'Hero 7 Black' 因 Black 全小写拉低大写占比，形态规则接不住——v11.13 起走
+  // 【整词豁免名单】兜底（只豁免不进遮蔽表，避免切碎既有 'Hero 7' 词条）。
   assert(isUntranslatable('GO 4', new Map()) === true, 'A7 全大写型号走 isModelListOrCode 也豁免（收录是对冲非必须）')
-  assert(isUntranslatable('Hero 7 Black', new Map()) === false, 'A7b Hero 7 Black 裸写不豁免（Black 拉低大写占比），靠词表遮蔽兜底')
+  assert(isUntranslatable('Hero 7 Black', new Map()) === true, 'A7b Hero 7 Black 整词豁免名单兜底（形态规则接不住，v11.13 起豁免）')
   assert(BUILTIN_THIRD_PARTY_ENTRIES.length >= 60, 'A5 内置层规模 ≥60', `got ${BUILTIN_THIRD_PARTY_ENTRIES.length}`)
 }
 

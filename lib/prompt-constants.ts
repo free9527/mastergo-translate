@@ -2150,8 +2150,9 @@ export function buildProofreadSystemPrompt(opts: {
   glossaryHint?: string
   sourceLang?: string          // v11.5: 变体对判定（zh-CN↔zh-TW / pt↔pt-BR 时注入 VARIANT_CHECKS）
   hasExpansionFlags?: boolean  // v11.5: true 时注入 EXPANSION_NOTE（expansionFlags 非空才有意义）
+  hasProhibitedFix?: boolean   // v11.12: true 时注入 PROHIBITED_NOTE（prohibitedFixMap 非空才有意义）
 }): string {
-  const { targetLang, productLine, useEnInstruction, glossaryHint = '', sourceLang, hasExpansionFlags = false } = opts
+  const { targetLang, productLine, useEnInstruction, glossaryHint = '', sourceLang, hasExpansionFlags = false, hasProhibitedFix = false } = opts
 
   const mission = IDENTITY_MISSION[targetLang] || IDENTITY_MISSION['en'] || ''
   const missionBlock = mission ? `\n[MISSION·${targetLang}]\n${mission}\n` : ''
@@ -2171,7 +2172,12 @@ export function buildProofreadSystemPrompt(opts: {
     ? '\n' + (useEnInstruction ? PROOFREAD_EXPANSION_NOTE : PROOFREAD_EXPANSION_NOTE_ZH)
     : ''
 
-  return missionBlock + proofreadPrompt + variantBlock + expansionBlock + glossaryHint + calibrationBlock + langBlock
+  // v11.12: 违禁词规避仅 prohibitedFixMap 命中时注入（平时是死文本）
+  const prohibitedBlock = hasProhibitedFix
+    ? '\n' + (useEnInstruction ? PROOFREAD_PROHIBITED_NOTE : PROOFREAD_PROHIBITED_NOTE_ZH)
+    : ''
+
+  return missionBlock + proofreadPrompt + variantBlock + expansionBlock + prohibitedBlock + glossaryHint + calibrationBlock + langBlock
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2812,6 +2818,14 @@ faithful and natural, keep it as-is; do NOT shorten merely because it is long.`
 export const PROOFREAD_EXPANSION_NOTE_ZH = `[超长提示] 部分条目带有"译文显著长于源文"的警告。
 长≠错——许多目标语言天然比英文长。该警告仅是提醒复核是否添加了源文没有的信息；
 若译文语义忠实、表达自然，请保持原样，不要仅因为长就精简。`
+
+// v11.12: 平台违禁词规避（仅批次内确有命中时注入；逐条 note 列具体词）
+export const PROOFREAD_PROHIBITED_NOTE = `[PROHIBITED WORDS] Some entries carry a "platform-prohibited word" warning with the specific words listed.
+Rewrite those entries to avoid EVERY listed word: preserve the original meaning, tone, and all product model names / technical terms; make the smallest change necessary; never introduce a different prohibited word. E-commerce platforms (JD, Amazon sites) reject these words outright.`
+
+export const PROOFREAD_PROHIBITED_NOTE_ZH = `[违禁词规避] 部分条目带有"平台违禁词"提示并列出具体词。
+请改写这些条目以规避所列全部违禁词：保持原意、语气和所有产品型号/技术术语不变，
+改动越小越好，且不得引入其他违禁词。电商平台（京东/亚马逊各站点）会直接拦截这些词。`
 // ═══════════════════════════════════════════════════════════════
 // v11.3: 产品名槽位解析 Prompt — LLM 兜底（代码判定失败时的语义裁决）
 // 原则：LLM 只做"是不是产品名+系列名是什么"的判断，不输出译名。

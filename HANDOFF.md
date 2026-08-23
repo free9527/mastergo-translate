@@ -1,7 +1,7 @@
 # 项目交接文档
 
-**日期**: 2026-08-13  
-**版本**: v11.9  
+**日期**: 2026-08-14  
+**版本**: v11.13（v11.12+ 之上 + 第三方品牌/型号裸词豁免根治）  
 **项目**: Lexar 翻译插件（MasterGo 插件）
 
 ---
@@ -39,7 +39,121 @@ MasterGo 设计工具插件，将 Lexar 产品设计稿从英文翻译成 20 个
 
 ---
 
-## 二、当前版本（v11.9）
+## 二、当前版本（v11.15）
+
+### v11.15 实机五问题修复（2026-08-18，同形字误表/违禁词豁免/字体变大/跳过逻辑）
+
+**背景（实机五事故）**：①「Lexar Recovery Tool 专业数据恢复（软件）」产品品类描述反复亮源文违禁词徽章（用户拍板：豁免，且 20 语种已覆盖）②「从开机第一秒到收工最后一刻」误命中广告法绝对化用语「第一」③字体映射卡手动选字体后点卡片「应用」字体变大 ④完美 zh-CN→zh-TW 译文（徹底釋放/語言）误报「翻译失败」⑤待处理面板「跳过」按钮把节点标记为"已应用"但从不写画布 → 批量应用永久跳过 → 好译文静默丢失（用户定性：违背自动化原则，会造成事故）。
+
+**根因与修复（一问题一行）**：
+
+| # | 问题 | 根因 | 修复 | 文件 |
+|---|------|------|------|------|
+| 1 | TW 译文误报翻译失败 | 简繁特征字表由词片段 split('') 建表，同形字「放」「言」混入两表（v9.5 手工清理 17 字的漏网残余）→ 含"釋放/語言"的正确繁体译文每层漏翻检测都被拒 → 全链重试后误报失败 | 两表删「放」「言」；真区分字（释/釋/语/語）仍在表，行为断言锁回归 | `lib/llm-api.ts` |
+| 2 | Recovery Tool 品类描述亮徽章 | 豁免短语精确子串匹配，「专业」开在锚词中间即失效 | 豁免机制升级字符级弹性 regex（字符间 `\W*` 吞空格+中文修饰字，字母/数字是 `\w` 不被吞——放宽有界）+ 豁免表加 `'Recovery Tool 数据恢复'`（锚定产品名+品类词两端；裸"100%数据恢复"无锚仍命中）；纯中文相邻条目（最佳实践等）`\W*` 恒匹配空串 → 语义与 includes 精确剔除完全一致 | `lib/prohibited-check.ts` + `lib/prohibited-words.ts` |
+| 3 | 「第一秒」误报 | 时间序数用法，豁免表漏词 | 豁免表加 `'第一秒'`（秒简繁同形，一条覆盖两形态） | `lib/prohibited-words.ts` |
+| 4 | 卡片「应用」字体变大 | v7.5.9 修复（autoMapFonts 回填）的孪生缺口：`onFontSelected` 手动选字体不回填字号 → targetFontSize 0 → syncFontMappings 把 0 写回 item → APPLY_SINGLE 换字体不设字号 → MasterGo 按默认字号渲染 | A：`onFontSelected` 回填 targetFontSize/targetLineHeight/targetLetterSpacing（=源值）；B：`syncFontMappings` 兜底守卫（targetFamily 非空但属性为 0/null 时回退 item 源值）——任何路径产生的"换字体不设字号"组合都被拦截 | `ui/App.vue` |
+| 5 | 「跳过」丢译文 | `skipPendingItem` 标记 appliedNodeIds 但不写画布 → 批量应用永久跳过该节点 | skipPendingItem 拆解为三个按类型的处置函数：`confirmKeepSource`（错词保留源文）/`dismissPendingItem`（知道了——清提示态+dismissedNodeIds，**不碰 appliedNodeIds**，卡片恢复可应用）/`applyWithoutGlossary`（应用但不入库）；待处理面板按类型渲染主操作（error/untranslated/placeholder→**重翻**+编辑+知道了；misspelled→确认保留源文+编辑；llmFallback→确认入库+应用但不入库+编辑；prohibitedTrans→**去校对规避**+编辑+知道了；其余→编辑+知道了）；item-actions 行条件 `!applied \|\| dismissed` 让"知道了"条目不再隐身 | `ui/App.vue` |
+
+**译文侧 20 语种零改动**（问题①的 20 语种要求）：各语言违禁词表命中继续走 v11.12 既有"代码检测→AI 校对改写→代码回检"链，源文恒为中/英故源文侧豁免只需中文豁免表一处。
+
+**豁免机制安全性（v11.15 新增不变量）**：`\W*` 只吞非单词字符（空格/中文修饰字），字母/数字是 `\w` 不在 `\W` 内 → "Recovery Tool 数据恢复X"（X 为字母/数字后缀）不会被错误剔除；裸功效宣称无锚不豁免（B 段防护断言锁）。
+
+**测试**：新 `tests/test-v1115-variant-shared-chars.ts` 15/15（A 含放/言繁体词不判简体残留+双向对称/B 实机案例全文免疫/C 真漏翻仍拦/D 纯同形字句双向无证据）；`test-v1112` 追加 G 段 12 断言（Recovery Tool 三形态豁免/第一秒实机文案/裸词防护五连/既有豁免语义不变）→ 166/166。回归全绿：v105(39)/v106(46)/v107(14)/v108(21)/v109(86)/v110(91)/v111(42)/v112(48)/v113-exposed(6)/v113-fallback(18)/v114(26)/v115(41)/v117(245)/v118(45)/v119(62)/v1110(53)/v1111(22)/v1113(55)/v1114(86)。双 tsconfig typecheck + build 通过。
+
+**回归套件环境教训**（2026-08-18，排查记录）：TS 6.x + ts-node 下历史套件全挂的三个假故障——①根 tsconfig `noUnusedLocals:true` 对 tests/ 误伤（tests 不在 include 内却沿用其 compilerOptions）②`lib:["esnext"]` 无 DOM → llm-api 的 XMLHttpRequest 类型缺失 ③TS6 rootDir 推断报错 5011。解法：TS_NODE_COMPILER_OPTIONS 显式带 `skipLibCheck+rootDir+importHelpers:false` + `TS_NODE_TRANSPILE_ONLY=true`（v1114 还需 importHelpers:false——node_modules 无 tslib）。全部历史套件实际行为全绿，无一真失败。
+
+**实机复验清单（交用户）**：①zh-CN→zh-TW 翻"高达 1650MB/s…释放…"不再报翻译失败 ②Recovery Tool 两句文案不再亮违禁词徽章 ③字体映射卡手动选字体后点卡片「应用」字号不变 ④待处理面板按钮行为符合上表（重翻/知道了/确认保留源文/应用但不入库/去校对规避）。
+
+---
+
+### v11.13 第三方品牌/型号裸词豁免根治（2026-08-14，实机兼容性列表事故）
+
+**背景（实机事故）**：用户粘贴第三方品牌/型号兼容性列表（DJI/GoPro/Nintendo/Lenovo/Logitech + Hero/Mavic/Mini/Switch 等数十型号多行混排），被标「翻译失败」「漏翻」「疑似拼写错误」或被直接翻译。用户：「这些都是品牌或者是型号…理论上他们应该是代码层面判定他不用翻译的呀」「这都是不对的」。用户委托决策：「可靠性最重要，你来决策吧」「我们有20个语言，有互翻的使用场景，请都考虑到」。
+
+**根因（四重）**：
+- **RC1 代码 bug**：`text-normalizer.ts` 在管道最前端把扫描文本 `\n` 转成 ` ↵ `（U+21B5），但 `isModelListOrCode` 只按 `/` 和 `\n` 切分、且段字符集 `/^[A-Za-z0-9\s\-*.®™©]+$/` 不含 ↵ → 多行型号列表豁免**整锅失败**（2026-08-14 实机现象主因）。
+- **RC2 覆盖缺口**：裸品牌词（DJI/GoPro/Insta360/Nintendo/Lenovo/ASUS/Logitech）v11.9 刻意不收遮蔽表（宁漏勿滥），但作为独立文本节点出现时形态判定链全军覆没（isModelListOrCode 单段要数字、TITLE_CASE 要 Lexar 等级词、规则4要 ≥2 Lexar 关键词）。
+- **RC3 错词误伤**：Nintendo/Lenovo/Logitech 形态上踩中 v10.6 `/^[A-Za-z]{6,}$/` 疑似错词 → 「疑似拼写错误」假阳性。
+- **RC4 型号覆盖缺口**：Hero11/Hero10 Black 连写、Bones、Mavic Pro/Mini、Mini 5 Pro、Mini2、Mini 3 Pro、Avata 360、Lito 1/X1、Switch NS。
+
+**修复（三条名单边界 + 一个切分符）**：
+
+| # | 改动 | 文件 |
+|---|------|------|
+| 1 | `isModelListOrCode` 切分符补 `↵`（对齐 text-normalizer 既成事实——检测器永远见不到真换行） | `lib/llm-api.ts` |
+| 2 | **遮蔽表**（`BUILTIN_THIRD_PARTY_ENTRIES`）新增：v11.13 型号（Hero11 Black/Mavic Pro/Mini 5 Pro/Mini2/Mini 3 Pro/Avata 360/Lito 1/Lito X1）+ 裸品牌词（DJI/GoPro/Insta360/Nintendo/Lenovo/ASUS/Logitech）——品牌名任何语言都不译，遮蔽即正确 | `lib/third-party-models.ts` |
+| 3 | **整词豁免名单**（`BUILTIN_THIRD_PARTY_WHOLE_TEXT_TERMS`）：裸品牌词 + Bones + Hero 7 Black——整条命中即豁免（`isBuiltinThirdPartyWholeText`），但只 DJI/GoPro/Insta360/Nintendo/Lenovo/ASUS/Logitech 进遮蔽表（`MASK_ONLY_WHOLE_TEXT`）；Bones/Hero 7 Black 只豁免不进遮蔽表（无数字裸词子串风险/切碎既有 'Hero 7' 词条） | `lib/third-party-models.ts` |
+| 4 | **段名单**（`BUILTIN_MODEL_SEGMENT_SET`：Mini/Switch NS）：只用于 isModelListOrCode 段判定，不豁免不进遮蔽表（无数字裸词段，切碎既有词条/过遮蔽） | `lib/third-party-models.ts` |
+| 5 | 豁免/段判定查询统一走 `BUILTIN_THIRD_PARTY_ALL_KEYS`（遮蔽表 ∪ 整词豁免名单归一化 key）——「收录即钦定型号的形态认证」，与遮蔽表解耦（Bones 收录在豁免名单也能被段判定认出） | `lib/llm-api.ts` |
+| 6 | `isSuspectMisspelledWord` 前置整词豁免——Nintendo/Lenovo/Logitech 不再标疑似错词 | `lib/llm-api.ts` |
+| 7 | llm-api 豁免链自带内置表冗余（不依赖 UI 层注入）——用户删/换 CSV 后第三方豁免链依然完整（v11.9 内置化初衷闭环） | `lib/llm-api.ts` |
+
+**三条名单的边界（名单即边界，改一处必须同步另一处）**：
+- 只豁免+遮蔽：DJI/GoPro/Insta360/Nintendo/Lenovo/ASUS/Logitech（裸品牌，任何上下文都该保留原文）
+- 只豁免不遮蔽：Bones/Hero 7 Black（无数字裸词/切碎既有词条）
+- 只进段名单（不豁免不遮蔽）：Mini/Switch NS（无数字裸词段，仅在【整条全是型号段】的列表语境认段）
+
+**遮蔽子串嵌套安全性**（20 语种互翻场景关键）：maskGlossaryTerms 按 cleanKey 长度降序 + 重叠防护，先锚长词——'GoPro Hero 13 Black' 先锚 'Hero 13 Black'，剩余 'GoPro' 再锚，不切碎；'Nintendo Switch OLED' 先锚 'Switch OLED'，剩余 'Nintendo' 再锚。裸品牌词进遮蔽表是**有意为之**（v11.9 '宁漏勿滥'针对无事故预先铺开；v11.13 这批全部实机事故驱动，品牌遮蔽"保留原文"永远正确）。
+
+**测试**：`tests/test-v1113-brand-model-exemption.ts` 55/55（A 原稿 21 行逐条豁免含真实 ↵/B 整词豁免正反样例+段名单边界/C 疑似错词不误伤品牌+真错词仍标/D 形态负样本防回归）。回归：v119(62)/v118(45——de 视图数据源从用户 CSV 换成内置层，v11.9 内置化后 CSV 已无第三方词条)/v1112(154)/v1111(22)/v1110(53)/v106(46)/v105(39)/v99(33) 全绿。双 tsconfig typecheck + build 通过。
+
+**GLOSSARY_VERSION 不动**（维持 6）：内置层变更不进 clientStorage，无需版本戳升级（v11.9 升 5→6 是因为 CSV 专属库 -16 行结构调整；v11.13 纯代码内置层增补）。
+
+---
+
+### v11.12+ 术语库最高优先级：违禁词锁定豁免（2026-08-14，v11.12 增强补丁）
+
+**背景（用户两条拍板）**：①「终生有限质保是没问题的」——「有限终身质保」是 Limited Lifetime Warranty 官方钦定译值，被 zh 词表裸「终身质保」误伤；②「术语库是最高优先级…违禁词可以适当放松，优先级也不高，做到提示就好。你是LLM，你来决策吧，我要对整个链路太大干扰，可靠性以及翻译的流畅性」——用户委托决策。
+
+**结构性死锁（根因）**：若对术语库锁定项照常走改写链，校对层术语合规校验会把改写结果锁回钦定值 → 回检仍命中 → 徽章永不消（改写→锁回→再命中）。必须在 LLM 调用前豁免。
+
+**决策（用户两次委托 LLM 拍板锁定：「你是LLM，你来决策吧」→「你做决策吧」）**：
+- **术语库锁定项**（源文整条命中术语库且译文==钦定值）→ **恒只提示不改写**：proofreadBatch 预豁免（进 prompt 前从 fixMap 剪除）+ UI 徽章走 `prohibitedLockedIds` 独立通道（描边徽章「⚠ 术语库违禁词」+待确认非阻塞条目），永不进改写链、永不计 `prohibitedFixedCount`。
+- **非锁定项**（含 test 类）：开校对=维持 v11.12 自动改写（复用已有 LLM 调用零边际成本，回检保证徽章准确）；关校对=只提示。判定依据：用户原文「没有明确向test这种其余的看能否只提示」中「能否」是探讨语气，而「对整个链路太大干扰」是硬约束——关自动改写反而违背已验收标准 ③「翻译到目标语言自动替换违禁词」。
+
+| # | 改动 | 文件 |
+|---|------|------|
+| 1 | 词表豁免 4 形态：有限终身质保/有限终身保修/有限終身保固/有限終身保修（裸「终身质保/终身保修」仍命中——豁免不放行裸承诺） | `lib/prohibited-words.ts` |
+| 2 | `isGlossaryLockedTranslation(sourceText, translatedText, normalizedGlossaryMap)` 纯函数：cleanKey(源文) 查表 + 译文严格等值才判锁定；map 缺失/译文≠钦定值 → false（保守不豁免，照常进修正链） | `lib/prohibited-check.ts` |
+| 3 | proofreadBatch 预豁免块（prompt 组装前）：锁定项从 fixMap 删除 → 该条不生成违禁词 note。曾误写一份「锁定后补豁免」死代码（prompt 已构建、调用方窗口已过，纯摆设），已删除——**豁免必须在 LLM 调用前** | `lib/llm-api.ts` |
+| 4 | UI 双徽章通道：`routeProhibitedHits` 统一路由（锁定→prohibitedLockedIds，否则→prohibitedTransIds）；5 处徽章写入点全部走路由（翻译写回/翻译终检/校对写回/串扰回退/校对终检）；待确认面板 prohibitedLocked 非阻塞类型+横幅计数；描边徽章样式与实心区分 | `ui/App.vue` + `ui/styles.css` |
+
+**不变量**：锁定徽章恒不计「自动规避」数；回检干净时双 map 同清（trans 侧删才计数++）；回退恢复译文时按恢复后文本重新路由到对应 map。
+
+**测试**：F 段 18 断言（F1-F4 豁免四形态/F5-F7 裸词仍命中+混合/F8-F13 锁定判定六场景/F14-F15 预豁免请求体零 note+fixMap 清空/F16-F18 混合批次分段断言+自由发挥不豁免）。**测试教训**：按译文文本+定长窗口定位 note 会「出血」——锁定项无 note 后，[2] 的 note 落在 [1] 译文 200 字符内；正确做法是按 `[n]` 条目标题切分段落断言。全套 154/154 绿；tsc --noEmit + build 通过。
+
+---
+
+### v11.12 电商平台违禁词检测与规避（2026-08-14，六维之六「合规」落地）
+
+**背景**：产品图文案上传电商平台受违禁词硬规则约束——中文上京东（广告法绝对化用语/虚假承诺/无据功效）、英文及小语种上各国亚马逊站点（test 已确认为真实拦截词）。文案侧难免有漏（→源文提醒），翻译侧可能把安全源文译成目标语违禁词（de `beste`/`Test`——→校对改写）。
+
+**需求锁定**（用户三条验收标准，逐字）：覆盖 20 个语种；原文遇违禁词有提醒；翻译到目标语言自动替换违禁词。
+
+**方案**（用户拍板：翻译提示词不变；可靠性第一/少操作充分自动化；代码管形式 LLM 管语义）：
+**代码检测 → AI 校对语义改写 → 代码回检**（与 v9.5 三层漏翻/v10.6 错词同构）。修正绑定校对开关：开=全自动闭环，关=只检测+提醒零 LLM 成本。源文/译文两类违禁词均**非阻塞**（平台风险≠翻译错误）。
+
+| # | 改动 | 文件 |
+|---|------|------|
+| 1 | 词表数据层：PROHIBITED_ZH（京东/广告法）+豁免短语表（最佳实践/最高可达不误报）+PROHIBITED_AVOID 20 语种与 LANGUAGES 严格对表。收录原则：只收消费电子/存储行业相关、宁漏勿滥 | `lib/prohibited-words.ts`（新增） |
+| 2 | 检测器纯函数：拉丁/西里尔词边界正则（i flag，**无 g flag** 防 lastIndex 污染）；CJK/泰/阿拉伯子串；符号词 100%/#1 数字端 `(?<!\d)` 防 1100% 误伤；复合词 `\s+` 弹性；zh 先剔豁免再匹配；重叠取最长。detectSourceLangForProhibited 自实现（CJK 优先——detectSourceLanguage 一票制会把"中文+英文型号"混排误判 en） | `lib/prohibited-check.ts`（新增） |
+| 3 | proofreadBatch 第 10 参 prohibitedFixMap（Map 非 Set——语义改写必须列具体词）；per-item note 祈使句防 LLM 复述违禁词；buildProofreadSystemPrompt 条件注入 PROOFREAD_PROHIBITED_NOTE 全局块（不传时逐字节不变，快照锁） | `lib/llm-api.ts` + `lib/prompt-constants.ts` |
+| 4 | UI：SCAN_RESULT 源文检测徽章；翻译写回处（缓存命中与 API 返回汇流点，v10.7 缓存旧译文也抓得到）+四个旁路（手改/恢复校对/CSV导入/单条重翻）全检测只提醒；两处校对链 fixMap+写回处回检（干净删徽章+计数，仍命中留徽章）；待确认面板 prohibitedSrc/prohibitedTrans 非阻塞；**enableProofread 默认值翻 true+一次性迁移**（proofreadDefaultMigrated 标记存 settings 内，防反复覆盖后续手动关闭） | `ui/App.vue` + `ui/styles.css` |
+
+**用户拍板决策**：①旁路译文全检测+只提醒 ②中文配豁免短语表 ③校对默认值翻转+老用户迁移一次 ④重扫已翻译稿自动校对维持现状。**增补轮（08-14）**：⑤时效促销词收录（营销图会写促销文案——en new arrival/on sale/clearance/free gift 等 + zh 限时秒杀/清仓甩卖）⑥欧盟环保词只收 eco-friendly 系（durable/long lasting 条件性违规代码判不了不收）。
+
+**收录红线（宁漏勿滥）**：竞品品牌名对比/诱导评价/站外引流/隐私间谍词/正品声称词不收（文案从不写，属侵权/运营违规非词表问题）；有合法语义的普通词不收（es prueba：a prueba de agua=防水规格必误报；en free/heal/new 同理）。
+
+**修复的实现 bug（测试推理抓出）**：compileEntry 原分支条件把纯符号词（100%/#1）路由到纯 indexOf 子串分支，文档承诺的 `(?<!\d)` 数字端防护（防 1100% 误伤）形同虚设。改为唯一条件 `!SUBSTRING_SCRIPT_RE.test(word)`。**教训：文档写的设计≠实现，写完测试后先推理一遍实现再跑。**
+
+**测试**：`tests/test-v1112-prohibited-words.ts` 154 通过（A 词表对表 20 语种+增补收录/B 检测单元 59 含 g-flag 回归锁+增补命中与误伤防护/C 校对端到端 16/D 关校对快照锁 7/E 源语言判定 7/F v11.12+ 术语库最高优先级 18）。回归：v119(62)/v117(245)/v1111(22)/mask-all-langs(80)/repro-mask-hang/v99(33)/v104(17)/v105(39)/v107(14)/v911(21)/v1110(43) 全绿；v118 维持 28 个文档化时间点预期失败。双 tsconfig typecheck + build 过。
+
+**Windows 环境教训**：Edit 工具经 GBK 控制台会损毁越南语变音符——非 ASCII 外科手术一律 `python -X utf8` 文件操作；批量替换编号断言注意防塌缩（降序替换会把已变的再变一次，用正则回调计数器）。
+
+---
+
+## 二点四、上一版本（v11.9）
 
 ### v11.9 第三方型号内置化 + 术语库合并升级（2026-08-13，v11.8 结构性风险收口）
 
@@ -961,6 +1075,14 @@ v8.7 设计"激进失败→保留原文不标记，交给校对 LLM 判断"，�
 
 `DESCRIPTIVE_WORDS` 防 "Lexar Fast" 误保护，但 SUPER 恰好是合法系列名——静态词表无法区分"营销形容词"vs"系列名"（语义判定）。**代码用静态词表做语义判定必然有边界；LLM 内建多语言语感，结构化 JSON 输出 + 代码形式校验（子串/描述词检查）可在可靠性优先前提下兜住边界。**
 
+### 坑 15: 豁免/修正若加在"锁定之后"就是死代码（v11.12+）
+
+对会被下游强制锁回的值做修正类豁免，豁免必须插在**锁定发生之前**——v11.12+ 初版把术语库锁定项的违禁词豁免写在 prompt 组装之后（改 fixMap 但 prompt 已构建、调用方读取窗口已过），功能为零纯摆设。**修正链路上每个豁免点都要问一句：这个变异在谁之前生效？数据流下游还有谁会读它？** 同类：徽章/计数的写入必须对最终结果做（坑 10 中间快照同理）。
+
+### 坑 16: 测试按"邻近文本+定长窗口"断言会出血（v11.12+）
+
+定位 prompt 中某条的 note 时，用 `indexOf(译文)` + 固定 200 字符窗口断言"窗口内不含 note"——当被测条**没有** note 时，**下一条**的 note 会落进窗口（条目越短越必然出血）。**断言按结构边界切段（`[n]` 条目标题），不按字符数窗口。** 根因同坑 10：对位置的假设比对内容的假设脆弱。
+
 ---
 
 ## 五点一、架构复盘（2026-07-31，v9.11 之后）
@@ -1018,8 +1140,10 @@ v8.7 设计"激进失败→保留原文不标记，交给校对 LLM 判断"，�
 
 | 文件 | 职责 |
 |------|------|
-| `lib/prompt-constants.ts` | 提示词常量（STYLE_GUIDES、LANG_SPECIFIC、PRODUCT_LINE_TONE_GUIDES、SCENE_CONSTRAINTS、CORE_PRINCIPLES、PROOFREAD_SYSTEM_PROMPT、**v11.3 PRODUCT_NAME_PARSE_PROMPT/ZH LLM 产品名解析**） |
-| `lib/llm-api.ts` | LLM 调用 + 翻译/校对管道 + 重试逻辑 + v9.5 三层漏翻检测 + v9.9 术语合规校验 + v9.10 双视图分发 + v9.11 批次级标注/untranslatedIndices/最终安全网 + v10.0 re-export lang-detect（兼容层）+ v10.2 截断判定（脚本存在性）+ 子兜底守卫 + 诊断日志埋点 + v10.4 管道阶段化(S1-S8)+auditStage 不变量审计 + v10.5 型号/裸单位豁免(isModelListOrCode/PURE_UNIT_RE)+截断跳过不可翻译+脚本校验豁免术语库已知值 + v10.6 revertMisspelledWordTranslation 疑似错词回退兜底 + **v11.3 parseProductNameWithLLM LLM 兜底产品名解析** |
+| `lib/prompt-constants.ts` | 提示词常量（STYLE_GUIDES、LANG_SPECIFIC、PRODUCT_LINE_TONE_GUIDES、SCENE_CONSTRAINTS、CORE_PRINCIPLES、PROOFREAD_SYSTEM_PROMPT、v11.3 PRODUCT_NAME_PARSE_PROMPT/ZH LLM 产品名解析、**v11.12 PROOFREAD_PROHIBITED_NOTE/_ZH 违禁词校对全局块**） |
+| `lib/llm-api.ts` | LLM 调用 + 翻译/校对管道 + 重试逻辑 + v9.5 三层漏翻检测 + v9.9 术语合规校验 + v9.10 双视图分发 + v9.11 批次级标注/untranslatedIndices/最终安全网 + v10.0 re-export lang-detect（兼容层）+ v10.2 截断判定（脚本存在性）+ 子兜底守卫 + 诊断日志埋点 + v10.4 管道阶段化(S1-S8)+auditStage 不变量审计 + v10.5 型号/裸单位豁免(isModelListOrCode/PURE_UNIT_RE)+截断跳过不可翻译+脚本校验豁免术语库已知值 + v10.6 revertMisspelledWordTranslation 疑似错词回退兜底 + v11.3 parseProductNameWithLLM LLM 兜底产品名解析 + **v11.12 proofreadBatch 第 10 参 prohibitedFixMap（per-item 违禁词改写 note）+ v11.12+ 术语库锁定项预豁免（prompt 组装前剪除，破改写→锁回死锁）** |
+| `lib/prohibited-words.ts` | **v11.12 违禁词表**（PROHIBITED_ZH 京东/广告法 + PROHIBITED_ZH_EXEMPTIONS 豁免短语 + PROHIBITED_AVOID 20 语种与 LANGUAGES 严格对表；收录红线：宁漏勿滥，有合法语义的普通词不收；**v11.12+ 豁免 +4：有限终身质保/有限终身保修/有限終身保固/有限終身保修**） |
+| `lib/prohibited-check.ts` | **v11.12 违禁词检测纯函数**（detectProhibited/hasProhibited/detectSourceLangForProhibited：拉丁词边界 i flag 无 g flag、CJK 子串、符号词 `(?<!\d)`、zh 先剔豁免、重叠取最长）+ **v11.12+ isGlossaryLockedTranslation 术语库锁定判定（cleanKey 查表+译文严格等值）** |
 | `lib/lang-detect.ts` | v10.0 语言检测单一事实源（三套检测/词表/字符集分类/同语系对，detectSingleTextLanguage 死代码已修为委托批次级）+ **v10.2 TARGET_SCRIPT_PATTERNS** |
 | `lib/keep-source.ts` | **v10.0 豁免中央注册表**（shouldKeepSource/isSameLanguageExempt，F3b 三重守卫迁入） |
 | `lib/new-product-detect.ts` | **v11.2/v11.3 新产品名检测**（五槽位解析 parseProductName + 五门判定 detectAdhocProductTerms + v11.3 LLM 兜底触发 detectFallbackCandidates）+ **v11.4 系列名 camelCase 品牌形态（nCARD/eSeries）** |
@@ -1032,8 +1156,8 @@ v8.7 设计"激进失败→保留原文不标记，交给校对 LLM 判断"，�
 | `lib/text-normalizer.ts` | 文本预处理（Unicode NFC、全角→半角、零宽字符、↵保护） |
 | `lib/default-glossary.ts` | 默认术语库（140 产品名 + 189 专属术语） |
 | `lib/main.ts` | 插件主线程（扫描/appliedTexts 快照/undoAll 三方对比/selectionchange/**fixRegisterSymbolFont v9.6**） |
-| `ui/App.vue` | UI 主组件（流程编排、sticky 操作区、待确认机制、busyPhase、computeUntranslatedBadge v9.5、buildGlossaryMaps 双视图 v9.10、**v11.2 新产品名检测/生成/入库 + v11.3 LLM 兜底集成 + llmFallbackTerms 待确认**） |
-| `ui/styles.css` | 全部样式（Apple 设计令牌、深色覆盖、.footer v9.3 恢复） |
+| `ui/App.vue` | UI 主组件（流程编排、sticky 操作区、待确认机制、busyPhase、computeUntranslatedBadge v9.5、buildGlossaryMaps 双视图 v9.10、v11.2 新产品名检测/生成/入库 + v11.3 LLM 兜底集成 + llmFallbackTerms 待确认 + **v11.12 违禁词徽章全链（源文/译文/四个旁路/校对回检/enableProofread 默认翻 true 迁移）+ v11.12+ prohibitedLockedIds 双徽章通道 + routeProhibitedHits 统一路由**） |
+| `ui/styles.css` | 全部样式（Apple 设计令牌、深色覆盖、.footer v9.3 恢复、**v11.12 .prohibited-badge #e8890c + v11.12+ .locked 描边变体**） |
 | `ui/ui.ts` | UI 挂载入口 |
 | `tests/test-untranslated-v3.ts` | **v9.5 三层漏翻检测全量回归（40 用例）** |
 | `tests/test-same-script-untranslated.ts` | v9.3 同语系豁免测试矩阵（21 断言，已适配 v9.5 行为） |
@@ -1051,6 +1175,7 @@ v8.7 设计"激进失败→保留原文不标记，交给校对 LLM 判断"，�
 | `tests/test-v113-llm-fallback.ts` | **v11.3 LLM 兜底产品名检测（18 断言：A 触发条件 7 + B 校验逻辑 2 + C 端到端 SUPER/Fast/nCARD/正常路径 4 + D v11.2 回归 3）** |
 | `tests/test-v113-exposed-product-names.ts` | v11.3 裸奔产品名分类验证（6 断言：C1 SUPER 误杀 / C2 MUSE 检出 / V1 nCARD **v11.4 起已检出** / V2-V4 不触发场景） |
 | `tests/test-v114-case-insensitive-category.ts` | **v11.4 大小写形态统一（26 断言：A detectCategory 双遍匹配+守卫 8 + B core-strip 3 + C camelCase 系列 5 + D nCARD 端到端 4 + E 回归 6）** |
+| `tests/test-v1112-prohibited-words.ts` | **v11.12 + v11.12+ 违禁词全链（154 断言：A 词表对表 20 语种+增补收录 / B 检测单元 59 含 g-flag 回归锁 / C 校对端到端 16 / D 关校对快照锁 7 / E 源语言判定 7 / F 术语库锁定豁免 18：豁免四形态+裸词仍命中+锁定判定六场景+预豁免零 note+混合批次分段断言+自由发挥不豁免）** |
 
 ---
 
@@ -1078,6 +1203,9 @@ npx tsx tests/test-v106-misspelled-word.ts       # v10.6 疑似错词保留+回�
 npx tsx tests/test-v112-product-name-v2.ts       # v11.2/v11.2.1/v11.2.2 新产品名全生命周期 48 断言（检测/生成/入库/端到端/短路场景）
 npx tsx tests/test-v113-llm-fallback.ts          # v11.3 LLM 兜底产品名检测 18 断言（触发条件/SUPER 端到端/Fast 拒绝/v11.2 回归）
 npx tsx tests/test-v114-case-insensitive-category.ts  # v11.4 大小写形态统一 26 断言（detectCategory 双遍匹配+守卫/core-strip/camelCase 系列/nCARD 端到端）
+
+# v11.12 起新增测试（ts-node 运行，tsx 不适用——package.json 模式）：
+TS_NODE_COMPILER_OPTIONS='{"module":"commonjs","esModuleInterop":true,"skipLibCheck":true,"types":["node"]}' npx ts-node -r tsconfig-paths/register tests/test-v1112-prohibited-words.ts  # v11.12 + v11.12+ 违禁词全链 154 断言（A 词表对表/B 检测单元/C 校对端到端/D 关校对快照锁/E 源语言判定/F 术语库锁定豁免）
 ```
 
 **铁律**：每次改代码后必须执行 `npm run typecheck` + `npm run build`。build 过 ≠ tsc 过。
@@ -1088,12 +1216,13 @@ npx tsx tests/test-v114-case-insensitive-category.ts  # v11.4 大小写形态统
 
 **短期**：
 1. ~~实机验证 v10.2~~ **已通过（2026-07-31）**：pt→ja 两句温度文案正常翻译，不再标漏翻/失败。遗留可选回归（有空顺带验证）：de→de 无误报、zh-CN→zh-TW、en→拉丁、"复制日志"自动全选 fallback
-2. 实机验证 v10.3/v10.4：跑一批翻译 → 诊断日志面板应看到 S1→S8 阶段轨迹 + 主线程 [main:scan]/[main:apply] 事件；关闭重开插件 → 应看到"── 恢复上次会话日志（N 条）──"分隔标记
-3. 实机验证 v9.9/v9.10：pt-BR 自动检测 → ja 产品名走短路出术语库值；非电商场景营销术语不注入；校对改错术语时被合规校验拉回
-4. 实机验证 v9.6：Avenir 字体的 `Lexar®` 文本，不翻译直接应用 + 字体替换后，® 是否都显示为 HarmonyOS 样式
-5. 实机验证 v11.3：扫描含 `Lexar® SUPER PCIe Gen5x4 NVMe SSD` 的设计稿 → 应触发 LLM 兜底 → 待确认区显示"新品名待确认（LLM 辅助识别）"→ 点击"确认入库"后写入专属术语库；扫描含 `Lexar® Fast SSD` 的设计稿 → 应触发兜底但 LLM 判 isProductName=false → 放弃保护走正常管道
-6. ~~提交代码~~ **已提交 5df3af2 + 已推 GitHub**（v9.5-v10.2，2026-07-31）；**v11.3 待提交**
-7. ~~R7 决策~~（已拍板 2026-07-31：现状即规则——去符号匹配，®™ 由源文驱动恢复，CSV 不携带符号，无需改代码）
+2. **实机验证 v11.12/v11.12+（当前版本，优先）**：①中文源文含「最佳」「终身质保」→ 扫描后源文徽章提醒；②zh→de 译文出现 `beste`/`Test` → 开校对自动改写+回检销徽章，关校对只提醒；③术语库条目 `Limited Lifetime Warranty`→`有限终身质保` → 译文锁定值命中词表但走**描边徽章**「⚠ 术语库违禁词」只提示不改写，且改写徽章不计数；④校对默认开（老用户一次性迁移）
+3. 实机验证 v10.3/v10.4：跑一批翻译 → 诊断日志面板应看到 S1→S8 阶段轨迹 + 主线程 [main:scan]/[main:apply] 事件；关闭重开插件 → 应看到"── 恢复上次会话日志（N 条）──"分隔标记
+4. 实机验证 v9.9/v9.10：pt-BR 自动检测 → ja 产品名走短路出术语库值；非电商场景营销术语不注入；校对改错术语时被合规校验拉回
+5. 实机验证 v9.6：Avenir 字体的 `Lexar®` 文本，不翻译直接应用 + 字体替换后，® 是否都显示为 HarmonyOS 样式
+6. 实机验证 v11.3：扫描含 `Lexar® SUPER PCIe Gen5x4 NVMe SSD` 的设计稿 → 应触发 LLM 兜底 → 待确认区显示"新品名待确认（LLM 辅助识别）"→ 点击"确认入库"后写入专属术语库；扫描含 `Lexar® Fast SSD` 的设计稿 → 应触发兜底但 LLM 判 isProductName=false → 放弃保护走正常管道
+7. ~~提交代码~~ **已提交 5df3af2 + 已推 GitHub**（v9.5-v10.2，2026-07-31）；**v11.3-v11.12+ 待提交**
+8. ~~R7 决策~~（已拍板 2026-07-31：现状即规则——去符号匹配，®™ 由源文驱动恢复，CSV 不携带符号，无需改代码）
 
 **架构优化（见"五点一、架构复盘"，按收益/风险排序）**：
 1. ~~判定逻辑单一事实源 + 豁免中央注册表~~ **已完成 v10.0**（lib/lang-detect.ts + lib/keep-source.ts）

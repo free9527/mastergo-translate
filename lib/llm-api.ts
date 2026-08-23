@@ -20,6 +20,20 @@ import {
   PRODUCT_NAME_PARSE_PROMPT_ZH,
 } from '@lib/prompt-constants'
 import { getFewShotExamples } from '@lib/few-shot-examples'
+import { isBuiltinThirdPartyWholeText, isBuiltinModelSegment, BUILTIN_THIRD_PARTY_ENTRIES, BUILTIN_THIRD_PARTY_ALL_KEYS } from '@lib/third-party-models'
+import { shouldSkipGlossaryEntry } from '@lib/glossary-guard'
+/**
+ * 内置第三方遮蔽表（v11.13）：第三方词条的 source→source identity Map。
+ *
+ * 与 BUILTIN_THIRD_PARTY_ENTRIES（GlossaryEntry[]，进 UI 层 buildGlossaryMaps）分工：
+ * UI 层 Map 供徽章/待确认面板；本 Map 供 llm-api 内部（S1 短路、isUntranslatable
+ * 兜底），保证第三方词条即使 UI 层术语库被替换/清空，翻译管道自身的豁免链仍完整。
+ * 同一批词条两处各持一份 Map，是「豁免链不依赖外部注入」的冗余设计。
+ */
+const BUILTIN_THIRD_PARTY_MASK_MAP: Map<string, string> = new Map(
+  BUILTIN_THIRD_PARTY_ENTRIES.map(e => [e.source, e.source])
+)
+
 import { uiLog } from '@lib/ui-debug-log'
 
 // DEBUG 日志辅助函数
@@ -796,12 +810,24 @@ export async function translateBatch(
   // 优化：构建查找表 O(n) 替代嵌套循环 O(n*m)
   const glossaryMatchedIndices = new Set<number>()
   const glossaryLookup = new Map<string, string>()
-  for (const [key, value] of glossaryMap.entries()) {
+  // v11.13: 内置第三方词条先注册——不依赖 UI 层 buildGlossaryMaps 注入，
+  // 用户术语库被替换/清空时第三方型号 S1 短路依然生效（内置优先，用户不可覆盖）。
+  for (const [key, value] of BUILTIN_THIRD_PARTY_MASK_MAP.entries()) {
     glossaryLookup.set(key.toLowerCase().replace(/[®™©]/g, '').trim(), value)
+  }
+  for (const [key, value] of glossaryMap.entries()) {
+    const k = key.toLowerCase().replace(/[®™©]/g, '').trim()
+    if (!glossaryLookup.has(k)) glossaryLookup.set(k, value)  // 内置优先，first-wins
   }
   const preprocessedTexts = normalizedTexts.map((text, i) => {
     const lookupKey = text.toLowerCase().replace(/[®™©]/g, '').trim()
     const matchedValue = glossaryLookup.get(lookupKey)
+    // v11.14: 脏条目（句形 key + identity/乱码™值）不走整条短路——该句走正常 LLM
+    // 翻译（2026-08-17 事故根治）；句形 key + 正经译文值的策展条目照常短路。
+    if (matchedValue && shouldSkipGlossaryEntry(text, matchedValue)) {
+      uiLog('glossary', `v11.14 脏条目跳过 S1 短路: "${text.slice(0, 60)}"`)
+      return text
+    }
     if (matchedValue) {
       glossaryMatchedIndices.add(i)
       // v7.5.3: 保留原文中所有商标符号位置，不限于末尾
@@ -1157,6 +1183,7 @@ ${texts.map((t, i) => `${i + 1}. "${t.slice(0, 100)}"`).join('\n')}
       if (revertedIndices.has(i)) continue                // 品牌注入回退源文的条目跳过
       if (!(texts[i] || '').trim()) continue
       const expected = normalizedGlossaryMap.get(cleanKey(texts[i]))
+      if (expected && shouldSkipGlossaryEntry(texts[i], expected)) continue   // v11.14: 脏条目（identity/乱码™值）不锁定
       if (expected && result[i] !== expected) {
         debugWarn('[translateBatch] 术语合规校验：整条命中术语库但译文不符，已锁定为术语库值', {
           source: texts[i].slice(0, 60), was: result[i].slice(0, 60), fixed: expected.slice(0, 60),
@@ -1829,6 +1856,7 @@ export async function proofreadBatch(
   taskGlossaryHint?: string,
   normalizedGlossaryMap?: Map<string, string>,  // v9.10: 校对路径合规校验用（与翻译管道对齐）
   expansionFlags?: Set<number>,                 // v10.8: 译文显著超长的条目索引（长度异常信号，供 CHECK 1 语义裁决）
+  prohibitedFixMap?: Map<number, Array<{ word: string; note: string }>>,  // v11.12: 批内索引→命中违禁词列表（语义改写必须列具体词）
 ): Promise<ProofreadResult[]> {
   const sourceTexts = items.map(it => it.sourceText)
   // v9.3: 批次级源语言判定（校对后漏翻检测用，治 pt→pt-BR 拉丁源文恒判 'en' 的死代码）
@@ -1872,6 +1900,19 @@ export async function proofreadBatch(
   // v7.1: 逐条标注源语言，校对 LLM 需检查每条是否确实翻译到了目标语言
   // v9.11: 与翻译管道对齐 — 标注改用批次级 detectedProofreadSource
   //        （detectSingleTextLanguage 拉丁文本恒 'en'，pt 源文标 (en→ja) 会让校对误判"非英文=已翻译"）
+  // v11.12+: 术语库锁定项预豁免（用户拍板 2026-08-14：术语库最高优先级）。
+  // 源文整条命中术语库且译文==钦定值 → 不进修正链，避免与术语合规锁定死锁
+  // （改写→锁回→再命中）。豁免后徽章由调用方保留，只做提示。
+  if (normalizedGlossaryMap && prohibitedFixMap && prohibitedFixMap.size > 0) {
+    for (const i of [...prohibitedFixMap.keys()]) {
+      if (i < 0 || i >= items.length) continue
+      const expected = normalizedGlossaryMap.get(cleanKey(sourceTexts[i] || ''))
+      if (expected && items[i].translatedText === expected) {
+        prohibitedFixMap.delete(i)
+      }
+    }
+  }
+
   const textList = items.map((it, i) => {
     const srcLang = detectedProofreadSource
     // 行首 * 替换为 ※，避免 LLM 将其解析为 markdown 列表标记
@@ -1883,7 +1924,15 @@ export async function proofreadBatch(
           ? '\n⚠️ Note: This translation is notably longer than the source. Verify whether it adds information absent from the source. If it is faithful and natural, keep it as-is; only tighten it if it contains source-absent additions.'
           : '\n⚠️ 提示：本条译文显著长于源文。请确认是否添加了源文没有的信息。若语义忠实、表达自然，请保持原样；仅当含有源文没有的添加内容时才精简。')
       : ''
-    return `[${i + 1}] (${srcLang}→${targetLang}) ${escapedSource}\n${transLabel}：${maskedTranslations[i]}${expansionNote}`
+    // v11.12: 违禁词修正提示 — 祈使句列出具体词（语义改写是定向替换，不列词 LLM 不知道绕开哪个）；
+    //         不写成"原词→建议词"对照表，防 LLM 在输出里复述违禁词。
+    const prohibitedHits = prohibitedFixMap ? prohibitedFixMap.get(i) : undefined
+    const prohibitedNote = (prohibitedHits && prohibitedHits.length > 0)
+      ? (useEnInstruction
+          ? `\n⚠️ Note: This translation contains platform-prohibited word(s): ${prohibitedHits.map(h => h.word).join(', ')}. Rewrite it to avoid ALL listed words while preserving the original meaning and tone. Output ONLY the rewritten text, without the prohibited words or any explanation.`
+          : `\n⚠️ 提示：本条译文含平台违禁词：${prohibitedHits.map(h => h.word).join('、')}。请在保持原意和语气的前提下改写规避以上全部违禁词。只输出改写后的文本，不要包含违禁词本身或任何解释。`)
+      : ''
+    return `[${i + 1}] (${srcLang}→${targetLang}) ${escapedSource}\n${transLabel}：${maskedTranslations[i]}${expansionNote}${prohibitedNote}`
   }).join('\n\n')
 
   // ⛔ 校对环节术语反补全闭环：术语 hint 的 label 不含反补全指令，
@@ -1914,6 +1963,7 @@ export async function proofreadBatch(
     glossaryHint,
     sourceLang: detectedProofreadSource,              // v11.5: 变体对条件注入
     hasExpansionFlags: !!expansionFlags && expansionFlags.size > 0,  // v11.5: 超长提示条件注入
+    hasProhibitedFix: !!prohibitedFixMap && prohibitedFixMap.size > 0,  // v11.12: 违禁词全局块条件注入
   })
 
   const apiKey = config.proofreadApiKey || config.apiKey
@@ -2020,6 +2070,7 @@ export async function proofreadBatch(
     for (let i = 0; i < resultTexts.length; i++) {
       if (!(proofreadSourceTexts[i] || '').trim()) continue
       const expected = normalizedGlossaryMap.get(cleanKey(proofreadSourceTexts[i]))
+      if (expected && shouldSkipGlossaryEntry(proofreadSourceTexts[i], expected)) continue   // v11.14: 脏条目不锁定
       if (expected && resultTexts[i] !== expected) {
         console.warn('[proofreadBatch] ⛔ 术语合规校验：整条命中术语库但译文不符，已锁定为术语库值', {
           source: proofreadSourceTexts[i].slice(0, 60),
@@ -2210,6 +2261,7 @@ export function detectTruncatedTexts(
 // 拉丁单疑似错词：无空格/标点/数字的纯字母单词，长度≥6（Panasionic/Spede/Transfser）
 const SUSPECT_MISSPELLED_WORD_RE = /^[A-Za-z]{6,}$/
 
+
 /**
  * v10.6.2: 疑似错词形态判定器（模块级，供漏翻检测/兜底链/回退兜底/UI 徽章共用）。
  *
@@ -2230,6 +2282,10 @@ const SUSPECT_MISSPELLED_WORD_RE = /^[A-Za-z]{6,}$/
 export function isSuspectMisspelledWord(src: string, glossaryMap?: Map<string, string>): boolean {
   const s = (src || '').trim()
   if (!SUSPECT_MISSPELLED_WORD_RE.test(s)) return false
+  // v11.13: 内置第三方整词豁免前置 —— Nintendo/Lenovo/Logitech 等裸品牌词形态上
+  // 就是"≥6 纯拉丁单字"，与疑似错词完全同形；它们是已知品牌，不是错词。
+  // 与 isUntranslatable 0.1 同一份名单，两处判断口径必须一致。
+  if (isBuiltinThirdPartyWholeText(s)) return false
   if (glossaryMap && glossaryMap.size > 0) {
     const key = normalizeGlossaryKey(s)
     for (const [k, v] of glossaryMap.entries()) {
@@ -2313,10 +2369,19 @@ const PURE_UNIT_RE = /^(GB|MB|TB|KB|MB\/s|GB\/s|TB\/s|MHz|GHz|TBW)\*?$/i
  *   'Read/write speed 2050MB/s'（小写词为主）。
  */
 function isModelListOrCode(s: string): boolean {
-  const segs = s.split(/\/|\n/).map(x => x.trim()).filter(Boolean)
+  // v11.13: 切分符补 ↵ —— text-normalizer.ts 在管道最前端已把扫描文本的 \n
+  // 转成 ' ↵ '（U+21B5），检测器永远见不到真换行；只按 /\n 切分会让多行型号列表
+  // 变成"一整段带非法字符 ↵"，段字符集校验整锅失败 → 多行列表全部误判漏翻。
+  const segs = s.split(/\/|\n|↵/).map(x => x.trim()).filter(Boolean)
   if (segs.length === 0) return false
   const isModelish = (seg: string): boolean => {
     if (!/^[A-Za-z0-9\s\-*.®™©]+$/.test(seg)) return false
+    // v11.13: 内置第三方词条（遮蔽表 ∪ 整词豁免名单全集）作为段直接成立——
+    // 收录即钦定型号的形态认证，无需再过数字/大写规则（'Bones' 无数字）。
+    if (BUILTIN_THIRD_PARTY_ALL_KEYS.has(normalizeGlossaryKey(seg))) return true
+    // v11.13: 段名单（Mini/Switch NS）——不进遮蔽表（切碎既有词条/过遮蔽），
+    // 只在【整条全是型号段】的列表语境认段，正文不受影响。
+    if (isBuiltinModelSegment(seg)) return true
     const letters = seg.replace(/[^A-Za-z]/g, '')
     if (letters.length === 0) return false
     const upper = letters.replace(/[^A-Z]/g, '').length
@@ -2398,6 +2463,12 @@ function getUntranslatableIndex(glossaryMap: Map<string, string>): Untranslatabl
 }
 
 export function isUntranslatable(s: string, glossaryMap?: Map<string, string>): boolean {
+  // 0.1 内置第三方整词豁免（v11.13）— 裸品牌词/无数字短型号整条命中即豁免。
+  // 独立于术语库（不可被用户 CSV 覆盖/删除削弱），且只在此做整词匹配、
+  // 不进遮蔽表（子串遮蔽裸品牌词=大面积过遮蔽，v11.9 红线）。
+  // 放在最前：代码内置零成本短路，比任何形态规则都可靠。
+  if (isBuiltinThirdPartyWholeText(s)) return true
+
   // 0. 纯标点/符号不承载可翻译语义，避免 +、—、• 等触发漏翻重试。
   // 保留字母、数字和占位符中的下划线以免掩盖真正的文本或实体还原失败。
   if (!s.replace(/[\p{P}\p{S}\s]/gu, '')) return true
@@ -2407,6 +2478,14 @@ export function isUntranslatable(s: string, glossaryMap?: Map<string, string>): 
   if (s.trim().length === 1) return true
 
   // 1. 术语库检查：如果源文在术语库中且目标语言与源文相同，不算漏翻
+  // v11.13: 内置第三方表优先于用户术语库——不依赖 UI 层注入，翻译管道自带兜底；
+  // 用户删/换 CSV 后第三方型号豁免链依然完整（v11.9 内置化初衷的闭环补全）。
+  {
+    const normalizedKey = normalizeGlossaryKey(s)
+    // key 已归一化（小写+去®™©+trim），查询前必须先归一化——遮蔽表 key 是原始
+    // 大小写（'Steam Deck'），直接 get 会失配；全集含遮蔽表∪整词豁免名单。
+    if (BUILTIN_THIRD_PARTY_ALL_KEYS.has(normalizedKey)) return true
+  }
   if (glossaryMap) {
     const normalizedKey = normalizeGlossaryKey(s)
     const idx = getUntranslatableIndex(glossaryMap)
@@ -2632,11 +2711,15 @@ export function detectTargetLanguageFeatures(
 // 简繁特征字表（高频区分字，覆盖营销/技术文案常用字）
 // 原则：只收录"该写法仅在简体/繁体中出现"的字，简繁同形字（如 性/能/人/全）不收录
 // 同形字无区分度，收录会导致双向误判（v9.5 初始版本误收 17 个同形字，已清理）
+// v11.15（2026-08-18 实机事故）：词片段拆字建表漏网同形字「放」「言」——
+// 繁体"釋放/語言/播放/發言"的 放/言 与简体同形，zh-CN→zh-TW 完美译文被判漏翻，
+// 全链重试（统一重试→激进→逐句拆分→兜底→最终安全网）层层拒收 → 误报"翻译失败"。
+// 已删；test-v1115 以行为断言锁回归（两表交集恒为空）。
 const SIMPLIFIED_ONLY_CHARS = new Set(
-  '让这说会对开关时间问题现发现实义经验证号国际学习体台湾龙们为产众优亿仅们见页车马门问闻间买卖读书读写话语言讲谈议论认记忆讨训议讲谢谢请诸课传释放电脑设计专为电脑'.split('')
+  '让这说会对开关时间问题现发现实义经验证号国际学习体台湾龙们为产众优亿仅们见页车马门问闻间买卖读书读写话语讲谈议论认记忆讨训议讲谢谢请诸课传释电脑设计专为电脑'.split('')
 )
 const TRADITIONAL_ONLY_CHARS = new Set(
-  '讓這說會對開關時間問題現發現實義經驗證號國際學習體臺灣龍們為產眾優億僅從們見頁車馬門問聞間買賣讀書讀寫話語言講談議論認記憶討訓議講謝謝請諸課傳釋放電腦設計專為電腦'.split('')
+  '讓這說會對開關時間問題現發現實義經驗證號國際學習體臺灣龍們為產眾優億僅從們見頁車馬門問聞間買賣讀書讀寫話語講談議論認記憶討訓議講謝謝請諸課傳釋電腦設計專為電腦'.split('')
 )
 
 // 简繁同形字（无区分度，从特征字表中排除）

@@ -107,14 +107,14 @@
       <!-- v9.1 #5/#6: 顺序引导 / 撤销禁用原因（合并一行，不挤 apply-row） -->
       <div class="apply-hint disabled-hint" v-if="applyRowHint || undoDisabledReason">{{ applyRowHint || undoDisabledReason }}</div>
 
-      <!-- ③ v8.9: 待处理警告条（v9.1 #7: 移入 sticky 区，阻塞操作 0 次滚动可达） -->
-      <div class="pending-banner" v-if="hasPendingBlockingIssue">
+      <!-- ③ v8.9: 待处理警告条（v9.1 #7: 移入 sticky 区，阻塞操作 0 次滚动可达；v11.12: 非阻塞提示也有入口） -->
+      <div class="pending-banner" :class="{ 'non-blocking-only': !hasPendingBlockingIssue }" v-if="hasPendingBlockingIssue || hasPendingNonBlockingIssue">
         <div class="pending-header" @click="togglePendingList">
           <span class="pending-icon">⚠️</span>
           <span class="pending-text">
             {{ pendingItems.filter(p => p.type === 'error').length }} 条错误，
             {{ pendingItems.filter(p => p.type === 'placeholder').length }} 条占位符，
-            {{ pendingItems.filter(p => p.type === 'untranslated').length }} 条漏翻待确认<template v-if="pendingItems.some(p => p.type === 'misspelled')">，{{ pendingItems.filter(p => p.type === 'misspelled').length }} 条疑似拼写错误</template><template v-if="pendingItems.some(p => p.type === 'llmFallback')">，{{ pendingItems.filter(p => p.type === 'llmFallback').length }} 条新品名待确认</template><template v-if="pendingItems.some(p => p.type === 'glossaryDiverged')">，{{ pendingItems.filter(p => p.type === 'glossaryDiverged').length }} 条术语库差异提示</template>
+            {{ pendingItems.filter(p => p.type === 'untranslated').length }} 条漏翻待确认<template v-if="pendingItems.some(p => p.type === 'misspelled')">，{{ pendingItems.filter(p => p.type === 'misspelled').length }} 条疑似拼写错误</template><template v-if="pendingItems.some(p => p.type === 'llmFallback')">，{{ pendingItems.filter(p => p.type === 'llmFallback').length }} 条新品名待确认</template><template v-if="pendingItems.some(p => p.type === 'glossaryDiverged')">，{{ pendingItems.filter(p => p.type === 'glossaryDiverged').length }} 条术语库差异提示</template><template v-if="pendingItems.some(p => p.type === 'prohibitedSrc')">，{{ pendingItems.filter(p => p.type === 'prohibitedSrc').length }} 条源文含平台违禁词</template><template v-if="pendingItems.some(p => p.type === 'prohibitedTrans')">，{{ pendingItems.filter(p => p.type === 'prohibitedTrans').length }} 条译文含平台违禁词</template><template v-if="pendingItems.some(p => p.type === 'prohibitedLocked')">，{{ pendingItems.filter(p => p.type === 'prohibitedLocked').length }} 条术语库官方值含违禁词（仅提示）</template>
           </span>
           <svg class="chevron" :class="{ open: showPendingList }" width="12" height="12" viewBox="0 0 12 12"><path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
         </div>
@@ -129,13 +129,30 @@
         <div class="pending-list" v-if="showPendingList">
           <div class="pending-item" v-for="p in pendingItems" :key="p.item.nodeIds[0]" :class="p.type">
             <div class="pending-item-source">
-              <span v-if="p.type === 'misspelled'" class="misspelled-tag">疑似拼写错误，请核对源稿：</span><span v-else-if="p.type === 'llmFallback'" class="llm-fallback-tag">新品名待确认（LLM 辅助识别）：</span><span v-else-if="p.type === 'glossaryDiverged'" class="glossary-diverged-tag">术语库差异提示（译文与源文写法不同，来自术语库官方值）：</span>{{ p.item.sourceText.slice(0, 40) }}{{ p.item.sourceText.length > 40 ? '...' : '' }}
+              <span v-if="p.type === 'misspelled'" class="misspelled-tag">疑似拼写错误，请核对源稿：</span><span v-else-if="p.type === 'llmFallback'" class="llm-fallback-tag">新品名待确认（LLM 辅助识别）：</span><span v-else-if="p.type === 'glossaryDiverged'" class="glossary-diverged-tag">术语库差异提示（译文与源文写法不同，来自术语库官方值）：</span><span v-else-if="p.type === 'prohibitedSrc'" class="prohibited-tag">源文含平台违禁词（{{ (prohibitedSrcIds.get(p.item.nodeIds[0]) || []).join('、') }}），上传京东/亚马逊会被拦截：</span><span v-else-if="p.type === 'prohibitedTrans'" class="prohibited-tag">译文含平台违禁词（{{ (prohibitedTransIds.get(p.item.nodeIds[0]) || []).join('、') }}）{{ llmConfig.enableProofread ? '，校对未修正' : '，开启 AI 校对可自动规避' }}：</span><span v-else-if="p.type === 'prohibitedLocked'" class="prohibited-tag">译文为术语库官方值，含平台违禁词（{{ (prohibitedLockedIds.get(p.item.nodeIds[0]) || []).join('、') }}），已保留术语库值未自动改写：</span>{{ p.item.sourceText.slice(0, 40) }}{{ p.item.sourceText.length > 40 ? '...' : '' }}
             </div>
             <div class="pending-item-trans">{{ p.item.translatedText.slice(0, 40) }}{{ p.item.translatedText.length > 40 ? '...' : '' }}</div>
             <div class="pending-item-actions">
+              <!-- v11.15（问题5）：按类型给"最合适的解决方案"作为主操作，消灭"跳过隐身丢译文" -->
+              <!-- error/untranslated/placeholder：重翻是首选修复路径 -->
+              <button v-if="p.type === 'error' || p.type === 'untranslated' || p.type === 'placeholder'"
+                class="btn btn-xs btn-primary"
+                :disabled="retranslatingIds.has(p.item.nodeIds[0]) || translating || proofreading"
+                @click="retranslateSingle(p.item)">重翻</button>
+              <!-- misspelled：确认源稿无误 → 保留源文作为译文（确认后条目可正常应用） -->
+              <button v-if="p.type === 'misspelled'" class="btn btn-xs btn-primary" @click="confirmKeepSource(p.item)">确认保留源文</button>
+              <!-- llmFallback：入库 or 应用但不入库，必须显式处置（无"知道了"） -->
               <button v-if="p.type === 'llmFallback'" class="btn btn-xs btn-primary" @click="confirmLlmFallbackTerm(p.item)">确认入库</button>
+              <button v-if="p.type === 'llmFallback'" class="btn btn-xs btn-tinted" @click="applyWithoutGlossary(p.item)">应用但不入库</button>
+              <!-- prohibitedTrans：首选校对规避（开校对时自动改写），未开校对禁用并提示 -->
+              <button v-if="p.type === 'prohibitedTrans'" class="btn btn-xs btn-primary"
+                :disabled="!llmConfig.enableProofread || proofreading || translating"
+                :title="llmConfig.enableProofread ? '运行 AI 校对自动规避违禁词' : '先在配置中开启 AI 校对'"
+                @click="startProofread()">去校对规避</button>
               <button class="btn btn-xs btn-tinted" @click="editPendingItem(p.item)">编辑</button>
-              <button class="btn btn-xs btn-plain" @click="skipPendingItem(p.item)">跳过</button>
+              <!-- 知道了：纯提醒类 + 阻塞类的消音出口（misspelled/llmFallback 须显式处置，无此钮） -->
+              <button v-if="p.type !== 'misspelled' && p.type !== 'llmFallback'"
+                class="btn btn-xs btn-plain" @click="dismissPendingItem(p.item)">知道了</button>
             </div>
           </div>
         </div>
@@ -258,6 +275,7 @@
             <div class="item-label">
               原文
               <span class="merge-badge" v-if="item.nodeIds.length > 1">×{{ item.nodeIds.length }}</span>
+              <span class="prohibited-badge" v-if="prohibitedSrcIds.has(item.nodeIds[0])" :title="'源文含平台违禁词：' + (prohibitedSrcIds.get(item.nodeIds[0]) || []).join('、') + '（上传京东/亚马逊会被拦截）'">⚠ 源文违禁词</span>
             </div>
             <div class="source-box">{{ item.sourceText }}</div>
           </div>
@@ -266,6 +284,8 @@
             <div class="item-label">
               译文
               <span class="error-badge" v-if="translateErrors.has(item.nodeIds[0])">翻译失败</span>
+              <span class="prohibited-badge" v-if="prohibitedTransIds.has(item.nodeIds[0])" :title="'译文含平台违禁词：' + (prohibitedTransIds.get(item.nodeIds[0]) || []).join('、')">⚠ 译文违禁词</span>
+              <span class="prohibited-badge locked" v-if="prohibitedLockedIds.has(item.nodeIds[0])" :title="'译文为术语库官方值，含平台违禁词：' + (prohibitedLockedIds.get(item.nodeIds[0]) || []).join('、') + '（术语库优先级最高，未自动改写）'">⚠ 术语库违禁词</span>
               <span class="misspelled-badge" v-if="misspelledIds.has(item.nodeIds[0])">疑似拼写错误</span>
               <span class="placeholder-badge" v-if="hasPlaceholderResidue(item.translatedText)">⚠️ 占位符</span>
               <span class="untranslated-badge" v-if="showUntranslatedBadge(item)">⚠️ 漏翻</span>
@@ -293,8 +313,8 @@
                 <span class="proof-original">原译文：{{ item.proofreadText }}</span>
               </div>
             </div>
-            <!-- 操作行 — 全部 icon+文字 -->
-            <div class="item-actions" v-if="!appliedNodeIds.has(item.nodeIds[0])">
+            <!-- 操作行 — 全部 icon+文字；v11.15：点过"知道了"的条目保持显形可应用 -->
+            <div class="item-actions" v-if="!appliedNodeIds.has(item.nodeIds[0]) || dismissedNodeIds.has(item.nodeIds[0])">
               <button class="btn btn-xs btn-tinted" @click.stop="navigateToNode(item)" title="在画布中定位该文本">
                 <svg width="12" height="12" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/><path d="M8 1v2.5M8 12.5V15M1 8h2.5M12.5 8H15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
                 定位
@@ -448,7 +468,7 @@
                 <span class="toggle" :class="{ on: llmConfig.enableProofread }">
                   <span class="toggle-knob"></span>
                 </span>
-                AI 校对（翻译后自动二次审查）
+                AI 校对（二次审查 + 平台违禁词规避，建议开启）
               </label>
             </div>
             <template v-if="llmConfig.enableProofread">
@@ -566,7 +586,8 @@
 import { ref, shallowRef, markRaw, computed, onMounted, nextTick, watch } from 'vue'
 import { UIMessage, PluginMessage, TextItem, LLMConfig, GlossaryEntry, TranslationCorrection, LANGUAGES, TestConnectionResult } from '@messages/types'
 import { sendMsgToPlugin } from '@messages/ui-sender'
-import { parseCSVRow, csvEncodeCell } from '@lib/parse-csv'
+import { parseGlossaryCSVText, serializeGlossaryCSV } from '@lib/parse-csv'
+import { validateAutoGlossarySource, sanitizeAutoGlossaryValue, isIdentityAutoAddAllowed, shouldSkipGlossaryEntry, hasMalformedTrademark } from '@lib/glossary-guard'
 import { formatCJKSpace } from '@lib/format-text'
 import { postProcessTranslation, restoreTrademarkSymbols, restoreStorageUnitFormatting, enforceGlossaryTerms, detectTranslationExpansion, sanitizeLineBreaks, cleanKey } from '@lib/post-process'
 import { translateBatch, proofreadBatch, fetchWithRetry, isProofreadScriptMismatch, detectTruncatedTexts, STYLE_PRESETS, SCENE_PRESETS, detectProductLine, buildTaskGlossaryHint, isUntranslatable, isSuspectMisspelledWord, classifyNecessity, getTargetScript, hasFunctionWords, hasSimplifiedOnlyChars, hasTraditionalOnlyChars } from '@lib/llm-api'
@@ -581,6 +602,7 @@ import { detectAdhocProductTerms, detectFallbackCandidates, parseProductName } f
 import { generateProductNameTranslations, zhCNtoZhTW } from '@lib/product-name-generator'
 import { parseProductNameWithLLM } from '@lib/llm-api'
 import { uiLog, getUiLogs, getUiLogVersion, clearUiLogs, formatUiLogs, receiveMainLog, restoreUiLogs, serializeUiLogs, UiLogEntry } from '@lib/ui-debug-log'
+import { detectProhibited, detectSourceLangForProhibited, isGlossaryLockedTranslation } from '@lib/prohibited-check'
 
 // ============================================================
 // 响应式状态
@@ -606,6 +628,8 @@ function showUntranslatedBadge(item: { sourceText: string; translatedText: strin
   if (item.sourceText !== item.translatedText) return false
   // v10.6.2: 疑似错词已单独标记"疑似拼写错误"，不再叠加"⚠️ 漏翻"徽章
   if (item.nodeIds?.[0] && misspelledIds.value.has(item.nodeIds[0])) return false
+  // v11.15: 用户已点"知道了"消音（下一轮翻译/校对批次启动时清空，真问题会复现）
+  if (item.nodeIds?.[0] && untranslatedDismissedIds.value.has(item.nodeIds[0])) return false
   const key = item.sourceText + '' + targetLang.value + '' + glossaryProducts.value.length + '/' + glossaryExclusive.value.length
   const cached = untranslatedBadgeCache.get(key)
   if (cached !== undefined) return cached
@@ -657,7 +681,7 @@ function hasPlaceholderResidue(text: string): boolean {
 
 /** v8.9: 待确认条目 — 三类阻塞问题 + v11.3 LLM 兜底新品名 + v11.6 术语库差异提示（非阻塞） */
 const pendingItems = computed(() => {
-  const errors: Array<{ item: typeof items.value[0]; type: 'error' | 'placeholder' | 'untranslated' | 'misspelled' | 'llmFallback' | 'glossaryDiverged' }> = []
+  const errors: Array<{ item: typeof items.value[0]; type: 'error' | 'placeholder' | 'untranslated' | 'misspelled' | 'llmFallback' | 'glossaryDiverged' | 'prohibitedSrc' | 'prohibitedTrans' | 'prohibitedLocked' }> = []
   for (const item of items.value) {
     if (appliedNodeIds.value.has(item.nodeIds[0])) continue // 已应用的不参与
     // v11.3: LLM 兜底检出的新品名（整条原文在 llmFallbackTerms 中）
@@ -677,12 +701,25 @@ const pendingItems = computed(() => {
       errors.push({ item, type: 'glossaryDiverged' })
     }
   }
+  // v11.12: 违禁词提示独立于阻塞问题链，可与任何类型叠加
+  // （平台合规风险与翻译质量问题正交：一条译文既可能漏翻又可能含违禁词）
+  // v11.12+: 术语库锁定项优先于普通译文违禁词（两 Map 互斥，else-if 仅兜底防御）
+  for (const item of items.value) {
+    if (appliedNodeIds.value.has(item.nodeIds[0])) continue
+    if (prohibitedLockedIds.value.has(item.nodeIds[0])) errors.push({ item, type: 'prohibitedLocked' })
+    else if (prohibitedTransIds.value.has(item.nodeIds[0])) errors.push({ item, type: 'prohibitedTrans' })
+    else if (prohibitedSrcIds.value.has(item.nodeIds[0])) errors.push({ item, type: 'prohibitedSrc' })
+  }
   return errors
 })
 
-/** v8.9: 是否有阻塞批量应用的问题（v11.6: glossaryDiverged 是提示非阻塞，不计入） */
+/** v8.9: 是否有阻塞批量应用的问题（v11.6: glossaryDiverged 是提示非阻塞，不计入；v11.12: 违禁词三类同理） */
 const hasPendingBlockingIssue = computed(() =>
-  pendingItems.value.some(p => p.type !== 'glossaryDiverged')
+  pendingItems.value.some(p => p.type !== 'glossaryDiverged' && p.type !== 'prohibitedSrc' && p.type !== 'prohibitedTrans' && p.type !== 'prohibitedLocked')
+)
+/** v11.12: 违禁词/术语差异等非阻塞提示单独显隐（无阻塞问题时 banner 不出现，提示也要有入口） */
+const hasPendingNonBlockingIssue = computed(() =>
+  pendingItems.value.some(p => p.type === 'glossaryDiverged' || p.type === 'prohibitedSrc' || p.type === 'prohibitedTrans' || p.type === 'prohibitedLocked')
 )
 
 /**
@@ -692,6 +729,8 @@ const hasPendingBlockingIssue = computed(() =>
  * 判定：源文含术语库 key + 译文含对应值 + key≠值（有实质差异）→ true。
  */
 function isGlossaryDivergedItem(item: typeof items.value[0]): boolean {
+  // v11.15: 用户已点"知道了"消音（下一轮批次启动时清空）
+  if (divergedDismissedIds.value.has(item.nodeIds[0])) return false
   const src = item.sourceText.trim()
   const trans = item.translatedText.trim()
   if (!src || !trans || src === trans) return false
@@ -705,7 +744,7 @@ function isGlossaryDivergedItem(item: typeof items.value[0]): boolean {
 }
 
 const translationCache = ref<Record<string, string>>({})
-const llmConfig = ref<LLMConfig>({ apiKey: '', apiUrl: '', model: '', translationStyle: 'standard', translationStyleCustom: '', scenePreset: 'ecommerce', enableProofread: false, proofreadApiKey: '', proofreadApiUrl: '', proofreadModel: '' })
+const llmConfig = ref<LLMConfig>({ apiKey: '', apiUrl: '', model: '', translationStyle: 'standard', translationStyleCustom: '', scenePreset: 'ecommerce', enableProofread: true, proofreadApiKey: '', proofreadApiUrl: '', proofreadModel: '' })
 
 const scanning = ref(false)
 /** v9.1 #11: 扫描进度（main.ts 每 100 节点上报），按钮文案"扫描中(N)..." */
@@ -739,8 +778,93 @@ const llmFallbackTerms = ref<Map<string, { translations: Record<string, string>;
 const suggestedGlossaryTerms = ref<string[]>([])
 /** 已被手动应用过的 nodeId 集合，批量应用时自动跳过 */
 const appliedNodeIds = ref<Set<string>>(new Set())
+/** v11.15（问题5"跳过隐身丢译文"根治）：点过"知道了"的条目集合——
+ * 只消提示音、不假装已应用（与 appliedNodeIds 严格分离），
+ * 卡片操作行保持可见可点，批量"应用翻译"照常带上该节点。
+ * 翻译/校对批次启动时清空（新一轮检测说了算）。 */
+const dismissedNodeIds = ref<Set<string>>(new Set())
+/** v11.15: 漏翻/占位符徽章消音集合（dismiss 后 showUntranslatedBadge 返回 false） */
+const untranslatedDismissedIds = ref<Set<string>>(new Set())
+/** v11.15: 术语库差异提示消音集合 */
+const divergedDismissedIds = ref<Set<string>>(new Set())
 /** 正在单条重翻中的 nodeId 集合，用于禁用按钮防止重复提交 */
 const retranslatingIds = ref<Set<string>>(new Set())
+/** v11.12: 源文违禁词命中（nodeIds[0] → 命中词列表）— 京东(zh)/亚马逊(en) 平台词表，非阻塞提醒 */
+const prohibitedSrcIds = ref<Map<string, string[]>>(new Map())
+/** v11.12: 译文违禁词命中（nodeIds[0] → 命中词列表）— 开校对时进修正链自动规避，关校对只提醒 */
+const prohibitedTransIds = ref<Map<string, string[]>>(new Map())
+/** v11.12+: 术语库锁定违禁词命中（nodeIds[0] → 命中词列表）— 只提示不改写（术语库最高优先级） */
+const prohibitedLockedIds = ref<Map<string, string[]>>(new Map())
+/** v11.12+: 本次翻译任务的归一化术语查找表（违禁词术语库锁定豁免判定用；翻译/校对启动时赋值） */
+let activeNormalizedGlossaryMap: Map<string, string> | undefined
+/** v11.12: 本轮校对自动规避成功的违禁词处数（toast 汇总用） */
+const prohibitedFixedCount = ref(0)
+
+/**
+ * v11.12: 译文违禁词检测+状态同步（翻译写回/校对写回/旁路四处共用）。
+ * 命中 → set（点亮徽章）；未命中 → delete（防重翻/修正后残留）。
+ * 只检测+提醒，修正走校对链（代码管形式，LLM 管语义）。
+ *
+ * v11.12+（2026-08-14 用户拍板：术语库最高优先级）：源文整条命中术语库且译文
+ * == 钦定值时，命中只进 prohibitedLockedIds（提示），不进 prohibitedTransIds
+ * （不触发校对改写）——避免与术语合规锁定死锁。
+ */
+function updateProhibitedTrans(id: string, text: string) {
+  if (!text || !text.trim()) {
+    prohibitedTransIds.value.delete(id)
+    prohibitedLockedIds.value.delete(id)
+    return
+  }
+  routeProhibitedHits(id, detectProhibited(text, targetLang.value), text)
+}
+
+/**
+ * v11.12+: 违禁词命中按"术语库锁定"状态路由到两套徽章（校对回检/终态回扫共用）。
+ * 术语库锁定（源文整条命中且文本==钦定值）→ prohibitedLockedIds（只提示，不进改写链）；
+ * 否则 → prohibitedTransIds（开校对时进自动规避链）；无命中 → 两套都清。
+ * @param text 被判定的译文原文（锁定判定须与当前文本同源，防"曾命中术语库但已改写"误判）
+ */
+function routeProhibitedHits(id: string, hits: Array<{ word: string; note: string }>, text: string) {
+  if (hits.length > 0) {
+    const item = items.value.find(it => it.nodeIds[0] === id)
+    if (item && isGlossaryLockedTranslation(item.sourceText, text, activeNormalizedGlossaryMap)) {
+      prohibitedLockedIds.value.set(id, hits.map(h => h.word))
+      prohibitedTransIds.value.delete(id)
+    } else {
+      prohibitedTransIds.value.set(id, hits.map(h => h.word))
+      prohibitedLockedIds.value.delete(id)
+    }
+  } else {
+    prohibitedTransIds.value.delete(id)
+    prohibitedLockedIds.value.delete(id)
+  }
+}
+
+/**
+ * v11.12: 源文违禁词全量重检（SCAN_RESULT 落地后 + 源语言下拉变更后调用）。
+ * 源语言判定：用户显式选择优先；auto 时用 detectSourceLangForProhibited 自实现快速判定
+ * （detectSourceLanguage 对"中文+英文型号"混排文案会误判 en——cjkChars > latinChars 一票制，
+ * SL500/PCIe 4.0 噪声字符数超过汉字即失效，而这是中文源文主场景）。
+ * zh → 京东/广告法词表；en → 亚马逊词表；null（纯数字/符号）不检测。
+ */
+function recheckProhibitedSource() {
+  prohibitedSrcIds.value = new Map()
+  const explicit = sourceLang.value
+  for (const item of items.value) {
+    let lang: 'zh' | 'en' | null
+    if (explicit === 'zh-CN' || explicit === 'zh-TW') lang = 'zh'
+    else if (explicit !== 'auto') lang = 'en'
+    else lang = detectSourceLangForProhibited(item.sourceText)
+    if (!lang) continue
+    const hits = detectProhibited(item.sourceText, lang === 'zh' ? 'zh-CN' : 'en')
+    if (hits.length > 0) prohibitedSrcIds.value.set(item.nodeIds[0], hits.map(h => h.word))
+  }
+}
+
+/** v11.12: 源语言下拉变更时若已有扫描结果，重跑源文违禁词检测（显式选择与 auto 判定可能不同） */
+watch(sourceLang, () => {
+  if (items.value.length > 0) recheckProhibitedSource()
+})
 
 
 const translateProgress = ref({ current: 0, total: 0 })
@@ -895,6 +1019,14 @@ function onFontSelected(f: FontMapping) {
     const parsed = parseFontKey(f.selectedFont)
     f.targetFamily = parsed.family
     f.targetStyle = parsed.style
+    // v11.15（问题3"点卡片应用字体变大"根治）：手动选字体必须回填字号/行距/字距，
+    // 否则 targetFontSize 留 0 → syncFontMappings 同步 0 → APPLY_SINGLE 换字体
+    // 不设字号 → MasterGo 按新字体默认字号渲染 → 变大。v7.5.9 只修了 autoMapFonts
+    // 自动映射路径，手动选择路径是同型孪生缺口。回填规则与 syncFontAttrs 一致
+    // （不换 textAlign——用户可能已在对齐上做过手动调整，换字体不该动它）。
+    if (!f.targetFontSize) f.targetFontSize = f.sourceFontSize
+    if (f.targetLineHeight == null) f.targetLineHeight = f.sourceLineHeight ?? null
+    if (f.targetLetterSpacing == null) f.targetLetterSpacing = f.sourceLetterSpacing ?? null
   } else {
     // "继承原字体"：清除所有目标字体属性，避免字号/行距/字距残留
     f.targetFamily = ''
@@ -1126,6 +1258,8 @@ function revertProofread(item: TextItem) {
   item.proofreadText = ''
   item.proofreadReason = ''
   item.corrected = false
+  // v11.12: 恢复原译文后重检——原译文含违禁词则徽章重新点亮（只提醒不修正）
+  updateProhibitedTrans(item.nodeIds[0], item.translatedText || '')
   showToast('已恢复原译文', 'info')
 }
 
@@ -1148,10 +1282,13 @@ function onTransInputBlur(item: TextItem) {
       originalTranslation: before,
       correctedTranslation: after,
       correctedAt: Date.now(),
+      origin: 'user',  // v11.14: 用户手动编辑来源标记（入库被拒时提示）
     }
     corrections.value.push(correction)
     sendMsgToPlugin(UIMessage.SAVE_CORRECTION, JSON.parse(JSON.stringify(correction)))
   }
+  // v11.12: 手动编辑后重检（含清空/改回含违禁词文本，徽章亮灭即时同步；只提醒不修正）
+  updateProhibitedTrans(item.nodeIds[0], after || '')
 }
 
 // ============================================================
@@ -1164,10 +1301,18 @@ function resetWorkState() {
   misspelledIds.value = new Set()
   expansionIds.value = new Set()
   llmFallbackTerms.value = new Map()  // v11.3: 清空 LLM 兜底待确认集合
+  prohibitedSrcIds.value = new Map()   // v11.12: 清空违禁词命中（源文/译文）
+  prohibitedTransIds.value = new Map()
+  prohibitedLockedIds.value = new Map()  // v11.12+: 清空术语库锁定违禁词
+  prohibitedFixedCount.value = 0
+  activeNormalizedGlossaryMap = undefined  // v11.12+: 任务结束，释放术语表引用
   failedNodeIds.value = []
   appliedNodeIds.value = new Set()
   retranslatingIds.value = new Set()
   csvChangedIds.value = new Set()
+  dismissedNodeIds.value = new Set()       // v11.15: 新一轮工作，消音集合清空
+  untranslatedDismissedIds.value = new Set()
+  divergedDismissedIds.value = new Set()
   showPendingList.value = false
   scanFoundCount.value = 0
   translateProgress.value = { current: 0, total: 0 }
@@ -1407,6 +1552,9 @@ async function startTranslate() {
   misspelledIds.value = new Set()
   expansionIds.value = new Set()
   llmFallbackTerms.value = new Map()  // v11.3: 清空 LLM 兜底待确认集合
+  prohibitedTransIds.value = new Map()   // v11.12: 清空违禁词命中（译文）
+  prohibitedLockedIds.value = new Map()  // v11.12+: 清空术语库锁定违禁词
+  prohibitedFixedCount.value = 0
   translateProgress.value = { current: 0, total: 0 }
 
   // 目标语言切换后需要重新翻译：清空所有旧译文和校对状态
@@ -1428,6 +1576,8 @@ async function startTranslate() {
         normalizedGlossaryMap.set(ck, value)
       }
     }
+    // v11.12+: 违禁词锁定豁免判定激活（本任务内 updateProhibitedTrans/routeProhibitedHits 据此分流）
+    activeNormalizedGlossaryMap = normalizedGlossaryMap
 
     // ═══ v11.2: 未收录新产品名保护 — 检测 → 按命名规则生成译名 → 并入术语链 ═══
     // 检测"整条独立出现+Lexar锚点+品类词"的未收录产品名（含®变体与纯型号形态），
@@ -1538,10 +1688,17 @@ async function startTranslate() {
       autoSkipped++
     } else if (noTranslateTerms.has(trimmed)) {
       // 术语库中 source===target 的产品名，全语种保留英文原样，不送 API
-      item.translatedText = trimmed
-      autoSkipped++
-    } else if (normalizedGlossaryMap.has(cleanKey(trimmed))) {
+      // v11.14: 脏条目（句形 key + identity 值）不短路——防脏 identity 条目把整句
+      // 锁死成"永不翻译"（Bug A 同款机制）；正当策展句照常短路
+      if (shouldSkipGlossaryEntry(trimmed, normalizedGlossaryMap.get(cleanKey(trimmed)) ?? trimmed)) {
+        uiLog('glossary', `v11.14 脏条目跳过 identity 短路: "${trimmed.slice(0, 60)}"`)
+      } else {
+        item.translatedText = trimmed
+        autoSkipped++
+      }
+    } else if (normalizedGlossaryMap.has(cleanKey(trimmed)) && !shouldSkipGlossaryEntry(trimmed, normalizedGlossaryMap.get(cleanKey(trimmed))!)) {
       // 术语库精确匹配（去®™©后）：直接使用术语库译文，不送API
+      // v11.14: 脏条目（identity/乱码™值）不短路——该句走正常 LLM 翻译（纵深防御）
       let glossTrans = normalizedGlossaryMap.get(cleanKey(trimmed))!
       // 源文有®™©但术语库译文没有 → 恢复商标符号
       if (/[®™©]/.test(trimmed)) {
@@ -1684,6 +1841,9 @@ async function startTranslate() {
               )
               if (!hasUserCorrection && hit !== expected) return true
             }
+            // 5. v11.14: ™/®/© 畸形形态（p™l™a™y™ 散弹/符号悬空/同符号≥3次）= 乱码缓存，
+            //    命中即弃用重翻（2026-08-17 事故的缓存放大通道封堵）
+            if (hasMalformedTrademark(hit)) return true
             return false
           }
           const uncachedIndices: number[] = []
@@ -1784,6 +1944,9 @@ async function startTranslate() {
             if (!batch[j].translatedText.trim() && texts[j].trim()) {
               translateErrors.value.add(batch[j].nodeIds[0])
             }
+            // v11.12: 译文违禁词检测（缓存命中与 API 返回汇流于此——旧缓存含违禁词也能被抓到，
+            // 开校对时进修正链，关校对只点亮徽章）。只检测，修正交校对层（代码管形式，LLM 管语义）。
+            updateProhibitedTrans(batch[j].nodeIds[0], batch[j].translatedText)
           }
 
           // v8.4: 记录批次指标
@@ -1872,6 +2035,12 @@ async function startTranslate() {
                 for (let pj = 0; pj < pBatch.length; pj++) {
                   if (expansionIds.value.has(pBatch[pj].nodeIds[0])) pExpansionFlags.add(pj)
                 }
+                // v11.12: 本批内译文违禁词命中 → 索引→具体词列表（语义改写必须列词，LLM 才知道绕开哪个）
+                const pProhibitedFixMap = new Map<number, string[]>()
+                for (let pj = 0; pj < pBatch.length; pj++) {
+                  const ph = prohibitedTransIds.value.get(pBatch[pj].nodeIds[0])
+                  if (ph && ph.length > 0) pProhibitedFixMap.set(pj, ph)
+                }
                 proofPromises.push((async () => {
                   try {
                     const batchResults = await proofreadBatch(
@@ -1884,6 +2053,7 @@ async function startTranslate() {
                       proofreadGlossaryHint,
                       proofreadNormalizedMap,
                       pExpansionFlags,
+                      pProhibitedFixMap.size > 0 ? new Map([...pProhibitedFixMap].map(([k, ws]) => [k, ws.map(w => ({ word: w, note: '' }))])) : undefined,
                     )
                     for (let j = 0; j < pBatch.length; j++) {
                       const proofed = batchResults[j]
@@ -1905,12 +2075,25 @@ async function startTranslate() {
                         pBatch[j].proofreadReason = (proofed.reason || '').slice(0, 40)
                         pBatch[j].corrected = true
                         proofreadStats.correctedCount++
+                        // v11.12: 校对修正后回检违禁词 — 干净则清徽章+计数；仍命中则留徽章兜底提醒
+                        // （守卫 continue 未写回时徽章自然还在；术语库值回灌命中同理，见 enforceGlossaryTerms 交叉）
+                        // v11.12+: 命中按术语库锁定路由——锁定项回挂只提示的 locked 徽章，不进改写链
+                        {
+                          const reHits = detectProhibited(fixed, targetLang.value)
+                          if (reHits.length === 0) {
+                            if (prohibitedTransIds.value.delete(pBatch[j].nodeIds[0])) prohibitedFixedCount.value++
+                            prohibitedLockedIds.value.delete(pBatch[j].nodeIds[0])
+                          } else {
+                            routeProhibitedHits(pBatch[j].nodeIds[0], reHits, fixed)
+                          }
+                        }
                         sendMsgToPlugin(UIMessage.SAVE_CORRECTION, {
                           source: pBatch[j].sourceText,
                           targetLang: targetLang.value,
                           originalTranslation: pBatch[j].proofreadText,
                           correctedTranslation: fixed,
                           correctedAt: Date.now(),
+                          origin: 'proofread',  // v11.14: 校对自动修正来源标记（入库被拒时静默）
                         })
                       }
                     }
@@ -2018,6 +2201,21 @@ async function startTranslate() {
   }
   // 自动字体映射（仅对未手动设置字体的条目生效）
   autoMapFonts()
+
+  // v11.12: 终态全量回检——一致化/换行保护是翻译主链最后的文本改动点，
+  // 覆盖缓存命中、校对跳过、三链统一兜底；命中挂徽章，干净且徽章还在则清+计数
+  // v11.12+: 命中按术语库锁定路由（锁定项回挂 locked 提示徽章，不算"自动规避"）
+  for (const it of items.value) {
+    if (!it.translatedText || !it.translatedText.trim()) continue
+    const reHits = detectProhibited(it.translatedText, targetLang.value)
+    const key = it.nodeIds[0]
+    if (reHits.length > 0) routeProhibitedHits(key, reHits, it.translatedText)
+    else if (prohibitedTransIds.value.delete(key)) prohibitedFixedCount.value++
+    else prohibitedLockedIds.value.delete(key)
+  }
+  if (prohibitedFixedCount.value > 0) {
+    showToast(`已自动规避 ${prohibitedFixedCount.value} 处平台违禁词`, 'success')
+  }
   } catch (e) {
     translating.value = false
     proofreading.value = false
@@ -2062,6 +2260,8 @@ async function startProofread() {
     const ck = cleanKey(key)
     if (ck.length >= 3 && !proofreadNormalizedMap.has(ck)) proofreadNormalizedMap.set(ck, value)
   }
+  // v11.12+: 独立校对路径同样激活违禁词锁定豁免判定（可能绕过 startTranslate 直接校对）
+  activeNormalizedGlossaryMap = proofreadNormalizedMap
 
   // 任务级术语预计算：用全部源文本一次性过滤 → 校对各批次 system prompt 100% 一致 → 缓存命中
   // v9.10: 传 EN 视图 — 场景/营销/合规分类器是 EN 精确匹配
@@ -2092,6 +2292,12 @@ async function startProofread() {
         for (let bj = 0; bj < batch.length; bj++) {
           if (expansionIds.value.has(batch[bj].nodeIds[0])) expansionFlags.add(bj)
         }
+        // v11.12: 本批内译文违禁词命中 → 索引→具体词列表（语义改写必须列词，LLM 才知道绕开哪个）
+        const prohibitedFixMap = new Map<number, string[]>()
+        for (let bj = 0; bj < batch.length; bj++) {
+          const ph = prohibitedTransIds.value.get(batch[bj].nodeIds[0])
+          if (ph && ph.length > 0) prohibitedFixMap.set(bj, ph)
+        }
 
         concurrentBatchPromises.push((async () => {
           if (cancelFlag.value) return
@@ -2106,6 +2312,7 @@ async function startProofread() {
               proofreadGlossaryHint,
               proofreadNormalizedMap,
               expansionFlags,
+              prohibitedFixMap.size > 0 ? new Map([...prohibitedFixMap].map(([k, ws]) => [k, ws.map(w => ({ word: w, note: '' }))])) : undefined,
             )
             for (let j = 0; j < batch.length; j++) {
               const proofed = batchResults[j]
@@ -2152,6 +2359,18 @@ async function startProofread() {
                 batch[j].proofreadReason = (proofed.reason || '').slice(0, 40)
                 batch[j].corrected = true
                 correctedCount++
+                // v11.12: 校对修正后回检违禁词 — 干净则清徽章+计数；仍命中则留徽章兜底提醒
+                // （守卫 continue 未写回时徽章自然还在；术语库值回灌命中同理，见 enforceGlossaryTerms 交叉）
+                // v11.12+: 命中按术语库锁定路由——锁定项回挂只提示的 locked 徽章，不进改写链
+                {
+                  const reHits = detectProhibited(fixed, targetLang.value)
+                  if (reHits.length === 0) {
+                    if (prohibitedTransIds.value.delete(batch[j].nodeIds[0])) prohibitedFixedCount.value++
+                    prohibitedLockedIds.value.delete(batch[j].nodeIds[0])
+                  } else {
+                    routeProhibitedHits(batch[j].nodeIds[0], reHits, fixed)
+                  }
+                }
                 // 闭环：将 AI 校对修正也存入反馈系统，触发术语库自动更新
                 sendMsgToPlugin(UIMessage.SAVE_CORRECTION, {
                   source: batch[j].sourceText,
@@ -2184,6 +2403,21 @@ async function startProofread() {
                     batch[j].proofreadReason = undefined
                     batch[j].corrected = false
                     correctedCount--
+                    // v11.12: 回退后重算违禁词徽章——修正时可能已清徽章+计数，这里把退回的旧译文重新挂上
+                    // v11.12+: 旧译文==术语库钦定值时挂 locked 提示徽章，不挂改写链徽章（术语库最高优先级）
+                    {
+                      const reHits = detectProhibited(batch[j].translatedText, targetLang.value)
+                      if (reHits.length > 0) {
+                        if (isGlossaryLockedTranslation(batch[j].sourceText, batch[j].translatedText, activeNormalizedGlossaryMap)) {
+                          prohibitedLockedIds.value.set(batch[j].nodeIds[0], reHits.map(h => h.word))
+                          prohibitedTransIds.value.delete(batch[j].nodeIds[0])
+                        } else {
+                          if (!prohibitedTransIds.value.has(batch[j].nodeIds[0]) && prohibitedFixedCount.value > 0) prohibitedFixedCount.value--
+                          prohibitedTransIds.value.set(batch[j].nodeIds[0], reHits.map(h => h.word))
+                          prohibitedLockedIds.value.delete(batch[j].nodeIds[0])
+                        }
+                      }
+                    }
                   }
                 }
               }
@@ -2286,6 +2520,18 @@ async function startProofread() {
           items.value[i].translatedText = allTranslatedTexts[i]
         }
       }
+
+      // v11.12: 校对后处理（扩写截断/术语校准/CJK格式/换行保护/截断兜底）可能再次改动修正过的文本
+      // ——全量重扫回检：命中回挂徽章；未命中只在徽章还在时清掉+计数（防与写回回检双重计数）
+      // v11.12+: 命中按术语库锁定路由（锁定项回挂 locked 提示徽章，不算"自动规避"）
+      for (const it of items.value) {
+        if (!it.translatedText || !it.translatedText.trim()) continue
+        const reHits = detectProhibited(it.translatedText, targetLang.value)
+        const key = it.nodeIds[0]
+        if (reHits.length > 0) routeProhibitedHits(key, reHits, it.translatedText)
+        else if (prohibitedTransIds.value.delete(key)) prohibitedFixedCount.value++
+        else prohibitedLockedIds.value.delete(key)
+      }
     }
 
     enforceSameSourceConsistency()
@@ -2307,12 +2553,25 @@ async function startProofread() {
       const skipMsg = skipped > 0 ? `，${skipped} 条无需校对` : ''
       showToast('校对完成: ' + correctedCount + ' 处被修正' + failMsg + skipMsg, correctedCount > 0 ? 'success' : 'info')
     }
+    // v11.12: 独立校对链收尾报告（计数已由上方全量重扫回检净更新）
+    if (prohibitedFixedCount.value > 0) {
+      showToast(`已自动规避 ${prohibitedFixedCount.value} 处平台违禁词`, 'success')
+    }
 
     // 校对完成后，歧义词自动写入专属术语库 source 列
     if (suggestedGlossaryTerms.value.length > 0) {
       const unique = [...new Set(suggestedGlossaryTerms.value)]
       let addedCount = 0
+      let rejectedCount = 0
       for (const term of unique) {
+        // v11.14: 歧义词入库守卫——LLM 原样吐出的字符串零校验曾可入库（整句/带标点/
+        // 占位符/畸形™），批量补全译文列后即激活为锁死条目。只收术语形态的词。
+        const check = validateAutoGlossarySource(term)
+        if (!check.ok) {
+          rejectedCount++
+          uiLog('glossary', `v11.14 歧义词拦截: "${term.slice(0, 60)}"（${check.reason}）`)
+          continue
+        }
         // 检查是否已存在于产品术语库或专属术语库
         const alreadyExists = glossaryExclusive.value.some(g => g.source === term) ||
           glossaryProducts.value.some(g => g.source === term)
@@ -2325,11 +2584,14 @@ async function startProofread() {
         saveGlossaryExclusive()
         setTimeout(() => {
           showToast(
-            '已将 ' + addedCount + ' 个歧义词加入专属术语库（待补全翻译）: ' +
-            unique.slice(0, 5).join(', ') + (unique.length > 5 ? ' ...' : ''),
+            '已将 ' + addedCount + ' 个歧义词加入专属术语库（待补全翻译）' +
+            (rejectedCount > 0 ? `，拦截 ${rejectedCount} 个非术语形态` : '') +
+            ': ' + unique.slice(0, 5).join(', ') + (unique.length > 5 ? ' ...' : ''),
             'success'
           )
         }, 1000)
+      } else if (rejectedCount > 0) {
+        uiLog('glossary', `v11.14 歧义词全部拦截: ${rejectedCount} 个非术语形态`)
       }
       suggestedGlossaryTerms.value = []
     }
@@ -2385,9 +2647,13 @@ function syncFontMappings() {
     if (!f) continue
     item.targetFontFamily = f.targetFamily
     item.targetFontStyle = f.targetStyle
-    item.targetFontSize = f.targetFontSize || 0
-    item.targetLineHeight = f.targetLineHeight
-    item.targetLetterSpacing = f.targetLetterSpacing
+    // v11.15 兜底守卫：选了目标字体但字号为 0（onFontSelected 回填前的历史状态/
+    // 任何未来路径产生的"换字体不设字号"组合）→ 回退源字号，绝不把 0 传给
+    // APPLY_SINGLE（main.ts applyTextStyle 对 targetFontSize>0 才设字号，
+    // 0 = 换字体但字号悬置 = MasterGo 默认字号渲染 = 字体变大事故）。
+    item.targetFontSize = f.targetFontSize || (f.targetFamily ? item.fontSize : 0)
+    item.targetLineHeight = f.targetLineHeight ?? (f.targetFamily ? item.lineHeight : null)
+    item.targetLetterSpacing = f.targetLetterSpacing ?? (f.targetFamily ? item.letterSpacing : null)
     item.targetTextAlign = f.targetTextAlign || ''
   }
 }
@@ -2639,39 +2905,9 @@ function triggerDownload(csv: string, filename: string) {
 // 已知的有效语言代码（与 LANGUAGES 常量保持一致）
 const VALID_LANG_CODES = new Set(LANGUAGES.map(l => l.code))
 
+// v11.14: 解析逻辑迁移到 lib/parse-csv.ts（parseCSVRecords+csvDecodeCell，修 split('\n') 碎行雷）
 function parseGlossaryCSV(text: string): GlossaryEntry[] {
-  const rows = text.replace(/^﻿/, '').trim().split('\n')
-  const headerCells = parseCSVRow(rows[0])
-  // 跳过旧版元数据列（兼容旧 CSV 格式）
-  const skipCols = new Set([
-    headerCells.findIndex((h: string) => h.trim() === '处理方式'),
-    headerCells.findIndex((h: string) => h.trim() === '术语分类'),
-    headerCells.findIndex((h: string) => h.trim() === '产品线'),
-    headerCells.findIndex((h: string) => h.trim() === '术语类型'),
-  ].filter(i => i >= 0))
-  const langCols: string[] = []
-  const dataCols: number[] = []
-  for (let i = 1; i < headerCells.length; i++) {
-    if (skipCols.has(i)) continue
-    const colName = headerCells[i].trim()
-    if (VALID_LANG_CODES.has(colName)) {
-      dataCols.push(i)
-      langCols.push(colName)
-    }
-  }
-  const entries: GlossaryEntry[] = []
-  for (let i = 1; i < rows.length; i++) {
-    const cells = parseCSVRow(rows[i])
-    const source = (cells[0] || '').trim()
-    if (!source) continue
-    const translations: Record<string, string> = {}
-    for (let j = 0; j < langCols.length; j++) {
-      const val = (cells[dataCols[j]] || '').trim()
-      if (val) translations[langCols[j]] = val
-    }
-    entries.push({ source, translations })
-  }
-  return entries
+  return parseGlossaryCSVText(text, VALID_LANG_CODES)
 }
 
 // ---- 产品名术语库 ----
@@ -2701,24 +2937,10 @@ function handleGlossaryProductsUpload(e: Event) {
 // ---- 专属术语术语库 ----
 function downloadGlossaryExclusive() {
   // 从当前 glossaryExclusive 数据生成 CSV，用户下载后可补全翻译再上传
+  // v11.14: serializeGlossaryCSV（csvEncodeCell）——换行→↵占位符，一条记录恒一物理行
   const langCodes = LANGUAGES.map(l => l.code)
-  const header = ['source', ...langCodes].join(',')
-  const rows = glossaryExclusive.value.map(g => {
-    const cells = [escapeCSVCell(g.source)]
-    for (const code of langCodes) {
-      cells.push(escapeCSVCell(g.translations[code] || ''))
-    }
-    return cells.join(',')
-  })
-  const csv = [header, ...rows].join('\n')
+  const csv = serializeGlossaryCSV(glossaryExclusive.value, langCodes)
   triggerDownload(csv, 'Lexar术语库_专属.csv')
-}
-
-function escapeCSVCell(val: string): string {
-  if (val.includes(',') || val.includes('"') || val.includes('\n')) {
-    return '"' + val.replace(/"/g, '""') + '"'
-  }
-  return val
 }
 
 const glossaryExclusiveInput = ref<HTMLInputElement | null>(null)
@@ -2979,9 +3201,15 @@ async function retranslateSingle(item: TextItem) {
       }
       translateErrors.value.delete(id)
       misspelledIds.value.delete(id)
+      // v11.15: 重翻成功即消音（用户可能先点"知道了"再重翻；新译文是新一轮结论）
+      dismissedNodeIds.value.delete(id)
+      untranslatedDismissedIds.value.delete(id)
+      divergedDismissedIds.value.delete(id)
       // v11.3: 重翻后从 LLM 兜底待确认集合移除（已确认/已跳过/已重翻）
       const termKey = item.sourceText.trim().replace(/[®™©]/g, '')
       llmFallbackTerms.value.delete(termKey)
+      // v11.12: 重翻写回后检测——旁路只提醒不修正（重翻不接校对链）
+      updateProhibitedTrans(id, item.translatedText)
       showToast('已重新翻译', 'success')
     } else {
       // v9.11: 空结果也标记失败（此前只弹 toast，条目状态不变，用户无处可查）
@@ -3041,19 +3269,57 @@ function editPendingItem(item: TextItem) {
   showToast('请编辑译文', 'info')
 }
 
-/** 跳过待处理条目：标记为已应用，不再阻塞 */
-function skipPendingItem(item: TextItem) {
+/** v11.15: 「确认保留源文」（misspelled 专属）——用户核对源稿无误后显式确认：
+ * 清错词标记 + 标记已应用（translatedText===sourceText，与 acceptAllUntranslated
+ * 同语义：应用=写回原文，安全）。源稿存疑条目必须有显式处置出口，不给"知道了"。 */
+function confirmKeepSource(item: TextItem) {
+  misspelledIds.value.delete(item.nodeIds[0])
   for (const nid of item.nodeIds) {
     appliedNodeIds.value.add(nid)
   }
-  misspelledIds.value.delete(item.nodeIds[0])
-  // v11.3: 跳过 LLM 兜底新品名 → 从待确认集合移除（不入库）
+  showToast('已确认保留源文', 'success')
+}
+
+/** v11.15（问题5）：「知道了」——只消提示音，不假装已应用。
+ * 旧 skipPendingItem 把节点加进 appliedNodeIds 却从不写画布：条目从面板隐身、
+ * 批量应用永久跳过 → 好译文（含误报条目）被静默丢弃，违背自动化原则且造成事故。
+ * 现语义：清该条当前渲染类型的提示状态 + 加入 dismissedNodeIds（卡片操作行显形、
+ * 批量应用照常带上）。真问题不会被消音——下一轮翻译/校对批次启动时 dismissed
+ * 清空，检测仍报 → 徽章自然复现。 */
+function dismissPendingItem(item: TextItem) {
+  const id = item.nodeIds[0]
+  // 按"当前会渲染出的类型"清状态（与 pendingItems else-if 链同优先级顺序）
+  const termKey = item.sourceText.trim().replace(/[®™©]/g, '')
+  if (llmFallbackTerms.value.has(termKey)) {
+    // llmFallback 没有"知道了"按钮（必须显式处置：入库/应用但不入库），防御兜底
+    return
+  } else if (misspelledIds.value.has(id)) {
+    misspelledIds.value.delete(id)
+  } else if (translateErrors.value.has(id)) {
+    translateErrors.value.delete(id)
+  } else if (hasPlaceholderResidue(item.translatedText) || showUntranslatedBadge(item)) {
+    untranslatedDismissedIds.value.add(id)
+  } else if (isGlossaryDivergedItem(item)) {
+    divergedDismissedIds.value.add(id)
+  }
+  // 违禁词三类（第二循环独立叠加，无论首类型是什么都顺手清）
+  prohibitedSrcIds.value.delete(id)
+  prohibitedTransIds.value.delete(id)
+  prohibitedLockedIds.value.delete(id)
+  dismissedNodeIds.value.add(id)
+  showToast('已知晓，条目保持可应用', 'info')
+}
+
+/** v11.15: 「应用但不入库」（llmFallback 专属）——旧 skipPendingItem 的
+ * llmFallback 分支语义原样保留：从待确认集合移除（不入库），翻译结果照常可用。 */
+function applyWithoutGlossary(item: TextItem) {
   const termKey = item.sourceText.trim().replace(/[®™©]/g, '')
   if (llmFallbackTerms.value.has(termKey)) {
     llmFallbackTerms.value.delete(termKey)
     uiLog('translate', `v11.3 LLM兜底新品名跳过（不入库）: "${termKey}"`)
   }
-  showToast('已跳过该条目', 'info')
+  dismissedNodeIds.value.add(item.nodeIds[0])
+  showToast('已跳过入库，译文可直接应用', 'info')
 }
 
 /** v11.3: 确认入库 LLM 兜底检出的新品名 */
@@ -3220,6 +3486,8 @@ onMounted(() => {
         resizeAllTextareas()
         // 扫描后预填字体映射：根据目标语言自动确定替换字体
         nextTick(() => autoMapFonts())
+        // v11.12: 扫描落地后源文违禁词检测（京东/亚马逊词表，非阻塞徽章）
+        recheckProhibitedSource()
         showToast(`扫描到 ${items.value.length} 个文本节点`, 'success')
         break
       }
@@ -3377,7 +3645,14 @@ onMounted(() => {
           if (raw.scenePreset === undefined) {
             raw.scenePreset = 'ecommerce'
           }
-          llmConfig.value = { translationStyle: 'standard', translationStyleCustom: '', scenePreset: 'ecommerce', enableProofread: false, proofreadApiKey: '', proofreadApiUrl: '', proofreadModel: '', ...(raw as LLMConfig) }
+          // v11.12: enableProofread 默认值翻转 false→true + 老用户一次性强制迁移。
+          // 迁移标记随 settings 对象持久化（proofreadDefaultMigrated），
+          // 只迁移"显式关过校对且未迁移过"的老用户；用户之后再手动关闭不再覆盖。
+          if (raw.enableProofread === false && !raw.proofreadDefaultMigrated) {
+            raw.enableProofread = true
+            raw.proofreadDefaultMigrated = true
+          }
+          llmConfig.value = { translationStyle: 'standard', translationStyleCustom: '', scenePreset: 'ecommerce', enableProofread: true, proofreadApiKey: '', proofreadApiUrl: '', proofreadModel: '', ...(raw as LLMConfig) }
         }
         selectedPreset.value = detectPreset()
         settingsReady = true
@@ -3427,16 +3702,30 @@ onMounted(() => {
         break
 
       case PluginMessage.CORRECTION_SUGGESTION: {
-        const sug = data as { source: string; targetLang: string; correctedTranslation: string; count: number }
-        showToast(`"${sug.source}" 已被手动修正 ${sug.count} 次，是否加入术语库？`, 'info')
-        // 自动将修正加入术语库
+        const sug = data as { source: string; targetLang: string; correctedTranslation: string; count: number; origin?: 'user' | 'proofread' }
+        // v11.14: 自动入库守卫（2026-08-17 事故根治——校对/手改的【整句】曾零校验直接锁进
+        // 术语库，命中 S1 短路致确定性漏翻 + ™乱码值经子串替换多点扩散）。
+        // 守卫只拦"不像术语"的内容，自动入库机制本身保留。
+        // origin=proofread（每轮校对可能多次触发）拒绝时静默，只记日志不刷 toast。
+        const srcCheck = validateAutoGlossarySource(sug.source)
+        const valResult = srcCheck.ok ? sanitizeAutoGlossaryValue(sug.correctedTranslation) : { ok: false as const, reason: srcCheck.reason }
+        const identityOk = valResult.ok ? isIdentityAutoAddAllowed(sug.source, valResult.value!) : false
+        if (!srcCheck.ok || !valResult.ok || !identityOk) {
+          const reason = srcCheck.reason || valResult.reason || '整句原样保留不适合入库'
+          uiLog('glossary', `v11.14 自动入库拦截: "${sug.source.slice(0, 60)}"（${reason}，来源=${sug.origin || 'user'}）`)
+          if ((sug.origin || 'user') === 'user') {
+            showToast(`修正未加入术语库：${reason}`, 'warning')
+          }
+          break
+        }
+        const cleanValue = valResult.value!
         const existing = glossaryExclusive.value.find(g => g.source === sug.source)
         if (existing) {
-          existing.translations[sug.targetLang] = sug.correctedTranslation
+          existing.translations[sug.targetLang] = cleanValue
         } else {
           glossaryExclusive.value.push({
             source: sug.source,
-            translations: { [sug.targetLang]: sug.correctedTranslation },
+            translations: { [sug.targetLang]: cleanValue },
           })
         }
         saveGlossaryExclusive()
@@ -3493,6 +3782,8 @@ function handleCSVImportDone(data: { nodeIds: string[]; translatedText: string }
           csvChangedIds.value.add(item.nodeIds[0])
         }
         item.translatedText = row.translatedText
+        // v11.12: CSV 导入值检测——导入是旁路写入，徽章亮灭与 csvChangedIds 高亮并存（只提醒不修正）
+        updateProhibitedTrans(item.nodeIds[0], row.translatedText)
         count++
         break
       }
