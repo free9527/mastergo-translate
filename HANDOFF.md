@@ -1,7 +1,7 @@
 # 项目交接文档
 
-**日期**: 2026-08-23  
-**版本**: v11.15（v11.14 自动入库守卫之上 + 实机五问题修复）  
+**日期**: 2026-08-24  
+**版本**: v12.0（v11.15 之上 + LLM 输出 schema 化，架构复盘方向 #5 落地）  
 **项目**: Lexar 翻译插件（MasterGo 插件）
 
 ---
@@ -39,7 +39,40 @@ MasterGo 设计工具插件，将 Lexar 产品设计稿从英文翻译成 20 个
 
 ---
 
-## 二、当前版本（v11.15）
+## 二、当前版本（v12.0）
+
+### v12.0 LLM 输出 schema 化（2026-08-23/24，架构复盘方向 #5 落地——五方向全清）
+
+**背景**：架构复盘（五点一）方向 #5「LLM 输出 schema 化：结构化输出替代 `[N] 文本` 解析，退役一批防御代码」。用户拍板原则：**可靠性/稳定性第一，不出翻译事故，防御代码一行不删**；模型为公司订阅 GPT-5.5（OpenAI 官方能力，`response_format:{type:'json_object'}` 原生可用）；节奏委托 LLM 判断 → **分两步走：校对先行实测，翻译跟进**。
+
+**实测先行**（`tests/test-schema-live.ts`，真实 API + 真实素材 CSV，生产代码改动前跑完）：
+
+| 段 | 内容 | 结果 |
+|---|---|---|
+| A | ↵（U+21B5）在 json_object 模式 JSON string 中的兼容性 | ✅ 字面字符保留，JSON.parse 原样还原（A1/A2/A3 全绿）——翻译 schema 化唯一硬风险排除 |
+| B | 校对软约定 vs 硬约束对比（10 次/组 ×2，8 条典型错误案例） | 两组 JSON 可解析 10/10、结构服从 10/10、reason 枚举全合规；错误抓取率无统计差异（soft 45改 vs hard 41改——首次 3 次采样的"硬约束保守倾向"扩样后确认是温度方差。**教训：小样本行为差异先扩采样再下结论**） |
+| C | 15 条满批+占位符+引号+多行+emoji+超长营销句 | ✅ 15/15 完整、占位符保留、↵ 2/2、超长未截断 |
+
+**生产改动（两步）**：
+
+| # | 改动 | 文件 |
+|---|------|------|
+| 1 | **第 1 步 校对**：proofreadBatch 请求体加 `response_format:{type:'json_object'}`；PROOFREAD_SYSTEM_PROMPT EN/ZH OUTPUT FORMAT 裸 array → `{"results":[...]}` 包装（**json_object 模式要求 object 顶层，不能裸 array**）；解析层新增 `extractResultsObject` 平衡括号提取器优先，裸 `[...]` + 逐行 `[N] |||` 兜底全保留 | `lib/llm-api.ts` + `lib/prompt-constants.ts` |
+| 2 | **第 2 步 翻译**：translateBatch 请求体加 `response_format`（首调+统一重试同一函数自动覆盖）；buildSystemPrompt OUTPUT 段（EN/ZH）`[N] 译文` → `{"translations":[{"i":N,"text":"..."}]}`（i 与输入索引一一对应+全部条目必输出）；**解析层 i 索引映射**（entry.i 优先于数组位置——防模型乱序输出译文错位，本次新修的风险点；无 i 旧形态按数组位置兼容）；逐行 `[N]`/`N.` + 非空行兜底全保留 | `lib/llm-api.ts` |
+| 3 | 激进重试/逐句拆分/大小写归一化子兜底**不动**（逐条纯文本调用，json_object 无收益） | — |
+
+**关键教训**：
+1. **`\{[\s\S]*"results"[\s\S]*\}` 贪婪正则被内容文本击穿**：译文含 results 字样+前缀垃圾时跨段误锚（H10 断言抓出）。修法=找键→平衡括号→parse 校验的提取器（坑 16 同型：对位置的假设比对内容的假设脆弱）。
+2. **↵ 的最终形态是真实换行**：post-process.ts:357 `replace(/\s*↵\s*/g,'\n')` 是 v9.x 既有还原语义（画布需要真换行）——schema 断言断"换行位置保留"不断"字面 ↵ 残留"。
+3. **落地形态调整**：原案"schema 化退役防御代码"→ 实落"硬约束+保留防御"（逐行 `[N]` 解析是 v9.x 救过命的安全气囊，留着零风险）。
+
+**测试**：v1112 套件 +H 段 10 断言（请求体硬约束/双版 prompt 包装/新格式落地/旧格式兼容/results 优先级/未修改条目回退原译文）176 全绿；v105 套件 +G 段 7 断言（翻译请求体/prompt 包装/i 乱序归位/↵ 换行位置/旧格式兜底）46 全绿；回归 v106(46)/v107(14)/v108(21)/v110(91)/v1114(86)/v115(41)/v1115(15) 全绿；双 tsconfig typecheck + build 通过。
+
+**实机验证**（test-v115-live-translation.ts 真实 API，PLAY PRO 12 格 zh-CN+de 全管道 schema 模式）：首调异常 0 / 漏翻 0 / 占位符残留 0 / 与源文相同 0（双语种）；校对修改 zh-CN 2 / de 7 正常；抽样译文多行 ↵ 位置/品牌名/规格值全保留。
+
+**实机复验清单（交用户）**：正常跑几批翻译+校对，确认①无"翻译失败"异常增多 ②校对修改行为与此前一致 ③待确认面板无占位符残留类条目。诊断面板（v10.3 持久化）可观测：schema 模式下 S4 解析应零告警。
+
+---
 
 ### v11.15 实机五问题修复（2026-08-18，同形字误表/违禁词豁免/字体变大/跳过逻辑）
 
@@ -1141,7 +1174,7 @@ v8.7 设计"激进失败→保留原文不标记，交给校对 LLM 判断"，�
 | 文件 | 职责 |
 |------|------|
 | `lib/prompt-constants.ts` | 提示词常量（STYLE_GUIDES、LANG_SPECIFIC、PRODUCT_LINE_TONE_GUIDES、SCENE_CONSTRAINTS、CORE_PRINCIPLES、PROOFREAD_SYSTEM_PROMPT、v11.3 PRODUCT_NAME_PARSE_PROMPT/ZH LLM 产品名解析、**v11.12 PROOFREAD_PROHIBITED_NOTE/_ZH 违禁词校对全局块**） |
-| `lib/llm-api.ts` | LLM 调用 + 翻译/校对管道 + 重试逻辑 + v9.5 三层漏翻检测 + v9.9 术语合规校验 + v9.10 双视图分发 + v9.11 批次级标注/untranslatedIndices/最终安全网 + v10.0 re-export lang-detect（兼容层）+ v10.2 截断判定（脚本存在性）+ 子兜底守卫 + 诊断日志埋点 + v10.4 管道阶段化(S1-S8)+auditStage 不变量审计 + v10.5 型号/裸单位豁免(isModelListOrCode/PURE_UNIT_RE)+截断跳过不可翻译+脚本校验豁免术语库已知值 + v10.6 revertMisspelledWordTranslation 疑似错词回退兜底 + v11.3 parseProductNameWithLLM LLM 兜底产品名解析 + **v11.12 proofreadBatch 第 10 参 prohibitedFixMap（per-item 违禁词改写 note）+ v11.12+ 术语库锁定项预豁免（prompt 组装前剪除，破改写→锁回死锁）** |
+| `lib/llm-api.ts` | LLM 调用 + 翻译/校对管道 + 重试逻辑 + v9.5 三层漏翻检测 + v9.9 术语合规校验 + v9.10 双视图分发 + v9.11 批次级标注/untranslatedIndices/最终安全网 + v10.0 re-export lang-detect（兼容层）+ v10.2 截断判定（脚本存在性）+ 子兜底守卫 + 诊断日志埋点 + v10.4 管道阶段化(S1-S8)+auditStage 不变量审计 + v10.5 型号/裸单位豁免(isModelListOrCode/PURE_UNIT_RE)+截断跳过不可翻译+脚本校验豁免术语库已知值 + v10.6 revertMisspelledWordTranslation 疑似错词回退兜底 + v11.3 parseProductNameWithLLM LLM 兜底产品名解析 + **v11.12 proofreadBatch 第 10 参 prohibitedFixMap（per-item 违禁词改写 note）+ v11.12+ 术语库锁定项预豁免（prompt 组装前剪除，破改写→锁回死锁）** + **v12.0 输出 schema 化（双管道 response_format json_object 硬约束 + 翻译 i 索引映射防乱序错位 + extractResultsObject 平衡括号提取器，逐行兜底全保留）** |
 | `lib/prohibited-words.ts` | **v11.12 违禁词表**（PROHIBITED_ZH 京东/广告法 + PROHIBITED_ZH_EXEMPTIONS 豁免短语 + PROHIBITED_AVOID 20 语种与 LANGUAGES 严格对表；收录红线：宁漏勿滥，有合法语义的普通词不收；**v11.12+ 豁免 +4：有限终身质保/有限终身保修/有限終身保固/有限終身保修**） |
 | `lib/prohibited-check.ts` | **v11.12 违禁词检测纯函数**（detectProhibited/hasProhibited/detectSourceLangForProhibited：拉丁词边界 i flag 无 g flag、CJK 子串、符号词 `(?<!\d)`、zh 先剔豁免、重叠取最长）+ **v11.12+ isGlossaryLockedTranslation 术语库锁定判定（cleanKey 查表+译文严格等值）** |
 | `lib/lang-detect.ts` | v10.0 语言检测单一事实源（三套检测/词表/字符集分类/同语系对，detectSingleTextLanguage 死代码已修为委托批次级）+ **v10.2 TARGET_SCRIPT_PATTERNS** |
@@ -1226,7 +1259,7 @@ TS_NODE_COMPILER_OPTIONS='{"module":"commonjs","esModuleInterop":true,"skipLibCh
 
 **架构优化（见"五点一、架构复盘"，按收益/风险排序）**：
 1. ~~判定逻辑单一事实源 + 豁免中央注册表~~ **已完成 v10.0**（lib/lang-detect.ts + lib/keep-source.ts）
-2. 结构改进：~~管道阶段化 + 不变量审计~~ **已完成 v10.4** → ~~Prompt 减肥（~2600行 prompt 稀释注意力）~~ **v10.9 已做第一步**（市场语感分段注入 -40% token + 风格越界清理 + 场景 Success 意图行；剩余：模块归并/瘦身空间仍在）→ LLM 输出 schema 化（退役 `[N] text` 解析防御）
+2. 结构改进：~~管道阶段化 + 不变量审计~~ **已完成 v10.4** → ~~Prompt 减肥（~2600行 prompt 稀释注意力）~~ **已完成 v11.5** → ~~LLM 输出 schema 化~~ **已完成 v12.0**（双管道 json_object 硬约束 + i 索引映射；落地形态=硬约束+保留防御，非退役防御代码）
 3. ~~日志持久化~~ **已完成 v10.3**；剩余：⑤metrics UI 面板（finalizeMetrics 只 console.log）⑥~~detectTranslationExpansion 语义移交校对~~ **已完成 v10.8**
 
 **中期**：
@@ -1277,4 +1310,4 @@ User Message：`[N] ({srcLang}→{targetLang}) source\nTrans：translation`
 
 ---
 
-**最后更新**: 2026-08-23
+**最后更新**: 2026-08-24
