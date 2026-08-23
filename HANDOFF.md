@@ -1202,13 +1202,14 @@ v8.7 设计"激进失败→保留原文不标记，交给校对 LLM 判断"，�
 | `tests/test-v911-non-en-source.ts` | **v9.11 非英源文漏翻闭环（21 断言：F1 标注/F2 激进指令/F3 漏翻上报/F3b 拉丁豁免）** |
 | `tests/test-v100-arch-consolidation.ts` | v10.0 判定逻辑收口（21 断言：re-export 同一引用 + 死代码修复 + 注册表三重守卫） |
 | `tests/test-v102-truncation-fix.ts` | **v10.2 截断误杀根治（38 断言：脚本存在性判定 + 真截断检出 + 拉丁 0.15 分支 + 20 语种一致性）** |
-| `tests/test-v105-model-list-exemption.ts` | **v10.5 型号/裸单位豁免（39 断言：A 型号正反样例 + B 裸单位 + C 截断豁免 + D 脚本校验库值豁免 + E 端到端零重试 + F 20 语种普遍性）** |
+| `tests/test-v105-model-list-exemption.ts` | **v10.5 型号/裸单位豁免（46 断言：A 型号正反样例 + B 裸单位 + C 截断豁免 + D 脚本校验库值豁免 + E 端到端零重试 + F 20 语种普遍性 + G v12.0 翻译 schema 化 7：请求体硬约束/prompt 包装/i 乱序归位/↵ 换行位置/旧格式兜底）** |
 | `tests/test-v106-misspelled-word.ts` | **v10.6 疑似错词保留+回退兜底（27 断言：A prompt 规则中英双语 + B 正反样例 + C 端到端音译回退+待确认 + D 20 语种拉丁不兜底/非拉丁兜底）** |
 | `tests/test-v112-product-name-v2.ts` | **v11.2/v11.2.1/v11.2.2 新产品名全生命周期（48 断言：A 检测 22 + B 生成并入 6 + C 入库语义 6 + D NF100 端到端 8 + E 短路场景入库 6）** |
 | `tests/test-v113-llm-fallback.ts` | **v11.3 LLM 兜底产品名检测（18 断言：A 触发条件 7 + B 校验逻辑 2 + C 端到端 SUPER/Fast/nCARD/正常路径 4 + D v11.2 回归 3）** |
 | `tests/test-v113-exposed-product-names.ts` | v11.3 裸奔产品名分类验证（6 断言：C1 SUPER 误杀 / C2 MUSE 检出 / V1 nCARD **v11.4 起已检出** / V2-V4 不触发场景） |
 | `tests/test-v114-case-insensitive-category.ts` | **v11.4 大小写形态统一（26 断言：A detectCategory 双遍匹配+守卫 8 + B core-strip 3 + C camelCase 系列 5 + D nCARD 端到端 4 + E 回归 6）** |
-| `tests/test-v1112-prohibited-words.ts` | **v11.12 + v11.12+ 违禁词全链（154 断言：A 词表对表 20 语种+增补收录 / B 检测单元 59 含 g-flag 回归锁 / C 校对端到端 16 / D 关校对快照锁 7 / E 源语言判定 7 / F 术语库锁定豁免 18：豁免四形态+裸词仍命中+锁定判定六场景+预豁免零 note+混合批次分段断言+自由发挥不豁免）** |
+| `tests/test-v1112-prohibited-words.ts` | **v11.12 + v11.12+ 违禁词全链 176 断言（A 词表对表 20 语种+增补收录 / B 检测单元 59 含 g-flag 回归锁 / C 校对端到端 16 / D 关校对快照锁 7 / E 源语言判定 7 / F 术语库锁定豁免 18 / G v11.15 豁免增补 12 / H v12.0 校对 schema 化 10：请求体硬约束+双版 prompt 包装+新格式落地+旧格式兼容+results 优先级+未修改回退原译文）** |
+| `tests/test-schema-live.ts` | **v12.0 schema 化实测脚本（真实 API + 真实素材 CSV）：A ↵ 兼容性 / B 校对软约定 vs 硬约束 10 轮对比 / C 15 条满批压力；输出 tests/tmp-schema-live-report.txt** |
 
 ---
 
@@ -1238,8 +1239,16 @@ npx tsx tests/test-v113-llm-fallback.ts          # v11.3 LLM 兜底产品名检�
 npx tsx tests/test-v114-case-insensitive-category.ts  # v11.4 大小写形态统一 26 断言（detectCategory 双遍匹配+守卫/core-strip/camelCase 系列/nCARD 端到端）
 
 # v11.12 起新增测试（ts-node 运行，tsx 不适用——package.json 模式）：
-TS_NODE_COMPILER_OPTIONS='{"module":"commonjs","esModuleInterop":true,"skipLibCheck":true,"types":["node"]}' npx ts-node -r tsconfig-paths/register tests/test-v1112-prohibited-words.ts  # v11.12 + v11.12+ 违禁词全链 154 断言（A 词表对表/B 检测单元/C 校对端到端/D 关校对快照锁/E 源语言判定/F 术语库锁定豁免）
+TS_NODE_COMPILER_OPTIONS='{"module":"commonjs","esModuleInterop":true,"skipLibCheck":true,"types":["node"]}' npx ts-node -r tsconfig-paths/register tests/test-v1112-prohibited-words.ts  # v11.12 + v11.12+ 违禁词全链 176 断言（A 词表对表/B 检测单元/C 校对端到端/D 关校对快照锁/E 源语言判定/F 术语库锁定豁免/G v11.15 豁免增补/H v12.0 校对 schema 化）
+
+# v12.0 schema 化实测（真实 API，非单元测试）：
+npx tsx tests/test-schema-live.ts           # 全部 A（↵ 兼容性）+ B（校对 schema 10 轮对比）+ C（15 条压力）
+npx tsx tests/test-schema-live.ts a         # 只跑 A 段
 ```
+
+**记忆与文档位置说明**（2026-08-24 用户确认）：
+- **项目记忆**：`C:\Users\Administrator\.claude\projects\C--Users-Administrator-Desktop-materGO-translate\memory\`（MEMORY.md 索引 + 每事件一个 .md，跨会话持久）
+- **全局记忆**：**不存在**（`~/.claude/CLAUDE.md` 未创建）——本项目的全部长期知识都在项目记忆 + 本文档
 
 **铁律**：每次改代码后必须执行 `npm run typecheck` + `npm run build`。build 过 ≠ tsc 过。
 
