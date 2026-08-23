@@ -556,9 +556,12 @@ export function buildSystemPrompt(params: {
     : ''
 
   // ── OUTPUT (instruction language) ──
+  // v12.0 第2步：翻译输出 schema 化——[N] 逐行 → {"translations":[{i,text}]} JSON object。
+  // 实测（tests/test-schema-live.ts A/C 段）：json_object 模式下 ↵ 字面保留、15 条满批完整、
+  // 占位符/引号/emoji/超长句无损。逐行解析兜底在 llm-api.ts 保留（防御代码不删）。
   const outputFormat = isZhInstruction
-    ? `\n[输出格式]\n格式："[N] 译文" — 每行一条。纯文本，无 markdown，无解释。\n⛔ ↵ 是字面字符标记，不是换行指令 — 输出字符 "↵"，不要转为真实换行。\n→ 开始翻译：`
-    : `\n[OUTPUT]\nFormat: "[N] translated text" — one line per item. Plain text only.\n⛔ The ↵ symbol is a LITERAL CHARACTER, NOT a line break — output it as the characters "↵".\nDo not wrap translations in quotation marks unless the source text itself is quoted.\n→ Output translations now:`
+    ? `\n[输出格式]\n仅输出合法 JSON 对象：{"translations":[{"i":<1-based 索引>,"text":"<译文>"}]}\n- 每条都要有对应项，i 与输入 [N] 一一对应\n- 纯 JSON，无 markdown 代码块，无解释\n⛔ ↵ 是字面字符标记，不是换行指令 — 在 text 中输出字符 "↵"，不要转为真实换行。\n→ 开始翻译：`
+    : `\n[OUTPUT]\nOutput ONLY a valid JSON object: {"translations":[{"i":<1-based index>,"text":"<translation>"}]}\n- Include ALL items — "i" must match the input [N] indices exactly\n- Raw JSON only, no markdown code blocks, no explanations\n⛔ The ↵ symbol is a LITERAL CHARACTER, NOT a line break — output it as the characters "↵" inside text strings.\nDo not wrap translations in quotation marks unless the source text itself is quoted.\n→ Output translations now:`
 
   // ── Assembly: IDENTITY → PRINCIPLES → MISSION → STYLE → FEWSHOT → LANG_RULES → CONTEXT → BRAND → GLOSSARY → OUTPUT ──
   return `${role}\n\n${principles}\n\n[MISSION·${targetLang}]\n${mission}${styleCard}${fewShotBlock}${langBlock_str}${contextHint}${brandNameRule}${glossaryBlock}${outputFormat}`
@@ -995,6 +998,8 @@ ${texts.map((t, i) => `${i + 1}. "${t.slice(0, 100)}"`).join('\n')}
         { role: 'user', content: textList },
       ],
       temperature,
+      // v12.0 第2步：翻译输出 schema 化——API 层硬约束 JSON object（实测 A/C 段全绿）
+      response_format: { type: 'json_object' },
     }),
   })
 
@@ -1014,14 +1019,35 @@ ${texts.map((t, i) => `${i + 1}. "${t.slice(0, 100)}"`).join('\n')}
 
   let result: string[] = []
 
-  // 尝试 JSON 解析（优先，模型可能以 JSON 格式返回）
+  // 尝试 JSON 解析（优先，v12.0 起 json_object 模式强制 {"translations":[...]}）
+  // i 映射修复：entry.i（1-based 索引）优先于数组位置——防模型乱序输出时译文错位
   const jsonMatch = content.match(/\{[\s\S]*"translations"[\s\S]*\}/)
   if (jsonMatch) {
     try {
       const parsed = JSON.parse(jsonMatch[0]) as { translations?: Array<{ i?: number; text?: string }> }
       if (parsed.translations && Array.isArray(parsed.translations)) {
-        for (const entry of parsed.translations) {
-          if (entry.text) result.push(entry.text.trim())
+        const hasValidIndex = parsed.translations.some(e => typeof e.i === 'number' && e.i >= 1)
+        if (hasValidIndex) {
+          // v12.0: i 索引映射（乱序安全）
+          const byIndex: string[] = []
+          for (const entry of parsed.translations) {
+            if (typeof entry.i === 'number' && entry.i >= 1 && entry.text) byIndex[entry.i - 1] = entry.text.trim()
+          }
+          // 无 i 或 i 越界的按顺序补位（i 缺失场景的保守兜底）
+          let cursor = 0
+          for (const entry of parsed.translations) {
+            if (!entry.text) continue
+            if (typeof entry.i === 'number' && entry.i >= 1) continue
+            while (byIndex[cursor] !== undefined) cursor++
+            byIndex[cursor++] = entry.text.trim()
+          }
+          for (let i = 0; i < byIndex.length; i++) result.push(byIndex[i] ?? '')
+          result = result.filter((_, i) => i < texts.length || byIndex[i] !== undefined)
+        } else {
+          // 旧形态：无 i 字段，按数组位置（v12.0 前模型的偶发 JSON 输出）
+          for (const entry of parsed.translations) {
+            if (entry.text) result.push(entry.text.trim())
+          }
         }
       }
     } catch { /* fall through to line parsing */ }

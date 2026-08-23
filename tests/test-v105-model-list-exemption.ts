@@ -277,6 +277,63 @@ async function main() {
   // ═══════════════════════════════════════════════════════════
   out.push('')
   out.push('═'.repeat(60))
+  out.push('G. v12.0 第2步 翻译输出 schema 化（2026-08-24：json_object 硬约束 + i 索引映射）')
+  out.push('═'.repeat(60))
+
+  // G1: 翻译请求体含 response_format json_object
+  {
+    const g1Body = JSON.parse(mockCalls[0].body)
+    assert(g1Body.response_format?.type === 'json_object', 'G1 翻译请求体含 response_format json_object 硬约束',
+      JSON.stringify(g1Body.response_format))
+    const g1Sys: string = g1Body.messages.find((m: { role: string }) => m.role === 'system').content
+    assert(/"translations"/.test(g1Sys), 'G2 system prompt 含 "translations" 包装约定')
+    assert(/"i"/.test(g1Sys) && /"text"/.test(g1Sys), 'G3 system prompt 含 i/text 字段约定')
+  }
+
+  // G4: 新格式 {"translations":[{i,text}]} 正序解析落地
+  clearUiLogs(); mockCalls.length = 0
+  enqueueResponse('{"translations":[{"i":1,"text":"高速伝送、快適体験"},{"i":2,"text":"A1 / A7M4"}]}')
+  const g4 = await translateBatch(
+    ['高速传输 绝佳体验', 'A1 / A7M4'],
+    'ja', emptyGlossary, config,
+    undefined, undefined, undefined, undefined, undefined, undefined, false, false, undefined, new Set())
+  assert(g4[0] === '高速伝送、快適体験', 'G4 新格式正序解析落地', JSON.stringify(g4[0]))
+
+  // G5: 乱序输出按 i 索引归位（防译文错位——v12.0 解析层修复点）
+  clearUiLogs(); mockCalls.length = 0
+  enqueueResponse('{"translations":[{"i":3,"text":"第三条译文"},{"i":1,"text":"第一条译文"},{"i":2,"text":"第二条译文"}]}')
+  const g5 = await translateBatch(
+    ['First marketing sentence here', 'Second marketing sentence here', 'Third marketing sentence here'],
+    'zh-CN', emptyGlossary, config,
+    undefined, undefined, undefined, undefined, undefined, undefined, false, false, undefined, new Set())
+  assert(g5[0] === '第一条译文' && g5[1] === '第二条译文' && g5[2] === '第三条译文',
+    'G5 乱序输出按 i 索引归位（零错位）', JSON.stringify(g5))
+
+  // G6: ↵ 字面字符在 JSON text 中保留（A 段实机的 mock 复刻）
+  //      注：post-process.ts:357 会把 ↵ 还原为真实换行（v9.x 既有还原语义——画布最终需要真换行），
+  //      因此断言"内容等价于 ↵ 形态"（换行位置保留），而非字面 ↵ 残留。
+  clearUiLogs(); mockCalls.length = 0
+  enqueueResponse('{"translations":[{"i":1,"text":"第一行 ↵ 第二行"}]}')
+  const g6 = await translateBatch(
+    ['Line one ↵ Line two'],
+    'zh-CN', emptyGlossary, config,
+    undefined, undefined, undefined, undefined, undefined, undefined, false, false, undefined, new Set())
+  assert(g6[0].replace(/\n/g, '↵').replace(/\s*↵\s*/g, ' ↵ ') === '第一行 ↵ 第二行',
+    'G6 JSON text 中 ↵ 换行位置保留（post-process 还原为真换行）', JSON.stringify(g6[0]))
+
+  // G7: 逐行 [N] 旧格式兜底仍工作（防御层不死——E 段同形态回归）
+  clearUiLogs(); mockCalls.length = 0
+  enqueueResponse('[1] 旧格式译文一\n[2] 旧格式译文二')
+  const g7 = await translateBatch(
+    ['First marketing sentence here', 'Second marketing sentence here'],
+    'zh-CN', emptyGlossary, config,
+    undefined, undefined, undefined, undefined, undefined, undefined, false, false, undefined, new Set())
+  assert(g7[0] === '旧格式译文一' && g7[1] === '旧格式译文二', 'G7 逐行 [N] 旧格式兜底解析仍工作',
+    JSON.stringify(g7))
+
+  // ═══════════════════════════════════════════════════════════
+  out.push('')
+  out.push('═'.repeat(60))
   out.push(`结果：${pass} 通过，${fail} 失败`)
   out.push('═'.repeat(60))
 
