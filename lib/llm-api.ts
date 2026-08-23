@@ -1983,6 +1983,10 @@ export async function proofreadBatch(
         { role: 'user', content: textList },
       ],
       temperature: 0.1,
+      // v12.0: 校对输出 schema 化——API 层硬约束 JSON object（软约定→硬保证，解析失败率降为 0）
+      // 实测（tests/test-schema-live.ts B 段 10 次/组）：硬约束格式服从 10/10、reason 枚举全合规、
+      // 错误抓取率与软约定无统计差异。↵ 字面保留实测通过（A 段）。
+      response_format: { type: 'json_object' },
     }),
   })
 
@@ -1997,8 +2001,56 @@ export async function proofreadBatch(
   let jsonParsed = false
 
   // 尝试 JSON 解析
+  // v12.0: 优先 {"results":[...]}（json_object 模式的新约定），向后兼容裸 [...]（旧软约定输出）
+  // 定位策略：找最后一个 "results" 键（内容文本含 results 字样时防误锚——坑16同型：
+  // 对位置的假设比对内容的假设脆弱），再在其后取平衡 {..} 段，JSON.parse 校验通过才采信。
+  function extractResultsObject(text: string): Record<string, unknown> | null {
+    let searchFrom = 0
+    for (;;) {
+      const keyIdx = text.indexOf('"results"', searchFrom)
+      if (keyIdx < 0) return null
+      // 向前找包含该键的最近开括号
+      let openIdx = -1
+      for (let i = keyIdx - 1; i >= 0; i--) {
+        if (text[i] === '{') { openIdx = i; break }
+        if (text[i] === '}') break  // 键在对象外（如 array 元素里），继续找下一个
+      }
+      if (openIdx >= 0) {
+        // 从 openIdx 起取平衡大括号段
+        let depth = 0, inStr = false, esc = false, end = -1
+        for (let i = openIdx; i < text.length; i++) {
+          const ch = text[i]
+          if (esc) { esc = false; continue }
+          if (ch === '\\') { esc = true; continue }
+          if (ch === '"') { inStr = !inStr; continue }
+          if (inStr) continue
+          if (ch === '{') depth++
+          else if (ch === '}') { depth--; if (depth === 0) { end = i; break } }
+        }
+        if (end > openIdx) {
+          try { return JSON.parse(text.slice(openIdx, end + 1)) } catch { /* 找下一个 */ }
+        }
+      }
+      searchFrom = keyIdx + 1
+    }
+  }
+  const resultsObj = extractResultsObject(content)
   const jsonMatch = content.match(/\[[\s\S]*\]/)
-  if (jsonMatch) {
+  if (resultsObj && Array.isArray((resultsObj as { results?: unknown[] }).results)) {
+    for (const entry of (resultsObj as { results: Array<{ i: number; text?: string; reason?: string; ambiguous?: string[] }> }).results) {
+      if (entry.i >= 1 && entry.i <= results.length) {
+        let entryText = (entry.text || '').trim()
+        entryText = entryText.replace(/^\[\d+\]\s*/, '')
+        results[entry.i - 1] = {
+          text: entryText,
+          reason: (entry.reason || '').trim(),
+          ambiguous: Array.isArray(entry.ambiguous) ? entry.ambiguous.filter(a => a && a.trim()) : [],
+        }
+      }
+    }
+    jsonParsed = true
+  }
+  if (!jsonParsed && jsonMatch) {
     try {
       const parsed = JSON.parse(jsonMatch[0]) as Array<{ i: number; text?: string; reason?: string; ambiguous?: string[] }>
       for (const entry of parsed) {

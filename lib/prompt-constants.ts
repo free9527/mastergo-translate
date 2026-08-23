@@ -2672,17 +2672,17 @@ the target MUST use the exact translation below. Do NOT alter spelling, casing,
 or internal spacing of target terms. Never "correct" by completing partial product names.
 
 [OUTPUT FORMAT]
-Output ONLY a valid JSON array. No other text.
-- All correct → output: []
-- Errors exist → output array of correction objects.
+Output ONLY a valid JSON object with a single key "results". No other text.
+- All correct → output: {"results":[]}
+- Errors exist → output: {"results":[<correction objects>]}
 
 JSON Schema:
-[{
+{"results":[{
   "i": <integer, 1-based index>,
   "text": "<string, fully corrected translation>",
   "reason": "<string, MUST be one of: 漏翻 | 多翻 | 语义错误 | 术语错误 | 语法错误 | 拼写错误 | 标点错误 | 一致性问题>",
   "ambiguous": [<array of strings, default: []>]
-}]
+}]}
 
 [AMBIGUOUS FIELD]
 Use "ambiguous" only for genuinely unclear terms or new concepts NOT in the glossary.
@@ -2695,9 +2695,9 @@ it, list the term in "ambiguous". Otherwise, always use [].
 3. Only include items that NEED correction. Correct items → omit entirely.
 
 Example (item 1 has grammar error, item 2 correct):
-[{"i":1,"text":"Tốc độ đọc lên đến 14000 MB/s","reason":"语法错误","ambiguous":[]}]
+{"results":[{"i":1,"text":"Tốc độ đọc lên đến 14000 MB/s","reason":"语法错误","ambiguous":[]}]}
 
-→ Review the translations and output the JSON array now:`
+→ Review the translations and output the JSON object now:`
 
 /** CJK 版本（zh-CN/zh-TW/ja/ko 校对使用）— 与翻译指令语言策略一致 */
 export const PROOFREAD_SYSTEM_PROMPT_ZH = `[角色]
@@ -2756,17 +2756,17 @@ export const PROOFREAD_SYSTEM_PROMPT_ZH = `[角色]
 严禁参照术语格式"纠正"译文，将部分产品名补全为全称。
 
 [输出格式]
-仅输出合法的 JSON 数组。不要输出其他任何文本。
-- 全部正确 → 输出: []
-- 存在错误 → 输出修正对象数组。
+仅输出合法的 JSON 对象，且只有一个键 "results"。不要输出其他任何文本。
+- 全部正确 → 输出: {"results":[]}
+- 存在错误 → 输出: {"results":[<修正对象>]}
 
 JSON Schema:
-[{
+{"results":[{
   "i": <整数，1-based 索引>,
   "text": "<字符串，完整修正后的译文>",
   "reason": "<字符串，必须为以下之一: 漏翻 | 多翻 | 语义错误 | 术语错误 | 语法错误 | 拼写错误 | 标点错误 | 一致性问题>",
   "ambiguous": [<字符串数组，默认: []>]
-}]
+}]}
 
 [歧义字段]
 仅对确实有歧义的术语或术语库未覆盖的新概念使用 "ambiguous"。
@@ -2779,9 +2779,9 @@ JSON Schema:
 3. 仅包含需要修正的条目。正确的条目 → 完全省略。
 
 示例（第1条有语法错误，第2条正确）：
-[{"i":1,"text":"读取速度最高可达 __PRD_0__ MB/s","reason":"语法错误","ambiguous":[]}]
+{"results":[{"i":1,"text":"读取速度最高可达 __PRD_0__ MB/s","reason":"语法错误","ambiguous":[]}]}
 
-→ 审查以下译文并输出 JSON 数组：`
+→ 审查以下译文并输出 JSON 对象：`
 
 // ═══════════════════════════════════════════════════════════════
 // v11.5: 校对条件注入块（从 PROOFREAD_SYSTEM_PROMPT/ZH 抽出，按需注入）

@@ -536,6 +536,56 @@ async function main() {
 
   out.push('')
   out.push('═'.repeat(60))
+  out.push('H. v12.0 校对输出 schema 化（2026-08-23：response_format json_object + {"results":[...]} 包装）')
+  out.push('═'.repeat(60))
+
+  // H1: 请求体含 response_format json_object（API 层硬约束存在）
+  mockCalls.length = 0
+  responseQueue.push('{"results":[]}')
+  await proofreadBatch(c1Items, 'zh-TW', emptyGlossary, config,
+    undefined, undefined, undefined, undefined, undefined, undefined)
+  const h1Body = JSON.parse(mockCalls[0].body)
+  assert(h1Body.response_format?.type === 'json_object', 'H1 请求体含 response_format json_object 硬约束',
+    JSON.stringify(h1Body.response_format))
+
+  // H2: system prompt 新约定——{"results":[...]} 包装（EN/ZH 双版同步）
+  const h2SysZh = h1Body.messages.find((m: { role: string }) => m.role === 'system').content
+  assert(/"results"/.test(h2SysZh), 'H2 中文 system prompt 含 "results" 包装约定')
+  assert(/\{"results":\[\]\}/.test(h2SysZh), 'H3 中文 prompt 全对示例 {"results":[]}')
+  mockCalls.length = 0
+  responseQueue.push('{"results":[]}')
+  await proofreadBatch(c2Items, 'de', emptyGlossary, config,
+    undefined, undefined, undefined, undefined, undefined, undefined)
+  const h2SysEn = JSON.parse(mockCalls[0].body).messages.find((m: { role: string }) => m.role === 'system').content
+  assert(/"results"/.test(h2SysEn), 'H4 英文 system prompt 含 "results" 包装约定')
+
+  // H5: 新格式 {"results":[...]} 解析落地（主路径）
+  mockCalls.length = 0
+  responseQueue.push('{"results":[{"i":1,"text":"高效能隨身碟","reason":"術語錯誤","ambiguous":[]}]}')
+  const h5Result = await proofreadBatch(c1Items, 'zh-TW', emptyGlossary, config,
+    undefined, undefined, undefined, undefined, undefined, undefined)
+  assert(h5Result[0].text === '高效能隨身碟', 'H5 {"results":[...]} 新格式解析落地', h5Result[0].text)
+  assert(h5Result[0].reason === '術語錯誤', 'H6 reason 字段解析', h5Result[0].reason)
+  assert(h5Result[1].text === '快速資料傳輸', 'H7 未修改条目回退原译文（防御兜底语义）', h5Result[1].text)
+
+  // H8: 向后兼容裸 [...]（旧软约定输出仍能解析——防御层不死）
+  mockCalls.length = 0
+  responseQueue.push('[{"i":2,"text":"快速傳輸","reason":"漏翻"}]')
+  const h8Result = await proofreadBatch(c1Items, 'zh-TW', emptyGlossary, config,
+    undefined, undefined, undefined, undefined, undefined, undefined)
+  assert(h8Result[1].text === '快速傳輸', 'H8 裸 [...] 旧格式向后兼容解析', h8Result[1].text)
+  assert(h8Result[0].text === '最佳高速隨身碟', 'H9 旧格式下未修改条目回退原译文', h8Result[0].text)
+
+  // H10: {"results":[...]} 优先级高于裸 [...]（双形态同时出现时 results 胜出——防 prompt 回显干扰）
+  mockCalls.length = 0
+  responseQueue.push('Some text [{"i":1,"text":"干扰项","reason":"x"}] {"results":[{"i":2,"text":"正解","reason":"漏翻"}]}')
+  const h10Result = await proofreadBatch(c1Items, 'zh-TW', emptyGlossary, config,
+    undefined, undefined, undefined, undefined, undefined, undefined)
+  assert(h10Result[1].text === '正解' && h10Result[0].text === '最佳高速隨身碟', 'H10 results 包装优先于裸 array（防回显干扰）',
+    `[0]=${h10Result[0].text} [1]=${h10Result[1].text}`)
+
+  out.push('')
+  out.push('═'.repeat(60))
   out.push(`结果：${pass} 通过，${fail} 失败`)
   out.push('═'.repeat(60))
 
