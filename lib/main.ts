@@ -750,6 +750,8 @@ async function saveCorrection(correction: TranslationCorrection): Promise<void> 
       targetLang: correction.targetLang,
       correctedTranslation: correction.correctedTranslation,
       count: sameSource.length,
+      // v11.14: 透传来源（用户手改 / 校对自动修正），UI 决定拒绝时是否提示
+      origin: correction.origin || 'user',
     })
   }
 }

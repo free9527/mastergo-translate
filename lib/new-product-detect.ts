@@ -65,6 +65,7 @@ const PAREN_SPEC_RE = /^\(.*\)$/
  *  CFexpress Type A / Type B、USB-A / USB-A/C 中的单字母 A/B/C 不是冠词/缩写，是规格代号 */
 const SPEC_LETTER_CONTEXT_RE = /\b(Type|USB|Gen)\s+[A-C]\b|\/[A-C]\b|-[A-C]\//i
 
+
 /** 品类词（英文 key 的单词集合 + 常见组成词）—— 命中即系列串终止。 */
 const CATEGORY_TOKEN_SET = new Set<string>()
 for (const key of Object.keys(CATEGORY_WORDS)) {
@@ -92,17 +93,35 @@ const DESCRIPTIVE_WORDS = new Set([
 ])
 
 /** 产品型号形态（NM790 / D40E / E300 / A30E / SL500 / H31 / P30 / 纯数字） */
-const MODEL_TOKEN_RE = /^([A-Z]{1,4}\d{1,5}[A-Za-z]?|\d{2,5}|[A-Z]\d{1,3}[A-Za-z]?)$/
+export const MODEL_TOKEN_RE = /^([A-Z]{1,4}\d{1,5}[A-Za-z]?|\d{2,5}|[A-Z]\d{1,3}[A-Za-z]?)$/
 
-/** 整条产品名形态门：仅允许字母/数字/有限标点（含 ®™©、英寸符号、括号、斜杠、×），无句读 */
-const NAME_SHAPE_RE = /^[A-Za-z0-9 .®™©/+×x\-–—'"”()]+$/
+/** 整条产品名形态门：仅允许字母/数字/有限标点（含 ®™©、英寸符号、括号、斜杠、×），无句读
+ *  v11.14: export —— glossary-guard 句形判定复用（同一字符集语义，防漂移） */
+export const NAME_SHAPE_RE = /^[A-Za-z0-9 .®™©/+×x\-–—'"”()]+$/
 
 /** 功能词（含则不是产品名，是句子/营销文案）
- *  v11.2.1: 移除 with —— 命名规则文档定义 "with Heatsink/Magnetic Set/Hub" 为标准配件话术 */
-const FUNCTION_WORDS_RE = /\b(the|a|an|for|your|our|their|this|that|these|those|from|have|been|will|would|could|should|may|might|can|must|are|were|was|has|had|its|and|but|or|not|also|very|more|most|than|then|now|when|where|which|who|why|how|about|after|before|between|during|into|over|under|until|upon|within|without)\b/i
+ *  v11.2.1: 移除 with —— 命名规则文档定义 "with Heatsink/Magnetic Set/Hub" 为标准配件话术
+ *  v11.14: export —— glossary-guard 句形判定复用（与产品名检测同一套词表，防漂移） */
+export const FUNCTION_WORDS_RE = /\b(the|a|an|for|your|our|their|this|that|these|those|from|have|been|will|would|could|should|may|might|can|must|are|were|was|has|had|its|and|but|or|not|also|very|more|most|than|then|now|when|where|which|who|why|how|about|after|before|between|during|into|over|under|until|upon|within|without)\b/i
 
-/** 动词（含则倾向于句子，非产品名） */
-const VERB_RE = /\b(is|are|delivers?|offers?|provides?|features?|supports?|enables?|designed|engineered|built|makes?|gives?|gets?|boosts?|experience|enjoy|upgrade|meet|meets)\b/i
+/** 动词（含则倾向于句子，非产品名）。v11.14: export —— glossary-guard 复用 */
+export const VERB_RE = /\b(is|are|delivers?|offers?|provides?|features?|supports?|enables?|designed|engineered|built|makes?|gives?|gets?|boosts?|experience|enjoy|upgrade|meet|meets)\b/i
+
+/**
+ * v11.14: 产品名形态直通正则 —— isSentenceLikeGlossaryKey 的"产品名豁免"信号。
+ * 与 parseProductName 同一套口径（防漂移）：产品名 = 整条过 NAME_SHAPE_RE 字符集门
+ * 且不命中"句子指纹"词表。词表按产品名语境收窄：
+ *   - 移除 with（"EQ790 with Heatsink"/"Go Portable SSD with Hub" 是标准配件话术）
+ *   - 移除 a（"Type A"/"USB-A" 是规格代号，SPEC_LETTER_CONTEXT_RE 同款语义）
+ * 命中以下任一 → 不是产品名 → 句形信号+1：
+ *   功能词（the/for/your/and...）、动词（is/delivers/designed...）、形态字符集违反。
+ */
+const NAME_FUNCTION_WORDS_RE = /\b(?:the|for|your|our|their|this|that|these|those|from|have|been|will|would|could|should|may|might|can|must|are|were|was|has|had|its|and|but|or|not|also|very|more|most|than|then|now|when|where|which|who|why|how|about|after|before|between|during|into|over|under|until|upon|within|without|an)\b/i
+const NAME_VERB_RE = /\b(?:is|are|delivers?|offers?|provides?|features?|supports?|enables?|designed|engineered|built|makes?|gives?|gets?|boosts?|experience|enjoy|upgrade|meet|meets)\b/i
+export const PRODUCT_NAME_SHAPE_PASS_RE = new RegExp(
+  `^(?!.*${NAME_FUNCTION_WORDS_RE.source})(?!.*${NAME_VERB_RE.source})${NAME_SHAPE_RE.source.slice(1, -1)}$`,
+  'i',  // .source 不带原正则 flags——外层补 'i'，句首大写 'The/Designed' 同样拦截
+)
 
 // ═══════════════════════════════════════════════════════════════
 // 工具

@@ -36,6 +36,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { DEBUG_MODE } from '@lib/constants'
+import { shouldSkipGlossaryEntry } from '@lib/glossary-guard'
 
 // DEBUG 日志辅助函数
 const debugLog = (...args: unknown[]) => DEBUG_MODE && console.log(...args)
@@ -257,22 +258,34 @@ export function enforceGlossaryTerms(
     const normalizedSource = cleanKey(source)
     let result = translated
 
+    // v11.14: 脏条目（句形 key + identity/乱码™值）精确匹配锁定放开——整句译文不得
+    // 被脏值整条锁死（2026-08-17 事故：乱码值经此通道灌回译文）。value 先取出再判定，
+    // 保证 Bug A 的 identity 条目（value===source）被识别。
+    const exactRaw = glossaryMap.get(source)
+    const skipExactRaw = exactRaw !== undefined && shouldSkipGlossaryEntry(source, exactRaw)
+    const exactCk = glossaryMap.get(normalizedSource)
+    const skipExactCk = exactCk !== undefined && shouldSkipGlossaryEntry(normalizedSource, exactCk)
+    const exactNorm = normalizedGlossaryMap.get(normalizedSource)
+    const skipExactNorm = exactNorm !== undefined && shouldSkipGlossaryEntry(normalizedSource, exactNorm)
+
     // 1. 精确匹配（三层：原文 → 去商标原文 → 术语库去商标key）
-    if (glossaryMap.has(source)) {
+    // v11.14: 句形 key + 正经译文值的正当策展条目（专属库免责声明/兼容性文案）照常
+    // 锁定（v11.12+ 术语库最高优先级）；仅 identity/乱码™值条目放开。
+    if (!skipExactRaw && glossaryMap.has(source)) {
       const target = glossaryMap.get(source)!
       if (target !== result) {
         debugLog('[enforceGlossaryTerms] exact match (raw):', source.slice(0, 60), '→', target.slice(0, 60))
         result = target
       }
     }
-    if (glossaryMap.has(normalizedSource)) {
+    if (!skipExactCk && glossaryMap.has(normalizedSource)) {
       const target = glossaryMap.get(normalizedSource)!
       if (target !== result) {
         debugLog('[enforceGlossaryTerms] exact match (cleanKey):', normalizedSource.slice(0, 60), '→', target.slice(0, 60))
         result = target
       }
     }
-    if (normalizedGlossaryMap.has(normalizedSource)) {
+    if (!skipExactNorm && normalizedGlossaryMap.has(normalizedSource)) {
       const target = normalizedGlossaryMap.get(normalizedSource)!
       if (target !== result) {
         debugLog('[enforceGlossaryTerms] exact match (normalizedMap):', normalizedSource.slice(0, 60), '→', target.slice(0, 60))
@@ -288,6 +301,9 @@ export function enforceGlossaryTerms(
       for (const [glossarySource, glossaryTarget] of sortedEntries) {
         const normalizedGlossarySource = cleanKey(glossarySource)
         if (normalizedGlossarySource.length < 3) continue
+        // v11.14: 脏条目（句形 key + identity/乱码™值）不参与子串替换——Bug B 扩散
+        // 通道封堵；正当句形策展条目照常替换（术语库最高优先级）。
+        if (shouldSkipGlossaryEntry(glossarySource, glossaryTarget)) continue
         if (normalizedSource.includes(normalizedGlossarySource)) {
           if (!result.includes(glossaryTarget)) {
             const escapedSource = normalizedGlossarySource.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')

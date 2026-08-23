@@ -288,6 +288,8 @@ function cleanKeyForMask(s: string): string {
  * - 用 cleanKey 归一化后匹配（忽略 ®™© 和多余空格）
  * - 占位符格式 __GLOSSARY_N__，与 __PRD_N__、__TRM_N__ 一致，LLM 更可能保留
  */
+import { shouldSkipGlossaryEntry } from '@lib/glossary-guard'
+
 export function maskGlossaryTerms(
   texts: string[],
   glossaryMap: Map<string, string>,
@@ -308,6 +310,9 @@ export function maskGlossaryTerms(
   // 生成变体后，两种写法都能匹配
   const terms = [...glossaryMap.entries()]
     .filter(([source]) => source.length >= 3)
+    // v11.14: 脏条目（句形 key + identity/乱码™值）不参与遮蔽——乱码值字面回灌通道封堵
+    // （2026-08-17 事故）。正当整句策展条目（正经译文 value）照常遮蔽锁定（v9.9/v11.12 语义）。
+    .filter(([source, target]) => !shouldSkipGlossaryEntry(source, target))
     .flatMap(([source, target]) => {
       const entries = [{ ck: cleanKeyForMask(source), source, target }]
       // 如果术语以 "Lexar " 开头，生成不带前缀的变体

@@ -116,6 +116,9 @@ export interface TranslationCorrection {
   originalTranslation: string
   correctedTranslation: string
   correctedAt: number  // timestamp
+  /** v11.14: 修正来源 —— user=用户手动编辑（自动入库被拒时提示）；
+   *  proofread=AI校对自动修正（被拒时静默，防刷toast）。缺省按 user 兼容旧记录 */
+  origin?: 'user' | 'proofread'
 }
 
 export interface GlossaryEntry {

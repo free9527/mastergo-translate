@@ -95,3 +95,73 @@ export function parseCSVRecords(text: string): string[][] {
   }
   return records
 }
+
+// ═══════════════════════════════════════════════════════════════
+// 术语库 CSV（v11.14：与翻译 CSV 同套原语——修 split('\n') 碎行雷）
+// ═══════════════════════════════════════════════════════════════
+
+export interface GlossaryCSVEntry {
+  source: string
+  translations: Record<string, string>
+}
+
+/**
+ * 解析术语库 CSV（产品名/专属共用）。
+ * v11.14 前：split('\n') + parseCSVRow——单元格内真实换行（Excel Alt+Enter）会把
+ * 一条记录切成多个碎片条目；从翻译导出复制的 ↵ 占位符不还原（字面残留）。
+ * 现与翻译 CSV 导入（csv-handler importCSV）同套 parseCSVRecords + csvDecodeCell。
+ *
+ * @param validLangCodes 有效语言代码集合（列名白名单）
+ */
+export function parseGlossaryCSVText(text: string, validLangCodes: Set<string>): GlossaryCSVEntry[] {
+  const rows = parseCSVRecords(text.replace(/^﻿/, '').trim())
+  if (rows.length === 0) return []
+  const headerCells = rows[0]
+  // 跳过旧版元数据列（兼容旧 CSV 格式）
+  const skipCols = new Set([
+    headerCells.findIndex(h => h.trim() === '处理方式'),
+    headerCells.findIndex(h => h.trim() === '术语分类'),
+    headerCells.findIndex(h => h.trim() === '产品线'),
+    headerCells.findIndex(h => h.trim() === '术语类型'),
+  ].filter(i => i >= 0))
+  const langCols: string[] = []
+  const dataCols: number[] = []
+  for (let i = 1; i < headerCells.length; i++) {
+    if (skipCols.has(i)) continue
+    const colName = headerCells[i].trim()
+    if (validLangCodes.has(colName)) {
+      dataCols.push(i)
+      langCols.push(colName)
+    }
+  }
+  const entries: GlossaryCSVEntry[] = []
+  for (let i = 1; i < rows.length; i++) {
+    const cells = rows[i]
+    const source = (cells[0] || '').trim()
+    if (!source) continue
+    const translations: Record<string, string> = {}
+    for (let j = 0; j < langCols.length; j++) {
+      const val = csvDecodeCell((cells[dataCols[j]] || '').trim())
+      if (val) translations[langCols[j]] = val
+    }
+    entries.push({ source, translations })
+  }
+  return entries
+}
+
+/**
+ * 序列化专属术语库为 CSV 文本。
+ * v11.14 前：escapeCSVCell 只加引号、单元格内保留字面 \n——Excel 打开即列错位；
+ * 现用 csvEncodeCell（换行→↵ 占位符，一条记录恒一物理行，与翻译导出同规约）。
+ */
+export function serializeGlossaryCSV(entries: GlossaryCSVEntry[], langCodes: string[]): string {
+  const header = ['source', ...langCodes].join(',')
+  const rows = entries.map(g => {
+    const cells = [csvEncodeCell(g.source)]
+    for (const code of langCodes) {
+      cells.push(csvEncodeCell(g.translations[code] || ''))
+    }
+    return cells.join(',')
+  })
+  return [header, ...rows].join('\n')
+}
