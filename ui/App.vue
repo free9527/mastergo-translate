@@ -477,7 +477,7 @@
                 <span class="toggle" :class="{ on: llmConfig.enablePolish }">
                   <span class="toggle-knob"></span>
                 </span>
-                AI 润色（去机翻感，de/es/ru/tr 默认开，其余语种默认关）
+                AI 润色（去机翻感，de/es/ru/tr/ja 默认开，其余语种默认关）
               </label>
             </div>
             <template v-if="llmConfig.enableProofread">
@@ -598,7 +598,7 @@ import { sendMsgToPlugin } from '@messages/ui-sender'
 import { parseGlossaryCSVText, serializeGlossaryCSV } from '@lib/parse-csv'
 import { validateAutoGlossarySource, sanitizeAutoGlossaryValue, isIdentityAutoAddAllowed, shouldSkipGlossaryEntry, hasMalformedTrademark } from '@lib/glossary-guard'
 import { formatCJKSpace } from '@lib/format-text'
-import { postProcessTranslation, restoreTrademarkSymbols, restoreStorageUnitFormatting, enforceGlossaryTerms, detectTranslationExpansion, sanitizeLineBreaks, cleanKey } from '@lib/post-process'
+import { postProcessTranslation, restoreTrademarkSymbols, restoreStorageUnitFormatting, enforceGlossaryTerms, detectTranslationExpansion, sanitizeLineBreaks, cleanKey, stripSpuriousAsterisks } from '@lib/post-process'
 import { translateBatch, proofreadBatch, fetchWithRetry, isProofreadScriptMismatch, detectTruncatedTexts, STYLE_PRESETS, SCENE_PRESETS, detectProductLine, buildTaskGlossaryHint, isUntranslatable, isSuspectMisspelledWord, classifyNecessity, getTargetScript, hasFunctionWords, hasSimplifiedOnlyChars, hasTraditionalOnlyChars, personaJudgeBatch, polishBatch } from '@lib/llm-api'
 import { startMetricsCollection, recordBatchMetrics, recordProofreadMetrics, finalizeMetrics, formatMetricsReport, createBatchTimer } from '@lib/metrics'
 import { DEFAULT_GLOSSARY_PRODUCTS_CSV } from '@lib/default-glossary'
@@ -739,8 +739,8 @@ const hasPendingNonBlockingIssue = computed(() =>
  * 若是产品名 → 直接按术语库译法（v9.9 合规锁已有）；若不是产品名 → 用户手动处理。
  */
 const translationCache = ref<Record<string, string>>({})
-/** v12.3: 润色灰度白名单（judge 基线低分语种）——默认值与管道启用共用单一事实源 */
-const POLISH_GRAY_LANGS = ['de', 'es', 'ru', 'tr']
+/** v12.3: 润色灰度白名单（judge 基线低分语种 + v12.6 ja 母语调研直訳感实锤）——默认值与管道启用共用单一事实源 */
+const POLISH_GRAY_LANGS = ['de', 'es', 'ru', 'tr', 'ja']
 const llmConfig = ref<LLMConfig>({ apiKey: '', apiUrl: '', model: '', translationStyle: 'standard', translationStyleCustom: '', scenePreset: 'ecommerce', enableProofread: true, proofreadApiKey: '', proofreadApiUrl: '', proofreadModel: '', enablePolish: false })
 
 const scanning = ref(false)
@@ -1934,7 +1934,7 @@ async function startTranslate() {
           translated = restoreTrademarkSymbols(texts, translated)
 
           // v12.3: 人设驱动判定→润色→硬锁（翻译完成后、校对之前）
-          // 只在 enablePolish 开 + 目标语言在灰度白名单（de/es/ru/tr）时启用；
+          // 只在 enablePolish 开 + 目标语言在灰度白名单（de/es/ru/tr/ja）时启用；
           // 资格负面清单（isPolishEligible）过滤掉合规/术语库锁定/不可翻译/极短/含↵条目。
           if (llmConfig.value.enablePolish && POLISH_GRAY_LANGS.includes(targetLang.value)) {
             try {
@@ -2122,6 +2122,7 @@ async function startTranslate() {
                         if (pBatch[j].sourceText.length >= 15 && proofed.text.length < pBatch[j].translatedText.length * 0.2) continue
                         let fixed = postProcessTranslation(proofed.text, targetLang.value)
                         if (!/[\n\r]/.test(pBatch[j].sourceText)) fixed = fixed.replace(/[\n\r]+/g, ' ')
+                        fixed = stripSpuriousAsterisks(pBatch[j].sourceText, fixed)
                         fixed = formatCJKSpace(fixed, targetLang.value)
                         if (fixed === pBatch[j].translatedText) continue
                         pBatch[j].proofreadText = pBatch[j].translatedText
@@ -2250,6 +2251,10 @@ async function startTranslate() {
   const allSrcTexts = items.value.map(it => it.sourceText)
   let allTgtTexts = items.value.map(it => it.translatedText)
   allTgtTexts = sanitizeLineBreaks(allSrcTexts, allTgtTexts)
+  // v12.5: LLM 自发星号清理（源文无 * 时）——最终安全网，覆盖翻译/缓存/一致性全路径
+  for (let i = 0; i < allTgtTexts.length; i++) {
+    allTgtTexts[i] = stripSpuriousAsterisks(allSrcTexts[i], allTgtTexts[i])
+  }
   for (let i = 0; i < items.value.length; i++) {
     items.value[i].translatedText = allTgtTexts[i]
   }
@@ -2412,6 +2417,7 @@ async function startProofread() {
                 if (!/[\n\r]/.test(batch[j].sourceText)) {
                   fixed = fixed.replace(/[\n\r]+/g, ' ')
                 }
+                fixed = stripSpuriousAsterisks(batch[j].sourceText, fixed)
                 fixed = formatCJKSpace(fixed, targetLang.value)
                 if (fixed === batch[j].translatedText) continue
                 batch[j].proofreadText = batch[j].translatedText
@@ -2535,6 +2541,7 @@ async function startProofread() {
       // 语言后处理 + CJK格式：只处理修改过的
       for (const i of correctedIndices) {
         allTranslatedTexts[i] = postProcessTranslation(allTranslatedTexts[i], targetLang.value)
+        allTranslatedTexts[i] = stripSpuriousAsterisks(allSourceTexts[i], allTranslatedTexts[i])
         allTranslatedTexts[i] = formatCJKSpace(allTranslatedTexts[i], targetLang.value)
       }
 
@@ -3179,7 +3186,7 @@ watch(manualProductLine, (val) => {
 }, { immediate: true })
 
 // 目标语言切换时重新计算字体映射
-// v12.3.2: 用户未手动碰过润色开关时，enablePolish 默认值跟随目标语言（de/es/ru/tr 开/其余关）
+// v12.3.2: 用户未手动碰过润色开关时，enablePolish 默认值跟随目标语言（de/es/ru/tr/ja 开/其余关）
 watch(targetLang, () => {
   if (!llmConfig.value.polishUserTouched) {
     llmConfig.value.enablePolish = POLISH_GRAY_LANGS.includes(targetLang.value)
@@ -3723,7 +3730,7 @@ onMounted(() => {
             raw.proofreadDefaultMigrated = true
           }
           // v12.3.2: enablePolish 默认值跟随目标语言——用户未手动碰过开关时，
-          // 每次加载按当前 targetLang 取默认（de/es/ru/tr 开/其余关）；
+          // 每次加载按当前 targetLang 取默认（de/es/ru/tr/ja 开/其余关）；
           // 用户手动改过（polishUserTouched）后尊重其选择不再覆盖。
           // （v12.3 初版按迁移那一刻的语言一次性定死，切语言不跟随，已修）
           if (!raw.polishUserTouched) {

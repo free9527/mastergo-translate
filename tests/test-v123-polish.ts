@@ -140,15 +140,24 @@ console.log('\n═══ B 硬锁校验（validatePolishOutput）═══')
   assert(!r.ok, 'B5 单位丢失回退', r.reason)
 }
 
-// B6: 词表未覆盖语种（ja）→ 极性校验跳过但数字/术语/单位仍校验
+// B6: ja（v12.6 已入词表）→ 极性校验生效：up to 限定词保留时数字/术语/单位/极性全通过
+{
+  const r = validatePolishOutput(
+    'Read speed up to 900MB/s',
+    '読み込み速度 最大900MB/s',
+    'ja'
+  )
+  assert(r.ok, 'B6 ja up to→最大 保留极性全通过', r.reason)
+}
+
+// B7: ja 限定词丢失 → 极性校验一票否决回退（v12.6 新增）
 {
   const r = validatePolishOutput(
     'Read speed up to 900MB/s',
     '読み込み速度 900MB/s',
     'ja'
   )
-  // ja 不在 POLARITY_TABLE，极性校验跳过；但数字/单位校验仍应通过
-  assert(r.ok, 'B6 词表未覆盖语种（ja）跳过极性校验', r.reason)
+  assert(!r.ok, 'B7 ja up to 丢失极性回退', r.reason)
 }
 
 // ============================================================
@@ -174,8 +183,17 @@ assert(!detectPolarityBreach('up to 900MB/s', "900MB/s'ye kadar", 'tr'), 'C5 tr 
 // C6: 源文无限定词 → 不触发
 assert(!detectPolarityBreach('fast speeds', 'schnelle Geschwindigkeiten', 'de'), 'C6 源文无限定词不触发')
 
-// C7: 词表未覆盖语种（ja）→ 不触发
-assert(!detectPolarityBreach('up to 900MB/s', '900MB/sまで', 'ja'), 'C7 词表未覆盖语种不触发')
+// C7: ja up to → まで（保留）→ 通过（v12.6 ja 已入词表）
+assert(!detectPolarityBreach('up to 900MB/s', '900MB/sまで', 'ja'), 'C7 ja up to→まで 通过')
+
+// C7b: ja up to → 无任何限定表达 → 违反（v12.6 新增）
+assert(detectPolarityBreach('up to 900MB/s', '900MB/s高速', 'ja'), 'C7b ja up to 丢失违反')
+
+// C7c: ja compatible with → 互換（保留）→ 通过（v12.6 新增）
+assert(!detectPolarityBreach('compatible with Intel XMP 3.0', 'Intel XMP 3.0と互換', 'ja'), 'C7c ja compatible with→互換 通过')
+
+// C7d: ja under → 以下（保留）→ 通过（v12.6 新增）
+assert(!detectPolarityBreach('under 30ms', '30ms以下', 'ja'), 'C7d ja under→以下 通过')
 
 // ============================================================
 // D 判定/润色输出解析（mock XHR 全链路）+ E CHECK 1R
@@ -314,6 +332,18 @@ console.log('\n═══ E CHECK 1R 校对分叉（polishedIndices 注入 + 快�
 {
   const prompt = buildProofreadSystemPrompt({ targetLang: 'de', productLine: null, useEnInstruction: true })
   assert(!prompt.includes('POLISHED ENTRIES'), 'E3 不传 hasPolished 默认不注入')
+}
+
+// E4: ja → JA_LAYOUT_NOTE 注入（v12.6 母语调研改行/排版实锤）
+{
+  const prompt = buildProofreadSystemPrompt({ targetLang: 'ja', productLine: null, useEnInstruction: false })
+  assert(prompt.includes('JA 排版自然度'), 'E4 ja 注入 JA_LAYOUT_NOTE')
+}
+
+// E5: 非 ja（de）→ JA_LAYOUT_NOTE 不注入（条件注入死文本纪律）
+{
+  const prompt = buildProofreadSystemPrompt({ targetLang: 'de', productLine: null, useEnInstruction: true })
+  assert(!prompt.includes('JA 排版自然度'), 'E5 de 不注入 JA_LAYOUT_NOTE')
 }
 
 // 执行

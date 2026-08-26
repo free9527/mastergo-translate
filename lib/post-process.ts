@@ -196,6 +196,43 @@ export function restoreTrademarkSymbols(sourceTexts: string[], translatedTexts: 
 }
 
 // ============================================================
+// v12.5: LLM 自发星号清理（源文无 * 时）
+// 背景：zh-TW 实机反馈「AI 生成文字中有出现 * 等符号」——LLM 把营销文案当 markdown
+//   输出 *强调* / **粗体** / 孤立 * 脚注符，源文并没有 *。设计稿是画布文本不是
+//   markdown 渲染器，星号会原样上稿。
+// 原则（代码管形式）：只有源文整条不含 * 时才清理——源文有 * 时（900MB/s* 速率
+//   脚注、行首列表符）一个都不碰，那些由 ※ 转义链路和 restoreStorageUnitFormatting
+//   的 * 连写规则负责。
+// ============================================================
+export function stripSpuriousAsterisks(source: string, translated: string): string {
+  if (source.includes('*') || source.includes('※')) return translated
+  if (!translated.includes('*')) return translated
+
+  let result = translated
+  // ① 成对 markdown 标记：**bold** / *em* —— 剥标记留内容
+  //    内容段不允许跨 *（防贪婪吞掉两个独立星号之间的文案）
+  let prev = ''
+  while (prev !== result) {
+    prev = result
+    result = result.replace(/\*\*([^*]+)\*\*/g, '$1')
+    result = result.replace(/\*([^*\n]+)\*/g, '$1')
+  }
+  // ② 剩余孤立星号（脚注符/半截标记）——剥掉并吸掉其前导空格
+  //    豁免：数字/单位后紧跟的 *（如 900MB/s* —— 即使源文没写 *，剥掉会改变速率语义，
+  //    保守保留交由人工判断；LLM 极少自发产出这种形态，真产出也比误剥安全）
+  //    正向空格吸收用 [ \t]* 不用 \s* —— 防止吸掉换行把 ↵ 还原的断行结构吃掉
+  result = result.replace(/(?<![\dA-Za-z])[ \t]*\*[ \t]*/g, (m, offset: number, s: string) => {
+    // 行首的星号连同缩进一起剥（列表符形态）
+    if (offset === 0 || s[offset - 1] === '\n') return ''
+    // 星号左右都是空格时剥完留一个空格（词间孤立）
+    return m.startsWith(' ') && m.endsWith(' ') ? ' ' : ''
+  })
+  // ③ 行首前导空格清尾：①②剥完行首星号/标记后残留的缩进（多行逐行处理）
+  result = result.split('\n').map(line => line.trimStart()).join('\n')
+  return result
+}
+
+// ============================================================
 // 存储单位格式还原
 // 原文中数字和存储单位连写时（如 900MB/s），AI 经常误加空格变成 900 MB/s
 // 需要恢复原文的连写格式，保持技术规格一致

@@ -42,7 +42,10 @@ export function isPolishEligible(
   const trans = translated.trim()
   if (!src || !trans) return false
 
-  // ① 含 ↵ 多行格豁免（用户拍板：第一版不润——多行格机翻感主要是连写/断行问题，非搭配问题）
+  // ① 含 ↵ 多行格豁免（v12.3 用户拍板：第一版不润——多行格机翻感主要是连写/断行问题，
+  //    非搭配问题；且行内润色后 ↵ 结构对齐硬锁缺位，贸然放开会把断行语义弄丢。
+  //    v12.6 ja 调研「改行タイミング不自然」实锤落在此豁免区——当前架构治不了，
+  //    要收窄成「保断行结构、润行内文案」需另出方案，不在本次 ja 上线范围）
   if (src.includes('↵') || src.includes('\n') || trans.includes('↵') || trans.includes('\n')) return false
 
   // ② 极短文本（≤3 词）豁免——润色空间为零
@@ -64,6 +67,7 @@ export function isPolishEligible(
 
 // ───────────────────────────────────────────────────────────────
 // 否定极性/限定词词表（de/es/ru/tr 四语种最小集，从实机源文反向提取）
+// v12.6: + ja（ja 判定 prompts 会处理直译/文体，限定词丢失仍走本表一票否决）
 // ───────────────────────────────────────────────────────────────
 // 词表完备性论证：词表只覆盖"源文实际出现的"否定/限定词型，不追求全覆盖——
 //   源文没有的词型润色时不会触发该校验，天然无风险。
@@ -109,6 +113,13 @@ const POLARITY_TABLE: Record<string, PolarityEntry[]> = {
     { source: 'theoretical', required: ['teorik'], type: 'hedge' },
     { source: 'compatible with', required: ['uyumlu', 'geriye dönük uyumlu'], type: 'hedge' },
     { source: 'under', required: ['altında', 'den az', 'kadar'], type: 'hedge' },
+  ],
+  ja: [
+    { source: 'up to', required: ['最大', 'まで', '最高'], type: 'hedge' },
+    { source: 'maximum', required: ['最大', '上限'], type: 'hedge' },
+    { source: 'theoretical', required: ['理論'], type: 'hedge' },
+    { source: 'compatible with', required: ['互換'], type: 'hedge' },
+    { source: 'under', required: ['以下', '未満'], type: 'hedge' },
   ],
 }
 

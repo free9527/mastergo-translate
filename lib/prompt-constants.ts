@@ -2193,7 +2193,10 @@ export function buildProofreadSystemPrompt(opts: {
     ? '\n' + (useEnInstruction ? PROOFREAD_POLISHED_NOTE : PROOFREAD_POLISHED_NOTE_ZH)
     : ''
 
-  return missionBlock + proofreadPrompt + variantBlock + expansionBlock + prohibitedBlock + polishedBlock + glossaryHint + calibrationBlock + langBlock
+  // v12.6: ja 排版自然度专项检查（仅 ja 注入；↵ 断行结构严禁改动的边界写在块内）
+  const jaLayoutBlock = targetLang === 'ja' ? '\n' + PROOFREAD_JA_LAYOUT_NOTE : ''
+
+  return missionBlock + proofreadPrompt + variantBlock + expansionBlock + prohibitedBlock + polishedBlock + jaLayoutBlock + glossaryHint + calibrationBlock + langBlock
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2853,6 +2856,12 @@ export const PROOFREAD_POLISHED_NOTE_ZH = `[已润色条目] 部分条目已经�
 这些条目的语序/句式可能与源文不同——这是预期行为，不是错误。
 对这些条目：只校验信息点完整与事实（数字/规格/术语）准确即可。
 不要把"与源文结构不同"判为问题——润色后的条目本来就应该像母语原创，不是逐字对译。`
+
+// v12.6: ja 排版自然度专项检查（仅 ja 注入——母语调研「直訳感+改行不自然」实锤）
+export const PROOFREAD_JA_LAYOUT_NOTE = `[JA 排版自然度] 以下两条仅作提示，任一条不满足都不扣分：
+- 全角/半角混用（半角カタカナ、全角英数字、不自然空格）可在修正时顺带规范化；
+- 読点（、）位置或断行节奏明显生硬时可微调。
+但：↵ 是换行占位符，其数量与位置严禁改动（动了会破坏设计稿断行结构）。`
 // ═══════════════════════════════════════════════════════════════
 // v11.3: 产品名槽位解析 Prompt — LLM 兜底（代码判定失败时的语义裁决）
 // 原则：LLM 只做"是不是产品名+系列名是什么"的判断，不输出译名。
