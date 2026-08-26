@@ -1,7 +1,7 @@
 # 项目交接文档
 
 **日期**: 2026-08-26  
-**版本**: v12.3.3（v12.3 之上 + 润色可观测性/开关跟随语言/英文豁免表）  
+**版本**: v12.4（v12.3.3 之上 + 迭代 4 灰度工具就绪 + 全部工作已提交 git）  
 **项目**: Lexar 翻译插件（MasterGo 插件）
 
 ---
@@ -102,19 +102,27 @@ translateBatch 返回（App.vue startTranslate 波内）
 **测试**：临时校验脚本 13/13（7 豁免正例：VPG200/VPG400/limited lifetime warranty 四句形态/嵌入句 + 4 裸词红线 + 2 边界防误伤，用完即删 claude-tmp 纪律）；回归 test:v1112 **176/176**、test:v123-polish **32/32**、test:v105 **46/46** 全绿；双 tsconfig typecheck + build 通过（dist 15:39 重建，豁免词表+日志串确认进 bundle——中文日志在 bundle 内是 \uXXXX 转义形态，grep 验证要用 unicode 转义形式，首次直搜中文数 0 是误判）。
 
 **遗留（下次迭代接续）**：
-- **迭代 4 灰度验证未跑**（去机翻感方案 A 判定标准：de/es/ru/tr 开润色后 fidelity 掉 >0.2 永久不开，naturalness 升 ≥0.3 判有效）——方案已定：test-judge-baseline.ts 加 `--polish` 模式（translateEntries 复用生产代码 isPolishEligible/personaJudgeBatch/polishBatch，与 App.vue 同路径），跑四语种对比 B 前基线（tests/baseline-pre-b/）。待用户实机确认润色触发后执行
+- **迭代 4 灰度验证未跑**（去机翻感方案 A 判定标准：de/es/ru/tr 开润色后 fidelity 掉 >0.2 永久不开，naturalness 升 ≥0.3 判有效）——**工具已就绪（v12.4）**：test-judge-baseline.ts `--polish` 模式已落地（translateEntries 插入生产同款管道：isPolishEligible 资格过滤 → personaJudgeBatch 判定 → polishBatch 润色，与 App.vue startTranslate 同函数同顺序；产物带 `-polish` 后缀不覆盖 B 前基线；冒烟验证通过）。运行命令：`npx tsx tests/test-judge-baseline.ts --polish de es ru tr --concurrency 2`，对比 tests/baseline-pre-b/。待用户实机确认润色触发后执行
 - **自动入库红线讨论挂起**：v11.14 双闸（入库闸 R1-R5/执行闸）已在工作（本次日志 10 条拦截全是 R1 长度闸拦整句），用户体感「泛滥」待确认具体实例后再定收紧方向（候选：R1 阈值 60字符/6词→40/4；proofread 来源禁入库；入库改待确认；维持现状）
 - **polishedIds 透出校对 CHECK 1R** 已闭环，但润色生效条目在 UI 无视觉标记（仅日志可见）——如需在卡片上加「已润色」徽章，下轮迭代讨论
+
+### v12.4 迭代 4 灰度工具 + 工作区全量提交（2026-08-26 收尾）
+
+**① test-judge-baseline.ts `--polish` 模式**：迭代 4 验证工具落地——--polish 时 translateBatch 后、proofreadBatch 前插入生产同款润色管道（isPolishEligible/personaJudgeBatch/polishBatch 全部复用生产函数，与 App.vue 同路径），POLISH_GRAY_LANGS（de/es/ru/tr）白名单与生产一致；每语种打印资格/判定/生效/回退明细；产物 `tmp-judge-baseline-<slug>-polish-<lang>.json` 带后缀不覆盖 B 前基线（tests/baseline-pre-b/）。冒烟验证：import 链 + 资格过滤行为（营销长句 eligible、合规/极短/↵ 豁免）正常。
+
+**② 工作区全量提交（4 commit）**：`06275b3` v12.1-v12.3 去机翻感三迭代（judge-personas/polish-guard/llm-api 润色函数/prompt-constants/post-process 数字格式 + 测试资产 v121/v122/v123/v124/baseline-pre-b/机翻味清单 CSV）；`0187285` v12.3.3 英文豁免表+术语库素材同步；`d1a39fa` v12.3.2/v12.3.3 UI 改动；`ec5b8a3` HANDOFF+复盘文档。**未推送远程**（用户未指示）。claude-tmp/ 按文件规则保持未跟踪。
+
+**③ 项目复盘文档产出**（docs/，用户汇报用途，与开发主线解耦）：`docs/project-review-2026.md`（13 页 PPT 结构：成本 12 万+/效率 14 倍/四重防线/七层定制优化/通用 vs 定制设计对比/开发历程/AI 资源倾斜请求）+ `docs/user-guide.md`（零基础操作指引：四步上手/功能详解 12 节/徽章速查/FAQ 10 条/截图占位）。留口：API 订阅费用、品牌部调研内容、截图、一页纸速查卡（用户自补）。
 
 #### 待办全景（2026-08-26 盘点，按「等拍板/等实机/长线挂起」三档）
 
 **等用户拍板**：
 1. 自动入库红线收紧方向——v11.14 双闸在工作（实机 10 条拦截全是 R1 长度闸拦整句），用户体感「泛滥」待实例反推或四选一直接定（R1 阈值 60字符/6词→40/4 / proofread 来源禁入库 / 入库改待确认 / 维持现状）
-2. git 提交——v12.0 后全部改动（v12.1/v12.2/v12.3/v12.3.2/v12.3.3）未提交，工作区 20+ 文件，待用户指示是否按版本切 commit
+2. ~~git 提交~~ **已完成（2026-08-26，4 commit 06275b3/0187285/d1a39fa/ec5b8a3）**；未推送远程，待用户指示
 
 **等实机验证**：
 3. v12.3.3 三项改动实机确认（润色五点日志/英文豁免表/面板悬停全文）——MasterGo 重新载入插件跑 de/es/ru/tr 批次，看 [polish] 日志出没出、Limited Lifetime Warranty/VPG200 源文还报不报警
-4. 迭代 4 灰度验证（方案 A GO/NO-GO：fidelity 掉>0.2 永久不开、nat 升≥0.3 判有效）——排在 #3 后执行；test-judge-baseline.ts 加 `--polish` 模式，对比 tests/baseline-pre-b/
+4. 迭代 4 灰度验证（方案 A GO/NO-GO：fidelity 掉>0.2 永久不开、nat 升≥0.3 判有效）——排在 #3 后执行；**工具已就绪**：`npx tsx tests/test-judge-baseline.ts --polish de es ru tr --concurrency 2`，对比 tests/baseline-pre-b/
 5. 历史实机复验清单（v11.12 违禁词全链/v12.0 schema S4 零告警/v10.3 日志跨会话恢复）——日常使用顺带观察
 
 **长线挂起**：
@@ -1302,7 +1310,7 @@ v0.1.0 的 `postProcessEuropeanNumbers` 设计假设是"LLM 会输出纯数字�
 | `tests/test-v114-case-insensitive-category.ts` | **v11.4 大小写形态统一（26 断言：A detectCategory 双遍匹配+守卫 8 + B core-strip 3 + C camelCase 系列 5 + D nCARD 端到端 4 + E 回归 6）** |
 | `tests/test-v1112-prohibited-words.ts` | **v11.12 + v11.12+ 违禁词全链 176 断言（A 词表对表 20 语种+增补收录 / B 检测单元 59 含 g-flag 回归锁 / C 校对端到端 16 / D 关校对快照锁 7 / E 源语言判定 7 / F 术语库锁定豁免 18 / G v11.15 豁免增补 12 / H v12.0 校对 schema 化 10：请求体硬约束+双版 prompt 包装+新格式落地+旧格式兼容+results 优先级+未修改回退原译文）** |
 | `tests/test-schema-live.ts` | **v12.0 schema 化实测脚本（真实 API + 真实素材 CSV）：A ↵ 兼容性 / B 校对软约定 vs 硬约束 10 轮对比 / C 15 条满批压力；输出 tests/tmp-schema-live-report.txt** |
-| `tests/test-judge-baseline.ts` | **v12.1 judge 基线脚本（去机翻感阶段 C）：judge 人设模拟三维评分（naturalness/tone/fidelity），翻译侧 v115 生产管道 + judge 侧裸 XHR json_object；CLI --csv/--langs/--concurrency/--judge-only/--persona-check；输出 tmp-judge-baseline-*.json（不截断）+ summary.txt** |
+| `tests/test-judge-baseline.ts` | **v12.1 judge 基线脚本（去机翻感阶段 C）：judge 人设模拟三维评分（naturalness/tone/fidelity），翻译侧 v115 生产管道 + judge 侧裸 XHR json_object；CLI --csv/--langs/--concurrency/--judge-only/--persona-check；输出 tmp-judge-baseline-*.json（不截断）+ summary.txt** + **v12.4 --polish 模式（迭代 4 灰度工具：translateEntries 插入生产同款润色管道，产物带 -polish 后缀对比 B 前基线）** |
 | `tests/test-v122-mt-flavor.ts` | **v12.2 机翻味反面词表（8 断言：A 首调注入 4 语种 / B 重试回归 / C 校对隔离 2 / D 规模回归）** |
 | `tests/test-v123-polish.ts` | **v12.3 人设驱动判定→润色→硬锁（32 断言：A 资格负面清单 9 / B 硬锁四层 6 / C 否定极性词表 7 / D 判定润色 mock XHR 全链路 6 / E CHECK 1R 注入+快照锁 4）** |
 
