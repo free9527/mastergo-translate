@@ -1,0 +1,1270 @@
+{
+  "lang": "sv",
+  "csv": "Card 卡类-OW&AMZ小语种翻译 - PLAY PRO microSD.csv",
+  "timestamp": "2026-08-25T11:23:57.175Z",
+  "methodology": "judge=LLM人设模拟(judge-personas.ts)，置信度低于真人母语评审；fidelity以代码校验为准，judge仅软信号；只允许差分对比结论，不允许绝对分数结论",
+  "cells": [
+    {
+      "index": 0,
+      "source": "Power Up Your Play\nLexar® PLAY PRO microSDXC™ Express Card",
+      "mine": "Ge ditt spelande mer kraft\nMinneskort Lexar® PLAY PRO microSDXC™ Express",
+      "official": "Reformera ditt spelande\n Lexar® PLAY PRO microSDXC™ Express Card",
+      "mineJudgement": {
+        "index": 0,
+        "runs": [
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Rubriken känns lite direktöversatt, men produktnamnet och typen går att förstå direkt."
+          },
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "Det låter som en direktöversatt slogan och jag fastnar mer på formuleringen än på produkten."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Kort och begripligt, även om rubriken låter lite reklamsvengelsk."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Kort och begripligt, även om 'spelande' känns lite stelt."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.25,
+          "tone": 3.25,
+          "fidelity": 4.75
+        },
+        "variance": {
+          "naturalness": 0.6875,
+          "tone": 0.6875,
+          "fidelity": 0.1875
+        },
+        "personaGap": 1.5,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 0,
+        "runs": [
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 1,
+            "fidelity": 2,
+            "note": "\"Reformera ditt spelande\" låter som maskinöversatt reklam och säger inte samma sak som originalet."
+          },
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 3,
+            "note": "”Reformera ditt spelande” låter som en dålig direktöversättning och säger inte riktigt samma sak som originalet."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 2,
+            "note": "”Reformera ditt spelande” låter stelt och översatt, inte som något som säljer ett minneskort till mig."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 2,
+            "note": "”Reformera ditt spelande” låter konstigt och får mig att känna att texten är direktöversatt."
+          }
+        ],
+        "mean": {
+          "naturalness": 2,
+          "tone": 1.75,
+          "fidelity": 2.25
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.1875,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 1,
+      "source": "Good for Today, Great for Tomorrow\n\nRevolutionary Performance\n\nPeace of Mind Extras\n\nLevel-up Your Handheld Gaming Experience\nRead speed up to 900MB/s\n\nCut Your Download Times\nWrite speed up to 600MB/s\n\nMassive Capacity up to 1TB\n\nProtection Built in",
+      "mine": "Bra idag, ännu bättre för morgondagen\nRevolutionerande prestanda\nExtra trygghet\nLyft din handhållna gamingupplevelse\nLäshastighet upp till 900MB/s\nKorta nedladdningstiderna\nSkrivhastighet upp till 600MB/s\nStor kapacitet upp till 1TB\nInbyggt skydd",
+      "official": "Bra idag, fantastiskt imorgon\n \n Revolutionerande prestanda\n \n Extrafunktioner för sinnesro\n \n Uppgradera din handhållna spelupplevelse\n Läshastighet upp till 900 MB/s\n \n Förkorta dina nedladdningstider\n Skrivhastighet upp till 600 MB/s\n \n Massiv kapacitet upp till 1 TB\n \n Inbyggt skydd",
+      "mineJudgement": {
+        "index": 1,
+        "runs": [
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Specarna sitter, men formuleringar som ”för morgondagen” och ”handhållna gamingupplevelse” låter mer översatt än svenskt."
+          },
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Specarna går fram, men rubriker som “handhållna gamingupplevelse” känns lite översatta och generiska."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Jag hinner ta till mig punkterna snabbt, men 'gamingupplevelse' skaver lite."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Jag fattar poängerna snabbt, men 'handhållna gamingupplevelse' låter översatt."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.25,
+          "tone": 3.25,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 1,
+        "runs": [
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "Specarna är med, men uttryck som \"sinnesro\" och \"massiv kapacitet\" känns rätt översatta och fluffiga."
+          },
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "Specarna är med, men formuleringar som ”Extrafunktioner för sinnesro” och ”Massiv kapacitet” känns maskinöversatta."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Det mesta går att förstå snabbt, men uttryck som ”sinnesro” och ”massiv kapacitet” känns lite direktöversatta."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Jag förstår allt, men uttryck som ”handhållna spelupplevelse” och ”massiv kapacitet” känns lite översatta."
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 2.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 2,
+      "source": "What is SD Express and how does it works?\n\nSD Express is a new SD card standard. It adopts the PCI Express 3.0 and NVMe 1.3 interfaces, which significantly enhances the data processing capability of SD cards. The working principle of SD Express is based on the PCI Express interface and the NVMe protocol. The PCIe interface supports high-speed data transmission, while the NVMe protocol optimizes storage access efficiency. SD Express uses the second row of contacts at the interface to transmit PCIe signals and is backwards-compatible with UHS-I through the first row of contacts. After being connected to a computer that supports SD Express products, SD Express will be recognized as a standard NVMe device, similar to a modern NVMe SSD.",
+      "mine": "Vad är SD Express och hur fungerar det?\nSD Express är en ny SD-kortstandard. Den använder gränssnitten PCI Express 3.0 och NVMe 1.3, vilket avsevärt förbättrar SD-kortens databehandlingskapacitet. Funktionsprincipen för SD Express bygger på PCI Express-gränssnittet och NVMe-protokollet. PCIe-gränssnittet stöder dataöverföring med hög hastighet, medan NVMe-protokollet optimerar effektiviteten vid lagringsåtkomst. SD Express använder den andra kontaktraden i gränssnittet för att överföra PCIe-signaler och är bakåtkompatibelt med UHS-I via den första kontaktraden. När SD Express ansluts till en dator som stöder SD Express-produkter identifieras det som en standard-NVMe-enhet, på liknande sätt som en modern NVMe SSD.",
+      "official": "Vad är SD Express och hur fungerar det?\n \n SD Express är en ny standard för SD-kort, som använder gränssnitten PCI Express 3.0 och NVMe 1.3, vilket markant förbättrar databehandlingskapaciteten hos SD-kort. Arbetsprincipen för SD Express är baserad på PCI Express-gränssnittet och NVMe-protokollet. PCIe-gränssnittet stöder höghastighetsöverföring, medan NVMe-protokollet optimerar lagringsåtkomstens effektivitet. SD Express använder den andra kontaktraden vid gränssnittet för att överföra PCIe-signaler och är bakåtkompatibel med UHS-I genom den första kontaktraden. Efter anslutning till en dator som stöder SD Express-produkter, kommer SD Express att ses som en standard NVMe-enhet, som en modern NVMe SSD.",
+      "mineJudgement": {
+        "index": 2,
+        "runs": [
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Det här är tekniskt och tydligt på ett sätt som faktiskt bygger förtroende, även om vissa meningar är lite stela."
+          },
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Det här är tydligt och tekniskt nog, även om vissa formuleringar är lite stela."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Faktiskt tydligt på svenska, men så långt och tekniskt att jag som kund snabbt börjar skumma."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "Faktamässigt verkar det rätt, men texten är så tung och manualaktig att jag hade hoppat över den."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.75,
+          "tone": 3.25,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.6875,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 2,
+        "runs": [
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Tekniken verkar korrekt återgiven, men texten är styltig med formuleringar som \"arbetsprincipen\" och \"ses som\"."
+          },
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Tekniskt sett stämmer det, men ”Arbetsprincipen” och meningsbyggnaden gör texten onödigt styltig."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "Det här blir för tungt och tekniskt med konstiga ord som ”arbetsprincipen”, så jag hade nog hoppat över texten."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "Det blir för tungt och tekniskt med ord som ”arbetsprincipen”, så jag hade snabbt tappat förtroendet och hoppat vidare."
+          }
+        ],
+        "mean": {
+          "naturalness": 2.5,
+          "tone": 2.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 1,
+        "flags": []
+      }
+    },
+    {
+      "index": 3,
+      "source": "Revolutionary Performance\n\nThanks to its next-gen tech of PCIe and NVMe interface technologies that deliver up to 900MB/s read speed*, the PLAY PRO microSDXC™ Express Card is a stunning 4x faster than typical UHS-I microSD cards.\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "Revolutionerande prestanda\nTack vare nästa generations PCIe- och NVMe-gränssnittsteknik, som ger upp till 900MB/s läshastighet*, är minneskortet PLAY PRO microSDXC™ Express hela 4x snabbare än typiska UHS-I microSD-kort.\n*Baserat på interna tester. Faktisk prestanda kan variera.",
+      "official": "Revolutionerande prestanda\n \n Tack vare dess nästa generations PCIe- och NVMe-gränssnittsteknik som ger upp till 900 MB/s läshastighet*, är PLAY PRO microSDXC™ Express Card hela fyra gånger snabbare än vanliga UHS-I microSD-kort.\n \n *Baserat på interna tester. Faktisk prestanda kan variera.",
+      "mineJudgement": {
+        "index": 3,
+        "runs": [
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "Fakta verkar rätt, men ”Revolutionerande prestanda” och den uppblåsta tonen gör mig skeptisk direkt."
+          },
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Fakta verkar stämma, men “revolutionerande prestanda” och “hela 4x” känns som standardmarknadsföring."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Budskapet går fram, men 'typiska UHS-I microSD-kort' känns översatt snarare än svenskt."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Budskapet går fram, men formuleringar som 'typiska' och '4x' känns inte helt svensk butikstext."
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 3,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.5,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 3,
+        "runs": [
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Fakta och siffror stämmer, men \"tack vare dess nästa generations\" känns inte som naturlig svensk produkttext."
+          },
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "Fakta och siffror verkar rätt, men ”Tack vare dess nästa generations...” är precis den sorts översatt marknadsföring jag studsar på."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Budskapet kommer fram, men meningen är lång och lite klumpigt översatt med ”dess nästa generations”-känsla."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Budskapet går fram, men meningen är lång och ”tack vare dess” låter inte riktigt som naturlig svenska."
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 2.75,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 4,
+      "source": "*Comparison of the theoretical maximum speeds under different interface forms (Data source: SDA)",
+      "mine": "* Jämförelse av teoretiska maxhastigheter för olika gränssnittstyper (Datakälla: SDA)",
+      "official": "*Jämförelse av teoretiska maximala hastigheter under olika gränssnittsformer (Datakälla: SDA)",
+      "mineJudgement": {
+        "index": 4,
+        "runs": [
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Kort, tekniskt och begripligt, även om parentesen känns lite katalogmässig."
+          },
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Kort och begripligt, även om parentesen kunde kännas lite mer svenskt formulerad."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 0,
+            "naturalness": 5,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "En rak och trovärdig fotnot, men förstås inget som säljer in produkten."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "En okej fotnot, saklig men inget som bygger särskilt mycket förtroende."
+          }
+        ],
+        "mean": {
+          "naturalness": 4.25,
+          "tone": 3.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 4,
+        "runs": [
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "Innehållet stämmer, men \"gränssnittsformer\" låter som en direktöversatt tabellrubrik."
+          },
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Som fotnot funkar den, men ”gränssnittsformer” låter inte som något en svensk produktsida normalt skulle skriva."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "”Gränssnittsformer” låter som maskinöversatt teknikspråk och inger inte riktigt förtroende."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Kort och begripligt, men ”gränssnittsformer” känns som ett maskinöversatt fackord."
+          }
+        ],
+        "mean": {
+          "naturalness": 2.25,
+          "tone": 2.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      }
+    },
+    {
+      "index": 5,
+      "source": "Good for Today, Great for Tomorrow\n\nThe PLAY PRO microSDXC™ Express Card is backwards-compatible with UHS-I and UHS-II host devices (at UHS-I speeds) so you can use it with your current handheld gaming consoles – and it's ideal for the microSD Express devices coming soon.",
+      "mine": "Bra idag, ännu bättre för morgondagen\nMinneskortet PLAY PRO microSDXC™ Express är bakåtkompatibelt med UHS-I- och UHS-II-värdenheter (med UHS-I-hastigheter), så att du kan använda det med dina nuvarande handhållna spelkonsoler – och det är väl lämpat för microSD Express-enheterna som kommer snart.",
+      "official": "Bra idag, fantastiskt imorgon\n \n PLAY PRO microSDXC™ Express Card är bakåtkompatibelt med UHS-I- och UHS-II-värdenheter (i UHS-I-hastigheter) så att du kan använda det med dina nuvarande handhållna spelkonsoler – och det är perfekt för microSD Express-enheterna som kommer snart.",
+      "mineJudgement": {
+        "index": 5,
+        "runs": [
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Det mesta låter rimligt och specifikationerna är tydliga, även om ”värdenheter” är lite torrt."
+          },
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Jag förstår kompatibiliteten, men “värdenheter” och “väl lämpat” gör texten onödigt stel."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "'Värdenheter' låter teknikeröversatt och gör texten mindre lätt att lita på vid snabb läsning."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Jag förstår kompatibiliteten, men 'värdenheter' och meningsbygget känns lite tekniskt översatt."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.25,
+          "tone": 3.25,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 5,
+        "runs": [
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Det går att förstå och specifikationerna matchar, men \"värdenheter\" och \"i UHS-I-hastigheter\" känns klumpigt."
+          },
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Innehållet är korrekt, men ”UHS-I- och UHS-II-värdenheter” och ”handhållna spelkonsoler” känns lite tekniskt klumpigt."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Texten är begriplig, men ”värdenheter” och ”i UHS-I-hastigheter” känns mer manual än butikstext."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Det är okej, men ”värdenheter” och ”i UHS-I-hastigheter” gör texten mer teknisk än säljande."
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 3,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 6,
+      "source": "Level-up Your Handheld Gaming Experience\n\nUp to 900MB/s* read speed, the PLAY PRO microSDXC™ Express Card is a stunning 4x faster than typical UHS-I microSD cards – meaning that games load faster and also ensuring a smooth, lag-free experience.\n\nRead speed up to 900MB/s*\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "Lyft din handhållna gamingupplevelse\nMed en läshastighet på upp till 900MB/s* är minneskortet PLAY PRO microSDXC™ Express hela 4x snabbare än typiska UHS-I microSD-kort – vilket innebär att spel laddas snabbare och ger en smidig upplevelse utan lagg.\nLäshastighet upp till 900MB/s*\n*Baserat på interna tester. Faktisk prestanda kan variera.",
+      "official": "Uppgradera din handhållna spelupplevelse\n \n Med upp till 900 MB/s läshastighet* är PLAY PRO microSDXC™ Express Card hela fyra gånger snabbare än vanliga UHS-I microSD-kort – vilket innebär att spel laddas snabbare och det garanterar även en smidig upplevelse utan fördröjningar.\n \n Läshastighet upp till 900 MB/s*\n \n *Baserade på interna tester. Faktisk prestanda kan variera.",
+      "mineJudgement": {
+        "index": 6,
+        "runs": [
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Bra att hastigheten och testbrasklappen är tydliga, men ”gamingupplevelse” och säljsnacket drar ned intrycket."
+          },
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Budskapet är klart, men “gamingupplevelse” och reklamspråket drar ned trovärdigheten lite."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Ganska säljande och lättläst, även om blandningen av gaming och lagg känns lite ungdomligt krystad."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Det säljer in hastigheten tydligt, men 'gamingupplevelse' och 'typiska' skaver lite."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.5,
+          "tone": 3.25,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 6,
+        "runs": [
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "Prestandauppgifterna är rätt, men meningen är tung och \"Baserade på interna tester\" ser slarvigt ut."
+          },
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 2,
+            "fidelity": 4,
+            "note": "Det mesta stämmer, men ”garanterar” och den felaktiga fotnoten ”Baserade” gör texten slarvig och lite för säljig."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Hyfsat säljande, men formuleringen är lång och fotnoten ”Baserade” ser slarvig ut."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Jag gillar poängen med snabbare laddning, men språket är lite stelt och fotnoten har en slarvig böjning."
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 2.5,
+          "fidelity": 4.75
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.25,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 7,
+      "source": "Cut Your Download Times\n\nThe PLAY PRO microSDXC™ Express Card also delivers 600MB/s write speeds* when paired with the Lexar microSD Express card reader so you can download a AAA game in less time than it'll take you to order a pizza!\n\nWrite speed up to 600MB/s*\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "Korta nedladdningstiderna\nMinneskortet PLAY PRO microSDXC™ Express levererar även skrivhastigheter på 600MB/s* när det används tillsammans med kortläsaren Lexar microSD Express, så att du kan ladda ned ett AAA-spel på kortare tid än det tar att beställa en pizza!\nSkrivhastighet upp till 600MB/s*\n*Baserat på interna tester. Faktisk prestanda kan variera.",
+      "official": "Förkorta dina nedladdningstider\n \n PLAY PRO microSDXC™ Express Card ger även 600 MB/s skrivhastigheter* när det parkopplas med Lexar microSD Express-kortläsare, så att du kan ladda ner ett AAA-spel på kortare tid än det tar att beställa en pizza!\n \n Skrivhastighet upp till 600 MB/s*\n \n *Baserade på interna tester. Faktisk prestanda kan variera.",
+      "mineJudgement": {
+        "index": 7,
+        "runs": [
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Pizza-exemplet är lite fånigt men texten är begriplig och de viktiga hastigheterna samt kravet på kortläsare framgår."
+          },
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Den här funkar bättre, med tydliga hastigheter och en lite mer avslappnad jämförelse."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Pizzajämförelsen funkar och specifikationerna är tydliga, men rubriken kunde låta mer naturlig."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Pizza-jämförelsen funkar och texten känns rätt säljig, även om rubriken är lite kantig."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 4,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 7,
+        "runs": [
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "\"Parkopplas med kortläsare\" är fel känsla tekniskt, och pizzaskämtet bygger inte direkt förtroende."
+          },
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 4,
+            "note": "”Parkopplas” med en kortläsare låter fel i sammanhanget, och pizzaskämtet hjälper inte trovärdigheten."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Pizzajämförelsen funkar, men ”parkopplas” med en kortläsare låter fel och lite översatt."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Pizzaexemplet funkar, men ”parkopplas med kortläsare” låter fel för ett minneskort och stör flytet."
+          }
+        ],
+        "mean": {
+          "naturalness": 2.5,
+          "tone": 2.5,
+          "fidelity": 4.5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.25,
+          "fidelity": 0.25
+        },
+        "personaGap": 1,
+        "flags": []
+      }
+    },
+    {
+      "index": 8,
+      "source": "Massive Capacity up to 1TB\n\nSome of your favorite games are probably pretty big in file size. Well, with up to 1TB capacity, juggling games just got easier. You can fit many games on a 1TB card.\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "Stor kapacitet upp till 1TB\nNågra av dina favoritspel tar förmodligen ganska mycket plats. Med upp till 1TB kapacitet blir det enklare att hantera dina spel. Du får plats med många spel på ett 1TB-kort.\n*Baserat på interna tester. Faktisk prestanda kan variera.",
+      "official": "Massiv kapacitet upp till 1 TB\n \n Några av dina favoritspel är förmodligen ganska stora vad gäller filstorlek. Med upp till 1 TB kapacitet blev det precis enklare att växla mellan spel. Du får plats med många spel på ett 1 TB-kort.\n \n *Baserat på interna tester. Faktisk prestanda kan variera.",
+      "mineJudgement": {
+        "index": 8,
+        "runs": [
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Det här låter helt okej och specifikationerna går fram, även om jag gärna hade sett svenskare enhetsformat som 1 TB."
+          },
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Det här låter helt okej och specifikationen är tydlig, även om jag hellre hade sett svensk formatering som 1 TB."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Det här känns rätt lättläst och begripligt, även om 1TB utan mellanslag ser lite butiksmaskinigt ut."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Det här känns ganska rakt och begripligt, även om jag hellre hade sett '1 TB' med mellanrum."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 4,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 8,
+        "runs": [
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Det här funkar helt okej, även om 'vad gäller filstorlek' känns lite översatt."
+          },
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Fullt begripligt, men 'blev det precis enklare' och 'växla mellan spel' känns översatt snarare än skrivet av någon som kan spelbibliotek och lagring."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Det låter ganska okej, men 'blev det precis enklare' känns lite översatt och jag skummar snabbt vidare."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Jag fattar vad de menar, men formuleringen känns lite direktöversatt och jag skummar förbi den."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.5,
+          "tone": 3.25,
+          "fidelity": 4.5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.1875,
+          "fidelity": 0.25
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 9,
+      "source": "Protection Built in\n\nThe PLAY PRO microSD Express card is IPX7 waterproof, wearproof, temperature-proof, x-ray-proof, vibration-resistant, magnetic-proof, shockproof, and drop-proof.*\n\nWearout resistance\n*up to 10,000 times of plugging and unplugging\nWaterproof\n*IPX7,1m deep water for 30min\nTemperature resistance\n*Operation: -25℃~85℃, Storage: -40℃~85℃\nShock resistance\n*1500G Shock\nAnti-vibration\n*10-2000Hz\nAnti-magnetic\n*15000Gauss\nX-ray protection\n*up to 100mGy\n(equivalent to airport X-ray machine exposure)\nDrop protection\n*1.5m drop",
+      "mine": "Inbyggt skydd\nPLAY PRO microSD Express-kortet är vattentåligt enligt IPX7, slitagetåligt, temperaturtåligt, röntgentåligt, vibrationståligt, magnettåligt, stöttåligt och falltåligt.*\nSlitagetålighet\n*upp till 10,000 i- och urkopplingar\nVattentåligt\n*IPX7, 1m djupt vatten i 30min\nTemperaturtålighet\n*Drift: -25°C~85°C, Förvaring: -40°C~85°C\nStöttålighet\n*1500G stöt\nVibrationstålighet\n*10-2000Hz\nMagnettålighet\n*15000Gauss\nRöntgenskydd\n*upp till 100mGy\n(motsvarar exponering från röntgenutrustning på flygplats)\nFallskydd\n*fall från 1.5m",
+      "official": "Inbyggt skydd\n  \n  PLAY PRO microSD Express-kortet är IPX7 vattentätt, slitstarkt, temperaturbeständigt, röntgenbeständigt, vibrationsbeständigt, magnetbeständigt, stötsäkert och tål fall.*\n \n Utslitningsmotstånd\n  * upp till 10 000 gånger till- och frånkoppling\n Vattentät\n  *IPX7,1 m djupt vatten i 30 minuter\n Temperaturbeständighet\n  *Drift: -25 ℃-85 ℃, Förvaring: -40 ℃-85 ℃\n Stöttålighet\n  *1500 G stöt\n Antivibration\n  *10-2000 Hz\n Antimagnetisk\n  *15000 Gauss\n Röntgenskydd\n  *upp till 100 mGy\n  (motsvarande exponering för röntgenmaskiner på flygplatser)\n Fallskydd\n  *1,5 m fall",
+      "mineJudgement": {
+        "index": 9,
+        "runs": [
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Fakta verkar sitta, men enhetsformaten och formuleringar som 10,000 och 1.5m får det att kännas lite slarvigt översatt."
+          },
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Specarna är användbara, men blandningen av 10,000, 1.5m och staplade 'tåligt'-ord känns översatt och slarvigt."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Jag får all teknisk info jag behöver, men listan med tålighetsord och enhetsformat känns ganska översatt och tung att skumma."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Specarna verkar stämma, men alla ihopklämda enheter och engelska sifferformat gör att jag börjar skumma."
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 3.25,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 9,
+        "runs": [
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Specarna finns där, men ord som 'utslitningsmotstånd' och 'till- och frånkoppling' låter inte som seriös svensk produkttext."
+          },
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Specarna verkar finnas där, men ord som 'utslitningsmotstånd' och 'till- och frånkoppling' låter som rå maskinöversättning."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Specarna verkar finnas där, men ord som 'utslitningsmotstånd' och 'magnetbeständigt' gör att jag tappar lite förtroende."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "Specarna verkar finnas där, men ord som ”utslitningsmotstånd” gör att jag tappar förtroendet direkt."
+          }
+        ],
+        "mean": {
+          "naturalness": 2,
+          "tone": 2.75,
+          "fidelity": 4.75
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.1875,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 10,
+      "source": "Peace of Mind Extras\n\nThis card undergoes strict testing in the Lexar Quality Lab and we're so confident in it that it comes with a limited lifetime warranty. Plus we offer lifetime access to the Lexar Recovery Tool which you can use to restore accidentally deleted and formatted files.",
+      "mine": "Extra trygghet\nDet här kortet genomgår strikta tester i Lexar Quality Lab, och vi är så säkra på det att det levereras med begränsad livstidsgaranti. Dessutom erbjuder vi livstidsåtkomst till Lexar Recovery Tool, som du kan använda för att återställa filer som raderats av misstag och filer från formaterade lagringsmedier.",
+      "official": "Extrafunktioner för sinnesro\n \n Detta kort genomgår stränga tester i Lexar Quality Lab och vi är så övertygade om dess kvalitet att du får en begränsad livstidsgaranti på köpet. Vi erbjuder dessutom livstidsåtkomst till Lexar Recovery Tool som du kan använda för att återställa oavsiktligt raderade och formaterade filer.",
+      "mineJudgement": {
+        "index": 10,
+        "runs": [
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Innehållet stämmer, men 'strikta tester' och 'så säkra på det' låter mer översatt än som svensk produktcopy."
+          },
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Ganska förtroendeingivande, men 'livstidsåtkomst' och 'begränsad livstidsgaranti' känns lite stela."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Budskapet inger viss trygghet, men uttryck som begränsad livstidsgaranti och livstidsåtkomst låter lite direktöversatta."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "Trygghetsdelen funkar och inger förtroende, men 'begränsad livstidsgaranti' låter lite översatt."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.5,
+          "tone": 3.5,
+          "fidelity": 4.5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.25,
+          "fidelity": 0.25
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 10,
+        "runs": [
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "'Sinnesro' och 'formaterade filer' skaver, men jag fattar vad de menar."
+          },
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Budskapet går fram, men 'sinnesro' och 'formaterade filer' känns inte som naturlig svensk produkttext för mig."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "Garantin och återställningsverktyget låter tryggt, även om 'sinnesro' och 'formaterade filer' känns lite styltigt."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "Det här låter ganska tryggt och begripligt, även om rubriken känns lite översatt."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.25,
+          "tone": 3.5,
+          "fidelity": 4
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      }
+    },
+    {
+      "index": 11,
+      "source": "Rigorously Tested\n\nAll Lexar products undergo extensive testing in the Lexar Quality Labs, facilities with thousands of different cameras and digital devices to ensure performance, quality, compatibility, and reliability.",
+      "mine": "Noggrant testad\nAlla Lexar-produkter genomgår omfattande tester i Lexar Quality Labs, anläggningar med tusentals olika kameror och digitala enheter för att säkerställa prestanda, kvalitet, kompatibilitet och tillförlitlighet.",
+      "official": "Noggrant Testad\n \n Alla Lexar-produkter testas noggrant i Lexar Quality Labs, anläggningar med mer än tusentals olika kameror och digitala enheter, för att säkerställa prestanda, kvalitet, kompatibilitet och tillförlitlighet.",
+      "mineJudgement": {
+        "index": 11,
+        "runs": [
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Det är begripligt och korrekt, men ganska generiskt marknadsspråk som inte direkt bygger extra förtroende."
+          },
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Rakt och trovärdigt, men formuleringen är lite katalogtext snarare än riktigt vass svensk produktcopy."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Det är tydligt nog, men meningen är lång och känns mer som översatt broschyrtext än naturlig svensk produkttext."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Det är sakligt och trovärdigt, men meningen är lite lång för att jag ska läsa den noggrant."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.75,
+          "tone": 3.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 11,
+        "runs": [
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 3,
+            "note": "'Noggrant Testad' och 'mer än tusentals' får det att kännas slarvigt och maskinöversatt."
+          },
+          {
+            "persona": "sv-stockholm-dev",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 3,
+            "note": "Rubriken och 'mer än tusentals' får mig direkt att tveka på kvaliteten, även om grundpoängen är begriplig."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Jag hakar upp mig på 'Noggrant Testad' och 'mer än tusentals', så texten känns inte riktigt svensk."
+          },
+          {
+            "persona": "sv-goteborg-teacher",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 4,
+            "note": "”Mer än tusentals” och rubrikens språk får texten att kännas slarvigt översatt."
+          }
+        ],
+        "mean": {
+          "naturalness": 2,
+          "tone": 2.25,
+          "fidelity": 3.5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.1875,
+          "fidelity": 0.25
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    }
+  ],
+  "summary": {
+    "mine": {
+      "naturalness": 3.5416666666666665,
+      "tone": 3.4166666666666665,
+      "fidelity": 4.9375
+    },
+    "official": {
+      "naturalness": 2.6666666666666665,
+      "tone": 2.6458333333333335,
+      "fidelity": 4.4375
+    },
+    "unstableCells": 0,
+    "personaSensitiveCells": 0
+  }
+}

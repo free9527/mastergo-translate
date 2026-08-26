@@ -1,0 +1,690 @@
+{
+  "lang": "pt-BR",
+  "csv": "Card 卡类-OW&AMZ小语种翻译 - PLAY PRO microSD.csv",
+  "timestamp": "2026-08-25T11:12:50.591Z",
+  "methodology": "judge=LLM人设模拟(judge-personas.ts)，置信度低于真人母语评审；fidelity以代码校验为准，judge仅软信号；只允许差分对比结论，不允许绝对分数结论",
+  "cells": [
+    {
+      "index": 0,
+      "source": "Power Up Your Play\nLexar® PLAY PRO microSDXC™ Express Card",
+      "mine": "Dê um boost no seu game\nCartão Lexar® PLAY PRO microSDXC™ Express",
+      "official": "",
+      "mineJudgement": {
+        "index": 0,
+        "runs": [
+          {
+            "persona": "pt-BR-saopaulo-gamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Soa gamer sem ficar tosco, só esse 'seu game' fica meio genérico de anúncio."
+          },
+          {
+            "persona": "pt-BR-saopaulo-gamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Soa meio marketing gamer com inglês no meio, mas é aceitável e não me passa vibe de tradução automática pesada."
+          },
+          {
+            "persona": "pt-BR-curitiba-mom",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Entendo a ideia gamer, mas esse “boost no seu game” soa meio forçado para mim."
+          },
+          {
+            "persona": "pt-BR-curitiba-mom",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Soa moderno e gamer, mas esse “boost no seu game” é meio forçado para mim."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 3.75,
+          "fidelity": 4.75
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.1875,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 1,
+      "source": "Good for Today, Great for Tomorrow\n\nRevolutionary Performance\n\nPeace of Mind Extras\n\nLevel-up Your Handheld Gaming Experience\nRead speed up to 900MB/s\n\nCut Your Download Times\nWrite speed up to 600MB/s\n\nMassive Capacity up to 1TB\n\nProtection Built in",
+      "mine": "Bom para hoje, ótimo para amanhã\nDesempenho revolucionário\nExtras para sua tranquilidade\nEleve sua experiência de games em consoles portáteis\nVelocidade de leitura de até 900MB/s\nReduza o tempo dos seus downloads\nVelocidade de gravação de até 600MB/s\nGrande capacidade de até 1TB\nProteção integrada",
+      "official": "",
+      "mineJudgement": {
+        "index": 1,
+        "runs": [
+          {
+            "persona": "pt-BR-saopaulo-gamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Dá pra entender tudo, mas tem cara de bullet traduzido certinho demais e pouco empolgante."
+          },
+          {
+            "persona": "pt-BR-saopaulo-gamer",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Dá pra entender tudo, mas frases como “extras para sua tranquilidade” e “experiência de games” ficam com cara de copy traduzida."
+          },
+          {
+            "persona": "pt-BR-curitiba-mom",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Passa os benefícios principais de um jeito claro, só achei “games em consoles portáteis” um pouco duro."
+          },
+          {
+            "persona": "pt-BR-curitiba-mom",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Dá para entender rápido e passa bem os benefícios, só fica um pouco genérico."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.75,
+          "tone": 3.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 2,
+      "source": "What is SD Express and how does it works?\n\nSD Express is a new SD card standard. It adopts the PCI Express 3.0 and NVMe 1.3 interfaces, which significantly enhances the data processing capability of SD cards. The working principle of SD Express is based on the PCI Express interface and the NVMe protocol. The PCIe interface supports high-speed data transmission, while the NVMe protocol optimizes storage access efficiency. SD Express uses the second row of contacts at the interface to transmit PCIe signals and is backwards-compatible with UHS-I through the first row of contacts. After being connected to a computer that supports SD Express products, SD Express will be recognized as a standard NVMe device, similar to a modern NVMe SSD.",
+      "mine": "O que é SD Express e como funciona?\nSD Express é um novo padrão de cartão SD. Ele adota as interfaces PCI Express 3.0 e NVMe 1.3, o que aumenta significativamente a capacidade de processamento de dados dos cartões SD. O princípio de funcionamento do SD Express é baseado na interface PCI Express e no protocolo NVMe. A interface PCIe oferece suporte à transmissão de dados em alta velocidade, enquanto o protocolo NVMe otimiza a eficiência de acesso ao armazenamento. O SD Express usa a segunda fileira de contatos na interface para transmitir sinais PCIe e é retrocompatível com UHS-I pela primeira fileira de contatos. Após ser conectado a um computador compatível com produtos SD Express, o SD Express será reconhecido como um dispositivo NVMe padrão, semelhante a um SSD NVMe moderno.",
+      "official": "",
+      "mineJudgement": {
+        "index": 2,
+        "runs": [
+          {
+            "persona": "pt-BR-saopaulo-gamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Como explicação técnica passa confiança, apesar de uns termos bem formais tipo texto de fabricante."
+          },
+          {
+            "persona": "pt-BR-saopaulo-gamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "É bem técnico e meio formal, mas para explicar SD Express passa confiança e mantém os termos certos."
+          },
+          {
+            "persona": "pt-BR-curitiba-mom",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Está correto e bem explicado, mas é bem técnico e eu provavelmente leria só por cima."
+          },
+          {
+            "persona": "pt-BR-curitiba-mom",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Está correto, mas é bem técnico e com cara de explicação que eu provavelmente só passaria o olho."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 3.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 3,
+      "source": "Revolutionary Performance\n\nThanks to its next-gen tech of PCIe and NVMe interface technologies that deliver up to 900MB/s read speed*, the PLAY PRO microSDXC™ Express Card is a stunning 4x faster than typical UHS-I microSD cards.\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "Desempenho revolucionário\nGraças às tecnologias de interface PCIe e NVMe de nova geração, que entregam velocidade de leitura de até 900MB/s*, o cartão PLAY PRO microSDXC™ Express é impressionantes 4x mais rápido que cartões microSD UHS-I típicos.\n*Com base em testes internos. O desempenho real pode variar.",
+      "official": "",
+      "mineJudgement": {
+        "index": 3,
+        "runs": [
+          {
+            "persona": "pt-BR-saopaulo-gamer",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "O 'é impressionantes 4x' entrega tradução e revisão meia-boca na hora."
+          },
+          {
+            "persona": "pt-BR-saopaulo-gamer",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "O conteúdo está certo, mas “é impressionantes 4x mais rápido” soa travado e com cara de adaptação direta do inglês."
+          },
+          {
+            "persona": "pt-BR-curitiba-mom",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "A frase “é impressionantes 4x” me trava um pouco e dá cara de tradução mal revisada."
+          },
+          {
+            "persona": "pt-BR-curitiba-mom",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "A informação convence, mas “é impressionantes 4x” soa estranho e me tira um pouco a confiança."
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 3,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 4,
+      "source": "*Comparison of the theoretical maximum speeds under different interface forms (Data source: SDA)",
+      "mine": "* Comparação das velocidades máximas teóricas em diferentes formatos de interface (fonte dos dados: SDA)",
+      "official": "",
+      "mineJudgement": {
+        "index": 4,
+        "runs": [
+          {
+            "persona": "pt-BR-saopaulo-gamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Nota técnica simples e correta, sem nada que soe muito estranho."
+          },
+          {
+            "persona": "pt-BR-saopaulo-gamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Como nota técnica está ok, só “formatos de interface” poderia soar um pouco mais natural como “tipos de interface”."
+          },
+          {
+            "persona": "pt-BR-curitiba-mom",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Como nota técnica está ok, embora não seja uma frase que venda muita confiança sozinha."
+          },
+          {
+            "persona": "pt-BR-curitiba-mom",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Parece nota técnica normal, sem charme, mas clara o suficiente."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 3.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 5,
+      "source": "Good for Today, Great for Tomorrow\n\nThe PLAY PRO microSDXC™ Express Card is backwards-compatible with UHS-I and UHS-II host devices (at UHS-I speeds) so you can use it with your current handheld gaming consoles – and it's ideal for the microSD Express devices coming soon.",
+      "mine": "Bom para hoje, ótimo para amanhã\nO cartão PLAY PRO microSDXC™ Express é retrocompatível com dispositivos host UHS-I e UHS-II (em velocidades UHS-I), para você usar com seus consoles portáteis atuais — e é ideal para os dispositivos microSD Express que estão chegando em breve.",
+      "official": "",
+      "mineJudgement": {
+        "index": 5,
+        "runs": [
+          {
+            "persona": "pt-BR-saopaulo-gamer",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Esse 'dispositivos host' é bem gringo e me faz pensar que só jogaram no tradutor."
+          },
+          {
+            "persona": "pt-BR-saopaulo-gamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Texto claro e útil, apesar de “dispositivos host” ficar bem jargão e pouco amigável."
+          },
+          {
+            "persona": "pt-BR-curitiba-mom",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "A informação é boa, mas “dispositivos host” parece termo jogado direto do inglês."
+          },
+          {
+            "persona": "pt-BR-curitiba-mom",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Entendi a compatibilidade, mas “dispositivos host” soa bem traduzido e pouco amigável."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.25,
+          "tone": 3.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 6,
+      "source": "Level-up Your Handheld Gaming Experience\n\nUp to 900MB/s* read speed, the PLAY PRO microSDXC™ Express Card is a stunning 4x faster than typical UHS-I microSD cards – meaning that games load faster and also ensuring a smooth, lag-free experience.\n\nRead speed up to 900MB/s*\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "Eleve sua experiência de games em consoles portáteis\nCom velocidade de leitura de até 900MB/s*, o cartão PLAY PRO microSDXC™ Express é impressionantes 4x mais rápido que cartões microSD UHS-I típicos — ou seja, os jogos carregam mais rápido, garantindo também uma experiência fluida e sem lag.\nVelocidade de leitura de até 900MB/s*\n*Com base em testes internos. O desempenho real pode variar.",
+      "official": "",
+      "mineJudgement": {
+        "index": 6,
+        "runs": [
+          {
+            "persona": "pt-BR-saopaulo-gamer",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "A ideia vende bem pra portátil, mas a frase dos 'impressionantes 4x' fica torta em português."
+          },
+          {
+            "persona": "pt-BR-saopaulo-gamer",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Fala a língua gamer com “sem lag”, mas tropeça em construções tipo “experiência de games” e “impressionantes 4x”."
+          },
+          {
+            "persona": "pt-BR-curitiba-mom",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "O benefício para jogos fica claro, mas de novo esse “é impressionantes 4x” soa estranho."
+          },
+          {
+            "persona": "pt-BR-curitiba-mom",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "A promessa é boa para quem joga, mas a frase do “impressionantes 4x” ficou esquisita."
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 4,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 7,
+      "source": "Cut Your Download Times\n\nThe PLAY PRO microSDXC™ Express Card also delivers 600MB/s write speeds* when paired with the Lexar microSD Express card reader so you can download a AAA game in less time than it'll take you to order a pizza!\n\nWrite speed up to 600MB/s*\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "Reduza o tempo dos seus downloads\nO cartão PLAY PRO microSDXC™ Express também entrega velocidades de gravação de 600MB/s* quando usado com o leitor de cartões Lexar microSD Express, para você baixar um jogo AAA em menos tempo do que levaria para pedir uma pizza!\nVelocidade de gravação de até 600MB/s*\n*Com base em testes internos. O desempenho real pode variar.",
+      "official": "",
+      "mineJudgement": {
+        "index": 7,
+        "runs": [
+          {
+            "persona": "pt-BR-saopaulo-gamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "A comparação com pizza funciona e fala comigo, só podia soar um pouco menos traduzido em algumas partes."
+          },
+          {
+            "persona": "pt-BR-saopaulo-gamer",
+            "run": 1,
+            "naturalness": 5,
+            "tone": 5,
+            "fidelity": 5,
+            "note": "Esse ficou natural, direto e com um toque gamer bom na comparação com pedir pizza."
+          },
+          {
+            "persona": "pt-BR-curitiba-mom",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Achei fácil de entender e a comparação com pizza deixa mais leve sem atrapalhar."
+          },
+          {
+            "persona": "pt-BR-curitiba-mom",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "A comparação com pizza deixa mais leve, só achei a velocidade meio afirmada demais antes de falar “até”."
+          }
+        ],
+        "mean": {
+          "naturalness": 4.25,
+          "tone": 4.25,
+          "fidelity": 4.75
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.1875,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 8,
+      "source": "Massive Capacity up to 1TB\n\nSome of your favorite games are probably pretty big in file size. Well, with up to 1TB capacity, juggling games just got easier. You can fit many games on a 1TB card.\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "Grande capacidade de até 1TB\nAlguns dos seus jogos favoritos provavelmente têm arquivos bem pesados. Com capacidade de até 1TB, ficou mais fácil gerenciar seus jogos. Você pode armazenar muitos jogos em um cartão de 1TB.\n*Com base em testes internos. O desempenho real pode variar.",
+      "official": "",
+      "mineJudgement": {
+        "index": 8,
+        "runs": [
+          {
+            "persona": "pt-BR-saopaulo-gamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Soa bem de boa pra página de cartão microSD, só meio genérico no papo de 'gerenciar seus jogos'."
+          },
+          {
+            "persona": "pt-BR-saopaulo-gamer",
+            "run": 1,
+            "naturalness": 5,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Esse texto passa bem, fala de jogo pesado e espaço de um jeito que eu leria numa loja sem estranhar."
+          },
+          {
+            "persona": "pt-BR-curitiba-mom",
+            "run": 0,
+            "naturalness": 5,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Li fácil e entendi na hora, só achei um pouco genérico como anúncio de cartão de memória."
+          },
+          {
+            "persona": "pt-BR-curitiba-mom",
+            "run": 1,
+            "naturalness": 5,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Li fácil e entendi o benefício sem enrolação, só achei um pouco genérico."
+          }
+        ],
+        "mean": {
+          "naturalness": 4.75,
+          "tone": 4,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 9,
+      "source": "Protection Built in\n\nThe PLAY PRO microSD Express card is IPX7 waterproof, wearproof, temperature-proof, x-ray-proof, vibration-resistant, magnetic-proof, shockproof, and drop-proof.*\n\nWearout resistance\n*up to 10,000 times of plugging and unplugging\nWaterproof\n*IPX7,1m deep water for 30min\nTemperature resistance\n*Operation: -25℃~85℃, Storage: -40℃~85℃\nShock resistance\n*1500G Shock\nAnti-vibration\n*10-2000Hz\nAnti-magnetic\n*15000Gauss\nX-ray protection\n*up to 100mGy\n(equivalent to airport X-ray machine exposure)\nDrop protection\n*1.5m drop",
+      "mine": "Proteção integrada\nO cartão PLAY PRO microSD Express tem classificação IPX7 de resistência à água, é resistente ao desgaste, a temperaturas, raios X, vibrações, campos magnéticos, impactos e quedas.*\nResistência ao desgaste\n*até 10.000 vezes de conexão e desconexão\nResistência à água\n*IPX7, água a 1m de profundidade por 30min\nResistência a temperaturas\n*Operação: -25°C~85°C, armazenamento: -40°C~85°C\nResistência a impactos\n*Impacto de 1500G\nAntivibração\n*10-2000Hz\nAntimagnético\n*15000Gauss\nProteção contra raios X\n*até 100mGy\n(equivalente à exposição a uma máquina de raios X de aeroporto)\nProteção contra quedas\n*queda de 1,5m",
+      "official": "",
+      "mineJudgement": {
+        "index": 9,
+        "runs": [
+          {
+            "persona": "pt-BR-saopaulo-gamer",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Dá pra entender as proteções, mas a lista tem cara de tradução técnica colada e umas frases que ninguém escreveria assim no Brasil."
+          },
+          {
+            "persona": "pt-BR-saopaulo-gamer",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "As specs estão claras, mas tem umas frases com cara de ficha técnica traduzida, tipo “vezes de conexão e desconexão”."
+          },
+          {
+            "persona": "pt-BR-curitiba-mom",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Passa confiança pelas especificações, mas algumas frases da lista soam meio duras e técnicas demais."
+          },
+          {
+            "persona": "pt-BR-curitiba-mom",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Passa confiança pelas especificações, mas algumas frases soam meio traduzidas e técnicas demais para mim."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.25,
+          "tone": 3.25,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 10,
+      "source": "Peace of Mind Extras\n\nThis card undergoes strict testing in the Lexar Quality Lab and we're so confident in it that it comes with a limited lifetime warranty. Plus we offer lifetime access to the Lexar Recovery Tool which you can use to restore accidentally deleted and formatted files.",
+      "mine": "Extras para sua tranquilidade\nEste cartão passa por testes rigorosos no Lexar Quality Lab e temos tanta confiança nele que ele vem com garantia limitada vitalícia. Além disso, oferecemos acesso vitalício ao Lexar Recovery Tool, que você pode usar para restaurar arquivos apagados e formatados acidentalmente.",
+      "official": "",
+      "mineJudgement": {
+        "index": 10,
+        "runs": [
+          {
+            "persona": "pt-BR-saopaulo-gamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "Passa confiança, mas 'arquivos apagados e formatados' ficou meio estranho e pode dar uma tropeçada no sentido."
+          },
+          {
+            "persona": "pt-BR-saopaulo-gamer",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Dá pra entender, mas “ao Lexar Recovery Tool” e “arquivos formatados” soam meio gringos e me tiram um pouco da confiança."
+          },
+          {
+            "persona": "pt-BR-curitiba-mom",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "A ideia de garantia e recuperação de arquivos me tranquiliza, embora 'arquivos formatados' soe um pouco estranho."
+          },
+          {
+            "persona": "pt-BR-curitiba-mom",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "A ideia de garantia e recuperação de arquivos me tranquiliza, apesar de o nome da ferramenta ficar meio duro na frase."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.75,
+          "tone": 3.75,
+          "fidelity": 4.5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.1875,
+          "fidelity": 0.25
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 11,
+      "source": "Rigorously Tested\n\nAll Lexar products undergo extensive testing in the Lexar Quality Labs, facilities with thousands of different cameras and digital devices to ensure performance, quality, compatibility, and reliability.",
+      "mine": "Testado rigorosamente\nTodos os produtos Lexar passam por testes extensivos nos Lexar Quality Labs, instalações com milhares de câmeras e dispositivos digitais diferentes para garantir desempenho, qualidade, compatibilidade e confiabilidade.",
+      "official": "",
+      "mineJudgement": {
+        "index": 11,
+        "runs": [
+          {
+            "persona": "pt-BR-saopaulo-gamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Texto correto e confiável, só com um leve cheiro de copy traduzida em 'testes extensivos'."
+          },
+          {
+            "persona": "pt-BR-saopaulo-gamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "É bem correto e profissional, só um pouco genérico, mas não parece tradução automática pesada."
+          },
+          {
+            "persona": "pt-BR-curitiba-mom",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "É claro e confiável, mas tem cara de texto corporativo traduzido, sem muito calor."
+          },
+          {
+            "persona": "pt-BR-curitiba-mom",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "É claro e confiável, mas bem institucional e pouco envolvente para uma descrição de produto."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 3.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    }
+  ],
+  "summary": {
+    "mine": {
+      "naturalness": 3.75,
+      "tone": 3.625,
+      "fidelity": 4.916666666666667
+    },
+    "official": null,
+    "unstableCells": 0,
+    "personaSensitiveCells": 0
+  }
+}

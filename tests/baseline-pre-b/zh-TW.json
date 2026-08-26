@@ -1,0 +1,690 @@
+{
+  "lang": "zh-TW",
+  "csv": "Card 卡类-OW&AMZ小语种翻译 - PLAY PRO microSD.csv",
+  "timestamp": "2026-08-25T10:57:30.299Z",
+  "methodology": "judge=LLM人设模拟(judge-personas.ts)，置信度低于真人母语评审；fidelity以代码校验为准，judge仅软信号；只允许差分对比结论，不允许绝对分数结论",
+  "cells": [
+    {
+      "index": 0,
+      "source": "Power Up Your Play\nLexar® PLAY PRO microSDXC™ Express Card",
+      "mine": "全面提升遊戲戰力\nLexar® PLAY PRO microSDXC™ Express 記憶卡",
+      "official": "",
+      "mineJudgement": {
+        "index": 0,
+        "runs": [
+          {
+            "persona": "zh-TW-taipei-photographer",
+            "run": 0,
+            "naturalness": 5,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "用語很台灣也順，但對我這種買卡看穩定的人來說偏遊戲熱血。"
+          },
+          {
+            "persona": "zh-TW-taipei-photographer",
+            "run": 1,
+            "naturalness": 5,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "中文很順、沒有大陸用語，但「遊戲戰力」這種口號對我這種買卡看穩定的人來說有點太浮。"
+          },
+          {
+            "persona": "zh-TW-kaohsiung-gamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "標題算順，但「遊戲戰力」有點手遊廣告感，還不到反感。"
+          },
+          {
+            "persona": "zh-TW-kaohsiung-gamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "「遊戲戰力」有點手遊廣告感，但標題掃過去算順、也不會太假。"
+          }
+        ],
+        "mean": {
+          "naturalness": 4.5,
+          "tone": 3.75,
+          "fidelity": 4.5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.1875,
+          "fidelity": 0.25
+        },
+        "personaGap": 1,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 1,
+      "source": "Good for Today, Great for Tomorrow\n\nRevolutionary Performance\n\nPeace of Mind Extras\n\nLevel-up Your Handheld Gaming Experience\nRead speed up to 900MB/s\n\nCut Your Download Times\nWrite speed up to 600MB/s\n\nMassive Capacity up to 1TB\n\nProtection Built in",
+      "mine": "現在好用，未來更強\n革新效能\n安心加值保障\n升級你的掌機遊戲體驗\n讀取速度最高可達 900MB/s\n縮短下載等待時間\n寫入速度最高可達 600MB/s\n大容量最高可達 1TB\n內建多重防護",
+      "official": "",
+      "mineJudgement": {
+        "index": 1,
+        "runs": [
+          {
+            "persona": "zh-TW-taipei-photographer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "整體像台灣通路文案，規格清楚，只是「安心加值保障」有點空泛。"
+          },
+          {
+            "persona": "zh-TW-taipei-photographer",
+            "run": 1,
+            "naturalness": 5,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "整體像台灣電商文案，資訊也清楚，只是偏遊戲行銷語，還沒打到我最在意的可靠性。"
+          },
+          {
+            "persona": "zh-TW-kaohsiung-gamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "整串賣點掃起來滿順，只是「安心加值保障」有點像硬翻的行銷詞。"
+          },
+          {
+            "persona": "zh-TW-kaohsiung-gamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "整串賣點看起來滿像台灣電商文案，只是「內建多重防護」有稍微多講一點。"
+          }
+        ],
+        "mean": {
+          "naturalness": 4.25,
+          "tone": 3.75,
+          "fidelity": 4.25
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.1875,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 2,
+      "source": "What is SD Express and how does it works?\n\nSD Express is a new SD card standard. It adopts the PCI Express 3.0 and NVMe 1.3 interfaces, which significantly enhances the data processing capability of SD cards. The working principle of SD Express is based on the PCI Express interface and the NVMe protocol. The PCIe interface supports high-speed data transmission, while the NVMe protocol optimizes storage access efficiency. SD Express uses the second row of contacts at the interface to transmit PCIe signals and is backwards-compatible with UHS-I through the first row of contacts. After being connected to a computer that supports SD Express products, SD Express will be recognized as a standard NVMe device, similar to a modern NVMe SSD.",
+      "mine": "什麼是 SD Express？它如何運作？\nSD Express 是全新的 SD 記憶卡標準。它採用 PCI Express 3.0 與 NVMe 1.3 介面，大幅提升 SD 記憶卡的資料處理能力。SD Express 的運作原理是基於 PCI Express 介面與 NVMe 協定。PCIe 介面支援高速資料傳輸，NVMe 協定則能最佳化儲存存取效率。SD Express 透過介面的第二排接點傳輸 PCIe 訊號，並透過第一排接點向下相容 UHS-I。連接至支援 SD Express 產品的電腦後，SD Express 會被辨識為標準 NVMe 裝置，類似現代 NVMe 固態硬碟。",
+      "official": "",
+      "mineJudgement": {
+        "index": 2,
+        "runs": [
+          {
+            "persona": "zh-TW-taipei-photographer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "技術說明寫得夠精準，沒有看到我會反感的簡體或大陸用語。"
+          },
+          {
+            "persona": "zh-TW-taipei-photographer",
+            "run": 1,
+            "naturalness": 5,
+            "tone": 5,
+            "fidelity": 5,
+            "note": "這段技術說明用語乾淨、規格交代完整，會讓我覺得品牌至少懂自己在賣什麼。"
+          },
+          {
+            "persona": "zh-TW-kaohsiung-gamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "技術說明翻得很完整，但讀起來偏規格書，我可能只挑重點看。"
+          },
+          {
+            "persona": "zh-TW-kaohsiung-gamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "規格解釋滿清楚但偏說明書，真的有興趣查 SD Express 才會慢慢看。"
+          }
+        ],
+        "mean": {
+          "naturalness": 4.25,
+          "tone": 3.75,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.6875,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 3,
+      "source": "Revolutionary Performance\n\nThanks to its next-gen tech of PCIe and NVMe interface technologies that deliver up to 900MB/s read speed*, the PLAY PRO microSDXC™ Express Card is a stunning 4x faster than typical UHS-I microSD cards.\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "革新效能\n憑藉新世代 PCIe 與 NVMe 介面技術，讀取速度最高可達 900MB/s*，PLAY PRO microSDXC™ Express 記憶卡比一般 UHS-I microSD 記憶卡快上驚人的 4 倍。\n*根據內部測試。實際效能可能有所不同。",
+      "official": "",
+      "mineJudgement": {
+        "index": 3,
+        "runs": [
+          {
+            "persona": "zh-TW-taipei-photographer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "速度與測試註記都有交代，讀起來是正常的台灣產品頁語氣。"
+          },
+          {
+            "persona": "zh-TW-taipei-photographer",
+            "run": 1,
+            "naturalness": 5,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "讀起來自然，速度與測試註記都有留下，但我還是會想再看到耐用度和保固細節。"
+          },
+          {
+            "persona": "zh-TW-kaohsiung-gamer",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "資訊沒問題，但「憑藉」「快上驚人的 4 倍」有點翻譯腔加制式業配感。"
+          },
+          {
+            "persona": "zh-TW-kaohsiung-gamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "速度和 4 倍有講到重點，「驚人的」稍微廣告腔但還在可接受範圍。"
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 3.75,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.5,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 1,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 4,
+      "source": "*Comparison of the theoretical maximum speeds under different interface forms (Data source: SDA)",
+      "mine": "* 不同介面型式下的理論最高速度比較（資料來源：SDA）",
+      "official": "",
+      "mineJudgement": {
+        "index": 4,
+        "runs": [
+          {
+            "persona": "zh-TW-taipei-photographer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "短句沒問題，「介面型式」稍硬但在規格圖註裡可以接受。"
+          },
+          {
+            "persona": "zh-TW-taipei-photographer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "腳註翻得準確，「介面型式」稍微硬一點但不影響專業感。"
+          },
+          {
+            "persona": "zh-TW-kaohsiung-gamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "註解本來就不用太花俏，這句清楚但也就是規格表口吻。"
+          },
+          {
+            "persona": "zh-TW-kaohsiung-gamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "註解翻得沒問題，就是很標準的圖表腳註，不會特別吸引人。"
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 3.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 5,
+      "source": "Good for Today, Great for Tomorrow\n\nThe PLAY PRO microSDXC™ Express Card is backwards-compatible with UHS-I and UHS-II host devices (at UHS-I speeds) so you can use it with your current handheld gaming consoles – and it's ideal for the microSD Express devices coming soon.",
+      "mine": "現在好用，未來更強\nPLAY PRO microSDXC™ Express 記憶卡可向下相容 UHS-I 與 UHS-II 主機裝置（以 UHS-I 速度運作），讓你可搭配現有的掌上型遊戲主機使用，也是即將推出的 microSD Express 裝置的理想選擇。",
+      "official": "",
+      "mineJudgement": {
+        "index": 5,
+        "runs": [
+          {
+            "persona": "zh-TW-taipei-photographer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "向下相容和 UHS-I 速度講得清楚，這種資訊比口號更能讓我放心。"
+          },
+          {
+            "persona": "zh-TW-taipei-photographer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "相容性說明清楚有用，只是「主機裝置」略帶翻譯味，但還在可接受範圍。"
+          },
+          {
+            "persona": "zh-TW-kaohsiung-gamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "相容性講得清楚，雖然「主機裝置」稍微硬一點但不影響理解。"
+          },
+          {
+            "persona": "zh-TW-kaohsiung-gamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "相容性講得清楚，「現在掌機能用、之後新設備也能用」這點有打中。"
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 4,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 6,
+      "source": "Level-up Your Handheld Gaming Experience\n\nUp to 900MB/s* read speed, the PLAY PRO microSDXC™ Express Card is a stunning 4x faster than typical UHS-I microSD cards – meaning that games load faster and also ensuring a smooth, lag-free experience.\n\nRead speed up to 900MB/s*\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "升級你的掌機遊戲體驗\nPLAY PRO microSDXC™ Express 記憶卡讀取速度最高可達 900MB/s*，比一般 UHS-I microSD 記憶卡快上驚人的 4 倍，讓遊戲載入更快，帶來順暢不延遲的體驗。\n讀取速度最高可達 900MB/s*\n*根據內部測試。實際效能可能有所不同。",
+      "official": "",
+      "mineJudgement": {
+        "index": 6,
+        "runs": [
+          {
+            "persona": "zh-TW-taipei-photographer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "文案順暢、規格也對，只是「驚人的 4 倍」稍微有點廣告味。"
+          },
+          {
+            "persona": "zh-TW-taipei-photographer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "文案順但「順暢不延遲」有點廣告口吻，對我來說速度有講到、可靠性還不夠。"
+          },
+          {
+            "persona": "zh-TW-kaohsiung-gamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "賣點有打到掌機玩家，但「順暢不延遲」跟「驚人的 4 倍」有點廣告罐頭味。"
+          },
+          {
+            "persona": "zh-TW-kaohsiung-gamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "讀取速度跟載入變快的賣點很直覺，文案有點制式但不像機翻。"
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 3.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 7,
+      "source": "Cut Your Download Times\n\nThe PLAY PRO microSDXC™ Express Card also delivers 600MB/s write speeds* when paired with the Lexar microSD Express card reader so you can download a AAA game in less time than it'll take you to order a pizza!\n\nWrite speed up to 600MB/s*\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "縮短下載等待時間\nPLAY PRO microSDXC™ Express 記憶卡搭配 Lexar microSD Express 記憶卡讀卡機使用時，寫入速度可達 600MB/s*，讓你下載一款 3A 遊戲的時間，比點一份披薩還短！\n寫入速度最高可達 600MB/s*\n*根據內部測試。實際效能可能有所不同。",
+      "official": "",
+      "mineJudgement": {
+        "index": 7,
+        "runs": [
+          {
+            "persona": "zh-TW-taipei-photographer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "規格翻得準，但披薩比喻和「3A 遊戲」有點太行銷，專業感稍弱。"
+          },
+          {
+            "persona": "zh-TW-taipei-photographer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "披薩比喻有點美式行銷感，但規格與搭配讀卡機的條件都有翻出來。"
+          },
+          {
+            "persona": "zh-TW-kaohsiung-gamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "披薩比喻算有趣不會太尬，只是「3A 遊戲」我會更習慣看到 AAA 大作。"
+          },
+          {
+            "persona": "zh-TW-kaohsiung-gamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "披薩梗有一點廣告味，但搭配讀卡機才有 600MB/s 這個條件有講清楚。"
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 3.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 8,
+      "source": "Massive Capacity up to 1TB\n\nSome of your favorite games are probably pretty big in file size. Well, with up to 1TB capacity, juggling games just got easier. You can fit many games on a 1TB card.\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "大容量最高可達 1TB\n你喜愛的遊戲，有些檔案容量可能相當可觀。有了最高 1TB 容量，要安排遊戲庫就輕鬆多了；一張 1TB 記憶卡就能裝下多款遊戲。\n*根據內部測試。實際效能可能有所不同。",
+      "official": "",
+      "mineJudgement": {
+        "index": 8,
+        "runs": [
+          {
+            "persona": "zh-TW-taipei-photographer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "讀起來算順，沒有大陸用語，容量訴求清楚但對我這種拍婚禮的人來說還是偏遊戲文案。"
+          },
+          {
+            "persona": "zh-TW-taipei-photographer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "用語看起來是台灣市場會用的，雖然遊戲情境跟我拍婚禮不太相關，但容量資訊講得清楚。"
+          },
+          {
+            "persona": "zh-TW-kaohsiung-gamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "讀起來算順，雖然有點品牌官網味，但重點 1TB 跟可以少刪遊戲有講清楚。"
+          },
+          {
+            "persona": "zh-TW-kaohsiung-gamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "看得懂也不雷，但「檔案容量相當可觀」這種字眼有點像官網文案，沒有很打中我。"
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 3.75,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 9,
+      "source": "Protection Built in\n\nThe PLAY PRO microSD Express card is IPX7 waterproof, wearproof, temperature-proof, x-ray-proof, vibration-resistant, magnetic-proof, shockproof, and drop-proof.*\n\nWearout resistance\n*up to 10,000 times of plugging and unplugging\nWaterproof\n*IPX7,1m deep water for 30min\nTemperature resistance\n*Operation: -25℃~85℃, Storage: -40℃~85℃\nShock resistance\n*1500G Shock\nAnti-vibration\n*10-2000Hz\nAnti-magnetic\n*15000Gauss\nX-ray protection\n*up to 100mGy\n(equivalent to airport X-ray machine exposure)\nDrop protection\n*1.5m drop",
+      "mine": "內建多重防護\nPLAY PRO microSD Express 記憶卡具備 IPX7 防水、耐插拔磨耗、耐溫、抗 X 光、抗震動、抗磁、防震與防摔能力。*\n耐插拔\n*最高可承受 10,000 次插拔\n防水\n*IPX7，1m 水深 30 分鐘\n耐溫\n*運作：-25°C~85°C，存放：-40°C~85°C\n防震\n*1500G 衝擊\n抗震動\n*10-2000Hz\n抗磁\n*15000 高斯\n抗 X 光\n*最高可達 100mGy\n（相當於機場 X 光機照射）\n防摔\n*1.5m 掉落",
+      "official": "",
+      "mineJudgement": {
+        "index": 9,
+        "runs": [
+          {
+            "persona": "zh-TW-taipei-photographer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 5,
+            "fidelity": 5,
+            "note": "防水、防摔、耐溫和插拔次數都列得很完整，這種規格寫法會讓我比較敢把資料交給它。"
+          },
+          {
+            "persona": "zh-TW-taipei-photographer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 5,
+            "fidelity": 5,
+            "note": "防水、防摔、耐溫和插拔次數都列出來，這種規格式寫法會讓我比較安心，只是「1.5m 掉落」稍微像直翻。"
+          },
+          {
+            "persona": "zh-TW-kaohsiung-gamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "規格列得很完整，只是防震、抗震動這種詞擠在一起有點像規格表，掃過去會有點累。"
+          },
+          {
+            "persona": "zh-TW-kaohsiung-gamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "規格列得滿清楚，買記憶卡會想看這些，但整段就是偏規格表，沒什麼溫度。"
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 4,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 1,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 10,
+      "source": "Peace of Mind Extras\n\nThis card undergoes strict testing in the Lexar Quality Lab and we're so confident in it that it comes with a limited lifetime warranty. Plus we offer lifetime access to the Lexar Recovery Tool which you can use to restore accidentally deleted and formatted files.",
+      "mine": "安心加值保障\n這張記憶卡通過 Lexar 品質實驗室的嚴格測試，我們對其品質深具信心，因此提供有限終身保固。此外，我們也提供 Lexar Recovery Tool 終身使用權，可用於復原意外刪除或格式化的檔案。",
+      "official": "",
+      "mineJudgement": {
+        "index": 10,
+        "runs": [
+          {
+            "persona": "zh-TW-taipei-photographer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 5,
+            "fidelity": 4,
+            "note": "嚴格測試、有限終身保固和救援工具都有講到，對在意備份風險的我很加分，只是「格式化的檔案」稍微不自然。"
+          },
+          {
+            "persona": "zh-TW-taipei-photographer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 5,
+            "fidelity": 5,
+            "note": "有限終身保固和救援工具有講到重點，對我這種怕資料出事的人來說是有加分的。"
+          },
+          {
+            "persona": "zh-TW-kaohsiung-gamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "內容可信但語氣偏正式，『深具信心』這種寫法有點像公司新聞稿。"
+          },
+          {
+            "persona": "zh-TW-kaohsiung-gamer",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "資訊有到位，不過「對其品質深具信心」這種講法太制式，像公司簡介。"
+          }
+        ],
+        "mean": {
+          "naturalness": 3.75,
+          "tone": 4,
+          "fidelity": 4.75
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 1,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 11,
+      "source": "Rigorously Tested\n\nAll Lexar products undergo extensive testing in the Lexar Quality Labs, facilities with thousands of different cameras and digital devices to ensure performance, quality, compatibility, and reliability.",
+      "mine": "嚴格測試\n所有 Lexar 產品都會在 Lexar 品質實驗室接受廣泛測試；該實驗室配備數千款不同相機與數位裝置，以確保效能、品質、相容性與可靠性。",
+      "official": "",
+      "mineJudgement": {
+        "index": 11,
+        "runs": [
+          {
+            "persona": "zh-TW-taipei-photographer",
+            "run": 0,
+            "naturalness": 5,
+            "tone": 5,
+            "fidelity": 5,
+            "note": "這段很像台灣官網會寫的品質保證文案，強調相機相容性和可靠性我會買單。"
+          },
+          {
+            "persona": "zh-TW-taipei-photographer",
+            "run": 1,
+            "naturalness": 5,
+            "tone": 5,
+            "fidelity": 5,
+            "note": "提到用數千款相機與數位裝置測相容性，這句很對攝影工作者的胃口，也沒有奇怪的大陸用語。"
+          },
+          {
+            "persona": "zh-TW-kaohsiung-gamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "翻得沒什麼問題，但整段就是標準官網保證文，對我來說偏乾一點。"
+          },
+          {
+            "persona": "zh-TW-kaohsiung-gamer",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "意思正確，但「接受廣泛測試；該實驗室配備」讀起來很翻譯腔，會快速掃過而已。"
+          }
+        ],
+        "mean": {
+          "naturalness": 4.25,
+          "tone": 4,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.6875,
+          "tone": 1,
+          "fidelity": 0
+        },
+        "personaGap": 1.5,
+        "flags": []
+      },
+      "officialJudgement": null
+    }
+  ],
+  "summary": {
+    "mine": {
+      "naturalness": 4.083333333333333,
+      "tone": 3.7708333333333335,
+      "fidelity": 4.875
+    },
+    "official": null,
+    "unstableCells": 0,
+    "personaSensitiveCells": 0
+  }
+}

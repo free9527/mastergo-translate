@@ -1,0 +1,1270 @@
+{
+  "lang": "fr",
+  "csv": "Card 卡类-OW&AMZ小语种翻译 - PLAY PRO microSD.csv",
+  "timestamp": "2026-08-25T11:06:48.415Z",
+  "methodology": "judge=LLM人设模拟(judge-personas.ts)，置信度低于真人母语评审；fidelity以代码校验为准，judge仅软信号；只允许差分对比结论，不允许绝对分数结论",
+  "cells": [
+    {
+      "index": 0,
+      "source": "Power Up Your Play\nLexar® PLAY PRO microSDXC™ Express Card",
+      "mine": "Donnez plus de puissance à votre jeu\nCarte Lexar® PLAY PRO microSDXC™ Express",
+      "official": "Boostez votre jeu\n Carte Lexar® PLAY PRO microSDXC™ Express",
+      "mineJudgement": {
+        "index": 0,
+        "runs": [
+          {
+            "persona": "fr-lyon-designer",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 4,
+            "note": "« Donnez plus de puissance à votre jeu » sonne très calqué et ne me donne pas l’impression d’une marque qui soigne son français."
+          },
+          {
+            "persona": "fr-lyon-designer",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 4,
+            "note": "« Donnez plus de puissance à votre jeu » sonne très calqué et ne me donne pas vraiment confiance dans le soin apporté à la fiche."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Ça se comprend, mais « donner plus de puissance à votre jeu » sonne un peu slogan traduit à la va-vite."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "« Donnez plus de puissance à votre jeu » sent un peu le slogan traduit, mais le nom du produit reste clair."
+          }
+        ],
+        "mean": {
+          "naturalness": 2.5,
+          "tone": 2.5,
+          "fidelity": 4.25
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.25,
+          "fidelity": 0.1875
+        },
+        "personaGap": 1,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 0,
+        "runs": [
+          {
+            "persona": "fr-lyon-designer",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "« Boostez votre jeu » sonne très slogan traduit, pas franchement écrit par une équipe francophone."
+          },
+          {
+            "persona": "fr-lyon-designer",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "« Boostez votre jeu » sonne un peu slogan traduit, pas catastrophique mais pas très élégant."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Court et clair, même si « Boostez votre jeu » sonne un peu slogan traduit."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Ça sonne un peu slogan traduit, mais je comprends direct que c’est une microSD orientée gaming."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.5,
+          "tone": 3.25,
+          "fidelity": 4.5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.1875,
+          "fidelity": 0.25
+        },
+        "personaGap": 1,
+        "flags": []
+      }
+    },
+    {
+      "index": 1,
+      "source": "Good for Today, Great for Tomorrow\n\nRevolutionary Performance\n\nPeace of Mind Extras\n\nLevel-up Your Handheld Gaming Experience\nRead speed up to 900MB/s\n\nCut Your Download Times\nWrite speed up to 600MB/s\n\nMassive Capacity up to 1TB\n\nProtection Built in",
+      "mine": "Prête pour aujourd’hui, pensée pour demain\nPerformances révolutionnaires\nDes plus pour l’esprit tranquille\nPassez au niveau supérieur sur console portable\nVitesse de lecture jusqu’à 900 Mo/s\nRéduisez vos temps de téléchargement\nVitesse d’écriture jusqu’à 600 Mo/s\nGrande capacité jusqu’à 1 To\nProtection intégrée",
+      "official": "Bonne pour aujourd'hui, excellente pour demain\n \n Des performances révolutionnaires\n \n Une tranquillité d'esprit optimale\n \n Améliorez votre expérience de jeu portable\n Vitesse de lecture jusqu'à 900 Mo/s\n \n Réduisez vos temps de téléchargement\n Vitesse d'écriture jusqu'à 600 Mo/s\n \n Capacité massive jusqu'à 1 To\n \n Protection intégrée",
+      "mineJudgement": {
+        "index": 1,
+        "runs": [
+          {
+            "persona": "fr-lyon-designer",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "C’est compréhensible, mais des formules comme « performances révolutionnaires » et « des plus pour l’esprit tranquille » font un peu traduction marketing automatique."
+          },
+          {
+            "persona": "fr-lyon-designer",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "C’est compréhensible, mais des formules comme « performances révolutionnaires » et « des plus pour l’esprit tranquille » sentent encore la traduction marketing."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Les specs sont là, mais « Des plus pour l’esprit tranquille » fait bizarre en français."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Globalement c’est lisible et orienté specs, même si « Des plus pour l’esprit tranquille » sonne un peu bizarre."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.25,
+          "tone": 3.25,
+          "fidelity": 4.5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.1875,
+          "fidelity": 0.25
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 1,
+        "runs": [
+          {
+            "persona": "fr-lyon-designer",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "L’ensemble est compréhensible, mais « tranquillité d’esprit optimale » et « capacité massive » me donnent tout de suite une impression de traduction automatique."
+          },
+          {
+            "persona": "fr-lyon-designer",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "La liste aligne des formules très calquées comme « tranquillité d'esprit optimale » et ça me donne une impression de traduction automatique."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Les specs sont là, mais « tranquillité d’esprit optimale » et « Bonne pour aujourd’hui » font très marketing Amazon traduit."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "La liste est lisible, mais des formules comme « tranquillité d’esprit optimale » font très Amazon traduit."
+          }
+        ],
+        "mean": {
+          "naturalness": 2.5,
+          "tone": 2.5,
+          "fidelity": 4.75
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.25,
+          "fidelity": 0.1875
+        },
+        "personaGap": 1,
+        "flags": []
+      }
+    },
+    {
+      "index": 2,
+      "source": "What is SD Express and how does it works?\n\nSD Express is a new SD card standard. It adopts the PCI Express 3.0 and NVMe 1.3 interfaces, which significantly enhances the data processing capability of SD cards. The working principle of SD Express is based on the PCI Express interface and the NVMe protocol. The PCIe interface supports high-speed data transmission, while the NVMe protocol optimizes storage access efficiency. SD Express uses the second row of contacts at the interface to transmit PCIe signals and is backwards-compatible with UHS-I through the first row of contacts. After being connected to a computer that supports SD Express products, SD Express will be recognized as a standard NVMe device, similar to a modern NVMe SSD.",
+      "mine": "Qu’est-ce que SD Express et comment fonctionne-t-il ?\nSD Express est une nouvelle norme de carte SD. Elle adopte les interfaces PCI Express 3.0 et NVMe 1.3, ce qui améliore considérablement la capacité de traitement des données des cartes SD. Le principe de fonctionnement de SD Express repose sur l’interface PCI Express et le protocole NVMe. L’interface PCIe prend en charge la transmission de données à haut débit, tandis que le protocole NVMe optimise l’efficacité de l’accès au stockage. SD Express utilise la deuxième rangée de contacts de l’interface pour transmettre les signaux PCIe et reste rétrocompatible avec UHS-I via la première rangée de contacts. Une fois connecté à un ordinateur prenant en charge les produits SD Express, SD Express est reconnu comme un périphérique NVMe standard, semblable à un SSD NVMe moderne.",
+      "official": "Qu'est-ce que SD Express et comment fonctionne-t-elle ?\n \n SD Express est une nouvelle norme de carte SD. Elle adopte les interfaces PCI Express 3.0 et NVMe 1.3, ce qui améliore considérablement la capacité de traitement des données des cartes SD. Le principe de fonctionnement de SD Express est basé sur l'interface PCI Express et le protocole NVMe. L'interface PCIe prend en charge la transmission de données à haute vitesse, tandis que le protocole NVMe optimise l'efficacité de l'accès au stockage. SD Express utilise la deuxième rangée de contacts de l'interface pour transmettre les signaux PCIe et est rétrocompatible avec UHS-I via la première rangée de contacts. Une fois connectée à un ordinateur prenant en charge les produits SD Express, SD Express sera reconnue comme un périphérique NVMe standard, similaire à un SSD NVMe moderne.",
+      "mineJudgement": {
+        "index": 2,
+        "runs": [
+          {
+            "persona": "fr-lyon-designer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Le passage technique est clair et plutôt sérieux, avec seulement quelques tournures un peu raides."
+          },
+          {
+            "persona": "fr-lyon-designer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Le passage technique est plutôt propre et clair, même si certaines tournures restent un peu rigides."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "C’est un peu dense, mais au moins l’explication technique est claire et les termes sont propres."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "C’est technique et plutôt propre, mais un peu pavé de fiche produit que je lirais en diagonale."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 3.75,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 2,
+        "runs": [
+          {
+            "persona": "fr-lyon-designer",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Le fond technique est clair, mais la formulation reste lourde et scolaire, avec quelques tournures peu naturelles."
+          },
+          {
+            "persona": "fr-lyon-designer",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Le fond technique est clair, mais « comment fonctionne-t-elle » et plusieurs tournures sentent la phrase anglaise recollée en français."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "C’est compréhensible pour un passage technique, mais les phrases sont lourdes et je décroche un peu."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Techniquement c’est propre, mais c’est lourd et je décroche un peu avec les phrases façon fiche technique traduite."
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 3,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 3,
+      "source": "Revolutionary Performance\n\nThanks to its next-gen tech of PCIe and NVMe interface technologies that deliver up to 900MB/s read speed*, the PLAY PRO microSDXC™ Express Card is a stunning 4x faster than typical UHS-I microSD cards.\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "Performances révolutionnaires\nGrâce à ses technologies d’interface PCIe et NVMe de nouvelle génération offrant des vitesses de lecture jusqu’à 900 Mo/s*, la carte PLAY PRO microSDXC™ Express est 4 fois plus rapide que les cartes microSD UHS-I classiques.\n*D’après des tests internes. Les performances réelles peuvent varier.",
+      "official": "Des performances révolutionnaires\n \n Grâce à ses technologies d'interface PCIe et NVMe de nouvelle génération qui offrent une vitesse de lecture pouvant atteindre 900 Mo/s*, la carte PLAY PRO microSDXC™ Express est 4 fois plus rapide que les cartes microSD UHS-I classiques.\n \n *Basé sur des tests internes. Les performances réelles peuvent varier.",
+      "mineJudgement": {
+        "index": 3,
+        "runs": [
+          {
+            "persona": "fr-lyon-designer",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Les infos sont là, mais « performances révolutionnaires » et la phrase très chargée sentent encore la fiche produit traduite."
+          },
+          {
+            "persona": "fr-lyon-designer",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Les infos sont là, mais « performances révolutionnaires » et le côté superlatif me font lever un sourcil."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Phrase marketing un peu chargée, mais les chiffres importants ressortent bien."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "La phrase est un peu longue, mais les infos importantes comme PCIe/NVMe et 900 Mo/s passent bien."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.5,
+          "tone": 3.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 1,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 3,
+        "runs": [
+          {
+            "persona": "fr-lyon-designer",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "C’est correct, mais « performances révolutionnaires » et « grâce à ses technologies » font très fiche produit traduite mot à mot."
+          },
+          {
+            "persona": "fr-lyon-designer",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "C'est compréhensible, mais « performances révolutionnaires » et la longue phrase marketing me paraissent assez génériques."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "L’info est bonne, mais la grande phrase avec « technologies d’interface » sent la traduction et le blabla promo."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Les specs sont là, mais la phrase est trop longue et le « performances révolutionnaires » me fait lever un sourcil."
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 3,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 4,
+      "source": "*Comparison of the theoretical maximum speeds under different interface forms (Data source: SDA)",
+      "mine": "* Comparaison des vitesses maximales théoriques selon les différents types d’interface (source des données : SDA)",
+      "official": "*Comparaison des vitesses maximales théoriques sous différentes formes d'interface (Source des données : SDA)",
+      "mineJudgement": {
+        "index": 4,
+        "runs": [
+          {
+            "persona": "fr-lyon-designer",
+            "run": 0,
+            "naturalness": 5,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "La note est propre, précise et se lit naturellement pour une mention technique."
+          },
+          {
+            "persona": "fr-lyon-designer",
+            "run": 1,
+            "naturalness": 5,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "C’est sobre, précis, et ça ressemble à une vraie note technique en français."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 0,
+            "naturalness": 5,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Simple, propre, rien qui me fait tiquer."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 1,
+            "naturalness": 5,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Note de bas de page claire, rien à redire côté formulation ou données."
+          }
+        ],
+        "mean": {
+          "naturalness": 5,
+          "tone": 4,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 4,
+        "runs": [
+          {
+            "persona": "fr-lyon-designer",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "« Sous différentes formes d’interface » n’est pas une formulation naturelle en français, ça me ferait tiquer sur une fiche technique."
+          },
+          {
+            "persona": "fr-lyon-designer",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "« Sous différentes formes d'interface » n'est pas naturel en français technique, je m'attendrais plutôt à « selon les types d'interface »."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "« Sous différentes formes d’interface » n’est pas naturel, même si on comprend l’idée."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "« Sous différentes formes d’interface » ne sonne pas naturel, même si on devine l’idée."
+          }
+        ],
+        "mean": {
+          "naturalness": 2,
+          "tone": 2.75,
+          "fidelity": 4.5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.1875,
+          "fidelity": 0.25
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 5,
+      "source": "Good for Today, Great for Tomorrow\n\nThe PLAY PRO microSDXC™ Express Card is backwards-compatible with UHS-I and UHS-II host devices (at UHS-I speeds) so you can use it with your current handheld gaming consoles – and it's ideal for the microSD Express devices coming soon.",
+      "mine": "Prête pour aujourd’hui, pensée pour demain\nLa carte PLAY PRO microSDXC™ Express est rétrocompatible avec les appareils hôtes UHS-I et UHS-II (aux vitesses UHS-I) : vous pouvez donc l’utiliser avec vos consoles de jeu portables actuelles. Elle est également idéale pour les appareils microSD Express qui arrivent bientôt.",
+      "official": "Bonne pour aujourd'hui, excellente pour demain\n \n La carte PLAY PRO microSDXC™ Express est rétrocompatible avec les appareils hôtes UHS-I et UHS-II (à des vitesses UHS-I), de sorte que vous pouvez l'utiliser avec vos consoles de jeu portables actuelles - et elle est idéale pour les appareils microSD Express qui seront bientôt disponibles.",
+      "mineJudgement": {
+        "index": 5,
+        "runs": [
+          {
+            "persona": "fr-lyon-designer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "C’est assez fluide et rassurant, même si « appareils hôtes » reste un peu jargon."
+          },
+          {
+            "persona": "fr-lyon-designer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Le titre est bien adapté et le texte me paraît clair, avec un ton assez fiable pour une fiche produit."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Ça lit assez naturellement et la compatibilité UHS-I/UHS-II est bien expliquée."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "C’est clair et utile, avec la compatibilité UHS-I/UHS-II bien expliquée sans trop en faire."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 4,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 5,
+        "runs": [
+          {
+            "persona": "fr-lyon-designer",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Le message passe, mais « bonne pour aujourd’hui » et « appareils hôtes » manquent vraiment de fluidité commerciale."
+          },
+          {
+            "persona": "fr-lyon-designer",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Le titre est maladroit et « à des vitesses UHS-I » fait très traduction littérale malgré des infos correctes."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "C’est factuellement propre, mais « appareils hôtes » et « de sorte que » rendent le texte assez raide."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "C’est compréhensible, mais « Bonne pour aujourd’hui » et « à des vitesses UHS-I » sentent la traduction."
+          }
+        ],
+        "mean": {
+          "naturalness": 2.75,
+          "tone": 3,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      }
+    },
+    {
+      "index": 6,
+      "source": "Level-up Your Handheld Gaming Experience\n\nUp to 900MB/s* read speed, the PLAY PRO microSDXC™ Express Card is a stunning 4x faster than typical UHS-I microSD cards – meaning that games load faster and also ensuring a smooth, lag-free experience.\n\nRead speed up to 900MB/s*\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "Passez au niveau supérieur sur console portable\nAvec une vitesse de lecture jusqu’à 900 Mo/s*, la carte PLAY PRO microSDXC™ Express est 4 fois plus rapide que les cartes microSD UHS-I classiques : vos jeux se chargent plus vite, pour une expérience fluide et sans latence.\nVitesse de lecture jusqu’à 900 Mo/s*\n*D’après des tests internes. Les performances réelles peuvent varier.",
+      "official": "Améliorez votre expérience de jeu portable\n \n Avec une vitesse de lecture allant jusqu'à 900 Mo/s*, la carte PLAY PRO microSDXC™ Express est 4 fois plus rapide que les cartes microSD UHS-I classiques, ce qui signifie que les jeux se chargent plus rapidement et que vous bénéficiez d'une expérience fluide et sans décalage.\n \n Vitesse de lecture jusqu'à 900 Mo/s*\n \n *Basé sur des tests internes. Les performances réelles peuvent varier.",
+      "mineJudgement": {
+        "index": 6,
+        "runs": [
+          {
+            "persona": "fr-lyon-designer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Le texte vend correctement la vitesse sans trop en faire, malgré un titre un peu maladroit."
+          },
+          {
+            "persona": "fr-lyon-designer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Ça se lit bien et le bénéfice est clair, même si « expérience fluide et sans latence » reste un peu formule de brochure."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Un peu cliché avec le « niveau supérieur », mais c’est clair et orienté usage gaming."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Le texte vend un peu, mais il reste concret avec les 900 Mo/s et le gain de chargement."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 4,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 6,
+        "runs": [
+          {
+            "persona": "fr-lyon-designer",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "C’est lisible, mais « expérience fluide et sans décalage » sonne moins naturel que du vrai vocabulaire gaming en français."
+          },
+          {
+            "persona": "fr-lyon-designer",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Le message passe, mais « sans décalage » et la construction de phrase manquent de naturel pour du gaming."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Ça passe, mais « sans décalage » pour du gaming et « ce qui signifie que » font un peu traduction automatique."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Les chiffres sont clairs, mais « expérience fluide et sans décalage » fait un peu calque de lag-free."
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 3,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 7,
+      "source": "Cut Your Download Times\n\nThe PLAY PRO microSDXC™ Express Card also delivers 600MB/s write speeds* when paired with the Lexar microSD Express card reader so you can download a AAA game in less time than it'll take you to order a pizza!\n\nWrite speed up to 600MB/s*\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "Réduisez vos temps de téléchargement\nLa carte PLAY PRO microSDXC™ Express offre également des vitesses d’écriture de 600 Mo/s* lorsqu’elle est associée au lecteur de carte Lexar microSD Express, pour télécharger un jeu AAA en moins de temps qu’il ne vous en faut pour commander une pizza !\nVitesse d’écriture jusqu’à 600 Mo/s*\n*D’après des tests internes. Les performances réelles peuvent varier.",
+      "official": "Réduisez vos temps de téléchargement\n \n La carte PLAY PRO microSDXC™ Express offre également des vitesses d'écriture de 600 Mo/s* lorsqu'elle est associée au lecteur de cartes Lexar microSD Express. Vous pouvez ainsi télécharger un jeu AAA en moins de temps qu'il n'en faut pour commander une pizza !\n \n Vitesse d'écriture jusqu'à 600 Mo/s*\n \n *Basé sur des tests internes. Les performances réelles peuvent varier.",
+      "mineJudgement": {
+        "index": 7,
+        "runs": [
+          {
+            "persona": "fr-lyon-designer",
+            "run": 0,
+            "naturalness": 5,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "La formulation est naturelle et la petite image de la pizza fonctionne bien pour parler de téléchargement."
+          },
+          {
+            "persona": "fr-lyon-designer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Le ton est vivant sans être trop forcé, et l’exemple de la pizza passe plutôt bien pour une cible gaming."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "La blague de la pizza passe mieux que prévu, et les conditions avec le lecteur Lexar sont bien gardées."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Les specs sont là, mais la blague de la pizza fait très marketing Amazon."
+          }
+        ],
+        "mean": {
+          "naturalness": 4.25,
+          "tone": 3.75,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 7,
+        "runs": [
+          {
+            "persona": "fr-lyon-designer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "La phrase de la pizza est plutôt efficace, même si le reste garde une petite raideur de fiche traduite."
+          },
+          {
+            "persona": "fr-lyon-designer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "C'est le passage qui sonne le mieux, avec une accroche claire et une touche pizza plutôt fluide."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "La phrase de la pizza marche plutôt bien, mais dire 600 Mo/s sans « jusqu’à » au début est un peu trop affirmatif."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "C’est plutôt naturel et le coup de la pizza passe bien, même si ça reste un peu marketing."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 4,
+          "fidelity": 4.75
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 8,
+      "source": "Massive Capacity up to 1TB\n\nSome of your favorite games are probably pretty big in file size. Well, with up to 1TB capacity, juggling games just got easier. You can fit many games on a 1TB card.\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "Grande capacité jusqu’à 1 To\nCertains de vos jeux préférés occupent probablement beaucoup d’espace. Avec une capacité jusqu’à 1 To, jongler entre vos jeux devient plus simple. Vous pouvez stocker de nombreux jeux sur une carte de 1 To.\n*D’après des tests internes. Les performances réelles peuvent varier.",
+      "official": "Capacité massive jusqu'à 1 To\n \n Certains de vos jeux préférés sont probablement des fichiers assez volumineux. Avec une capacité allant jusqu'à 1 To, il devient plus facile de jongler avec les jeux. Vous pouvez faire tenir de nombreux jeux sur une carte de 1 To.\n \n *Basé sur des tests internes. Les performances réelles peuvent varier.",
+      "mineJudgement": {
+        "index": 8,
+        "runs": [
+          {
+            "persona": "fr-lyon-designer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Ça se lit plutôt bien, même si “Grande capacité” et “jongler entre vos jeux” restent un peu sages et très fiche produit."
+          },
+          {
+            "persona": "fr-lyon-designer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Ça se lit plutôt bien, même si « jongler entre vos jeux » sent un peu la tournure marketing traduite."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 0,
+            "naturalness": 5,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "C’est clair, pas trop survendu, et je comprends direct l’intérêt du 1 To."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "C’est clair et ça va droit aux specs, même si « jongler entre vos jeux » sent un peu la traduction."
+          }
+        ],
+        "mean": {
+          "naturalness": 4.25,
+          "tone": 4,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 8,
+        "runs": [
+          {
+            "persona": "fr-lyon-designer",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Ça se comprend, mais « capacité massive » et « jongler avec les jeux » sentent un peu la fiche traduite à la va-vite."
+          },
+          {
+            "persona": "fr-lyon-designer",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Ça se comprend, mais « capacité massive » et « jongler avec les jeux » sentent clairement la traduction un peu paresseuse."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Ça se comprend, mais le côté « fichiers volumineux » et « jongler avec les jeux » sent un peu la traduction Amazon."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Ça se comprend, mais « des jeux sont des fichiers » et « capacité massive » sentent un peu la traduction Amazon."
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 3,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 9,
+      "source": "Protection Built in\n\nThe PLAY PRO microSD Express card is IPX7 waterproof, wearproof, temperature-proof, x-ray-proof, vibration-resistant, magnetic-proof, shockproof, and drop-proof.*\n\nWearout resistance\n*up to 10,000 times of plugging and unplugging\nWaterproof\n*IPX7,1m deep water for 30min\nTemperature resistance\n*Operation: -25℃~85℃, Storage: -40℃~85℃\nShock resistance\n*1500G Shock\nAnti-vibration\n*10-2000Hz\nAnti-magnetic\n*15000Gauss\nX-ray protection\n*up to 100mGy\n(equivalent to airport X-ray machine exposure)\nDrop protection\n*1.5m drop",
+      "mine": "Protection intégrée\nLa carte PLAY PRO microSD Express est étanche IPX7, résistante à l’usure, aux températures, aux rayons X, aux vibrations, aux champs magnétiques, aux chocs et aux chutes.*\nRésistance à l’usure\n*jusqu’à 10 000 cycles d’insertion et de retrait\nÉtanchéité\n*IPX7, 1 m de profondeur pendant 30 min\nRésistance aux températures\n*Fonctionnement : -25 °C~85 °C, Stockage : -40 °C~85 °C\nRésistance aux chocs\n*Choc de 1500 G\nProtection antivibration\n*10-2000 Hz\nProtection antimagnétique\n*15 000 gauss\nProtection contre les rayons X\n*jusqu’à 100 mGy\n(équivalent à l’exposition d’un appareil à rayons X d’aéroport)\nProtection contre les chutes\n*chute de 1,5 m",
+      "official": "Protection intégrée\n  \n  La carte microSD Express PLAY PRO est étanche à l'eau, à l'usure, à la température, aux rayons X, aux vibrations, au magnétisme, aux chocs et aux chutes selon la norme IPX7*.\n \n Résistance à l'usure\n  *jusqu'à 10 000 actions de branchement et de débranchement\n Étanche à l’eau\n  *IPX7, 1 m de profondeur d'eau pendant 30 minutes\n Résistance à la température\n  *Fonctionnement : -25℃~85℃, Stockage : -40℃~85℃\n Résistance aux chocs\n  *Choc 1 500 G\n \n Anti-vibration\n  *10-2 000 Hz\n Anti-magnétique\n  *15 000 Gauss\n Protection contre les rayons X\n  *jusqu'à 100 mGy\n  (équivalent à l'exposition à une machine à rayons X d'un aéroport)\n Protection contre les chutes\n  *Chute de 1,5 m",
+      "mineJudgement": {
+        "index": 9,
+        "runs": [
+          {
+            "persona": "fr-lyon-designer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "La liste technique est claire et rassurante, avec juste quelques tournures un peu raides comme les plages de température au format anglais."
+          },
+          {
+            "persona": "fr-lyon-designer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "La fiche est technique et rassurante, avec quelques formulations un peu raides mais rien qui me ferait tiquer fortement."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "La liste de protections est un peu sèche mais les specs sont propres et faciles à scanner."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "La liste des protections est lisible et rassurante, avec juste quelques formulations un peu brutes comme les plages de température au tilde."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 4,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 9,
+        "runs": [
+          {
+            "persona": "fr-lyon-designer",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 4,
+            "note": "La phrase « étanche à l’usure, à la température » me fait tiquer immédiatement, même si la liste technique derrière reste exploitable."
+          },
+          {
+            "persona": "fr-lyon-designer",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 4,
+            "note": "La phrase « étanche à l'usure, à la température » me fait tiquer tout de suite et ne m'inspire pas trop confiance pour un produit technique."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 3,
+            "note": "La liste de specs est utile, mais « étanche à l’usure » et compagnie me fait tiquer direct."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "La liste de specs est utile, mais « étanche à l’usure/à la température » me ferait clairement lever un sourcil."
+          }
+        ],
+        "mean": {
+          "naturalness": 2,
+          "tone": 2.5,
+          "fidelity": 3.75
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.25,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 10,
+      "source": "Peace of Mind Extras\n\nThis card undergoes strict testing in the Lexar Quality Lab and we're so confident in it that it comes with a limited lifetime warranty. Plus we offer lifetime access to the Lexar Recovery Tool which you can use to restore accidentally deleted and formatted files.",
+      "mine": "Des plus pour l’esprit tranquille\nCette carte est soumise à des tests stricts dans le laboratoire qualité Lexar. Nous avons tellement confiance en elle qu’elle est fournie avec une garantie limitée à vie. De plus, nous offrons un accès à vie à l’outil de récupération Lexar, que vous pouvez utiliser pour restaurer des fichiers supprimés accidentellement ou effacés lors d’un formatage.",
+      "official": "Une tranquillité d'esprit optimale\n \n Cette carte est soumise à des tests rigoureux dans le laboratoire de qualité Lexar et c’est en toute confiance qu'elle est assortie d'une garantie à vie limitée. De plus, nous offrons un accès à vie à Lexar Recovery Tool que vous pouvez utiliser pour restaurer des fichiers accidentellement supprimés et formatés.",
+      "mineJudgement": {
+        "index": 10,
+        "runs": [
+          {
+            "persona": "fr-lyon-designer",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "“Des plus pour l’esprit tranquille” sent vraiment la traduction, même si le fond est compréhensible et rassurant."
+          },
+          {
+            "persona": "fr-lyon-designer",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "« Des plus pour l’esprit tranquille » me fait vraiment penser à une traduction automatique, même si le fond est clair."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "« Des plus pour l’esprit tranquille » sonne traduit, mais le fond est clair."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "« Des plus pour l’esprit tranquille » sonne bizarre, mais le fond sur la garantie et l’outil de récupération est bien transmis."
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 3,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 10,
+        "runs": [
+          {
+            "persona": "fr-lyon-designer",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "« Tranquillité d’esprit optimale » et « garantie à vie limitée » sonnent très calqués, pas vraiment rassurants pour une marque de stockage."
+          },
+          {
+            "persona": "fr-lyon-designer",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 4,
+            "note": "« Tranquillité d'esprit optimale » et « garantie à vie limitée » sonnent très calqués, avec un côté marketing automatique assez rebutant."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 2,
+            "fidelity": 4,
+            "note": "Le fond est là, mais la phrase sur la garantie sonne lourde et trop marketing pour moi."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 2,
+            "fidelity": 4,
+            "note": "C’est trop tourné marketing corporate, avec une phrase longue qui sonne traduite plutôt que rassurante."
+          }
+        ],
+        "mean": {
+          "naturalness": 2.5,
+          "tone": 2.25,
+          "fidelity": 4
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 1,
+        "flags": []
+      }
+    },
+    {
+      "index": 11,
+      "source": "Rigorously Tested\n\nAll Lexar products undergo extensive testing in the Lexar Quality Labs, facilities with thousands of different cameras and digital devices to ensure performance, quality, compatibility, and reliability.",
+      "mine": "Des tests rigoureux\nTous les produits Lexar sont soumis à des tests approfondis dans les laboratoires qualité Lexar, des installations équipées de milliers d’appareils photo et d’appareils numériques différents afin de garantir performances, qualité, compatibilité et fiabilité.",
+      "official": "Testé de façon rigoureuse\n \n Tous les produits Lexar sont testés de manière approfondie dans les laboratoires de qualité Lexar, sur des milliers de caméras et d'appareils numériques différents, afin d'assurer les performances, la qualité, la compatibilité et la fiabilité.",
+      "mineJudgement": {
+        "index": 11,
+        "runs": [
+          {
+            "persona": "fr-lyon-designer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "C’est propre et crédible pour une marque de stockage, malgré une formulation un peu générique de brochure traduite."
+          },
+          {
+            "persona": "fr-lyon-designer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "C’est sobre, crédible et assez naturel pour une marque de stockage, malgré une petite lourdeur corporate."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Phrase un peu corporate et longue, mais ça reste français et fidèle aux infos."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Phrase un peu longue mais propre, et le message qualité/compatibilité passe bien sans trop en faire."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 3.75,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 11,
+        "runs": [
+          {
+            "persona": "fr-lyon-designer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "C’est plutôt propre, mais « caméras » au lieu d’« appareils photo » me sort un peu du discours pro photo."
+          },
+          {
+            "persona": "fr-lyon-designer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "C'est globalement propre, même si j'aurais préféré « appareils photo » plutôt que « caméras » pour parler à des photographes."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "C’est clair et plutôt propre, même si « caméras » ferait plus naturel en « appareils photo » selon le contexte."
+          },
+          {
+            "persona": "fr-paris-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "C’est clair et plutôt crédible, même si « caméras » fait un peu moins naturel que « appareils photo » en français."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 4,
+          "fidelity": 4.75
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    }
+  ],
+  "summary": {
+    "mine": {
+      "naturalness": 3.8125,
+      "tone": 3.625,
+      "fidelity": 4.895833333333333
+    },
+    "official": {
+      "naturalness": 2.9375,
+      "tone": 3.0208333333333335,
+      "fidelity": 4.666666666666667
+    },
+    "unstableCells": 0,
+    "personaSensitiveCells": 0
+  }
+}

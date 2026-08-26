@@ -1,0 +1,1270 @@
+{
+  "lang": "zh-CN",
+  "csv": "Card 卡类-OW&AMZ小语种翻译 - PLAY PRO microSD.csv",
+  "timestamp": "2026-08-25T11:00:14.519Z",
+  "methodology": "judge=LLM人设模拟(judge-personas.ts)，置信度低于真人母语评审；fidelity以代码校验为准，judge仅软信号；只允许差分对比结论，不允许绝对分数结论",
+  "cells": [
+    {
+      "index": 0,
+      "source": "Power Up Your Play\nLexar® PLAY PRO microSDXC™ Express Card",
+      "mine": "为你的游戏火力加码\nLexar® PLAY PRO microSDXC™ Express 存储卡",
+      "official": "高能玩家\nLexar® PLAY PRO microSDXC™ Express 存储卡",
+      "mineJudgement": {
+        "index": 0,
+        "runs": [
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "这句游戏向标题还算顺口，参数和品名也没乱来。"
+          },
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "“火力加码”有点游戏味，虽然略营销但不算翻译腔，标题我能接受。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "标题挺顺，‘火力加码’有点营销感但我能接受。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "标题挺有游戏感，虽然“火力加码”有点用力，但我能接受。"
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 4,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 0,
+        "runs": [
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "标题还算像游戏向存储卡文案，但“Power Up Your Play”的升级感被压成了一个口号。"
+          },
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 3,
+            "note": "“高能玩家”挺像电商标题，但把 Power Up Your Play 直接改成身份标签，意思有点跑。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 3,
+            "note": "标题挺顺口，但“高能玩家”更像在说人，不太像“提升游戏体验”的意思。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 3,
+            "note": "标题挺顺眼，但“高能玩家”更像在夸我，不太像在说给游戏加速。"
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 4,
+          "fidelity": 3.25
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 1,
+      "source": "Good for Today, Great for Tomorrow\n\nRevolutionary Performance\n\nPeace of Mind Extras\n\nLevel-up Your Handheld Gaming Experience\nRead speed up to 900MB/s\n\nCut Your Download Times\nWrite speed up to 600MB/s\n\nMassive Capacity up to 1TB\n\nProtection Built in",
+      "mine": "满足当下，面向未来\n革新性性能\n安心加持\n升级你的掌机游戏体验\n读取速度高达 900MB/s\n缩短下载时间\n写入速度高达 600MB/s\n大容量高达 1TB\n内置防护",
+      "official": "体验下一代掌机的性能巅峰\n\n旗舰性能 前瞻之势\n\n数据恢复软件 全方位护航\n\n游戏大作 玩出新体验\n读取速度高达900MB/s\n\n不用10分钟！下载一个3A游戏\n写入速度高达600MB/s\n\n大容量 存满游戏大作\n\n高能玩家 无惧挑战",
+      "mineJudgement": {
+        "index": 1,
+        "runs": [
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "信息都在，但“革新性性能”“安心加持”这种词一看就有点翻译腔。"
+          },
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "信息没啥问题，但“革新性性能”“安心加持”这种词一看就是英文页面硬掰过来的。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "卖点刷起来清楚，虽然‘安心加持’有点虚，但整体不像机翻。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "卖点列表刷起来很快，基本都是我关心的速度和容量信息。"
+          }
+        ],
+        "mean": {
+          "naturalness": 3.5,
+          "tone": 3.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 1,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 1,
+        "runs": [
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 2,
+            "note": "看着挺会喊口号，但1TB、内置防护这些关键信息没了，还硬加“不用10分钟”让我有点警惕。"
+          },
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 2,
+            "note": "这段像国内营销话术但有点堆词，而且 1TB、内置保护这些关键点没说清，还硬加了“不用10分钟”。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 2,
+            "note": "卖点看着挺燃，但跟英文原意对不上不少，还把1TB这种关键信息漏了。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 2,
+            "note": "卖点短句刷起来还行，但“10分钟下载3A”和容量、保护这些信息对不上，有点营销改写过头。"
+          }
+        ],
+        "mean": {
+          "naturalness": 3.5,
+          "tone": 3.5,
+          "fidelity": 2
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 1,
+        "flags": []
+      }
+    },
+    {
+      "index": 2,
+      "source": "What is SD Express and how does it works?\n\nSD Express is a new SD card standard. It adopts the PCI Express 3.0 and NVMe 1.3 interfaces, which significantly enhances the data processing capability of SD cards. The working principle of SD Express is based on the PCI Express interface and the NVMe protocol. The PCIe interface supports high-speed data transmission, while the NVMe protocol optimizes storage access efficiency. SD Express uses the second row of contacts at the interface to transmit PCIe signals and is backwards-compatible with UHS-I through the first row of contacts. After being connected to a computer that supports SD Express products, SD Express will be recognized as a standard NVMe device, similar to a modern NVMe SSD.",
+      "mine": "什么是 SD Express，它的工作原理是什么？\nSD Express 是一种新的 SD 存储卡标准。它采用 PCI Express 3.0 和 NVMe 1.3 接口，可显著增强 SD 存储卡的数据处理能力。SD Express 的工作原理基于 PCI Express 接口和 NVMe 协议。PCIe 接口支持高速数据传输，而 NVMe 协议可优化存储访问效率。SD Express 通过接口的第二排触点传输 PCIe 信号，并通过第一排触点向后兼容 UHS-I。连接到支持 SD Express 产品的电脑后，SD Express 会被识别为标准 NVMe 设备，类似于现代 NVMe 固态硬盘。",
+      "official": "一图带你了解 microSD Express\n\nmicroSD Express 是一种全新的存储卡标准，采用了 PCIe 3.0 和 NVMe 1.3 接口。接口协议的变化，提升了数据处理能力和存储访问效率，在传输速度上有了质的飞跃，帮助用户在短时间内传输大量的文件，无论是大型游戏、高清视频还是高分辨率图片。microSD Express 工作原理是利用接口处的第二排触点传输 PCIe 信号，当接入支持它的电脑和掌机设备时，它会被识别为标准的 NVMe 设备，就像 NVMe SSD 固态硬盘一样，实现高速传输和高效存储管理，为你的设备带来前所未有的性能体验；通过第一排触点向下兼容 UHS-I，即使设备不支持 microSD Express，也能正常使用。",
+      "mineJudgement": {
+        "index": 2,
+        "runs": [
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "技术解释基本靠谱，虽然“向后兼容”略硬，但作为参数党我能接受。"
+          },
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "技术解释整体顺，参数和协议也对，就是“现代 NVMe 固态硬盘”这种说法稍微有点译味。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "技术解释是说清楚了，但一大段看着像说明书，我可能会直接跳过。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "技术解释看得懂，但一大段偏说明书，我这种逛详情页的可能会直接跳过。"
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 3.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 2,
+        "runs": [
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "技术解释基本说清楚了，但句子拉太长又夹了几句营销腔，读起来不够利落。"
+          },
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "科普内容基本能看懂，但句子太长、营销尾巴太重，像详情页编辑强行润色过。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "内容能看懂，就是一大段有点长，我这种刷详情页的人可能只看前两句。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "技术解释能看懂，但句子太长太满，我刷详情页时大概率只看前半段。"
+          }
+        ],
+        "mean": {
+          "naturalness": 3.5,
+          "tone": 3.25,
+          "fidelity": 4
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 3,
+      "source": "Revolutionary Performance\n\nThanks to its next-gen tech of PCIe and NVMe interface technologies that deliver up to 900MB/s read speed*, the PLAY PRO microSDXC™ Express Card is a stunning 4x faster than typical UHS-I microSD cards.\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "革新性性能\n得益于新一代 PCIe 与 NVMe 接口技术，PLAY PRO microSDXC™ Express 存储卡读取速度高达 900MB/s*，可达常见 UHS-I microSD 存储卡的 4 倍。\n*基于内部测试。实际性能可能有所不同。",
+      "official": "旗舰性能 前瞻之势\n\n采用 PCIe 和 NVMe 接口协议，从 SD 4.0 规格性能提升到 SD 7.1 规格性能。接口协议的更新和技术的创新实现了更高的读写性能，读取速度可高达 900MB/s*，写入速度可高达 600MB/s*。\n\n*数据来源于Lexar质量实验室，实际性能因设备差异，可能有所不同。",
+      "mineJudgement": {
+        "index": 3,
+        "runs": [
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "速度和对比没问题，就是“革新性性能”这种标题让我有点想吐槽文案不接地气。"
+          },
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "“革新性性能”和“得益于新一代……”太模板化，不过 900MB/s、4 倍和测试声明都对上了。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "速度和对比讲得直接，买给 Switch 或相机会比较容易抓到重点。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "速度对比说得清楚，900MB/s 和 4 倍这种信息挺抓眼。"
+          }
+        ],
+        "mean": {
+          "naturalness": 3.5,
+          "tone": 3.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 1,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 3,
+        "runs": [
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 2,
+            "note": "这段把4倍于UHS-I漏掉了，还额外塞了600MB/s写入和SD 4.0到7.1，参数党看到会皱眉。"
+          },
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 2,
+            "note": "“SD 4.0 到 SD 7.1”这些新增说法看着很硬，原文的 4 倍 UHS-I 反而漏了，我会重点查参数。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 3,
+            "note": "文案还算像国产详情页，但加了SD 4.0到7.1和600MB/s，反而漏了4倍速度这个重点。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 2,
+            "note": "文案像正规电商卖点，不过加了写入600和SD规格升级，却漏了4倍于UHS-I这个重点。"
+          }
+        ],
+        "mean": {
+          "naturalness": 3.5,
+          "tone": 3.5,
+          "fidelity": 2.25
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.25,
+          "fidelity": 0.1875
+        },
+        "personaGap": 1,
+        "flags": []
+      }
+    },
+    {
+      "index": 4,
+      "source": "*Comparison of the theoretical maximum speeds under different interface forms (Data source: SDA)",
+      "mine": "* 不同接口形态下理论最大速度对比（数据来源：SDA）",
+      "official": "*不同接口形式下理论最高速度对比（数据来源SDA）",
+      "mineJudgement": {
+        "index": 4,
+        "runs": [
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "脚注表达清楚，数据来源也保留了，没什么大毛病。"
+          },
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "脚注基本像正常参数图说明，“接口形态”稍硬但不影响理解。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "这句偏参数说明，‘接口形态’稍微有点硬，但意思没问题。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "脚注没问题，就是“接口形态”有点技术报告味。"
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 3.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 4,
+        "runs": [
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 0,
+            "naturalness": 5,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "这句没毛病，像参数图下面正常会出现的注释。"
+          },
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 1,
+            "naturalness": 5,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "这条就是正常参数图注，信息对得上，没什么槽点。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 0,
+            "naturalness": 5,
+            "tone": 5,
+            "fidelity": 5,
+            "note": "这句就是正常图注，信息清楚没毛病。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 1,
+            "naturalness": 5,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "这句很正常，就是标准图注说明，没什么违和感。"
+          }
+        ],
+        "mean": {
+          "naturalness": 5,
+          "tone": 4.25,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 5,
+      "source": "Good for Today, Great for Tomorrow\n\nThe PLAY PRO microSDXC™ Express Card is backwards-compatible with UHS-I and UHS-II host devices (at UHS-I speeds) so you can use it with your current handheld gaming consoles – and it's ideal for the microSD Express devices coming soon.",
+      "mine": "满足当下，面向未来\nPLAY PRO microSDXC™ Express 存储卡向后兼容 UHS-I 和 UHS-II 主机设备（以 UHS-I 速度运行），可用于你当前的游戏掌机，也适合即将推出的 microSD Express 设备。",
+      "official": "感受下一代设备的性能巅峰\n\nmicroSD Express 可向下兼容 UHS-I 接口的主机设备、如 Switch 一代，同时也会支持未来的掌上游戏机，实现更强大、更快速的游戏体验，高速加载大型游戏的精彩高清画面。",
+      "mineJudgement": {
+        "index": 5,
+        "runs": [
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "兼容性说明比较清楚，“主机设备”稍微有点别扭但不影响理解。"
+          },
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "兼容性说清楚了，只是“主机设备”放在游戏掌机场景里有点容易让人多想。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "兼容现在设备和未来设备这个点讲得挺实用，就是‘主机设备’稍微技术腔。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "兼容现在掌机和未来设备这个点说清楚了，对我买卡挺有参考价值。"
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 4,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 5,
+        "runs": [
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 2,
+            "note": "文案顺是顺，但UHS-II兼容和UHS-I速度都没交代，还加了Switch一代，信息不够严谨。"
+          },
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 3,
+            "note": "文案读着还行，但 UHS-II 和“以 UHS-I 速度运行”没翻出来，兼容性描述不够严谨。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 3,
+            "note": "说Switch一代我能秒懂，但漏了UHS-II和UHS-I速度限制，规格党会介意。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 3,
+            "note": "说Switch一代我能秒懂，但漏掉UHS-II和UHS-I速度限制，信息不够严谨。"
+          }
+        ],
+        "mean": {
+          "naturalness": 3.75,
+          "tone": 3.5,
+          "fidelity": 2.75
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.25,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0.5,
+        "flags": []
+      }
+    },
+    {
+      "index": 6,
+      "source": "Level-up Your Handheld Gaming Experience\n\nUp to 900MB/s* read speed, the PLAY PRO microSDXC™ Express Card is a stunning 4x faster than typical UHS-I microSD cards – meaning that games load faster and also ensuring a smooth, lag-free experience.\n\nRead speed up to 900MB/s*\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "升级你的掌机游戏体验\n读取速度高达 900MB/s*，PLAY PRO microSDXC™ Express 存储卡可达常见 UHS-I microSD 存储卡的 4 倍，让游戏加载更快，体验更流畅、少卡顿。\n读取速度高达 900MB/s*\n*基于内部测试。实际性能可能有所不同。",
+      "official": "游戏大作，玩出新体验\n\n高速读写性能领先目前市场上的主机设备速写速度性能，在未来升级或采用新协议标准的掌上游戏机设备上可实现高速性能，高达 900MB/s* 的读取速度能够快速加载运行大型游戏，高规格制作的游戏画面细节也能清晰流畅地加载呈现，感受不卡顿不掉帧的游戏体验。\n\n读取速度高达900MB/s*\n\n*数据来源于Lexar质量实验室，实际性能因设备差异，可能有所不同。",
+      "mineJudgement": {
+        "index": 6,
+        "runs": [
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "整体像正常电商文案，不过把 lag-free 写成“少卡顿”语气有点降了一档。"
+          },
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "文案读起来还行，但把 lag-free 说成“少卡顿”比原文稍微保守了一点。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "加载更快、少卡顿很直观，但‘lag-free’翻成‘少卡顿’感觉稍微弱了一点。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "加载更快、少卡顿的表达挺顺，但“少卡顿”比原文的无卡顿保守一点。"
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 4,
+          "fidelity": 4
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 6,
+        "runs": [
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 2,
+            "note": "“主机设备速写速度性能”这种错字加拗口表达太掉价，而且拿存储卡暗示不卡顿不掉帧也不靠谱。"
+          },
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 2,
+            "note": "“主机设备速写速度性能”这种病句很劝退，还把存储卡写成能保证不掉帧，太敢吹了。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 2,
+            "note": "“主机设备速写速度性能”这句像机翻还带错字，读一遍直接劝退。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 2,
+            "note": "“主机设备速写速度性能”这种句子我会直接怀疑是机翻或没校对，看着费劲。"
+          }
+        ],
+        "mean": {
+          "naturalness": 2,
+          "tone": 2,
+          "fidelity": 2
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 7,
+      "source": "Cut Your Download Times\n\nThe PLAY PRO microSDXC™ Express Card also delivers 600MB/s write speeds* when paired with the Lexar microSD Express card reader so you can download a AAA game in less time than it'll take you to order a pizza!\n\nWrite speed up to 600MB/s*\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "缩短下载时间\n搭配 Lexar microSD Express 存储卡读卡器使用时，PLAY PRO microSDXC™ Express 存储卡还可实现 600MB/s 写入速度*，下载一款 3A 游戏，比点一份披萨用时更短！\n写入速度高达 600MB/s*\n*基于内部测试。实际性能可能有所不同。",
+      "official": "不用 10 分钟！\n下载一个 3A 游戏*\n\n搭配 SD Express 卡专用读卡器，实现高达 600MB/s* 的写入速度。大体积的 3A 游戏文件，高速下载减少等待时间。\n\n*数据来源于Lexar质量实验室，实际性能因设备差异，可能有所不同。",
+      "mineJudgement": {
+        "index": 7,
+        "runs": [
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "这段挺像国内游戏存储广告，只是拿写入速度说下载 3A 游戏我会顺手提醒别忽略网速瓶颈。"
+          },
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "披萨梗有点美式但翻得不别扭，写入 600MB/s 和搭配读卡器这些关键信息都在。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "披萨这个比喻挺好懂，600MB/s 写入和读卡器条件也交代清楚了。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "披萨这个比喻有点夸张但好懂，600MB/s 写入速度也很醒目。"
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 4,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 7,
+        "runs": [
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 3,
+            "note": "“不用10分钟”挺抓眼球，但原文是披萨梗，且Lexar读卡器品牌信息没了，营销味比参数味重。"
+          },
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 3,
+            "note": "“不用10分钟”挺抓眼球但属于自加承诺，读卡器也没点名 Lexar microSD Express，规格党会有疑问。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 3,
+            "note": "“不用10分钟”挺抓人，但英文没给这个具体时间，感觉有点自己加戏。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 3,
+            "note": "“不用10分钟下载3A”挺抓人，但原文是披萨时间梗，还少了Lexar读卡器这个条件。"
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 3.5,
+          "fidelity": 3
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 8,
+      "source": "Massive Capacity up to 1TB\n\nSome of your favorite games are probably pretty big in file size. Well, with up to 1TB capacity, juggling games just got easier. You can fit many games on a 1TB card.\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "大容量高达 1TB\n你喜欢的游戏里，也许不少都是大容量。容量高达 1TB，管理游戏库更轻松。一张 1TB 存储卡可容纳多款游戏。\n*基于内部测试。实际性能可能有所不同。",
+      "official": "大空间，存满游戏大作 \n\n提供 256GB-1TB 多种容量选择，高达 1TB 的大容量空间可以存储更多的 3A 游戏，256GB 约存储游戏 25 个，512GB 约存储游戏 50 个，1TB 约存储游戏 100 个。",
+      "mineJudgement": {
+        "index": 8,
+        "runs": [
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "整体挺顺，但“游戏是大容量”这个说法有点别扭，像是没按国内玩家习惯改成“文件体积大”之类。"
+          },
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "“游戏是大容量”这个说法有点硬翻，参数意思能懂但我会觉得文案没太打磨。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "读起来挺顺，1TB 对 Switch 用户很直观，就是“游戏是大容量”这句有点翻译腔。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "整体挺顺，但“游戏是大容量”有点别扭，我更习惯说游戏很占空间。"
+          }
+        ],
+        "mean": {
+          "naturalness": 3.75,
+          "tone": 3.75,
+          "fidelity": 4.5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.1875,
+          "fidelity": 0.25
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 8,
+        "runs": [
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 2,
+            "note": "文案挺像国内电商页，但游戏数量和256GB/512GB这些信息原文没有，参数党看了会警惕。"
+          },
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 1,
+            "naturalness": 5,
+            "tone": 4,
+            "fidelity": 2,
+            "note": "中文写得挺顺，但硬塞了256GB/512GB和游戏数量这些源文没有的参数，我看参数表会直接打个问号。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 0,
+            "naturalness": 5,
+            "tone": 5,
+            "fidelity": 2,
+            "note": "这段看着挺像国内电商卖点，也很戳 Switch 用户，但突然多了各容量能装多少游戏这些源文没有的数字。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 2,
+            "note": "文案看着挺顺，也像我会快速扫到的卖点，但那些25/50/100个游戏数量感觉是自己加的，和原文不太对得上。"
+          }
+        ],
+        "mean": {
+          "naturalness": 4.5,
+          "tone": 4.25,
+          "fidelity": 2
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 9,
+      "source": "Protection Built in\n\nThe PLAY PRO microSD Express card is IPX7 waterproof, wearproof, temperature-proof, x-ray-proof, vibration-resistant, magnetic-proof, shockproof, and drop-proof.*\n\nWearout resistance\n*up to 10,000 times of plugging and unplugging\nWaterproof\n*IPX7,1m deep water for 30min\nTemperature resistance\n*Operation: -25℃~85℃, Storage: -40℃~85℃\nShock resistance\n*1500G Shock\nAnti-vibration\n*10-2000Hz\nAnti-magnetic\n*15000Gauss\nX-ray protection\n*up to 100mGy\n(equivalent to airport X-ray machine exposure)\nDrop protection\n*1.5m drop",
+      "mine": "内置防护\nPLAY PRO microSD Express 存储卡具备 IPX7 防水、耐磨损、耐温、防 X 射线、抗振动、防磁、抗冲击和防跌落能力。*\n插拔耐久\n*最高 10,000 次插拔\n防水\n*IPX7，1m 水深 30 分钟\n耐温\n*工作：-25°C~85°C，存储：-40°C~85°C\n抗冲击\n*1500G 冲击\n抗振动\n*10-2000Hz\n防磁\n*15000Gauss\n防 X 射线\n*最高 100mGy\n（相当于机场 X 光机照射）\n防跌落\n*1.5m 跌落",
+      "official": "高能玩家 无惧挑战\n\n经过多次在严格环境下的测试，能经受 10000 次反复拔插使用，和户外使用场景，如防摔、防冲击、防水、\n防振、防磁、防 X 射线、耐高低温、耐拔插磨损。*\n\n耐拔插\n*高达10,000次插拔磨损测试\n\nIPX7级防水\n*IPX7级防水，1m深水，持续浸泡30min\n\n耐高低温\n*工作温度-25℃~85℃，存储温度-40℃~85℃\n\n防冲击\n*1500G冲击\n\n防振\n*10-2000Hz\n\n防磁\n*15000Gauss\n\n防X射线\n*高达100mGy(相当于机场X射线机的照射)\n\n防摔\n*1.5m跌落",
+      "mineJudgement": {
+        "index": 9,
+        "runs": [
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "参数基本都对，信息密度也够，但“内置防护”“1m 水深 30 分钟”这种表达还是有点翻译腔。"
+          },
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "防护参数列得比较清楚，虽然“内置防护”和“1m水深30分钟”略生硬，但作为存储卡详情页我能接受。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "参数列得很清楚，防水防摔这些对运动相机挺有用，但标题“内置防护”稍微有点生硬。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "参数列得很清楚，虽然有点像规格表，但买运动相机存储卡我会想看这些防护信息。"
+          }
+        ],
+        "mean": {
+          "naturalness": 3.75,
+          "tone": 4,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 9,
+        "runs": [
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "整体读着还算顺，防护参数基本都对，就是开头那句“和户外使用场景”有点别扭。"
+          },
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "参数基本对得上，但“经过多次在严格环境下的测试，能经受……和户外使用场景”这句读着有点别扭，像没润好的翻译稿。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "参数列得很全让我比较放心，不过开头那句“能经受…和户外使用场景”读起来有点别扭。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "参数很全我能看懂，但开头那句“经过多次在严格环境下的测试，和户外使用场景”读起来有点拧巴。"
+          }
+        ],
+        "mean": {
+          "naturalness": 3.25,
+          "tone": 3.75,
+          "fidelity": 4.25
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.1875,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0.5,
+        "flags": []
+      }
+    },
+    {
+      "index": 10,
+      "source": "Peace of Mind Extras\n\nThis card undergoes strict testing in the Lexar Quality Lab and we're so confident in it that it comes with a limited lifetime warranty. Plus we offer lifetime access to the Lexar Recovery Tool which you can use to restore accidentally deleted and formatted files.",
+      "mine": "安心加持\n这张存储卡经过 Lexar 品质实验室严格测试，我们对其品质充满信心，因此提供有限终身质保。此外，我们还提供 Lexar Recovery Tool 的终身使用权限，可用于恢复意外删除和误格式化的文件。",
+      "official": "数据恢复软件\n全方位护航\n\n选购 Lexar 存储卡，即可享有 Lexar Recovery Tool 数据恢复软件终身免费使用权益，助您快速找回不慎删除的影像资料。",
+      "mineJudgement": {
+        "index": 10,
+        "runs": [
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "读起来比较像正经存储品牌文案，“有限终身质保”和恢复工具这两个点交代得清楚。"
+          },
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "“有限终身质保”和恢复工具权益说清楚了，整体像正规存储品牌文案，只是稍微有点模板感。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 5,
+            "fidelity": 5,
+            "note": "质保和恢复工具说得比较安心，语气像正经品牌会写的卖点。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 1,
+            "naturalness": 5,
+            "tone": 5,
+            "fidelity": 5,
+            "note": "这个说法挺让人放心，质保和恢复工具都讲明白了，不像机翻。"
+          }
+        ],
+        "mean": {
+          "naturalness": 4.25,
+          "tone": 4.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 10,
+        "runs": [
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 2,
+            "note": "话术不难读，但把终身有限质保和实验室测试都漏了，只剩恢复软件，卖点少了一大截。"
+          },
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 2,
+            "note": "文案本身像电商页面，但把严格测试和终身有限质保都漏了，还把恢复文件缩成影像资料，信息不完整。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 0,
+            "naturalness": 5,
+            "tone": 4,
+            "fidelity": 2,
+            "note": "文案本身顺口，但源文里的实验室测试和终身有限质保都没说，感觉少了关键保障信息。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 2,
+            "note": "中文挺像电商页，也能打消误删文件的顾虑，但原文里的终身有限质保和实验室测试都没翻出来。"
+          }
+        ],
+        "mean": {
+          "naturalness": 4.25,
+          "tone": 3.75,
+          "fidelity": 2
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      }
+    },
+    {
+      "index": 11,
+      "source": "Rigorously Tested\n\nAll Lexar products undergo extensive testing in the Lexar Quality Labs, facilities with thousands of different cameras and digital devices to ensure performance, quality, compatibility, and reliability.",
+      "mine": "严格测试\n所有 Lexar 产品都经过 Lexar 品质实验室的广泛测试。该实验室配备数千款不同相机和数字设备，确保产品的性能、品质、兼容性和可靠性。",
+      "official": "高品质\n终身有限质保\n\n\n所有Lexar雷克沙产品均经过雷克沙质量实验室专业设备的大量测试，为用户带来更高的稳定性、兼容性与性能表现",
+      "mineJudgement": {
+        "index": 11,
+        "runs": [
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "事实没问题，但“广泛测试”“数字设备”这些词很硬，像英文商品页直译过来的。"
+          },
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "信息完整可信，“广泛测试”“数字设备”有一点翻译味，但不影响我看参数和判断可靠性。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "意思清楚也有可信度，不过“数字设备”“广泛测试”有点像直译，没那么抓人。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "读起来正常，实验室和兼容性测试这些信息对我选卡有帮助。"
+          }
+        ],
+        "mean": {
+          "naturalness": 3.75,
+          "tone": 3.75,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 11,
+        "runs": [
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 2,
+            "note": "中文像正常电商文案，可标题硬塞“终身有限质保”，又漏掉上千设备测试这个关键信息，不够严谨。"
+          },
+          {
+            "persona": "zh-CN-shenzhen-blogger",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 2,
+            "note": "读起来还算正常，不过源文的数千台相机和数码设备没了，标题还加了终身有限质保，这种规格漂移我会重点吐槽。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 3,
+            "note": "大意能看懂但有点官话，而且标题加了终身有限质保、正文又少了上千设备兼容测试这个重点。"
+          },
+          {
+            "persona": "zh-CN-guangzhou-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 2,
+            "note": "读起来还算自然，但标题突然写终身有限质保，原文这段主要是在讲严格测试，信息有点串段了。"
+          }
+        ],
+        "mean": {
+          "naturalness": 3.75,
+          "tone": 3,
+          "fidelity": 2.25
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0.5,
+        "flags": []
+      }
+    }
+  ],
+  "summary": {
+    "mine": {
+      "naturalness": 3.875,
+      "tone": 3.8333333333333335,
+      "fidelity": 4.875
+    },
+    "official": {
+      "naturalness": 3.75,
+      "tone": 3.5208333333333335,
+      "fidelity": 2.8958333333333335
+    },
+    "unstableCells": 0,
+    "personaSensitiveCells": 0
+  }
+}

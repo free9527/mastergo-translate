@@ -1,0 +1,1270 @@
+{
+  "lang": "pl",
+  "csv": "Card 卡类-OW&AMZ小语种翻译 - PLAY PRO microSD.csv",
+  "timestamp": "2026-08-25T11:18:02.388Z",
+  "methodology": "judge=LLM人设模拟(judge-personas.ts)，置信度低于真人母语评审；fidelity以代码校验为准，judge仅软信号；只允许差分对比结论，不允许绝对分数结论",
+  "cells": [
+    {
+      "index": 0,
+      "source": "Power Up Your Play\nLexar® PLAY PRO microSDXC™ Express Card",
+      "mine": "Dodaj mocy swojej grze\nKarta pamięci Lexar® PLAY PRO microSDXC™ Express",
+      "official": "Spotęguj wrażenia podczas gry\n Karta Lexar® PLAY PRO microSDXC™ Express",
+      "mineJudgement": {
+        "index": 0,
+        "runs": [
+          {
+            "persona": "pl-warszawa-it",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "„Dodaj mocy swojej grze” brzmi jak kalka z angielskiego, choć nazwa produktu jest oddana poprawnie."
+          },
+          {
+            "persona": "pl-warszawa-it",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Hasło „Dodaj mocy swojej grze” brzmi jak kalka z angielskiego, choć sam opis produktu jest poprawny."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Brzmi całkiem zgrabnie, choć trochę reklamowo i dosłownie."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Brzmi krótko i reklamowo, trochę dosłownie, ale nie odrzuca mnie."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.5,
+          "tone": 3.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 1,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 0,
+        "runs": [
+          {
+            "persona": "pl-warszawa-it",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Brzmi trochę jak hasło przepuszczone przez tłumacza, ale nazwę produktu i ogólny sens łapię bez problemu."
+          },
+          {
+            "persona": "pl-warszawa-it",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Brzmi poprawnie, ale „spotęguj” od razu pachnie marketingowym tłumaczeniem, nie normalnym hasłem dla graczy."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Brzmi całkiem zgrabnie i od razu wiem, że chodzi o kartę do grania."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Brzmi całkiem normalnie jak hasło na pudełku, choć trochę napompowane."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.5,
+          "tone": 3.5,
+          "fidelity": 4.5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.25,
+          "fidelity": 0.25
+        },
+        "personaGap": 1,
+        "flags": []
+      }
+    },
+    {
+      "index": 1,
+      "source": "Good for Today, Great for Tomorrow\n\nRevolutionary Performance\n\nPeace of Mind Extras\n\nLevel-up Your Handheld Gaming Experience\nRead speed up to 900MB/s\n\nCut Your Download Times\nWrite speed up to 600MB/s\n\nMassive Capacity up to 1TB\n\nProtection Built in",
+      "mine": "Gotowa na dziś, świetna na jutro\nRewolucyjna wydajność\nDodatki dla pełnego spokoju\nPodkręć wrażenia z grania na handheldzie\nPrędkość odczytu do 900MB/s\nSkróć czas pobierania\nPrędkość zapisu do 600MB/s\nOgromna pojemność do 1TB\nWbudowana ochrona",
+      "official": "Dobra na dziś, doskonała na jutro\n \n Rewolucyjne osiągi\n \n Dodatkowe funkcje, by pozbyć się zmartwień\n \n Spotęguj wrażenia podczas gry z użyciem urządzeń przenośnych\n Szybkość odczytu do 900 MB/s\n \n Krótszy czas pobierania\n Szybkość zapisu do 600 MB/s\n \n Ogromna pojemność nawet do 1 TB\n \n Wbudowane zabezpieczenia",
+      "mineJudgement": {
+        "index": 1,
+        "runs": [
+          {
+            "persona": "pl-warszawa-it",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Da się to czytać, ale hasła typu „Dodatki dla pełnego spokoju” i „Rewolucyjna wydajność” pachną katalogowym tłumaczeniem."
+          },
+          {
+            "persona": "pl-warszawa-it",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Całość jest zrozumiała i dość gamingowa, ale „dodatki dla pełnego spokoju” brzmi trochę sztucznie."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Da się zrozumieć, ale „handheld” i „dodatki dla pełnego spokoju” brzmią trochę jak z tłumacza."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Da się zrozumieć, ale „dodatki dla pełnego spokoju” i „handheld” brzmią trochę jak tłumaczenie z katalogu."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.25,
+          "tone": 3.25,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 1,
+        "runs": [
+          {
+            "persona": "pl-warszawa-it",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Kilka nagłówków jest okej, ale „pozbyć się zmartwień” i granie „z użyciem urządzeń przenośnych” brzmią bardzo sztucznie."
+          },
+          {
+            "persona": "pl-warszawa-it",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Da się zrozumieć, ale „z użyciem urządzeń przenośnych” i „pozbyć się zmartwień” brzmią sztywno i nienatywnie."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Da się zrozumieć, ale zwroty typu „pozbyć się zmartwień” i „z użyciem urządzeń przenośnych” pachną mi tłumaczeniem."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Da się zrozumieć, ale kilka zwrotów brzmi sztucznie i raczej nie buduje mi zaufania."
+          }
+        ],
+        "mean": {
+          "naturalness": 2.5,
+          "tone": 3,
+          "fidelity": 4.25
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0,
+          "fidelity": 0.1875
+        },
+        "personaGap": 1,
+        "flags": []
+      }
+    },
+    {
+      "index": 2,
+      "source": "What is SD Express and how does it works?\n\nSD Express is a new SD card standard. It adopts the PCI Express 3.0 and NVMe 1.3 interfaces, which significantly enhances the data processing capability of SD cards. The working principle of SD Express is based on the PCI Express interface and the NVMe protocol. The PCIe interface supports high-speed data transmission, while the NVMe protocol optimizes storage access efficiency. SD Express uses the second row of contacts at the interface to transmit PCIe signals and is backwards-compatible with UHS-I through the first row of contacts. After being connected to a computer that supports SD Express products, SD Express will be recognized as a standard NVMe device, similar to a modern NVMe SSD.",
+      "mine": "Czym jest SD Express i jak działa?\nSD Express to nowy standard kart SD. Wykorzystuje interfejsy PCI Express 3.0 i NVMe 1.3, co znacząco zwiększa możliwości przetwarzania danych przez karty SD. Zasada działania SD Express opiera się na interfejsie PCI Express i protokole NVMe. Interfejs PCIe obsługuje szybką transmisję danych, a protokół NVMe optymalizuje efektywność dostępu do pamięci masowej. SD Express wykorzystuje drugi rząd styków w interfejsie do przesyłania sygnałów PCIe i jest kompatybilny wstecznie z UHS-I przez pierwszy rząd styków. Po podłączeniu do komputera obsługującego produkty SD Express karta SD Express zostanie rozpoznana jako standardowe urządzenie NVMe, podobnie jak nowoczesny dysk SSD NVMe.",
+      "official": "Czym jest karta SD Express i jak działa?\n \n Karta SD Express to nowy standard karty SD. Obejmuje interfejsy PCI Express 3.0 i NVMe 1.3, aby zdecydowanie przyspieszyć przetwarzanie danych na karcie SD. Zasada działania karty SD Express opiera się na interfejsie PCI Express oraz zastosowaniu protokołu NVMe. Interfejs PCIe obsługuje szybki transfer danych, a protokół NVMe optymalizuje efektywność pracy pamięci, usprawniając dostęp do jej zasobów. Drugi rząd styków interfejsu karty SD Express służy do przekazywania sygnałów PCIe, podczas gdy pierwszy zapewnia wsteczną kompatybilność ze standardem UHS-I. Po podłączeniu do komputera obsługującego produkty SD Express karta SD Express zostanie rozpoznana jako standardowe urządzenie NVMe, niczym nowoczesny dysk SSD NVMe.",
+      "mineJudgement": {
+        "index": 2,
+        "runs": [
+          {
+            "persona": "pl-warszawa-it",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Technicznie jest sensownie i rzeczowo, tylko miejscami trochę sztywno jak z dokumentacji producenta."
+          },
+          {
+            "persona": "pl-warszawa-it",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Techniczny opis jest konkretny i wiarygodny, tylko miejscami czuć cięższy, tłumaczony styl."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Poprawne, ale bardzo techniczne i długie, więc pewnie tylko bym to przeleciała wzrokiem."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Technicznie wygląda rzetelnie, tylko jest tak długie i suche, że pewnie przeczytałabym po łebkach."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 3.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 2,
+        "runs": [
+          {
+            "persona": "pl-warszawa-it",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Technicznie jest jasno i w miarę po polsku, choć miejscami czuć katalogowy styl zamiast naturalnego opisu."
+          },
+          {
+            "persona": "pl-warszawa-it",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Technicznie jest jasno i całkiem profesjonalnie, choć parę zwrotów typu „obejmuje interfejsy” nadal brzmi lekko tłumaczeniowo."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Technicznie wygląda porządnie, choć jako klientka szybko bym to przeleciała wzrokiem, bo jest ciężkie i długie."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Technicznie wygląda solidnie, tylko jest to taki długi opis, który pewnie bym szybko przewinęła."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 3.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 3,
+      "source": "Revolutionary Performance\n\nThanks to its next-gen tech of PCIe and NVMe interface technologies that deliver up to 900MB/s read speed*, the PLAY PRO microSDXC™ Express Card is a stunning 4x faster than typical UHS-I microSD cards.\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "Rewolucyjna wydajność\nDzięki technologiom interfejsów PCIe i NVMe nowej generacji, które zapewniają prędkość odczytu do 900MB/s*, karta pamięci PLAY PRO microSDXC™ Express jest aż 4x szybsza niż typowe karty microSD UHS-I.\n*Na podstawie testów wewnętrznych. Rzeczywista wydajność może się różnić.",
+      "official": "Rewolucyjne osiągi\n \n Dzięki technologii interfejsów PCIe i NVMe najnowszej generacji, które zapewniają szybkość odczytu do 900 MB/s*, karta PLAY PRO microSDXC™ Express pracuje w imponującym tempie czterokrotnie przewyższającym typowe karty microSD w standardzie UHS-I.\n \n *Na podstawie testów wewnętrznych. Rzeczywiste osiągi mogą być inne.",
+      "mineJudgement": {
+        "index": 3,
+        "runs": [
+          {
+            "persona": "pl-warszawa-it",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Treść jest zgodna, ale „zapewniają prędkość” i „Rewolucyjna wydajność” brzmią jak typowy marketing po tłumaczeniu."
+          },
+          {
+            "persona": "pl-warszawa-it",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "„Rewolucyjna wydajność” i „zapewniają prędkość” to typowy marketingowy automat, który nie buduje mi zaufania."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Brzmi wiarygodnie, choć zdanie jest trochę ciężkie i naszpikowane skrótami."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Informacje są jasne, ale zdanie z interfejsami jest ciężkie i trochę sztuczne."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.25,
+          "tone": 3.25,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 3,
+        "runs": [
+          {
+            "persona": "pl-warszawa-it",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Fakty się zgadzają, ale „pracuje w imponującym tempie czterokrotnie przewyższającym” to typowa marketingowa kalka."
+          },
+          {
+            "persona": "pl-warszawa-it",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Specyfikacja się zgadza, ale zdanie o „imponującym tempie czterokrotnie przewyższającym” jest ciężkie i typowo katalogowe."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Sens jest jasny, ale zdanie jest napompowane i trochę nienaturalne jak z katalogu po tłumaczeniu."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Informacja jest jasna, ale zdanie jest ciężkie i czuć katalogowe tłumaczenie."
+          }
+        ],
+        "mean": {
+          "naturalness": 2.75,
+          "tone": 3,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      }
+    },
+    {
+      "index": 4,
+      "source": "*Comparison of the theoretical maximum speeds under different interface forms (Data source: SDA)",
+      "mine": "* Porównanie teoretycznych prędkości maksymalnych w różnych typach interfejsów (źródło danych: SDA)",
+      "official": "*Porównanie teoretycznych maksymalnych prędkości dla różnych rodzajów interfejsu (źródło danych: SDA)",
+      "mineJudgement": {
+        "index": 4,
+        "runs": [
+          {
+            "persona": "pl-warszawa-it",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Krótka notka brzmi poprawnie, choć trochę technicznie i bez polotu."
+          },
+          {
+            "persona": "pl-warszawa-it",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Przypis brzmi poprawnie i jasno, choć format z odstępem po gwiazdce wygląda trochę niechlujnie."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Normalna przypisana gwiazdka, bez większych zgrzytów."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Normalna przypisowa formułka, bez emocji, ale brzmi poprawnie."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 3.75,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 4,
+        "runs": [
+          {
+            "persona": "pl-warszawa-it",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Krótka nota brzmi poprawnie i technicznie sensownie, bez większych zgrzytów."
+          },
+          {
+            "persona": "pl-warszawa-it",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Krótka notka techniczna brzmi w porządku i nie razi, choć można by ją minimalnie wygładzić."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 0,
+            "naturalness": 5,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Krótka informacja brzmi normalnie i budzi zaufanie jako przypis techniczny."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Krótka notka brzmi poprawnie i nie budzi podejrzeń."
+          }
+        ],
+        "mean": {
+          "naturalness": 4.25,
+          "tone": 4,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      }
+    },
+    {
+      "index": 5,
+      "source": "Good for Today, Great for Tomorrow\n\nThe PLAY PRO microSDXC™ Express Card is backwards-compatible with UHS-I and UHS-II host devices (at UHS-I speeds) so you can use it with your current handheld gaming consoles – and it's ideal for the microSD Express devices coming soon.",
+      "mine": "Gotowa na dziś, świetna na jutro\nKarta pamięci PLAY PRO microSDXC™ Express jest kompatybilna wstecznie z urządzeniami hosta UHS-I i UHS-II (z prędkościami UHS-I), więc możesz używać jej ze swoimi obecnymi przenośnymi konsolami do gier — a przy tym idealnie sprawdzi się w nadchodzących urządzeniach microSD Express.",
+      "official": "Dobra na dziś, doskonała na jutro\n \n Karta PLAY PRO microSDXC™ Express jest wstecznie kompatybilna z urządzeniami macierzystymi UHS-I oraz UHS-II (z szybkością właściwą dla standardu UHS-I), dlatego można ją wykorzystać z dotychczasową przenośną konsolą do gier; idealnie sprawdzi się również w urządzeniach Express obsługujących microSD, które pojawią się już wkrótce.",
+      "mineJudgement": {
+        "index": 5,
+        "runs": [
+          {
+            "persona": "pl-warszawa-it",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "„Urządzenia hosta” i „z prędkościami UHS-I” są zrozumiałe, ale niezgrabne po polsku."
+          },
+          {
+            "persona": "pl-warszawa-it",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Sens jest zachowany, ale „urządzenia hosta” i „z prędkościami UHS-I” brzmią mało naturalnie w sklepowym opisie."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "„Urządzenia hosta” i „z prędkościami” brzmią sztywno, ale sens jest jasny."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Treść jest przydatna, choć „urządzenia hosta” od razu brzmią mi mało po polsku."
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 3.25,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 5,
+        "runs": [
+          {
+            "persona": "pl-warszawa-it",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 4,
+            "note": "„Urządzenia macierzyste” w opisie karty microSD od razu biją po oczach jako zły przekład host devices."
+          },
+          {
+            "persona": "pl-warszawa-it",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 4,
+            "note": "„Urządzenia macierzyste” i końcówka o „urządzeniach Express obsługujących microSD” brzmią jak terminologia z automatu, nie opis produktu."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "„Urządzenia macierzyste” brzmi dla mnie bardzo technicznie i obco, więc musiałabym się oprzeć bardziej na opiniach."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 4,
+            "note": "„Urządzenia macierzyste” brzmią dla mnie jak z automatu i od razu patrzyłabym bardziej na opinie."
+          }
+        ],
+        "mean": {
+          "naturalness": 2.25,
+          "tone": 2.25,
+          "fidelity": 4
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      }
+    },
+    {
+      "index": 6,
+      "source": "Level-up Your Handheld Gaming Experience\n\nUp to 900MB/s* read speed, the PLAY PRO microSDXC™ Express Card is a stunning 4x faster than typical UHS-I microSD cards – meaning that games load faster and also ensuring a smooth, lag-free experience.\n\nRead speed up to 900MB/s*\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "Podkręć wrażenia z grania na handheldzie\nDzięki prędkości odczytu do 900MB/s* karta pamięci PLAY PRO microSDXC™ Express jest aż 4x szybsza niż typowe karty microSD UHS-I — co oznacza szybsze ładowanie gier i pomaga zapewnić płynną rozgrywkę bez lagów.\nPrędkość odczytu do 900MB/s*\n*Na podstawie testów wewnętrznych. Rzeczywista wydajność może się różnić.",
+      "official": "Spotęguj wrażenia podczas gry z użyciem urządzeń przenośnych\n \n Dzięki szybkości odczytu do 900 MB/s* karta PLAY PRO microSDXC™ Express pracuje w imponującym tempie czterokrotnie przewyższającym typowe karty microSD pracujące w standardzie UHS-I – oznacza to, że gry ładują się szybciej, a rozgrywki przebiegają płynnie i bez opóźnień.\n \n Szybkość odczytu do 900 MB/s*\n \n *Na podstawie testów wewnętrznych. Rzeczywiste osiągi mogą być inne.",
+      "mineJudgement": {
+        "index": 6,
+        "runs": [
+          {
+            "persona": "pl-warszawa-it",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "To już brzmi całkiem dobrze dla gracza, choć „pomaga zapewnić” jest niepotrzebnie asekuracyjne."
+          },
+          {
+            "persona": "pl-warszawa-it",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "To już brzmi całkiem sensownie dla gracza, zwłaszcza „bez lagów”, choć nadal są typowe marketingowe klisze."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "Gamingowy ton jest okej, tylko „handheld” i „lagi” nie każdemu zabrzmią swojsko."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Całość brzmi całkiem naturalnie, tylko gamingowe słowa typu „handheld” i „lagi” nie każdemu podejdą."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 4,
+          "fidelity": 4.75
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 6,
+        "runs": [
+          {
+            "persona": "pl-warszawa-it",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Da się zrozumieć i specyfikacja jest zachowana, ale nagłówek i zdanie o „pracowaniu w imponującym tempie” są nienaturalne."
+          },
+          {
+            "persona": "pl-warszawa-it",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Fakty są zachowane, ale nagłówek i powtórzenia typu „karty microSD pracujące” sprawiają wrażenie topornego tłumaczenia."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Przekaz o szybszym ładowaniu gier jest dobry, ale sformułowania są przydługie i trochę sztuczne."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Sens jest zachowany, ale opis jest przydługi i ma parę nienaturalnych sformułowań."
+          }
+        ],
+        "mean": {
+          "naturalness": 2.75,
+          "tone": 3,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      }
+    },
+    {
+      "index": 7,
+      "source": "Cut Your Download Times\n\nThe PLAY PRO microSDXC™ Express Card also delivers 600MB/s write speeds* when paired with the Lexar microSD Express card reader so you can download a AAA game in less time than it'll take you to order a pizza!\n\nWrite speed up to 600MB/s*\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "Skróć czas pobierania\nKarta pamięci PLAY PRO microSDXC™ Express zapewnia też prędkość zapisu 600MB/s* w połączeniu z czytnikiem kart Lexar microSD Express, dzięki czemu pobierzesz grę AAA szybciej, niż zdążysz zamówić pizzę!\nPrędkość zapisu do 600MB/s*\n*Na podstawie testów wewnętrznych. Rzeczywista wydajność może się różnić.",
+      "official": "Krótszy czas pobierania\n \n W przypadku sparowania z czytnikiem kart Lexar microSD Express karta PLAY PRO microSDXC™ Express zapewnia zapis w tempie 600 MB/s*, umożliwiając pobranie gier AAA w krótszym czasie niż potrzeba, by zamówić pizzę!\n \n Szybkość zapisu do 600 MB/s*\n \n *Na podstawie testów wewnętrznych. Rzeczywiste osiągi mogą być inne.",
+      "mineJudgement": {
+        "index": 7,
+        "runs": [
+          {
+            "persona": "pl-warszawa-it",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "Hasło z pizzą wypada naturalnie, ale w treści zabrakło „do” przy 600MB/s, więc specyfikacja robi się zbyt kategoryczna."
+          },
+          {
+            "persona": "pl-warszawa-it",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Tekst jest lekki i trafia w klimat, a porównanie z pizzą brzmi po polsku całkiem naturalnie."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "Tekst z pizzą brzmi nawet naturalnie, ale w pierwszym miejscu brakuje mi „do” przy 600 MB/s."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "Tekst jest zgrabny i obrazowy z pizzą, ale wolę gdy przy prędkościach od razu jest jasno napisane „do”."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 4,
+          "fidelity": 4.25
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 7,
+        "runs": [
+          {
+            "persona": "pl-warszawa-it",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Tekst sprzedaje właściwą funkcję, ale „sparowanie z czytnikiem” brzmi jak Bluetooth, nie jak normalne użycie karty z czytnikiem."
+          },
+          {
+            "persona": "pl-warszawa-it",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Pomysł z pizzą jest fajny, ale „sparowanie z czytnikiem” przy karcie pamięci brzmi jak kalka z angielskiego."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "Porównanie z pizzą jest fajne, ale „sparowanie z czytnikiem” i zapis podany jak pewnik brzmią niezgrabnie."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Pomysł z pizzą jest fajny, ale „sparowanie z czytnikiem” i zapis w tempie brzmią trochę niezgrabnie."
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 3.25,
+          "fidelity": 4
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 8,
+      "source": "Massive Capacity up to 1TB\n\nSome of your favorite games are probably pretty big in file size. Well, with up to 1TB capacity, juggling games just got easier. You can fit many games on a 1TB card.\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "Ogromna pojemność do 1TB\nNiektóre z Twoich ulubionych gier pewnie zajmują naprawdę dużo miejsca. Dzięki pojemności do 1TB żonglowanie grami stało się łatwiejsze. Na karcie 1TB zmieścisz wiele gier.\n*Na podstawie testów wewnętrznych. Rzeczywista wydajność może się różnić.",
+      "official": "Ogromna pojemność nawet do 1 TB\n \n Niektóre z Twoich ulubionych gier najpewniej zajmują wiele miejsca na dysku. Nie martw się! Dzięki pojemności do 1 TB przechowywanie licznych gier właśnie stało się łatwiejsze. Na karcie o pojemności 1 TB zmieści się ich wiele.\n \n *Na podstawie testów wewnętrznych. Rzeczywiste osiągi mogą być inne.",
+      "mineJudgement": {
+        "index": 8,
+        "runs": [
+          {
+            "persona": "pl-warszawa-it",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Da się czytać, ale „żonglowanie grami” i brak spacji w „1TB” brzmią jak bezpośrednia kalka z angielskiej ulotki."
+          },
+          {
+            "persona": "pl-warszawa-it",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Da się czytać, ale „żonglowanie grami” i „stało się łatwiejsze” brzmią jak żywcem przełożone z angielskiego."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Da się czytać, ale „żonglowanie grami” brzmi trochę jak z reklamy tłumaczonej na szybko."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Rozumiem, o co chodzi, ale „żonglowanie grami” brzmi dla mnie trochę jak tłumaczenie i przy karcie do zdjęć rodzinnych mało mnie przekonuje."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.25,
+          "tone": 3,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 8,
+        "runs": [
+          {
+            "persona": "pl-warszawa-it",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Da się czytać, ale „przechowywanie licznych gier” i „rzeczywiste osiągi” brzmią jak katalog tłumaczony z angielskiego."
+          },
+          {
+            "persona": "pl-warszawa-it",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Da się to czytać, ale „przechowywanie licznych gier” i „rzeczywiste osiągi” brzmią jak katalog po tłumaczeniu, nie jak opis dla gracza."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "Brzmi w miarę po ludzku, tylko „osiągi” i „przechowywanie licznych gier” są trochę katalogowe."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Brzmi dość normalnie, choć trochę marketingowo i sztywno przy „przechowywaniu licznych gier”."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.5,
+          "tone": 3.5,
+          "fidelity": 4.5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.25,
+          "fidelity": 0.25
+        },
+        "personaGap": 1,
+        "flags": []
+      }
+    },
+    {
+      "index": 9,
+      "source": "Protection Built in\n\nThe PLAY PRO microSD Express card is IPX7 waterproof, wearproof, temperature-proof, x-ray-proof, vibration-resistant, magnetic-proof, shockproof, and drop-proof.*\n\nWearout resistance\n*up to 10,000 times of plugging and unplugging\nWaterproof\n*IPX7,1m deep water for 30min\nTemperature resistance\n*Operation: -25℃~85℃, Storage: -40℃~85℃\nShock resistance\n*1500G Shock\nAnti-vibration\n*10-2000Hz\nAnti-magnetic\n*15000Gauss\nX-ray protection\n*up to 100mGy\n(equivalent to airport X-ray machine exposure)\nDrop protection\n*1.5m drop",
+      "mine": "Wbudowana ochrona\nKarta pamięci PLAY PRO microSD Express ma klasę wodoodporności IPX7 oraz jest odporna na zużycie, temperaturę, promieniowanie rentgenowskie, wibracje, pole magnetyczne, wstrząsy i upadki.*\nOdporność na zużycie\n*do 10 000 cykli podłączania i odłączania\nWodoodporność\n*IPX7, zanurzenie w wodzie o głębokości 1m przez 30min\nOdporność na temperaturę\n*Praca: -25 °C~85 °C, przechowywanie: -40 °C~85 °C\nOdporność na wstrząsy\n*wstrząs 1500G\nOdporność na wibracje\n*10-2000Hz\nOdporność na pole magnetyczne\n*15000Gauss\nOchrona przed promieniowaniem rentgenowskim\n*do 100mGy\n(odpowiednik ekspozycji w lotniskowym skanerze rentgenowskim)\nOchrona przed upadkiem\n*upadek z 1,5m",
+      "official": "Wbudowane zabezpieczenia\n  \n  Karta PLAY PRO microSD Express jest wodoodporna dzięki klasie ochrony IPX7, odporna na zużycie, działanie skrajnych temperatur, promieniowania rentgenowskiego, drgań, pól magnetycznych, a także na wstrząsy i upadki*.\n \n  Odporność na zużycie\n  * do 10 000 podłączeń i rozłączeń\n Wodoszczelność\n  * IPX7, zanurzenie w wodzie na głębokość 1 m przez 30 min\n Odporność na temperatury\n  * obsługa: od -25°C do 85°C, przechowywanie: od -40°C do 85°C\n Odporność na wstrząsy\n  * wstrząsy do 1500 G\n Ochrona antywibracyjna\n  * 10-2000 Hz\n Ochrona antymagnetyczna\n  * 15 000 Gausów\n Odporność na promieniowanie rentgenowskie\n  * do 100 mGy\n  (równoważnik ekspozycji lotniskowego urządzenia rentgenowskiego)\n Ochrona przed upadkiem\n  * upadek z wysokości 1,5 m",
+      "mineJudgement": {
+        "index": 9,
+        "runs": [
+          {
+            "persona": "pl-warszawa-it",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Specyfikacja jest konkretna i budzi zaufanie, choć format jednostek typu „1m”, „30min” i „15000Gauss” wygląda mało po polsku."
+          },
+          {
+            "persona": "pl-warszawa-it",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Technicznie jest konkretnie, ale zapis jednostek i frazy typu „wstrząs 1500G” wyglądają mało po polsku i trochę katalogowo."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Lista parametrów budzi zaufanie, choć zapis jednostek i kilka sformułowań wygląda mało po polsku."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Dużo technicznych konkretów, miejscami ciasno zapisane jednostki, ale jako kupująca kartę pamięci czułabym, że wiem, za co płacę."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.5,
+          "tone": 4,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 9,
+        "runs": [
+          {
+            "persona": "pl-warszawa-it",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Specyfikacja jest kompletna i konkretna, choć miejscami razi technicznym kalkowaniem typu „obsługa” zamiast „praca” i dziwnym „Gausów”."
+          },
+          {
+            "persona": "pl-warszawa-it",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Specyfikacja jest kompletna i budzi zaufanie, choć „obsługa” temperatur i „równoważnik ekspozycji” są mocno sztywne po polsku."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Specyfikacja wygląda konkretnie, ale część sformułowań typu „obsługa” i „równoważnik ekspozycji” czytam jak tłumaczenie."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Lista zabezpieczeń jest konkretna i budzi zaufanie, tylko miejscami czuć katalogowy język typu „obsługa” zamiast temperatura pracy."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.25,
+          "tone": 3.75,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      }
+    },
+    {
+      "index": 10,
+      "source": "Peace of Mind Extras\n\nThis card undergoes strict testing in the Lexar Quality Lab and we're so confident in it that it comes with a limited lifetime warranty. Plus we offer lifetime access to the Lexar Recovery Tool which you can use to restore accidentally deleted and formatted files.",
+      "mine": "Dodatki dla pełnego spokoju\nTa karta przechodzi rygorystyczne testy w laboratorium jakości Lexar, a my jesteśmy jej tak pewni, że obejmuje ją ograniczona dożywotnia gwarancja. Dodatkowo oferujemy dożywotni dostęp do narzędzia Lexar Recovery Tool, którego możesz użyć do odzyskiwania plików przypadkowo usuniętych lub utraconych po formatowaniu.",
+      "official": "Dodatkowe funkcje, by pozbyć się zmartwień\n \n Karta jest poddawana rygorystycznym testom w laboratorium Lexar Quality Lab i jesteśmy tak pewni jej perfekcyjnego działania, że jest ona objęta dożywotnią ograniczoną gwarancją. Oferujemy również dożywotni dostęp do narzędzia Lexar Recovery Tool, które pomaga w odzyskaniu przypadkowo usuniętych i sformatowanych plików.",
+      "mineJudgement": {
+        "index": 10,
+        "runs": [
+          {
+            "persona": "pl-warszawa-it",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "„Dodatki dla pełnego spokoju” i „jesteśmy jej tak pewni” są dość sztywne, jakby ktoś tłumaczył slogan słowo w słowo."
+          },
+          {
+            "persona": "pl-warszawa-it",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "„Dodatki dla pełnego spokoju” i „jesteśmy jej tak pewni” to typowe kalki, choć sens i fakty są zachowane."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Rozumiem sens, ale „dodatki dla pełnego spokoju” i „jesteśmy jej tak pewni” brzmią nienaturalnie."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "„Dodatki dla pełnego spokoju” brzmi sztucznie, ale gwarancja i odzyskiwanie plików to dla mnie ważne i budzi trochę zaufania."
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 3,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 10,
+        "runs": [
+          {
+            "persona": "pl-warszawa-it",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 3,
+            "note": "Nagłówek i „perfekcyjne działanie” są sztuczne i marketingowo przesadzone, a „sformatowane pliki” brzmią po polsku po prostu źle."
+          },
+          {
+            "persona": "pl-warszawa-it",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 4,
+            "note": "Nagłówek i „perfekcyjne działanie” pachną maszynowym marketingiem, a „sformatowane pliki” brzmią technicznie niezręcznie."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 2,
+            "fidelity": 3,
+            "note": "Nagłówek jest sztuczny, a „sformatowane pliki” i obietnica perfekcyjnego działania nie wzbudzają u mnie pełnego zaufania."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Nagłówek i „dożywotnia ograniczona gwarancja” brzmią jak tłumaczenie, a obietnica „perfekcyjnego działania” jest trochę na wyrost."
+          }
+        ],
+        "mean": {
+          "naturalness": 2.5,
+          "tone": 2.25,
+          "fidelity": 3.5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.1875,
+          "fidelity": 0.25
+        },
+        "personaGap": 1,
+        "flags": []
+      }
+    },
+    {
+      "index": 11,
+      "source": "Rigorously Tested\n\nAll Lexar products undergo extensive testing in the Lexar Quality Labs, facilities with thousands of different cameras and digital devices to ensure performance, quality, compatibility, and reliability.",
+      "mine": "Rygorystycznie testowane\nWszystkie produkty Lexar przechodzą szeroko zakrojone testy w laboratoriach jakości Lexar — obiektach wyposażonych w tysiące różnych aparatów i urządzeń cyfrowych — aby zapewnić wydajność, jakość, kompatybilność i niezawodność.",
+      "official": "Rygorystyczne testy\n \n Wszystkie produkty Lexar są dokładnie testowane w laboratoriach Lexar Quality Labs wyposażonych w tysiące kamer i urządzeń cyfrowych, aby zapewnić wydajność, jakość, kompatybilność i niezawodność.",
+      "mineJudgement": {
+        "index": 11,
+        "runs": [
+          {
+            "persona": "pl-warszawa-it",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Brzmi całkiem profesjonalnie, tylko końcówka z „zapewnieniem wydajności” jest trochę generycznym marketingowym frazesem."
+          },
+          {
+            "persona": "pl-warszawa-it",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Brzmi dość poprawnie, tylko nadal korporacyjnie i z lekkim posmakiem tłumaczenia przy „zapewnić wydajność”."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Brzmi poprawnie, tylko to jedno długie zdanie z „obiektami” jest trochę ciężkie i katalogowe."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Brzmi dość profesjonalnie i konkretnie, choć zdanie jest długie, więc pewnie tylko bym je szybko przeskanowała."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.75,
+          "tone": 3.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 11,
+        "runs": [
+          {
+            "persona": "pl-warszawa-it",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Krótko i zrozumiale, ale „zapewnić wydajność” oraz „kamery” zamiast raczej „aparaty” odbierają temu naturalność."
+          },
+          {
+            "persona": "pl-warszawa-it",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Krótko i zrozumiale, ale „zapewnić wydajność” to typowa korpomowa, a „kamery” pewnie powinny być raczej „aparaty”."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Krótko i zrozumiale, ale „tysiące kamer” przy kartach do aparatu brzmi dla mnie trochę jak kalka z angielskiego."
+          },
+          {
+            "persona": "pl-krakow-nurse",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Da się zrozumieć, ale „tysiące kamer” przy karcie do aparatu brzmi dla mnie mniej pewnie niż „aparaty”."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.5,
+          "tone": 3,
+          "fidelity": 4
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    }
+  ],
+  "summary": {
+    "mine": {
+      "naturalness": 3.5416666666666665,
+      "tone": 3.5,
+      "fidelity": 4.916666666666667
+    },
+    "official": {
+      "naturalness": 3.1458333333333335,
+      "tone": 3.1666666666666665,
+      "fidelity": 4.479166666666667
+    },
+    "unstableCells": 0,
+    "personaSensitiveCells": 0
+  }
+}

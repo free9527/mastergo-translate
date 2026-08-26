@@ -1,0 +1,690 @@
+{
+  "lang": "ru",
+  "csv": "Card 卡类-OW&AMZ小语种翻译 - PLAY PRO microSD.csv",
+  "timestamp": "2026-08-25T11:23:33.702Z",
+  "methodology": "judge=LLM人设模拟(judge-personas.ts)，置信度低于真人母语评审；fidelity以代码校验为准，judge仅软信号；只允许差分对比结论，不允许绝对分数结论",
+  "cells": [
+    {
+      "index": 0,
+      "source": "Power Up Your Play\nLexar® PLAY PRO microSDXC™ Express Card",
+      "mine": "Прокачайте свою игру\nКарта памяти Lexar® PLAY PRO microSDXC™ Express",
+      "official": "",
+      "mineJudgement": {
+        "index": 0,
+        "runs": [
+          {
+            "persona": "ru-moscow-admin",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Нормальный короткий слоган, «прокачайте» для геймерской карты звучит уместно."
+          },
+          {
+            "persona": "ru-moscow-admin",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Звучит бодро и по-геймерски, хотя «прокачайте свою игру» немного отдает рекламным шаблоном."
+          },
+          {
+            "persona": "ru-spb-mom",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Звучит по-геймерски и в целом нормально, но для карты памяти к фотоаппарату меня бы не зацепило."
+          },
+          {
+            "persona": "ru-spb-mom",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Нормально и коротко, но «прокачайте» для меня звучит слишком по-геймерски."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 3.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 1,
+      "source": "Good for Today, Great for Tomorrow\n\nRevolutionary Performance\n\nPeace of Mind Extras\n\nLevel-up Your Handheld Gaming Experience\nRead speed up to 900MB/s\n\nCut Your Download Times\nWrite speed up to 600MB/s\n\nMassive Capacity up to 1TB\n\nProtection Built in",
+      "mine": "Хороша сегодня, отлична завтра\nРеволюционная производительность\nДополнительная уверенность\nПрокачайте портативный гейминг\nСкорость чтения до 900MB/s\nСократите время загрузки\nСкорость записи до 600MB/s\nБольшая ёмкость до 1 ТБ\nВстроенная защита",
+      "official": "",
+      "mineJudgement": {
+        "index": 1,
+        "runs": [
+          {
+            "persona": "ru-moscow-admin",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Понимается, но «дополнительная уверенность» и «революционная производительность» сразу отдают переводным маркетингом."
+          },
+          {
+            "persona": "ru-moscow-admin",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "В целом понятно, но «дополнительная уверенность» и MB/s без русской локализации выглядят как сырой перевод."
+          },
+          {
+            "persona": "ru-spb-mom",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Понять можно, но «дополнительная уверенность» и MB/s сразу выглядят как перевод с витрины."
+          },
+          {
+            "persona": "ru-spb-mom",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Пробегаю глазами, смысл понятен, но «дополнительная уверенность» и MB/s сразу пахнут переводом."
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 3,
+          "fidelity": 4.25
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 2,
+      "source": "What is SD Express and how does it works?\n\nSD Express is a new SD card standard. It adopts the PCI Express 3.0 and NVMe 1.3 interfaces, which significantly enhances the data processing capability of SD cards. The working principle of SD Express is based on the PCI Express interface and the NVMe protocol. The PCIe interface supports high-speed data transmission, while the NVMe protocol optimizes storage access efficiency. SD Express uses the second row of contacts at the interface to transmit PCIe signals and is backwards-compatible with UHS-I through the first row of contacts. After being connected to a computer that supports SD Express products, SD Express will be recognized as a standard NVMe device, similar to a modern NVMe SSD.",
+      "mine": "Что такое SD Express и как он работает?\nSD Express — новый стандарт карт памяти SD. Он использует интерфейсы PCI Express 3.0 и NVMe 1.3, что значительно повышает возможности обработки данных у карт SD. Принцип работы SD Express основан на интерфейсе PCI Express и протоколе NVMe. Интерфейс PCIe поддерживает высокоскоростную передачу данных, а протокол NVMe оптимизирует эффективность доступа к хранилищу. SD Express использует второй ряд контактов интерфейса для передачи сигналов PCIe и обратно совместим с UHS-I через первый ряд контактов. После подключения к компьютеру с поддержкой продуктов SD Express SD Express распознаётся как стандартное устройство NVMe, аналогично современному NVMe SSD.",
+      "official": "",
+      "mineJudgement": {
+        "index": 2,
+        "runs": [
+          {
+            "persona": "ru-moscow-admin",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Технически всё на месте, но фразы вроде «доступ к хранилищу» и повтор SD Express звучат сухо и калькировано."
+          },
+          {
+            "persona": "ru-moscow-admin",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Технически всё передано нормально, но фразы вроде «доступа к хранилищу» и повтор SD Express читаются суховато и переводно."
+          },
+          {
+            "persona": "ru-spb-mom",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Технически вроде аккуратно, но абзац длинный и я бы половину пролистала."
+          },
+          {
+            "persona": "ru-spb-mom",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "Факты вроде на месте, но такой длинный технический блок я бы быстро пролистала."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.25,
+          "tone": 3,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.5,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 3,
+      "source": "Revolutionary Performance\n\nThanks to its next-gen tech of PCIe and NVMe interface technologies that deliver up to 900MB/s read speed*, the PLAY PRO microSDXC™ Express Card is a stunning 4x faster than typical UHS-I microSD cards.\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "Революционная производительность\nБлагодаря технологиям нового поколения — интерфейсам PCIe и NVMe, обеспечивающим скорость чтения до 900MB/s*, карта памяти PLAY PRO microSDXC™ Express впечатляюще в 4 раза быстрее типичных карт microSD UHS-I.\n*На основе внутреннего тестирования. Фактическая производительность может отличаться.",
+      "official": "",
+      "mineJudgement": {
+        "index": 3,
+        "runs": [
+          {
+            "persona": "ru-moscow-admin",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "«Обеспечивающим» и «впечатляюще в 4 раза быстрее» выглядят как машинный перевод из рекламного буклета."
+          },
+          {
+            "persona": "ru-moscow-admin",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "Вот тут прямо маркетинговая калька: «революционная производительность», «обеспечивающим» и «впечатляюще в 4 раза» доверия не добавляют."
+          },
+          {
+            "persona": "ru-spb-mom",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Смысл ясен, но «впечатляюще в 4 раза быстрее» звучит не по-русски и слишком рекламно."
+          },
+          {
+            "persona": "ru-spb-mom",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Понять можно, но фраза «впечатляюще в 4 раза быстрее» звучит не по-русски."
+          }
+        ],
+        "mean": {
+          "naturalness": 2.5,
+          "tone": 2.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 1,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 4,
+      "source": "*Comparison of the theoretical maximum speeds under different interface forms (Data source: SDA)",
+      "mine": "* Сравнение теоретических максимальных скоростей для разных типов интерфейсов (источник данных: SDA)",
+      "official": "",
+      "mineJudgement": {
+        "index": 4,
+        "runs": [
+          {
+            "persona": "ru-moscow-admin",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Сноска читается нормально, разве что форматирование со звёздочкой немного неряшливое."
+          },
+          {
+            "persona": "ru-moscow-admin",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Нормальная сноска, сухая как и должна быть, разве что оформление со звёздочкой можно привести к русскому виду."
+          },
+          {
+            "persona": "ru-spb-mom",
+            "run": 0,
+            "naturalness": 5,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Обычная понятная сноска, тут доверие не теряется."
+          },
+          {
+            "persona": "ru-spb-mom",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Обычная сноска, читается нормально и без лишней рекламы."
+          }
+        ],
+        "mean": {
+          "naturalness": 4.25,
+          "tone": 4,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 5,
+      "source": "Good for Today, Great for Tomorrow\n\nThe PLAY PRO microSDXC™ Express Card is backwards-compatible with UHS-I and UHS-II host devices (at UHS-I speeds) so you can use it with your current handheld gaming consoles – and it's ideal for the microSD Express devices coming soon.",
+      "mine": "Хороша сегодня, отлична завтра\nКарта памяти PLAY PRO microSDXC™ Express обратно совместима с хост-устройствами UHS-I и UHS-II (на скоростях UHS-I), поэтому её можно использовать с вашими текущими портативными игровыми консолями — и она отлично подойдёт для устройств microSD Express, которые скоро появятся.",
+      "official": "",
+      "mineJudgement": {
+        "index": 5,
+        "runs": [
+          {
+            "persona": "ru-moscow-admin",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Смысл ясен, но «текущие консоли», «хост-устройства» и «на скоростях UHS-I» звучат не по-русски гладко."
+          },
+          {
+            "persona": "ru-moscow-admin",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Смысл точный, но «с вашими текущими» и «хост-устройствами» звучат не как живой русский текст для покупателя."
+          },
+          {
+            "persona": "ru-spb-mom",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "«Хост-устройства» и «вашими текущими» пахнут переводом, хотя характеристики переданы понятно."
+          },
+          {
+            "persona": "ru-spb-mom",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "В целом ясно, но «хост-устройства» и «текущие консоли» выглядят сухо и переводно."
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 3,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 6,
+      "source": "Level-up Your Handheld Gaming Experience\n\nUp to 900MB/s* read speed, the PLAY PRO microSDXC™ Express Card is a stunning 4x faster than typical UHS-I microSD cards – meaning that games load faster and also ensuring a smooth, lag-free experience.\n\nRead speed up to 900MB/s*\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "Прокачайте портативный гейминг\nБлагодаря скорости чтения до 900MB/s* карта памяти PLAY PRO microSDXC™ Express впечатляюще в 4 раза быстрее типичных карт microSD UHS-I — игры загружаются быстрее, а игровой процесс остаётся плавным и без лагов.\nСкорость чтения до 900MB/s*\n*На основе внутреннего тестирования. Фактическая производительность может отличаться.",
+      "official": "",
+      "mineJudgement": {
+        "index": 6,
+        "runs": [
+          {
+            "persona": "ru-moscow-admin",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Есть нормальные игровые слова вроде «без лагов», но «впечатляюще в 4 раза быстрее» снова палит перевод."
+          },
+          {
+            "persona": "ru-moscow-admin",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Идея понятная и для гейминга подходит, но «впечатляюще в 4 раза быстрее» снова выдаёт машинно-рекламный перевод."
+          },
+          {
+            "persona": "ru-spb-mom",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Для игровой аудитории звучит живее, но MB/s и «впечатляюще» всё равно немного режут глаз."
+          },
+          {
+            "persona": "ru-spb-mom",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Для геймеров, наверное, нормально, но «портативный гейминг» и «лаги» мне доверия не добавляют."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.25,
+          "tone": 3.25,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 7,
+      "source": "Cut Your Download Times\n\nThe PLAY PRO microSDXC™ Express Card also delivers 600MB/s write speeds* when paired with the Lexar microSD Express card reader so you can download a AAA game in less time than it'll take you to order a pizza!\n\nWrite speed up to 600MB/s*\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "Сократите время загрузки\nКарта памяти PLAY PRO microSDXC™ Express также обеспечивает скорость записи 600MB/s* при использовании с картридером Lexar microSD Express, чтобы вы могли скачать игру AAA быстрее, чем заказать пиццу!\nСкорость записи до 600MB/s*\n*На основе внутреннего тестирования. Фактическая производительность может отличаться.",
+      "official": "",
+      "mineJudgement": {
+        "index": 7,
+        "runs": [
+          {
+            "persona": "ru-moscow-admin",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Идея с пиццей понятная, но по-русски лучше бы сказать «скачивания» и «AAA-игру», сейчас текст слегка деревянный."
+          },
+          {
+            "persona": "ru-moscow-admin",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Про пиццу забавно, но «скорость записи 600MB/s» без «до» в основном тексте и «скачать игру AAA» выглядят неаккуратно."
+          },
+          {
+            "persona": "ru-spb-mom",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Про пиццу забавно, но «игру AAA» и скорость в MB/s выглядят небрежно для русского описания."
+          },
+          {
+            "persona": "ru-spb-mom",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Про скорость записи понятно, хотя «игра AAA» и пицца звучат немного рекламно и не совсем по-нашему."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.25,
+          "tone": 3,
+          "fidelity": 4.75
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 8,
+      "source": "Massive Capacity up to 1TB\n\nSome of your favorite games are probably pretty big in file size. Well, with up to 1TB capacity, juggling games just got easier. You can fit many games on a 1TB card.\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "Большая ёмкость до 1 ТБ\nНекоторые из ваших любимых игр наверняка занимают немало места. С ёмкостью до 1 ТБ управлять игровой библиотекой стало проще. На карту 1 ТБ поместится много игр.\n*На основе внутреннего тестирования. Фактическая производительность может отличаться.",
+      "official": "",
+      "mineJudgement": {
+        "index": 8,
+        "runs": [
+          {
+            "persona": "ru-moscow-admin",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "В целом читается нормально, но формулировки про «управлять библиотекой» и «фактическую производительность» немного отдают переводным маркетингом."
+          },
+          {
+            "persona": "ru-moscow-admin",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "В целом читается нормально, только «управлять игровой библиотекой стало проще» чуть отдаёт переводным маркетингом."
+          },
+          {
+            "persona": "ru-spb-mom",
+            "run": 0,
+            "naturalness": 5,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Читается нормально и понятно, без лишней воды, хотя про игры мне как покупателю карты для фотоаппарата не очень близко."
+          },
+          {
+            "persona": "ru-spb-mom",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Читается нормально и понятно, только «ёмкость» и «управлять библиотекой» звучат чуть по-магазинному."
+          }
+        ],
+        "mean": {
+          "naturalness": 4.25,
+          "tone": 3.75,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 9,
+      "source": "Protection Built in\n\nThe PLAY PRO microSD Express card is IPX7 waterproof, wearproof, temperature-proof, x-ray-proof, vibration-resistant, magnetic-proof, shockproof, and drop-proof.*\n\nWearout resistance\n*up to 10,000 times of plugging and unplugging\nWaterproof\n*IPX7,1m deep water for 30min\nTemperature resistance\n*Operation: -25℃~85℃, Storage: -40℃~85℃\nShock resistance\n*1500G Shock\nAnti-vibration\n*10-2000Hz\nAnti-magnetic\n*15000Gauss\nX-ray protection\n*up to 100mGy\n(equivalent to airport X-ray machine exposure)\nDrop protection\n*1.5m drop",
+      "mine": "Встроенная защита\nКарта памяти PLAY PRO microSD Express имеет водозащиту IPX7, устойчива к износу, температурам, рентгеновскому излучению, вибрации, магнитному полю, ударам и падениям.*\nУстойчивость к износу\n*до 10,000 циклов подключения и отключения\nВодозащита\n*IPX7, глубина 1m в течение 30min\nУстойчивость к температурам\n*Работа: -25°C~85°C, хранение: -40°C~85°C\nУдаростойкость\n*Ударная нагрузка 1500G\nЗащита от вибрации\n*10-2000Hz\nЗащита от магнитного поля\n*15000Gauss\nЗащита от рентгеновского излучения\n*до 100mGy\n(эквивалентно воздействию рентгеновского сканера в аэропорту)\nЗащита при падении\n*падение с высоты 1.5m",
+      "official": "",
+      "mineJudgement": {
+        "index": 9,
+        "runs": [
+          {
+            "persona": "ru-moscow-admin",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "Технически всё вроде на месте, но 1m, 30min, 10,000 и Gauss выглядят как сырой перевод без русской вычитки, доверия это не добавляет."
+          },
+          {
+            "persona": "ru-moscow-admin",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Спеки вроде на месте, но 1m, 30min, 15000Gauss и запятые в числах выглядят как сырой копипаст с английского и доверия не добавляют."
+          },
+          {
+            "persona": "ru-spb-mom",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Смысл понятен, но английские единицы типа 1m и 30min сразу создают ощущение небрежного перевода."
+          },
+          {
+            "persona": "ru-spb-mom",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Характеристики вроде все на месте, но эти 1m, 30min и Gauss сразу выглядят как недоделанный перевод."
+          }
+        ],
+        "mean": {
+          "naturalness": 2.5,
+          "tone": 2.75,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 1,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 10,
+      "source": "Peace of Mind Extras\n\nThis card undergoes strict testing in the Lexar Quality Lab and we're so confident in it that it comes with a limited lifetime warranty. Plus we offer lifetime access to the Lexar Recovery Tool which you can use to restore accidentally deleted and formatted files.",
+      "mine": "Дополнительная уверенность\nЭта карта проходит строгие испытания в лаборатории качества Lexar, и мы настолько уверены в ней, что предоставляем ограниченную пожизненную гарантию. Кроме того, мы предлагаем пожизненный доступ к Lexar Recovery Tool, с помощью которого можно восстановить случайно удалённые файлы и файлы, потерянные при форматировании.",
+      "official": "",
+      "mineJudgement": {
+        "index": 10,
+        "runs": [
+          {
+            "persona": "ru-moscow-admin",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Понятно, но «Дополнительная уверенность» и «мы настолько уверены в ней» звучат как калька с англоязычного лендинга."
+          },
+          {
+            "persona": "ru-moscow-admin",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "«Дополнительная уверенность» звучит не по-русски, хотя смысл про гарантию и Recovery Tool передан нормально."
+          },
+          {
+            "persona": "ru-spb-mom",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "В целом внушает доверие, но заголовок «Дополнительная уверенность» звучит немного искусственно."
+          },
+          {
+            "persona": "ru-spb-mom",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Смысл понятен, но «дополнительная уверенность» и длинная фраза про гарантию звучат сухо и переводно."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.25,
+          "tone": 3.25,
+          "fidelity": 4.75
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.1875,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 11,
+      "source": "Rigorously Tested\n\nAll Lexar products undergo extensive testing in the Lexar Quality Labs, facilities with thousands of different cameras and digital devices to ensure performance, quality, compatibility, and reliability.",
+      "mine": "Строгое тестирование\nВсе продукты Lexar проходят комплексное тестирование в Lexar Quality Labs — лабораториях с тысячами разных камер и цифровых устройств, чтобы подтвердить производительность, качество, совместимость и надёжность.",
+      "official": "",
+      "mineJudgement": {
+        "index": 11,
+        "runs": [
+          {
+            "persona": "ru-moscow-admin",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Нормальный нейтральный текст, хотя «подтвердить производительность» звучит суховато и слегка канцелярски."
+          },
+          {
+            "persona": "ru-moscow-admin",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Фраза понятная и аккуратная, но немного канцелярская — скорее из пресс-релиза, чем из нормального описания товара."
+          },
+          {
+            "persona": "ru-spb-mom",
+            "run": 0,
+            "naturalness": 5,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Коротко и по делу, такой текст про тестирование я бы восприняла спокойно и с доверием."
+          },
+          {
+            "persona": "ru-spb-mom",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Коротко и достаточно убедительно, без явных странностей, я бы такое прочитала."
+          }
+        ],
+        "mean": {
+          "naturalness": 4.25,
+          "tone": 3.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": null
+    }
+  ],
+  "summary": {
+    "mine": {
+      "naturalness": 3.3958333333333335,
+      "tone": 3.2083333333333335,
+      "fidelity": 4.895833333333333
+    },
+    "official": null,
+    "unstableCells": 0,
+    "personaSensitiveCells": 0
+  }
+}

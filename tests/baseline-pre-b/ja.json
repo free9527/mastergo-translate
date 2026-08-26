@@ -1,0 +1,1270 @@
+{
+  "lang": "ja",
+  "csv": "Card 卡类-OW&AMZ小语种翻译 - PLAY PRO microSD.csv",
+  "timestamp": "2026-08-25T11:00:21.458Z",
+  "methodology": "judge=LLM人设模拟(judge-personas.ts)，置信度低于真人母语评审；fidelity以代码校验为准，judge仅软信号；只允许差分对比结论，不允许绝对分数结论",
+  "cells": [
+    {
+      "index": 0,
+      "source": "Power Up Your Play\nLexar® PLAY PRO microSDXC™ Express Card",
+      "mine": "プレイをもっとパワフルに\nLexar® PLAY PRO microSDXC™ Express カード",
+      "official": "PLAYをパワーアップ\n Lexar® PLAY PRO microSDXC™ Expressカード",
+      "mineJudgement": {
+        "index": 0,
+        "runs": [
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "キャッチとしては悪くないですが、『Express カード』の半角スペース入り表記は少し海外メーカー感があります。"
+          },
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "「Express カード」の半角スペースは少し気になりますが、見出しとしては普通に売り場で使える表現です。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "ちょっとカタカナ感はあるけど、ゲーム向けの見出しとしては普通に見られる。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "ちょっとカタカナ強めやけど、見出しとしては普通に読める感じ。"
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 4,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 0,
+        "runs": [
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "見出しとしては悪くないですが、空白や『Expressカード』の処理に少し輸入品ページ感があります。"
+          },
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "意味は通るけど『PLAYをパワーアップ』は英語コピーをそのまま置いた感じで、売り場で推すには少し軽いです。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "短いから読めるけど、『PLAYをパワーアップ』はちょっと英語コピーをそのまま寄せた感じがする。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "意味は分かるけど『PLAYをパワーアップ』はちょっと直訳っぽくて、商品名に寄せすぎ感があります。"
+          }
+        ],
+        "mean": {
+          "naturalness": 3.25,
+          "tone": 3.5,
+          "fidelity": 4.5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.25,
+          "fidelity": 0.25
+        },
+        "personaGap": 0.5,
+        "flags": []
+      }
+    },
+    {
+      "index": 1,
+      "source": "Good for Today, Great for Tomorrow\n\nRevolutionary Performance\n\nPeace of Mind Extras\n\nLevel-up Your Handheld Gaming Experience\nRead speed up to 900MB/s\n\nCut Your Download Times\nWrite speed up to 600MB/s\n\nMassive Capacity up to 1TB\n\nProtection Built in",
+      "mine": "今も使えて、これからも活躍\n革新的なパフォーマンス\n安心のプラス機能\n携帯ゲーム体験をレベルアップ\n最大読み込み速度900MB/s\nダウンロード時間を短縮\n最大書き込み速度600MB/s\n最大1TBの大容量\n保護性能を搭載",
+      "official": "いいものを、もっとよく\n \n 革命的なパフォーマンス\n \n 安心の追加装備\n \n 携帯ゲーム機の体験をレベルアップ\n 最大リード速度900MB/s\n \n ダウンロード時間を短縮\n 最大ライト速度600MB/s\n \n 最大1TBの大容量\n \n 内蔵の保護",
+      "mineJudgement": {
+        "index": 1,
+        "runs": [
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "全体に読みやすいものの、『携帯ゲーム体験』だけは日本の売り場コピーとして少し硬く不自然に感じます。"
+          },
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "全体に無難ですが、「携帯ゲーム体験」はやや直訳っぽく、ゲーミング向けコピーならもう一段こなれてほしいです。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "意味は分かるけど「革新的なパフォーマンス」とかがいかにも商品説明の直訳っぽくて少し警戒する。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "内容は分かるけど「革新的なパフォーマンス」とかがいかにも海外製品ページっぽい。"
+          }
+        ],
+        "mean": {
+          "naturalness": 3.5,
+          "tone": 3.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 1,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 1,
+        "runs": [
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 3,
+            "note": "『内蔵の保護』や『安心の追加装備』が直訳っぽく、店頭でそのまま説明に使うには少し不安です。"
+          },
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 3,
+            "note": "見出しとしては読めますが『内蔵の保護』など直訳っぽく、『Good for Today』のニュアンスも落ちています。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 3,
+            "note": "『安心の追加装備』とか『内蔵の保護』がかなり機械翻訳っぽくて、スペックより先にレビュー見たくなる。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 3,
+            "note": "『安心の追加装備』とか『内蔵の保護』が機械翻訳っぽくて、スペックは見えるけど売り文句としては信用しにくいです。"
+          }
+        ],
+        "mean": {
+          "naturalness": 2.5,
+          "tone": 2.5,
+          "fidelity": 3
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 1,
+        "flags": []
+      }
+    },
+    {
+      "index": 2,
+      "source": "What is SD Express and how does it works?\n\nSD Express is a new SD card standard. It adopts the PCI Express 3.0 and NVMe 1.3 interfaces, which significantly enhances the data processing capability of SD cards. The working principle of SD Express is based on the PCI Express interface and the NVMe protocol. The PCIe interface supports high-speed data transmission, while the NVMe protocol optimizes storage access efficiency. SD Express uses the second row of contacts at the interface to transmit PCIe signals and is backwards-compatible with UHS-I through the first row of contacts. After being connected to a computer that supports SD Express products, SD Express will be recognized as a standard NVMe device, similar to a modern NVMe SSD.",
+      "mine": "SD Expressとは？どのように動作しますか？\nSD Expressは新しいSDカード規格です。PCI Express 3.0およびNVMe 1.3インターフェースを採用し、SDカードのデータ処理能力を大幅に高めます。SD Expressの動作原理は、PCI ExpressインターフェースとNVMeプロトコルに基づいています。PCIeインターフェースは高速データ転送をサポートし、NVMeプロトコルはストレージアクセス効率を最適化します。SD Expressはインターフェース部の2列目の接点を使用してPCIe信号を伝送し、1列目の接点を通じてUHS-Iとの下位互換性を備えています。SD Express製品に対応したコンピューターに接続すると、SD Expressは最新のNVMe SSDと同様に、標準のNVMeデバイスとして認識されます。",
+      "official": "SD Expressとは？どんな仕組み？\n \n SD Expressは、新しいSDカード規格です。PCI Express 3.0とNVMe 1.3インターフェイスを採用し、SDカードのデータ処理能力を大幅に向上しています。SD Expressの動作原理は、PCI ExpressインターフェイスとNVMeプロトコルに基づいています。PCIeンターフェイスは高速データ転送をサポートし、NVMeプロトコルはストレージのアクセス効率を最適化します。SD Expressは、インターフェイスで2列目の端子を使用してPCIe信号を送信し、1列目の端子を通じてUHS-Iとの下位互換性を維持しています。SD Express製品をサポートしているコンピューターに接続されると、SD Expressは最新のNVMe SSDと同じように、標準のNVMeデバイスとして認識されます。",
+      "mineJudgement": {
+        "index": 2,
+        "runs": [
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "技術説明としては十分まともで、PCIeやNVMe周りの説明も安心して読めます。"
+          },
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "技術説明としてはかなりしっかりしていて、PCIeやNVMe周りも安心して読めますが、見出しだけ少し硬いです。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "技術説明としては読めるけど、全体的に教科書っぽくて販売ページにしては硬い。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "技術説明としては正確そうやけど、文章が硬くて説明書を直訳した感じが少しある。"
+          }
+        ],
+        "mean": {
+          "naturalness": 3.5,
+          "tone": 3.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 1,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 2,
+        "runs": [
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "内容は合っていますが、『PCIeンターフェイス』の脱字は技術商材ではかなり信用を落とします。"
+          },
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "技術説明はかなりまともですが、『PCIeンターフェイス』の脱字はストレージ商品では信用を落とします。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "内容はちゃんと伝わるけど、『PCIeンターフェイス』の typo と硬い説明文で商品ページというより翻訳マニュアル感がある。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "技術説明としては読めるけど、『PCIeンターフェイス』の typo と少し硬い言い回しで翻訳感があります。"
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 3.25,
+          "fidelity": 4.75
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.1875,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 3,
+      "source": "Revolutionary Performance\n\nThanks to its next-gen tech of PCIe and NVMe interface technologies that deliver up to 900MB/s read speed*, the PLAY PRO microSDXC™ Express Card is a stunning 4x faster than typical UHS-I microSD cards.\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "革新的なパフォーマンス\nPCIeおよびNVMeインターフェースの次世代技術により、最大900MB/sの読み込み速度*を実現。PLAY PRO microSDXC™ Express カードは、一般的なUHS-I microSDカードより4倍高速です。\n*社内テストに基づきます。実際の性能は使用環境により異なる場合があります。",
+      "official": "革命的なパフォーマンス\n \n 最大リード速度900MB/s*を実現するPCIeとNVMeインターフェイステクノロジーの次世代技術により、PLAY PRO microSDXC™ Expressカードは標準的なUHS-I microSDカードよりも4倍も高速です。\n \n *社内テストに基づいています。実際のパフォーマンスは異なる場合があります。",
+      "mineJudgement": {
+        "index": 3,
+        "runs": [
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "スペック訴求として自然で、900MB/sやUHS-I比4倍のポイントもきちんと伝わります。"
+          },
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "スペック訴求は正確で自然ですが、「Express カード」の表記ゆれ感だけ量販店目線では少し惜しいです。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "スペックはちゃんと伝わるけど、「革新的なパフォーマンス」が機械翻訳っぽくてレビューを確認したくなる。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "スペックはちゃんと伝わるけど「革新的なパフォーマンス」はちょっと機械翻訳っぽく見える。"
+          }
+        ],
+        "mean": {
+          "naturalness": 3.5,
+          "tone": 3.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 1,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 3,
+        "runs": [
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "スペックは伝わりますが、『インターフェイステクノロジーの次世代技術』が重たくて翻訳文っぽいです。"
+          },
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "スペックは合っていますが『最大リード速度』や『4倍も高速です』がやや翻訳調で、量販店のPOPとしては硬いです。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "『革命的なパフォーマンス』や『テクノロジーの次世代技術』が直訳っぽくて、正直ちょっと盛ってそうに見える。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "『革命的なパフォーマンス』や『テクノロジーの次世代技術』がかなりカタい直訳で、レビュー確認したくなります。"
+          }
+        ],
+        "mean": {
+          "naturalness": 2.5,
+          "tone": 2.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 1,
+        "flags": []
+      }
+    },
+    {
+      "index": 4,
+      "source": "*Comparison of the theoretical maximum speeds under different interface forms (Data source: SDA)",
+      "mine": "* 異なるインターフェース形式における理論上の最大速度の比較（データ出典：SDA）",
+      "official": "*異なるインターフェイス形式での理論最高速度の比較（データ出典：SDA）",
+      "mineJudgement": {
+        "index": 4,
+        "runs": [
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "意味は合っていますが、『データ出典』やアスタリスク後のスペースが少し直訳っぽく見えます。"
+          },
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "意味は合っていますが、アスタリスク後の半角スペースや「インターフェース形式」が翻訳調で、細部の日本語監修が甘く見えます。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "注記だから許せるけど、「インターフェース形式」「データ出典」がかなり直訳調に見える。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "注釈文としては少し硬いけど、特に引っかかるほどではない。"
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 3.25,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.5,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 4,
+        "runs": [
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "注記としては自然で、速度比較の出典表記も問題なく読めます。"
+          },
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "短い注記としては自然で、SDA出典もきちんと伝わります。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "注釈としては普通に読めるし、変に売り文句っぽくないので信頼感はある。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "注釈としては普通に読めますが、『インターフェイス形式』は少しだけ硬めです。"
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 3.75,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 5,
+      "source": "Good for Today, Great for Tomorrow\n\nThe PLAY PRO microSDXC™ Express Card is backwards-compatible with UHS-I and UHS-II host devices (at UHS-I speeds) so you can use it with your current handheld gaming consoles – and it's ideal for the microSD Express devices coming soon.",
+      "mine": "今も使えて、これからも活躍\nPLAY PRO microSDXC™ Express カードは、UHS-IおよびUHS-IIホスト機器と下位互換性があり（UHS-I速度で動作）、現在お使いの携帯型ゲーム機で使用できます。さらに、今後登場するmicroSD Express対応機器にも最適です。",
+      "official": "いいものを、もっとよく\n \n PLAY PRO microSDXC™ Expressカードは、UHS-IおよびUHS-IIホストデバイスと（UHS-Iの速度で）下位互換性があるため、現在の携帯型ゲーム機に使用でき、またまもなく登場するmicroSD Expressデバイスに最適です。",
+      "mineJudgement": {
+        "index": 5,
+        "runs": [
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "互換性の説明は販売時にも使いやすく、UHS-IIでもUHS-I速度という注意点が明確です。"
+          },
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "互換性の説明は明快で、お客様にそのまま説明しても誤解が出にくい表現です。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "互換性の話が具体的で、今のゲーム機でも使える感じがちゃんと伝わる。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "今のゲーム機でも将来機でも使えるっていうメリットが自然に伝わる。"
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 4,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 5,
+        "runs": [
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "本文の互換性説明は分かりますが、見出しの意味が英語からかなりズレていて『またまもなく』もぎこちないです。"
+          },
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "互換性の説明は分かりますが、見出しが原文の今日・明日の訴求からズレていて『またまもなく』も引っかかります。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "本文はだいたい分かるけど、『いいものを、もっとよく』は元の今日・明日感が消えていて少しふわっとしてる。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "本文はだいたい分かるけど、見出しの『いいものを、もっとよく』が元の意味とズレていてふわっとしています。"
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 3,
+          "fidelity": 4
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 6,
+      "source": "Level-up Your Handheld Gaming Experience\n\nUp to 900MB/s* read speed, the PLAY PRO microSDXC™ Express Card is a stunning 4x faster than typical UHS-I microSD cards – meaning that games load faster and also ensuring a smooth, lag-free experience.\n\nRead speed up to 900MB/s*\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "携帯ゲーム体験をレベルアップ\n最大900MB/s*の読み込み速度を備えたPLAY PRO microSDXC™ Express カードは、一般的なUHS-I microSDカードより4倍高速です。ゲームの読み込みを短縮し、スムーズでラグの少ない体験をサポートします。\n最大読み込み速度900MB/s*\n*社内テストに基づきます。実際の性能は使用環境により異なる場合があります。",
+      "official": "携帯ゲーム機の体験をレベルアップ\n \n 最大リード900MB/s*を誇るPLAY PRO microSDXC™ Expressカードは、標準的なUHS-I microSDカードの4倍も高速で、ゲームの読み込みがより速く、滑らかでラグのない体験が保証されます。\n \n 最大リード速度900MB/s*\n \n *社内テストに基づいています。実際のパフォーマンスは異なる場合があります。",
+      "mineJudgement": {
+        "index": 6,
+        "runs": [
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "言いたいことは分かりますが、『携帯ゲーム体験』や『読み込みを短縮』がやや翻訳調で、ラグなしの表現も少し弱まっています。"
+          },
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "「携帯ゲーム体験」や「読み込みを短縮」が少し不自然で、ラグなし訴求も弱まり気味なのが気になります。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "ゲーマー向けなのは分かるけど、「携帯ゲーム体験」や「読み込みを短縮」が少し不自然。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "「携帯ゲーム体験」や「読み込みを短縮」が少し不自然で、商品ページの翻訳感がある。"
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 3,
+          "fidelity": 4.5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0.25
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 6,
+        "runs": [
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 2,
+            "fidelity": 4,
+            "note": "『ラグのない体験が保証されます』は言い切りが強すぎて、販売員目線ではクレームが怖い表現です。"
+          },
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "内容は合っていますが『最大リード900MB/s』は日本語として雑で、『保証されます』も販売文句として少し危なっかしいです。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 2,
+            "fidelity": 4,
+            "note": "『ラグのない体験が保証されます』はmicroSDでそこまで言う？って感じで、ゲーマー目線だと逆に怪しく見える。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 4,
+            "note": "『最大リード900MB/s』や『体験が保証されます』が不自然で、ゲーム向けコピーとしてはちょっと怪しく見えます。"
+          }
+        ],
+        "mean": {
+          "naturalness": 2.75,
+          "tone": 2.25,
+          "fidelity": 4.25
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.1875,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0.5,
+        "flags": []
+      }
+    },
+    {
+      "index": 7,
+      "source": "Cut Your Download Times\n\nThe PLAY PRO microSDXC™ Express Card also delivers 600MB/s write speeds* when paired with the Lexar microSD Express card reader so you can download a AAA game in less time than it'll take you to order a pizza!\n\nWrite speed up to 600MB/s*\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "ダウンロード時間を短縮\nPLAY PRO microSDXC™ Express カードは、Lexar microSD Express カードリーダーと組み合わせることで、600MB/sの書き込み速度*も実現。ピザを注文するより短い時間でAAAタイトルをダウンロードできます！\n最大書き込み速度600MB/s*\n*社内テストに基づきます。実際の性能は使用環境により異なる場合があります。",
+      "official": "ダウンロード時間を短縮\n \n また、PLAY PRO microSDXC™ ExpressカードはLexar microSD Expressカードリーダーと組み合わせたとき600MB/sのライト速度*を実現するため、ピザの注文よりも短時間でAAAゲーム1本をダウンロードできます。\n \n 最大ライト速度600MB/s*\n \n *社内テストに基づいています。実際のパフォーマンスは異なる場合があります。",
+      "mineJudgement": {
+        "index": 7,
+        "runs": [
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "内容は合っていますが、『ピザを注文するより短い時間』は日本語だと少し大げさで店頭ではそのまま言いにくいです。"
+          },
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "ピザの例えはやや海外っぽいですが、ゲーミング商材の勢いとしては許容範囲で、スペックも合っています。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "内容は合ってるけど、ピザの例えが海外広告をそのまま訳した感じでちょっと浮いてる。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "スペックは合ってるけど、ピザの例えが日本語だと海外ノリすぎて少し浮いてる。"
+          }
+        ],
+        "mean": {
+          "naturalness": 3.5,
+          "tone": 3.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 1,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 7,
+        "runs": [
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "少し海外ノリですが、カードリーダー併用時の600MB/sライトという条件はきちんと伝わっています。"
+          },
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "600MB/sやカードリーダー条件は伝わるものの、ピザのくだりが直訳っぽく日本の製品ページでは浮きます。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "ピザ注文の例えは面白いけど日本語だと直訳感があって、ノリが少し海外通販っぽい。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "内容は合ってるけど、『ピザの注文よりも短時間』の例えが日本語だと少し変で、海外コピーの直訳感があります。"
+          }
+        ],
+        "mean": {
+          "naturalness": 3.25,
+          "tone": 3.25,
+          "fidelity": 4.75
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.1875,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0.5,
+        "flags": []
+      }
+    },
+    {
+      "index": 8,
+      "source": "Massive Capacity up to 1TB\n\nSome of your favorite games are probably pretty big in file size. Well, with up to 1TB capacity, juggling games just got easier. You can fit many games on a 1TB card.\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "最大1TBの大容量\nお気に入りのゲームの中には、かなりファイルサイズが大きいものもあるでしょう。最大1TBの容量があれば、ゲームの入れ替えがぐっと簡単になります。1TBのカードなら、多くのゲームを保存できます。\n*社内テストに基づきます。実際の性能は使用環境により異なる場合があります。",
+      "official": "最大1TBの大容量\n \n お気に入りのゲームは、ファイルサイズがかなり大きいかもしれません。最大1TBの容量があれば、複数のゲームにも簡単に対応できます。1TBのカードにはたくさんのゲームを保存できます。\n \n *社内テストに基づいています。実際のパフォーマンスは異なる場合があります。",
+      "mineJudgement": {
+        "index": 8,
+        "runs": [
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 0,
+            "naturalness": 5,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "容量訴求としては自然で、お客様にもそのまま説明しやすい文面です。"
+          },
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 1,
+            "naturalness": 5,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "普通に日本向けの商品ページとして読めて、容量訴求もゲーム用途にちゃんと刺さります。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 0,
+            "naturalness": 5,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "これは普通に日本向けの商品説明っぽくて、ゲーム容量の話もすっと入ってきます。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 1,
+            "naturalness": 5,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "普通に読みやすくて、ゲーム容量の話も自分向けにちゃんと伝わる感じ。"
+          }
+        ],
+        "mean": {
+          "naturalness": 5,
+          "tone": 4,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 8,
+        "runs": [
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "少し翻訳っぽいですが、容量訴求としては店頭でもそのまま説明に使えるレベルです。"
+          },
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "大きな破綻はないですが、『ゲームにも簡単に対応』が少し翻訳っぽくて売り文句としては弱いです。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "普通に読めるけど、『対応できます』あたりがちょっとカタログ翻訳っぽくてレビューも見たくなる感じ。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "意味はちゃんと分かるけど、「パフォーマンス」や言い回しがちょっと直訳っぽくてレビューも見たくなる感じ。"
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 3.25,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 9,
+      "source": "Protection Built in\n\nThe PLAY PRO microSD Express card is IPX7 waterproof, wearproof, temperature-proof, x-ray-proof, vibration-resistant, magnetic-proof, shockproof, and drop-proof.*\n\nWearout resistance\n*up to 10,000 times of plugging and unplugging\nWaterproof\n*IPX7,1m deep water for 30min\nTemperature resistance\n*Operation: -25℃~85℃, Storage: -40℃~85℃\nShock resistance\n*1500G Shock\nAnti-vibration\n*10-2000Hz\nAnti-magnetic\n*15000Gauss\nX-ray protection\n*up to 100mGy\n(equivalent to airport X-ray machine exposure)\nDrop protection\n*1.5m drop",
+      "mine": "保護性能を搭載\nPLAY PRO microSD Express カードは、IPX7防水、耐摩耗、耐温度、X線耐性、耐振動、耐磁性、耐衝撃、耐落下性能を備えています。*\n耐摩耗性\n*最大10,000回の抜き差し\n防水\n*IPX7、水深1mで30分\n耐温度性\n*動作時：-25°C~85°C、保管時：-40°C~85°C\n耐衝撃性\n*1500G衝撃\n耐振動性\n*10-2000Hz\n耐磁性\n*15000Gauss\nX線保護\n*最大100mGy\n（空港のX線検査装置による照射に相当）\n落下保護\n*1.5m落下",
+      "official": "内蔵の保護\n  \n  PLAY PRO microSD Expressカードは、IPX7の防水性、耐摩耗性、耐温度性、X線耐性、耐振動性、耐磁性、耐衝撃性、耐落下性を備えています。*\n  \n 耐摩耗性\n  *最大10,000回の挿抜\n 防水性\n  *IPX7、深さ1mの水中で30分間\n 温度耐性\n  *動作温度：-25℃～85℃、保管温度：-40℃～85℃\n 耐衝撃性\n  *1500Gの衝撃\n 耐振動性\n  *10～2000Hz\n 防磁性\n  *15000Gauss\n X線保護\n  *最大100mGy\n  （空港のX線被曝相当）\n 落下保護\n  *1.5mの落下",
+      "mineJudgement": {
+        "index": 9,
+        "runs": [
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "仕様は合っていますが、『耐温度性』や『15000Gauss』など日本向けページとしては表記の詰めが甘く見えます。"
+          },
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "スペックは揃っていますが、『耐温度性』『落下保護』あたりの言い回しが直訳っぽくて店頭でそのままは勧めにくいです。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "スペック表としては分かるけど、『保護性能を搭載』とか『耐温度性』あたりがちょっと翻訳っぽく感じます。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "スペックは分かるけど『耐温度』とか『保護性能を搭載』がちょっと翻訳っぽくて身構える。"
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 3,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 9,
+        "runs": [
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "スペックは揃っていますが、『内蔵の保護』や『耐温度性』が直訳臭くて日本向けページとしては詰めが甘いです。"
+          },
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "スペックは揃っていますが、『内蔵の保護』や『X線被曝相当』の言い方が量販店のPOPとしてはかなり気になります。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "スペックは分かるけど『内蔵の保護』や『耐温度性』が直訳感強くて、メーカー公式っぽい安心感は少し落ちる。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "スペック表としては読めるけど、「内蔵の保護」や「耐温度性」あたりが機械翻訳っぽくて少し警戒する。"
+          }
+        ],
+        "mean": {
+          "naturalness": 2.75,
+          "tone": 3,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      }
+    },
+    {
+      "index": 10,
+      "source": "Peace of Mind Extras\n\nThis card undergoes strict testing in the Lexar Quality Lab and we're so confident in it that it comes with a limited lifetime warranty. Plus we offer lifetime access to the Lexar Recovery Tool which you can use to restore accidentally deleted and formatted files.",
+      "mine": "安心のプラス機能\nこのカードはLexar Quality Labで厳格なテストを受けており、その品質への自信から制限付き永久保証が付いています。さらに、誤って削除したファイルやフォーマットにより失われたファイルの復元に使えるLexar Recovery Toolを無期限でご利用いただけます。",
+      "official": "安心の追加装備\n \n このカードは、Lexar品質ラボ出の厳格なテストを経ており、自信を示す制限付き無期限保証付きです。さらに、うっかり削除・フォーマットしてしまったファイルの復元に使用できるLexar Recovery Toolへの無期限アクセスを提供しています。",
+      "mineJudgement": {
+        "index": 10,
+        "runs": [
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "やや直訳っぽい箇所はあるものの、保証と復元ツールの安心感はきちんと伝わります。"
+          },
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "『制限付き永久保証』は少し硬いですが、保証と復旧ツールの安心感はきちんと伝わります。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "意味はちゃんと伝わるけど、『安心のプラス機能』みたいな言い方は少しカタログ臭くて刺さりにくいです。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "保証と復元ツールの安心感は伝わるし、少し硬いけど信用はできる文面。"
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 3.75,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 10,
+        "runs": [
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 4,
+            "note": "『Lexar品質ラボ出』の誤字と『安心の追加装備』の違和感で、正直このままお客様には見せたくないです。"
+          },
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 4,
+            "note": "『Lexar品質ラボ出』の誤字と『安心の追加装備』の不自然さで、日本向けページとしては一気に信用を落とします。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 4,
+            "note": "『品質ラボ出』のミスと『安心の追加装備』が変で、保証の説明なのにちょっと怪しい日本語に見える。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "「Lexar品質ラボ出の」が誤字っぽいし、「安心の追加装備」も変で、保証まわりの信頼感が下がる。"
+          }
+        ],
+        "mean": {
+          "naturalness": 2,
+          "tone": 2,
+          "fidelity": 4.25
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 11,
+      "source": "Rigorously Tested\n\nAll Lexar products undergo extensive testing in the Lexar Quality Labs, facilities with thousands of different cameras and digital devices to ensure performance, quality, compatibility, and reliability.",
+      "mine": "厳格なテストを実施\nすべてのLexar製品は、数千種類のカメラやデジタル機器を備えたLexar Quality Labsで幅広いテストを受け、性能、品質、互換性、信頼性を確保しています。",
+      "official": "厳格なテストに合格\n \n すべてのLexar製品には、Lexar品質ラボにおいて、数千の異なるカメラやデジタル機器を使用して、性能、品質、互換性、信頼性を確認する広範なテストが実施されています。",
+      "mineJudgement": {
+        "index": 11,
+        "runs": [
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 0,
+            "naturalness": 5,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "量販店の売り場で使っても違和感がなく、信頼性訴求として十分きれいな日本語です。"
+          },
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "やや定型文っぽいものの、検証環境と信頼性の説明としては違和感なく使えます。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "自然ではあるけどかなり無難で、信頼材料として読むならまあOKという感じです。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 1,
+            "naturalness": 5,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "品質テストの説明として自然で、派手すぎずちゃんとしてる印象。"
+          }
+        ],
+        "mean": {
+          "naturalness": 4.5,
+          "tone": 3.75,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 11,
+        "runs": [
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "意味は分かりますが、『製品にはテストが実施』の言い回しが硬く、タイトルの『合格』も少し言い切りすぎに感じます。"
+          },
+          {
+            "persona": "ja-tokyo-camera-clerk",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "意味は通りますが、『製品にはテストが実施されています』が硬くて翻訳調なので、もう少し自然な日本語にしてほしいです。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "内容はちゃんと伝わるけど、全体的に硬めで『テストに合格』は少し盛ってる感じがする。"
+          },
+          {
+            "persona": "ja-osaka-student",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "内容はだいたい分かるけど、「広範なテスト」みたいな硬い直訳感があって商品コピーとしては少し bland。"
+          }
+        ],
+        "mean": {
+          "naturalness": 3.25,
+          "tone": 3.25,
+          "fidelity": 4
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      }
+    }
+  ],
+  "summary": {
+    "mine": {
+      "naturalness": 3.7083333333333335,
+      "tone": 3.5625,
+      "fidelity": 4.958333333333333
+    },
+    "official": {
+      "naturalness": 3.0208333333333335,
+      "tone": 2.9583333333333335,
+      "fidelity": 4.458333333333333
+    },
+    "unstableCells": 0,
+    "personaSensitiveCells": 0
+  }
+}

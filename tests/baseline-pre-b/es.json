@@ -1,0 +1,1270 @@
+{
+  "lang": "es",
+  "csv": "Card 卡类-OW&AMZ小语种翻译 - PLAY PRO microSD.csv",
+  "timestamp": "2026-08-25T11:06:05.892Z",
+  "methodology": "judge=LLM人设模拟(judge-personas.ts)，置信度低于真人母语评审；fidelity以代码校验为准，judge仅软信号；只允许差分对比结论，不允许绝对分数结论",
+  "cells": [
+    {
+      "index": 0,
+      "source": "Power Up Your Play\nLexar® PLAY PRO microSDXC™ Express Card",
+      "mine": "Más potencia para sus partidas\nTarjeta Lexar® PLAY PRO microSDXC™ Express",
+      "official": "Da un impulso a tu juego\n Tarjeta Lexar® PLAY PRO microSDXC™ Express",
+      "mineJudgement": {
+        "index": 0,
+        "runs": [
+          {
+            "persona": "es-madrid-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Se entiende bien, pero ese 'sus partidas' me suena demasiado de usted para un producto gaming."
+          },
+          {
+            "persona": "es-madrid-student",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "Se entiende, pero ese «sus partidas» suena a anuncio traducido para señores, no para gamers de aquí."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Se entiende al momento, pero eso de “sus partidas” me suena un poco distante para algo de videojuegos."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Me suena bastante bien y directo, aunque el tratamiento de “sus” queda algo formal para hablar de juegos."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.75,
+          "tone": 3,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.5,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 0,
+        "runs": [
+          {
+            "persona": "es-madrid-student",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Se entiende, pero 'da un impulso a tu juego' me suena a eslogan traducido sin mucho cariño."
+          },
+          {
+            "persona": "es-madrid-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Suena bastante correcto para un titular gaming, aunque un poco genérico."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Me suena bastante bien, aunque yo habría dicho algo más directo como “potencia tu juego”."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Suena bastante claro y comercial, aunque “da un impulso” me parece un pelín traducido."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.75,
+          "tone": 3.75,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      }
+    },
+    {
+      "index": 1,
+      "source": "Good for Today, Great for Tomorrow\n\nRevolutionary Performance\n\nPeace of Mind Extras\n\nLevel-up Your Handheld Gaming Experience\nRead speed up to 900MB/s\n\nCut Your Download Times\nWrite speed up to 600MB/s\n\nMassive Capacity up to 1TB\n\nProtection Built in",
+      "mine": "Ideal para hoy, preparada para mañana\nRendimiento revolucionario\nExtras para su tranquilidad\nSuba de nivel su experiencia de juego portátil\nVelocidad de lectura de hasta 900MB/s\nReduzca sus tiempos de descarga\nVelocidad de escritura de hasta 600MB/s\nGran capacidad de hasta 1TB\nProtección integrada",
+      "official": "Buena para hoy, aún mejor para mañana\n \n Rendimiento revolucionario\n \n Tranquilidad extra\n \n Lleva tu experiencia de gaming portátil a un nuevo nivel\n Velocidades de lectura de hasta 900 MB/s\n \n Reduce los tiempos de descarga\n Velocidad de escritura de hasta 600 MB/s\n \n Enorme capacidad de hasta 1 TB\n \n Protección incorporada",
+      "mineJudgement": {
+        "index": 1,
+        "runs": [
+          {
+            "persona": "es-madrid-student",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Está correcto, pero frases como 'Extras para su tranquilidad' y 'Suba de nivel' huelen a traducción de folleto."
+          },
+          {
+            "persona": "es-madrid-student",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "Los titulares están correctos, pero «Suba de nivel su experiencia» y «Extras para su tranquilidad» me cantan a traducción automática."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Lo pillo rápido, aunque frases como “Suba de nivel su experiencia” me suenan bastante traducidas."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Se entiende todo, pero frases como “Suba de nivel su experiencia” me suenan a traducción de anuncio."
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 2.75,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 1,
+        "runs": [
+          {
+            "persona": "es-madrid-student",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Está todo, pero frases como 'tranquilidad extra' y 'experiencia de gaming portátil' huelen bastante a plantilla de marketing traducida."
+          },
+          {
+            "persona": "es-madrid-student",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Se entiende todo, pero huele a ficha traducida con cosas como protección incorporada y gaming portátil metido sin mucho mimo."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Se entiende rápido y vende bien, aunque alguna frase como “Tranquilidad extra” queda un poco de folleto traducido."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Lo entiendo de un vistazo y me vende bien la tarjeta, aunque “tranquilidad extra” queda algo raro."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.5,
+          "tone": 3.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 1,
+        "flags": []
+      }
+    },
+    {
+      "index": 2,
+      "source": "What is SD Express and how does it works?\n\nSD Express is a new SD card standard. It adopts the PCI Express 3.0 and NVMe 1.3 interfaces, which significantly enhances the data processing capability of SD cards. The working principle of SD Express is based on the PCI Express interface and the NVMe protocol. The PCIe interface supports high-speed data transmission, while the NVMe protocol optimizes storage access efficiency. SD Express uses the second row of contacts at the interface to transmit PCIe signals and is backwards-compatible with UHS-I through the first row of contacts. After being connected to a computer that supports SD Express products, SD Express will be recognized as a standard NVMe device, similar to a modern NVMe SSD.",
+      "mine": "¿Qué es SD Express y cómo funciona?\nSD Express es un nuevo estándar para tarjetas SD. Adopta las interfaces PCI Express 3.0 y NVMe 1.3, lo que mejora de forma significativa la capacidad de procesamiento de datos de las tarjetas SD. El principio de funcionamiento de SD Express se basa en la interfaz PCI Express y el protocolo NVMe. La interfaz PCIe admite transmisión de datos de alta velocidad, mientras que el protocolo NVMe optimiza la eficiencia de acceso al almacenamiento. SD Express utiliza la segunda fila de contactos de la interfaz para transmitir señales PCIe y es retrocompatible con UHS-I mediante la primera fila de contactos. Tras conectarse a un ordenador compatible con productos SD Express, SD Express se reconocerá como un dispositivo NVMe estándar, similar a una unidad de estado sólido (SSD) NVMe moderna.",
+      "official": "¿Qué es SD Express y cómo funciona?\n \n SD Express es una nueva tarjeta SD estándar. Adopta las interfaces PCI Express 3.0 y NVMe 1.3, lo que mejora de manera significativa la capacidad de procesado de datos de las tarjetas SD. El principio rector de SD Express está basado en la interfaz PCI Express y el protocolo NVMe. La interfaz PCIe acepta transmisión de datos a alta velocidad, mientras que el protocolo NVMe optimiza la eficiencia del acceso a almacenamiento. SD Express utiliza la segunda fila de contactos de la interfaz para transmitir señales PCIe y es compatible con versiones anteriores con UHS-I mediante la primera fila de contactos. Después de conectarse a un ordenador que admite productos SD Express, SD Express se reconocerá como un dispositivo NVMe estándar, similar a una SSD NVMe moderna.",
+      "mineJudgement": {
+        "index": 2,
+        "runs": [
+          {
+            "persona": "es-madrid-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Para una explicación técnica está bastante limpio y no chirría mucho, aunque sigue sonando algo corporativo."
+          },
+          {
+            "persona": "es-madrid-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Como explicación técnica está bastante bien y no me saca demasiado, aunque alguna frase suena un poco encorsetada."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Es técnico y algo denso, pero está bien explicado y no me chirría demasiado."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Es un texto técnico largo, pero está claro y me da sensación de estar bien explicado."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 3.75,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 2,
+        "runs": [
+          {
+            "persona": "es-madrid-student",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 4,
+            "note": "La parte técnica se entiende, pero 'nueva tarjeta SD estándar', 'principio rector' y 'acepta transmisión' suenan rarísimos para una ficha seria."
+          },
+          {
+            "persona": "es-madrid-student",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 4,
+            "note": "La parte técnica se lee muy calcada, con frases como principio rector o acepta transmisión que no diría nadie en una ficha española seria."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 4,
+            "note": "Aquí me pierdo un poco porque suena técnico y traducido, con frases que no fluyen como español normal."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "La información está, pero frases como “principio rector” o “acepta transmisión” me hacen sentir que estoy leyendo una traducción técnica."
+          }
+        ],
+        "mean": {
+          "naturalness": 2.25,
+          "tone": 2.25,
+          "fidelity": 4.25
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.1875,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0.5,
+        "flags": []
+      }
+    },
+    {
+      "index": 3,
+      "source": "Revolutionary Performance\n\nThanks to its next-gen tech of PCIe and NVMe interface technologies that deliver up to 900MB/s read speed*, the PLAY PRO microSDXC™ Express Card is a stunning 4x faster than typical UHS-I microSD cards.\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "Rendimiento revolucionario\nGracias a sus tecnologías de nueva generación con interfaces PCIe y NVMe, que ofrecen velocidades de lectura de hasta 900MB/s*, la Tarjeta PLAY PRO microSDXC™ Express es unas impresionantes 4 veces más rápida que las tarjetas microSD UHS-I habituales.\n*Basado en pruebas internas. El rendimiento real puede variar.",
+      "official": "Rendimiento revolucionario\n \n Gracias a su tecnología de última generación de interfaces PCIe y NVMe que ofrecen una velocidad de lectura de hasta 900 MB/s*, la tarjeta PLAY PRO microSDXC™ Express es 4 veces más rápida que las tarjetas microSD UHS-I típicas.\n \n *Basado en pruebas internas. El rendimiento real puede variar.",
+      "mineJudgement": {
+        "index": 3,
+        "runs": [
+          {
+            "persona": "es-madrid-student",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "El mensaje se entiende, pero 'ofrecen velocidades' y 'unas impresionantes 4 veces' suenan a marketing traducido."
+          },
+          {
+            "persona": "es-madrid-student",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "«Gracias a sus tecnologías... que ofrecen» y «unas impresionantes 4 veces» es el típico copy calcado que me da poca confianza."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "La información queda clara, aunque la frase principal es larga y un poco de folleto traducido."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "La información queda clara, aunque eso de “unas impresionantes 4 veces” me chirría un poco."
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 2.75,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 3,
+        "runs": [
+          {
+            "persona": "es-madrid-student",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Correcta en datos, aunque 'tecnología de última generación de interfaces' es la típica frase calcada que me hace desconfiar un poco."
+          },
+          {
+            "persona": "es-madrid-student",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Correcta en datos, pero el arranque de gracias a su tecnología de última generación de interfaces suena a traducción automática de manual."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "La información está clara, pero la frase principal es algo larga y pesada para leerla de pasada."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Se entiende, pero la frase principal es larga y un poco enrevesada para leerla rápido en una ficha de producto."
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 3,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 4,
+      "source": "*Comparison of the theoretical maximum speeds under different interface forms (Data source: SDA)",
+      "mine": "* Comparación de las velocidades máximas teóricas con distintos tipos de interfaz (Fuente de datos: SDA)",
+      "official": "*Comparación de las velocidades máximas teóricas bajo diferentes formas de la interfaz (Fuente de los datos: SDA)",
+      "mineJudgement": {
+        "index": 4,
+        "runs": [
+          {
+            "persona": "es-madrid-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Como nota técnica funciona y no mete ruido, salvo algún detalle de formato."
+          },
+          {
+            "persona": "es-madrid-student",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Cumple como nota al pie, pero «Fuente de datos» suena raro; yo pondría simplemente «Fuente: SDA»."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Como nota técnica cumple, aunque “Fuente de datos” suena algo rígido."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Como nota al pie cumple bien y no me distrae."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.75,
+          "tone": 3.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 4,
+        "runs": [
+          {
+            "persona": "es-madrid-student",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "Como nota técnica vale, pero 'bajo diferentes formas de la interfaz' no lo diría nadie en España."
+          },
+          {
+            "persona": "es-madrid-student",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "Bajo diferentes formas de la interfaz queda rarísimo, como si hubieran traducido palabra por palabra."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "Eso de “bajo diferentes formas de la interfaz” me suena muy raro y poco natural."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "“Bajo diferentes formas de la interfaz” me suena muy artificial y me hace desconfiar un poco."
+          }
+        ],
+        "mean": {
+          "naturalness": 2,
+          "tone": 2,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 5,
+      "source": "Good for Today, Great for Tomorrow\n\nThe PLAY PRO microSDXC™ Express Card is backwards-compatible with UHS-I and UHS-II host devices (at UHS-I speeds) so you can use it with your current handheld gaming consoles – and it's ideal for the microSD Express devices coming soon.",
+      "mine": "Ideal para hoy, preparada para mañana\nLa Tarjeta PLAY PRO microSDXC™ Express es retrocompatible con dispositivos host UHS-I y UHS-II (a velocidades UHS-I), para que pueda usarla con sus consolas portátiles de videojuegos actuales; además, es ideal para los dispositivos microSD Express que llegarán próximamente.",
+      "official": "Buena para hoy, aún mejor para mañana\n \n La tarjeta PLAY PRO microSDXC™ Express es compatible con versiones anteriores de dispositivos host UHS-I y UHS-II (a velocidades UHS-I), por lo que puede usarla con sus consolas de juegos portátiles actuales, y es ideal para los dispositivos microSD Express que estarán disponibles próximamente.",
+      "mineJudgement": {
+        "index": 5,
+        "runs": [
+          {
+            "persona": "es-madrid-student",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Correcta en datos, pero 'dispositivos host' y el trato de usted no me suenan muy cercanos para consolas portátiles."
+          },
+          {
+            "persona": "es-madrid-student",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "La información está, pero entre «dispositivos host» y el trato de usted parece más ficha técnica traducida que mensaje para consola portátil."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Me queda claro que sirve para lo de ahora y lo próximo, pero “dispositivos host” queda muy de ficha técnica."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Me resulta claro y útil, aunque “dispositivos host” es un poco de jerga."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.5,
+          "tone": 3,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.5,
+          "fidelity": 0
+        },
+        "personaGap": 1,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 5,
+        "runs": [
+          {
+            "persona": "es-madrid-student",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "El cambio a usted y lo de 'dispositivos host' queda muy frío y poco pensado para alguien que compra esto para una consola portátil."
+          },
+          {
+            "persona": "es-madrid-student",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "Lo de dispositivos host y encima tratarme de usted en una ficha gaming me saca bastante del producto."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Se entiende, pero cambia a un trato de “usted” que me resulta distante y poco consistente."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "El mensaje se entiende, pero “dispositivos host” y la mezcla de tono formal me cortan la lectura."
+          }
+        ],
+        "mean": {
+          "naturalness": 2.5,
+          "tone": 2.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 1,
+        "flags": []
+      }
+    },
+    {
+      "index": 6,
+      "source": "Level-up Your Handheld Gaming Experience\n\nUp to 900MB/s* read speed, the PLAY PRO microSDXC™ Express Card is a stunning 4x faster than typical UHS-I microSD cards – meaning that games load faster and also ensuring a smooth, lag-free experience.\n\nRead speed up to 900MB/s*\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "Suba de nivel su experiencia de juego portátil\nCon una velocidad de lectura de hasta 900MB/s*, la Tarjeta PLAY PRO microSDXC™ Express es unas impresionantes 4 veces más rápida que las tarjetas microSD UHS-I habituales, lo que significa que los juegos cargan más rápido y que disfrutará de una experiencia fluida y sin lag.\nVelocidad de lectura de hasta 900MB/s*\n*Basado en pruebas internas. El rendimiento real puede variar.",
+      "official": "Lleva tu experiencia de gaming portátil a un nuevo nivel\n \n Con una velocidad de lectura de hasta 900 MB/s*, la tarjeta PLAY PRO microSDXC™ Express es 4 veces más rápida que las tarjetas microSD UHS-I típicas, lo que significa que los juegos se cargan más rápido y también garantiza una experiencia fluida y sin demoras.\n \n Velocidad de lectura de hasta 900 MB/s*\n \n *Basado en pruebas internas. El rendimiento real puede variar.",
+      "mineJudgement": {
+        "index": 6,
+        "runs": [
+          {
+            "persona": "es-madrid-student",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "Lo de 'Suba de nivel su experiencia' es el típico calco que me hace pensar que no lo ha escrito alguien de aquí."
+          },
+          {
+            "persona": "es-madrid-student",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "«Suba de nivel su experiencia» me chirría muchísimo, aunque lo de fluida y sin lag sí encaja con el producto."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Entiendo el beneficio, pero mezcla un tono formal con palabras de gamer y se nota un poco forzado."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Lo entiendo, pero mezcla formalidad con palabras como “lag” y queda un poco forzado."
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 2.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 6,
+        "runs": [
+          {
+            "persona": "es-madrid-student",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Tiene el mensaje claro, pero 'sin demoras' y el rollo de 'gaming portátil' suenan más a traducción que a ficha gamer natural."
+          },
+          {
+            "persona": "es-madrid-student",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Está bien para entenderlo, pero sin demoras y garantiza una experiencia fluida suena a copy traducido y algo tieso."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Me resulta claro y bastante convincente, aunque “sin demoras” no suena muy de videojuegos."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Me resulta bastante convincente para juegos, aunque “sin demoras” no es lo más natural para hablar de lag."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.5,
+          "tone": 3.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 1,
+        "flags": []
+      }
+    },
+    {
+      "index": 7,
+      "source": "Cut Your Download Times\n\nThe PLAY PRO microSDXC™ Express Card also delivers 600MB/s write speeds* when paired with the Lexar microSD Express card reader so you can download a AAA game in less time than it'll take you to order a pizza!\n\nWrite speed up to 600MB/s*\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "Reduzca sus tiempos de descarga\nLa Tarjeta PLAY PRO microSDXC™ Express también ofrece velocidades de escritura de 600MB/s* al combinarla con el lector de tarjetas Lexar microSD Express, para que pueda descargar un juego AAA en menos tiempo del que tarda en pedir una pizza.\nVelocidad de escritura de hasta 600MB/s*\n*Basado en pruebas internas. El rendimiento real puede variar.",
+      "official": "Reduce los tiempos de descarga\n \n La tarjeta PLAY PRO microSDXC™ Express también ofrece velocidades de escritura de 600 MB/s* cuando se combina con el lector de tarjetas microSD Express de Lexar, para que puedas descargar un juego AAA en menos tiempo del que te llevaría pedir una pizza.\n \n Velocidad de escritura de hasta 600 MB/s*\n \n *Basado en pruebas internas. El rendimiento real puede variar.",
+      "mineJudgement": {
+        "index": 7,
+        "runs": [
+          {
+            "persona": "es-madrid-student",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "La idea de la pizza está bien, pero 'Reduzca sus tiempos de descarga' y el usted le quitan naturalidad gamer."
+          },
+          {
+            "persona": "es-madrid-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Es de las más naturales por lo de la pizza, pero mantiene el usted y en el cuerpo dice 600 MB/s como si fuera fijo, no «hasta»."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "La comparación con pedir una pizza me resulta cercana, aunque lo de la velocidad debería decir siempre “hasta” para no dar pie a dudas."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "La comparación con la pizza hace el texto más cercano y se entiende bien lo que promete."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.75,
+          "tone": 3.5,
+          "fidelity": 4.5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.25,
+          "fidelity": 0.25
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 7,
+        "runs": [
+          {
+            "persona": "es-madrid-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Esta sí entra mejor: el ejemplo de la pizza queda cercano, aunque 'cuando se combina con' sigue sonando un poco calcado."
+          },
+          {
+            "persona": "es-madrid-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Esta parte fluye mejor y el ejemplo de la pizza encaja, aunque todavía queda algún giro algo calcado como cuando se combina con."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Esta parte me entra bien y la comparación con la pizza suena cercana y fácil de entender."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 5,
+            "fidelity": 5,
+            "note": "La comparación con pedir una pizza suena cercana y me ayuda a entender rápido la ventaja."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 4.25,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 8,
+      "source": "Massive Capacity up to 1TB\n\nSome of your favorite games are probably pretty big in file size. Well, with up to 1TB capacity, juggling games just got easier. You can fit many games on a 1TB card.\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "Gran capacidad de hasta 1TB\nEs probable que algunos de sus juegos favoritos ocupen bastante espacio. Pues bien, con una capacidad de hasta 1TB, gestionar sus juegos ahora es más fácil. En una tarjeta de 1TB caben muchos juegos.\n*Basado en pruebas internas. El rendimiento real puede variar.",
+      "official": "Enorme capacidad de hasta 1 TB\n \n Algunos de tus juegos favoritos probablemente tengan un tamaño de archivo bastante grande. Bien, con una capacidad de hasta 1 TB, hacer malabarismos con juegos ahora es más fácil. En una tarjeta de 1 TB caben muchos juegos.\n \n *Basado en pruebas internas. El rendimiento real puede variar.",
+      "mineJudgement": {
+        "index": 8,
+        "runs": [
+          {
+            "persona": "es-madrid-student",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Se entiende, pero el trato de “sus juegos” y cosas como “gestionar sus juegos” suenan bastante a ficha traducida y poco gamer."
+          },
+          {
+            "persona": "es-madrid-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Se entiende bien, pero el tratamiento de usted y cosas como “gestionar sus juegos” suenan un poco a ficha traducida sin mucho mimo."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Se entiende bien, pero el trato de “sus juegos” me suena un poco distante para hablar de juegos y tarjetas."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Se entiende bien, aunque lo de “gestionar sus juegos” y el trato de usted me suena un poco frío para una tarjeta de memoria."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.75,
+          "tone": 3,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 8,
+        "runs": [
+          {
+            "persona": "es-madrid-student",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "Se entiende, pero lo de “hacer malabarismos con juegos” y el “Bien,” huele mucho a traducción literal."
+          },
+          {
+            "persona": "es-madrid-student",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "Lo de “hacer malabarismos con juegos” canta muchísimo a traducción literal y me baja la confianza."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Se entiende, pero eso de “hacer malabarismos con juegos” me suena a traducción y me corta un poco la confianza."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Se entiende, pero eso de “hacer malabarismos con juegos” me suena a traducción y me corta un poco el ritmo."
+          }
+        ],
+        "mean": {
+          "naturalness": 2.5,
+          "tone": 2.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 1,
+        "flags": []
+      }
+    },
+    {
+      "index": 9,
+      "source": "Protection Built in\n\nThe PLAY PRO microSD Express card is IPX7 waterproof, wearproof, temperature-proof, x-ray-proof, vibration-resistant, magnetic-proof, shockproof, and drop-proof.*\n\nWearout resistance\n*up to 10,000 times of plugging and unplugging\nWaterproof\n*IPX7,1m deep water for 30min\nTemperature resistance\n*Operation: -25℃~85℃, Storage: -40℃~85℃\nShock resistance\n*1500G Shock\nAnti-vibration\n*10-2000Hz\nAnti-magnetic\n*15000Gauss\nX-ray protection\n*up to 100mGy\n(equivalent to airport X-ray machine exposure)\nDrop protection\n*1.5m drop",
+      "mine": "Protección integrada\nLa tarjeta PLAY PRO microSD Express es resistente al agua con certificación IPX7, al desgaste, a la temperatura, a los rayos X, a las vibraciones, al magnetismo, a los golpes y a las caídas.*\nResistencia al desgaste\n*hasta 10,000 ciclos de conexión y desconexión\nResistencia al agua\n*IPX7, agua a 1m de profundidad durante 30min\nResistencia a la temperatura\n*Funcionamiento: -25°C~85°C, almacenamiento: -40°C~85°C\nResistencia a los golpes\n*Impacto de 1500G\nResistencia a las vibraciones\n*10-2000Hz\nResistencia al magnetismo\n*15000Gauss\nProtección contra rayos X\n*hasta 100mGy\n(equivalente a la exposición a una máquina de rayos X de aeropuerto)\nProtección contra caídas\n*caída de 1.5m",
+      "official": "Protección incorporada\n  \n  La tarjeta microSD Express PLAY PRO es resistente al agua, al desgaste, a la temperatura, a los rayos X, a las vibraciones, al magnetismo, a los golpes y a las caídas según clasificación IPX7.*\n  \n Resistencia al desgaste\n  *enchufar y desenchufar hasta 10 000 veces\n Resistente al agua\n  *IPX7, 1 m de profundidad en agua durante 30 min\n Resistencia a la temperatura\n  *Funcionamiento: -25 ℃~85 ℃, Almacenamiento: -40 ℃ ~ 85 ℃\n Resistencia a golpes\n  *Choque de 1500 G\n Antivibración\n  *10-2000 Hz\n Antimagnético\n  *15 000 Gauss\n Protección contra rayos X\n  *hasta 100 mGy\n  (equivalente a la exposición a una máquina de rayos X en un aeropuerto)\n Protección contra caídas\n  *Caídas de 1,5 m",
+      "mineJudgement": {
+        "index": 9,
+        "runs": [
+          {
+            "persona": "es-madrid-student",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "La lista técnica está clara, pero el formato de números tipo “10,000” y expresiones como “máquina de rayos X de aeropuerto” cantan a traducción rápida."
+          },
+          {
+            "persona": "es-madrid-student",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "La lista técnica da confianza, pero formatos como 10,000, 1.5m y alguna expresión tipo “resistente a la temperatura” cantan a traducción rápida."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "La lista de resistencias da confianza, aunque algunas frases y formatos como “10,000” o “1.5m” me suenan poco de aquí."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "La lista de protecciones me da confianza, pero los números y unidades están puestos muy a la inglesa y se nota traducido."
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 3.5,
+          "fidelity": 4.5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.25,
+          "fidelity": 0.25
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 9,
+        "runs": [
+          {
+            "persona": "es-madrid-student",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 4,
+            "note": "Tiene todas las specs, pero suena a ficha traducida deprisa, con cosas raras como “enchufar y desenchufar” una microSD."
+          },
+          {
+            "persona": "es-madrid-student",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 4,
+            "note": "Las specs están casi todas, pero “enchufar y desenchufar” una microSD y el IPX7 colocado raro suenan muy poco cuidados."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "La lista de resistencias está bien para mirar especificaciones, pero frases como “enchufar y desenchufar” o lo del IPX7 al final suenan raras."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Tiene todos los datos, pero algunas frases como “enchufar y desenchufar” una tarjeta me suenan raras y poco cuidadas."
+          }
+        ],
+        "mean": {
+          "naturalness": 2,
+          "tone": 2.5,
+          "fidelity": 4
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 10,
+      "source": "Peace of Mind Extras\n\nThis card undergoes strict testing in the Lexar Quality Lab and we're so confident in it that it comes with a limited lifetime warranty. Plus we offer lifetime access to the Lexar Recovery Tool which you can use to restore accidentally deleted and formatted files.",
+      "mine": "Extras para su tranquilidad\nEsta tarjeta se somete a pruebas estrictas en el Lexar Quality Lab y confiamos tanto en ella que incluye una garantía limitada de por vida. Además, ofrecemos acceso de por vida a Lexar Recovery Tool, que puede utilizar para restaurar archivos eliminados accidentalmente y archivos formateados.",
+      "official": "Tranquilidad extra\n \n Esta tarjeta se somete a pruebas estrictas en el laboratorio de calidad de Lexar y estamos tan seguros de ella que viene con una garantía limitada de por vida. Además, ofrecemos acceso de por vida a Lexar Recovery Tool, que puede utilizar para restaurar archivos borrados y formateados accidentalmente.",
+      "mineJudgement": {
+        "index": 10,
+        "runs": [
+          {
+            "persona": "es-madrid-student",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Correcto pero muy formal, y lo de “archivos formateados” suena raro; yo esperaría algo más natural como recuperar archivos borrados o perdidos tras formatear."
+          },
+          {
+            "persona": "es-madrid-student",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "“Extras para su tranquilidad” y “archivos formateados” me suenan bastante calcados, aunque la información queda clara."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "Me transmite bastante tranquilidad, aunque lo de “archivos formateados” queda algo raro al leerlo rápido."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "El mensaje tranquiliza, aunque “archivos formateados” me hace tropezar porque no suena muy natural en español."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.25,
+          "tone": 3.5,
+          "fidelity": 4.25
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.25,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 10,
+        "runs": [
+          {
+            "persona": "es-madrid-student",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Es aceptable, aunque “estamos tan seguros de ella” y el cambio a “puede utilizar” queda bastante poco natural."
+          },
+          {
+            "persona": "es-madrid-student",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Se entiende y vende lo importante, aunque ese “estamos tan seguros de ella” y el cambio a usted quedan bastante traducidos."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Este texto sí me transmite más confianza, aunque alguna frase como “tan seguros de ella” no suena del todo natural."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Me transmite la idea de garantía y recuperación, aunque “estamos tan seguros de ella” queda algo forzado."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.25,
+          "tone": 3.25,
+          "fidelity": 4.75
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.1875,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0.5,
+        "flags": []
+      }
+    },
+    {
+      "index": 11,
+      "source": "Rigorously Tested\n\nAll Lexar products undergo extensive testing in the Lexar Quality Labs, facilities with thousands of different cameras and digital devices to ensure performance, quality, compatibility, and reliability.",
+      "mine": "Probados rigurosamente\nTodos los productos Lexar se someten a pruebas exhaustivas en los Lexar Quality Labs, instalaciones con miles de cámaras y dispositivos digitales diferentes para garantizar el rendimiento, la calidad, la compatibilidad y la fiabilidad.",
+      "official": "Rigurosamente probado\n \n Todos los productos Lexar se someten a amplias pruebas en Laboratorios de calidad Lexar, instalaciones con miles cámaras y dispositivos digitales, para garantizar el rendimiento, la calidad, la compatibilidad y la fiabilidad.",
+      "mineJudgement": {
+        "index": 11,
+        "runs": [
+          {
+            "persona": "es-madrid-student",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Está bastante bien, aunque sigue teniendo ese tono corporativo genérico de “garantizar el rendimiento, la calidad…” que no dice mucho."
+          },
+          {
+            "persona": "es-madrid-student",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Correcto y bastante limpio, pero el típico “garantizar el rendimiento, la calidad…” es copy genérico de marca traducida."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Es claro y serio, justo lo que espero para fiarme de una tarjeta de memoria."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Es una frase clara y bastante creíble, aunque mantiene ese toque de folleto traducido con el nombre del laboratorio en inglés."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 3.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 11,
+        "runs": [
+          {
+            "persona": "es-madrid-student",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 4,
+            "note": "Ese “miles cámaras” canta muchísimo y hace que parezca texto pasado por traductor sin revisar."
+          },
+          {
+            "persona": "es-madrid-student",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 4,
+            "note": "“Miles cámaras” es un fallo que me salta al instante y hace que parezca una ficha pasada por traductor sin revisar."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 4,
+            "note": "Tiene fallos claros como “miles cámaras”, y eso en una ficha de producto me hace desconfiar bastante."
+          },
+          {
+            "persona": "es-sevilla-dad",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "El mensaje se entiende, pero lo de “miles cámaras” y “Laboratorios de calidad Lexar” suena descuidado y traducido."
+          }
+        ],
+        "mean": {
+          "naturalness": 2,
+          "tone": 2.25,
+          "fidelity": 4.25
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.1875,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    }
+  ],
+  "summary": {
+    "mine": {
+      "naturalness": 3.4791666666666665,
+      "tone": 3.1875,
+      "fidelity": 4.854166666666667
+    },
+    "official": {
+      "naturalness": 2.8541666666666665,
+      "tone": 2.9375,
+      "fidelity": 4.770833333333333
+    },
+    "unstableCells": 0,
+    "personaSensitiveCells": 0
+  }
+}

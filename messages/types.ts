@@ -108,6 +108,11 @@ export interface LLMConfig {
   proofreadApiKey: string
   proofreadApiUrl: string
   proofreadModel: string
+  /** v12.3: 人设润色开关（去机翻感）——默认关，仅 de/es/ru/tr 四语种灰度 */
+  enablePolish?: boolean
+  /** v12.3.2: 用户手动碰过润色开关的标记——未标记时 enablePolish 随目标语言自动
+   *  取默认（de/es/ru/tr 开/其余关）；标记后尊重用户选择不再覆盖 */
+  polishUserTouched?: boolean
 }
 
 export interface TranslationCorrection {

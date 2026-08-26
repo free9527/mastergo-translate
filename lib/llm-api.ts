@@ -3,7 +3,7 @@ import { API_MAX_RETRIES, API_RETRY_DELAY_MS, API_TIMEOUT_MS, DEBUG_MODE, MIN_DU
 import { filterRelevantGlossary } from '@lib/glossary-filter'
 import { normalizeTextForLLM, protectCjkSpaces } from '@lib/text-normalizer'
 import { maskEntities, unmaskEntities, maskEntitiesForProofread, maskGlossaryTerms, unmaskGlossaryTerms } from '@lib/entity-masker'
-import { postProcessTranslation, restoreTrademarkSymbols, restoreStorageUnitFormatting, enforceGlossaryTerms, capitalizeFirstLetter, detectTranslationExpansion, detectBrandInjection, validateNumbers, cleanKey } from '@lib/post-process'
+import { postProcessTranslation, restoreTrademarkSymbols, restoreStorageUnitFormatting, enforceGlossaryTerms, capitalizeFirstLetter, detectTranslationExpansion, detectBrandInjection, validateNumbers, cleanKey, hasTrademarkSpam } from '@lib/post-process'
 import {
   IDENTITY_MISSION,
   CORE_PRINCIPLES,
@@ -22,6 +22,8 @@ import {
 import { getFewShotExamples } from '@lib/few-shot-examples'
 import { isBuiltinThirdPartyWholeText, isBuiltinModelSegment, BUILTIN_THIRD_PARTY_ENTRIES, BUILTIN_THIRD_PARTY_ALL_KEYS } from '@lib/third-party-models'
 import { shouldSkipGlossaryEntry } from '@lib/glossary-guard'
+import { getJudgePersonas } from '@lib/judge-personas'
+import { validatePolishOutput } from '@lib/polish-guard'
 /**
  * 内置第三方遮蔽表（v11.13）：第三方词条的 source→source identity Map。
  *
@@ -945,7 +947,10 @@ export async function translateBatch(
 
   // v8.0: 语言专属提示词（仅 品类词 + rules，tone/style/compliance/scene 由 getStyleCard 统一注入）
   // v11.5: 首调不注入 commonErrors（补救型历史事故对照表移到重试层，首调注意力集中）
-  const langBlock = renderLangForTranslate(targetLang, productLine, /* includeCommonErrors */ forceTranslate)
+  // v12.2: commonErrors 回填首调——v12.1 起 commonErrors 重新定位为「预防型机翻味搭配清单」
+  //        （de/es/ru/tr 四语种 judge 基线实据条目），与 v11.5 搬出的补救型内容（⛔三条/BRAND）
+  //        不同物；校对渲染链不含 commonErrors（renderLangForProofread 无此项），零加戏风险
+  const langBlock = renderLangForTranslate(targetLang, productLine, /* includeCommonErrors */ true)
 
   // v8.0: 统一风格卡片（替代分散的 productTone + styleGuide + sceneConstraints）
   const styleCard = getStyleCard(targetLang, productLine, effectiveStyle || 'standard', config.scenePreset)
@@ -1784,7 +1789,18 @@ DO NOT return the source text unchanged. Output ONLY the translation, no explana
   for (const idx of misspelledReverted) misspelledIndices?.add(idx)
 
   // v7.5.4: 最终商标符号兜底 — 确保管道中任何步骤都不会丢失 ®™©
+  // v12.4: restoreTrademarkSymbols 内部已含散弹剥离（hasTrademarkSpam 命中先剥™再定位插入）
   result = restoreTrademarkSymbols(texts, result)
+
+  // v12.4: ™ 散弹最终兜底 — restore 后仍残留散弹（LLM 输出异常到 restore 无法定位正确位置时）
+  // 直接剥离所有 ™®©（干净无符号远好于散弹物料事故），日志告警可追溯。
+  result = result.map((t, i) => {
+    if (hasTrademarkSpam(t)) {
+      console.warn(`[translateBatch] ⛔ ™散弹兜底剥离: [${i}] "${t.slice(0, 60)}"`)
+      return t.replace(/[®™©]/g, '')
+    }
+    return t
+  })
 
   // ═══════════════════════════════════════════════════════════
   // S8: 最终兜底（™还原 → 残留占位符清理 → v9.11 漏翻安全网）
@@ -1839,6 +1855,360 @@ DO NOT return the source text unchanged. Output ONLY the translation, no explana
   return result
 }
 
+// ═══════════════════════════════════════════════════════════════
+// personaJudgeBatch / polishBatch — 人设驱动判定→润色→硬锁（v12.3）
+// ═══════════════════════════════════════════════════════════════
+// 机制：judge 人设（getJudgePersonas）读译文判「需要润色吗」→ 命中条目润色 LLM
+//   按人设反馈的具体问题点改写 → 代码硬锁（validatePolishOutput）校验，失败回退。
+// 纪律：误杀无妨（回退=没润色），漏放不行（=物料事故）。
+// 插入点：翻译完成后、校对之前（App.vue startTranslate 波内，translateBatch 返回后调用）。
+// ═══════════════════════════════════════════════════════════════
+
+export interface PolishIssue {
+  type: 'calque' | 'structure' | 'register'
+  span: string       // 问题点原文片段
+  suggestion: string // 改法建议
+}
+
+export interface PersonaJudgement {
+  index: number          // 批内索引
+  needsPolish: boolean
+  issues: PolishIssue[]
+  confidence: number     // 1-5
+  persona: string        // 人设 id（报告用）
+}
+
+interface PersonaJudgeApiResult {
+  judgements: Array<{
+    i: number
+    needsPolish: boolean
+    issues?: Array<{ type?: string; span?: string; suggestion?: string }>
+    confidence?: number
+  }>
+}
+
+const POLISH_JUDGE_BATCH = 4  // 判定批次（D1：比校对的 8 更保守，防审美疲劳）
+
+function buildJudgePrompt(personaText: string, targetLang: string): string {
+  return `${personaText}
+
+You will be given source texts (English) and their ${targetLang} translations from a product listing.
+Read the translations AS YOUR PERSONA and judge whether each needs polishing for naturalness (机翻感/translation flavor).
+
+Output ONLY a valid JSON object:
+{"judgements":[{"i":<1-based index>,"needsPolish":<true|false>,"issues":[{"type":"calque|structure|register","span":"<the exact problematic phrase in the translation>","suggestion":"<how to fix it, in ${targetLang}>"}],"confidence":<1-5>}]}
+- Include ALL items — "i" must match the input [N] indices exactly
+- needsPolish=true ONLY if the translation has noticeable translation flavor (calqued collocations, stiff structure, wrong register) — do NOT polish correct translations
+- issues: list the specific problems (empty array if needsPolish=false)
+- confidence: 1=guessing, 5=certain (only flag needsPolish=true when confidence≥3)
+- Raw JSON only, no markdown code blocks`
+}
+
+function buildJudgeUser(sources: string[], translations: string[], startIdx: number): string {
+  // v12.4: 判定前剥离™®©——判定人设只看自然度，™是格式噪音；
+  // 防止判定 LLM 模仿译文中的™分布在其 issues span/suggestion 里输出散弹。
+  const stripTm = (t: string) => t.replace(/[™®©]/g, '').replace(/\n/g, ' ↵ ')
+  return translations.map((t, k) => {
+    const n = startIdx + k + 1
+    return `[${n}] Source: ${stripTm(sources[startIdx + k])}\nTranslation: ${stripTm(t)}`
+  }).join('\n\n')
+}
+
+/** 平衡括号提取 {"judgements":[...]}（v12.0 教训复用） */
+function extractJudgementsObject(text: string): PersonaJudgeApiResult | null {
+  let searchFrom = 0
+  while (true) {
+    const keyIdx = text.indexOf('"judgements"', searchFrom)
+    if (keyIdx < 0) return null
+    let braceStart = -1
+    for (let k = keyIdx - 1; k >= 0; k--) {
+      if (text[k] === '{') { braceStart = k; break }
+      if (text[k] === '}') break
+    }
+    if (braceStart < 0) { searchFrom = keyIdx + 12; continue }
+    let depth = 0
+    let inStr = false
+    let esc = false
+    for (let k = braceStart; k < text.length; k++) {
+      const c = text[k]
+      if (esc) { esc = false; continue }
+      if (c === '\\' && inStr) { esc = true; continue }
+      if (c === '"') { inStr = !inStr; continue }
+      if (inStr) continue
+      if (c === '{') depth++
+      else if (c === '}') {
+        depth--
+        if (depth === 0) {
+          try {
+            const obj = JSON.parse(text.slice(braceStart, k + 1))
+            if (obj && Array.isArray(obj.judgements)) return obj
+          } catch { /* 找下一个 */ }
+          break
+        }
+      }
+    }
+    searchFrom = keyIdx + 12
+  }
+}
+
+/**
+ * 人设判定：2 个人设分别读译文判「需要润色吗」。
+ * 两人设任一判定 needsPolish=true 且 confidence≥3 → 该条进润色（宁可多润不可漏）。
+ * @returns 命中条目的批内索引 → issues 合并集（两人设的 issues 去重合并）
+ */
+export async function personaJudgeBatch(
+  sources: string[],
+  translations: string[],
+  targetLang: string,
+  config: LLMConfig,
+  productLine?: string | null,
+): Promise<Map<number, PolishIssue[]>> {
+  const personas = getJudgePersonas(targetLang, productLine)
+  if (personas.length === 0) return new Map()
+
+  const hitMap = new Map<number, PolishIssue[]>()
+
+  for (const persona of personas) {
+    const system = buildJudgePrompt(persona.text, targetLang)
+    for (let b = 0; b < translations.length; b += POLISH_JUDGE_BATCH) {
+      const batchTrans = translations.slice(b, b + POLISH_JUDGE_BATCH)
+      const user = buildJudgeUser(sources, batchTrans, b)
+      try {
+        const res = await fetchWithRetry(config.proofreadApiUrl || config.apiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${config.proofreadApiKey || config.apiKey}`,
+          },
+          body: JSON.stringify({
+            model: config.proofreadModel || config.model,
+            messages: [
+              { role: 'system', content: system },
+              { role: 'user', content: user },
+            ],
+            temperature: 0.1,
+            response_format: { type: 'json_object' },
+          }),
+        })
+        if (!res.ok) continue
+        const resData = res.json as Record<string, unknown> | undefined
+        const choices = resData?.choices as Array<{ message?: { content?: string } }> | undefined
+        const content = choices?.[0]?.message?.content || res.text || ''
+        const parsed = extractJudgementsObject(content)
+        if (!parsed) continue
+        const byI = new Map<number, PersonaJudgeApiResult['judgements'][0]>()
+        for (const j of parsed.judgements) byI.set(j.i, j)
+        for (let k = 0; k < batchTrans.length; k++) {
+          const j = byI.get(b + k + 1)
+          if (!j || !j.needsPolish || (j.confidence ?? 0) < 3) continue
+          const idx = b + k
+          const issues: PolishIssue[] = (j.issues || [])
+            .filter(it => it.span && it.suggestion)
+            .map(it => ({
+              type: (['calque', 'structure', 'register'].includes(it.type || '') ? it.type : 'calque') as PolishIssue['type'],
+              span: String(it.span || '').slice(0, 200),
+              suggestion: String(it.suggestion || '').slice(0, 300),
+            }))
+          if (issues.length === 0) continue
+          if (!hitMap.has(idx)) hitMap.set(idx, [])
+          // 两人设 issues 合并（span 去重）
+          const existing = hitMap.get(idx)!
+          const existingSpans = new Set(existing.map(e => e.span))
+          for (const issue of issues) {
+            if (!existingSpans.has(issue.span)) existing.push(issue)
+          }
+        }
+      } catch (e) {
+        debugWarn(`[personaJudgeBatch] 判定异常（${persona.id} 批${b}）: ${(e as Error).message.slice(0, 80)}`)
+      }
+    }
+  }
+
+  return hitMap
+}
+
+// ═══════════════════════════════════════════════════════════════
+// polishBatch — 润色 LLM 改写（动作白名单 + issues 结构化传递）
+// ═══════════════════════════════════════════════════════════════
+
+export interface PolishChange {
+  issueIndex: number
+  before: string
+  after: string
+}
+
+export interface PolishResult {
+  index: number          // 批内索引
+  text: string           // 润色后译文（硬锁失败时=润色前原文）
+  polished: boolean      // 是否实际润色（false=硬锁回退）
+  reason?: string        // 回退原因
+}
+
+interface PolishApiResult {
+  polished: Array<{
+    i: number
+    text: string
+    changes?: Array<{ issueIndex?: number; before?: string; after?: string }>
+  }>
+}
+
+function buildPolishSystemPrompt(targetLang: string): string {
+  return `You are a native ${targetLang} copywriter polishing translations for a Lexar product listing.
+
+RULES — you may ONLY do these three things (whitelist):
+1. Replace a calqued collocation with the natural ${targetLang} expression (guided by the issues list)
+2. Restructure word order within a sentence
+3. Split a long sentence at a clause boundary
+
+FORBIDDEN (hard constraints — violation = rejection):
+- Do NOT add, remove, or change any facts (numbers, specs, capacities, speeds, model names, brand terms)
+- Do NOT merge information points across sentences
+- Do NOT change hedges or qualifiers (up to/maximum/approximately must stay)
+- Do NOT change anything not listed in the issues — if it's not in the issues list, leave it alone
+
+Output ONLY a valid JSON object:
+{"polished":[{"i":<1-based index>,"text":"<polished translation>","changes":[{"issueIndex":<which issue this change addresses>,"before":"<original phrase>","after":"<polished phrase>"}]}]}
+- Include ALL items — "i" must match the input [N] indices exactly
+- changes.length MUST NOT exceed the number of issues for that item (you may fix fewer, never more)
+- Raw JSON only, no markdown code blocks`
+}
+
+function buildPolishUser(
+  sources: string[],
+  translations: string[],
+  issuesMap: Map<number, PolishIssue[]>,
+  batchIndices: number[],
+): string {
+  // v12.4: 润色前剥离™®©——润色 LLM 只看表达不看格式，™是格式噪音；
+  // 防止润色 LLM 模仿译文中的™分布输出散弹。硬锁校验/写回前由调用方恢复™。
+  const stripTm = (t: string) => t.replace(/[™®©]/g, '').replace(/\n/g, ' ↵ ')
+  return batchIndices.map((idx, k) => {
+    const n = k + 1
+    const issues = issuesMap.get(idx) || []
+    const issueList = issues.map((it, ii) => `  Issue ${ii}: [${it.type}] "${it.span}" → Suggestion: ${it.suggestion}`).join('\n')
+    return `[${n}] Source: ${stripTm(sources[idx])}\nTranslation: ${stripTm(translations[idx])}\nIssues to fix (ONLY fix these):\n${issueList}`
+  }).join('\n\n')
+}
+
+/**
+ * 润色 LLM 改写：命中条目按人设反馈的 issues 改写。
+ * 硬锁校验（validatePolishOutput）失败 → 整条回退润色前译文。
+ * @param batchIndices 命中条目的批内索引
+ * @param issuesMap 命中条目的 issues（personaJudgeBatch 输出）
+ * @param glossaryMap 术语库 map（硬锁 enforceGlossaryTerms 用）
+ */
+export async function polishBatch(
+  sources: string[],
+  translations: string[],
+  batchIndices: number[],
+  issuesMap: Map<number, PolishIssue[]>,
+  targetLang: string,
+  config: LLMConfig,
+  glossaryMap?: Map<string, string>,
+): Promise<PolishResult[]> {
+  if (batchIndices.length === 0) return []
+
+  const system = buildPolishSystemPrompt(targetLang)
+  const user = buildPolishUser(sources, translations, issuesMap, batchIndices)
+
+  let parsed: PolishApiResult | null = null
+  try {
+    const res = await fetchWithRetry(config.proofreadApiUrl || config.apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.proofreadApiKey || config.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: config.proofreadModel || config.model,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
+        temperature: 0.2,
+        response_format: { type: 'json_object' },
+      }),
+    })
+    if (res.ok) {
+      const resData = res.json as Record<string, unknown> | undefined
+      const choices = resData?.choices as Array<{ message?: { content?: string } }> | undefined
+      const content = choices?.[0]?.message?.content || res.text || ''
+      parsed = extractPolishedObject(content)
+    }
+  } catch (e) {
+    debugWarn(`[polishBatch] 润色异常: ${(e as Error).message.slice(0, 80)}`)
+  }
+
+  return batchIndices.map((idx, k) => {
+    const n = k + 1
+    const original = translations[idx]
+    if (!parsed) {
+      return { index: idx, text: original, polished: false, reason: '润色 LLM 调用/解析失败' }
+    }
+    const byI = new Map<number, PolishApiResult['polished'][0]>()
+    for (const p of parsed.polished) byI.set(p.i, p)
+    const p = byI.get(n)
+    if (!p || !p.text) {
+      return { index: idx, text: original, polished: false, reason: '润色输出缺该条目' }
+    }
+    // changes 数量校验（防顺手改别的）
+    const issueCount = (issuesMap.get(idx) || []).length
+    const changes = p.changes || []
+    if (changes.length > issueCount) {
+      return { index: idx, text: original, polished: false, reason: `changes 数量超限（${changes.length} > ${issueCount}）` }
+    }
+    // 硬锁校验（validatePolishOutput 用剥离™后的文本跑，校验逻辑本身不做™比较）
+    const validation = validatePolishOutput(sources[idx], p.text, targetLang, glossaryMap)
+    if (!validation.ok) {
+      return { index: idx, text: original, polished: false, reason: validation.reason }
+    }
+    // v12.4: 润色输出剥离™后硬锁通过 → 恢复™再写回（源文有™的位置按 restore 定位加回）
+    const restored = restoreTrademarkSymbols([sources[idx]], [p.text])[0]
+    // 恢复后仍含散弹（理论不该发生——LLM 输出无™时 restore 定位不到散弹位置；防御层）→ 回退
+    if (hasTrademarkSpam(restored)) {
+      return { index: idx, text: original, polished: false, reason: '™恢复后仍含散弹（hasTrademarkSpam）' }
+    }
+    return { index: idx, text: restored, polished: true }
+  })
+}
+
+/** 平衡括号提取 {"polished":[...]} */
+function extractPolishedObject(text: string): PolishApiResult | null {
+  let searchFrom = 0
+  while (true) {
+    const keyIdx = text.indexOf('"polished"', searchFrom)
+    if (keyIdx < 0) return null
+    let braceStart = -1
+    for (let k = keyIdx - 1; k >= 0; k--) {
+      if (text[k] === '{') { braceStart = k; break }
+      if (text[k] === '}') break
+    }
+    if (braceStart < 0) { searchFrom = keyIdx + 10; continue }
+    let depth = 0
+    let inStr = false
+    let esc = false
+    for (let k = braceStart; k < text.length; k++) {
+      const c = text[k]
+      if (esc) { esc = false; continue }
+      if (c === '\\' && inStr) { esc = true; continue }
+      if (c === '"') { inStr = !inStr; continue }
+      if (inStr) continue
+      if (c === '{') depth++
+      else if (c === '}') {
+        depth--
+        if (depth === 0) {
+          try {
+            const obj = JSON.parse(text.slice(braceStart, k + 1))
+            if (obj && Array.isArray(obj.polished)) return obj
+          } catch { /* 找下一个 */ }
+          break
+        }
+      }
+    }
+    searchFrom = keyIdx + 10
+  }
+}
+
 interface ProofreadInput {
   sourceText: string
   translatedText: string
@@ -1883,6 +2253,7 @@ export async function proofreadBatch(
   normalizedGlossaryMap?: Map<string, string>,  // v9.10: 校对路径合规校验用（与翻译管道对齐）
   expansionFlags?: Set<number>,                 // v10.8: 译文显著超长的条目索引（长度异常信号，供 CHECK 1 语义裁决）
   prohibitedFixMap?: Map<number, Array<{ word: string; note: string }>>,  // v11.12: 批内索引→命中违禁词列表（语义改写必须列具体词）
+  polishedIndices?: Set<number>,                // v12.3: 已人设润色的条目索引（CHECK 1R 分叉——语序句式不同是预期，只查信息点完整与事实准确）
 ): Promise<ProofreadResult[]> {
   const sourceTexts = items.map(it => it.sourceText)
   // v9.3: 批次级源语言判定（校对后漏翻检测用，治 pt→pt-BR 拉丁源文恒判 'en' 的死代码）
@@ -1918,9 +2289,12 @@ export async function proofreadBatch(
   // 校对时对源文本做 CJK 空格保护
   const proofreadSpaceProtected = protectCjkSpaces(maskedSources)
 
-  // ™®©符号保护：校对前移除源文中的商标符号，防止校对 LLM 乱加符号
-  // restoreTrademarkSymbols 会在校对后用原始源文把符号加回来
+  // ™®©符号保护：校对前移除源文与译文中的商标符号，防止校对 LLM 模仿™分布输出散弹。
+  // v12.4: 此前只剥源文（proofTmStrippedSources），译文带™直发校对 LLM 是™散弹主凶——
+  //        校对 LLM 看到译文里已有™会"模仿格式"但不懂™只跟品牌词，逐字母复制成 S™o™n™y™。
+  //        源/译双侧剥离后，校对 LLM 完全看不到™，restoreTrademarkSymbols 校对后按源文加回。
   const proofTmStrippedSources = proofreadSpaceProtected.map(t => t.replace(/[™®©]/g, ''))
+  const proofTmStrippedTranslations = maskedTranslations.map(t => t.replace(/[™®©]/g, ''))
 
   const transLabel = useEnInstruction ? 'Trans' : '译'
   // v7.1: 逐条标注源语言，校对 LLM 需检查每条是否确实翻译到了目标语言
@@ -1958,7 +2332,13 @@ export async function proofreadBatch(
           ? `\n⚠️ Note: This translation contains platform-prohibited word(s): ${prohibitedHits.map(h => h.word).join(', ')}. Rewrite it to avoid ALL listed words while preserving the original meaning and tone. Output ONLY the rewritten text, without the prohibited words or any explanation.`
           : `\n⚠️ 提示：本条译文含平台违禁词：${prohibitedHits.map(h => h.word).join('、')}。请在保持原意和语气的前提下改写规避以上全部违禁词。只输出改写后的文本，不要包含违禁词本身或任何解释。`)
       : ''
-    return `[${i + 1}] (${srcLang}→${targetLang}) ${escapedSource}\n${transLabel}：${maskedTranslations[i]}${expansionNote}${prohibitedNote}`
+    // v12.3: 已润色条目提示 — 语序句式不同是预期，只查信息点完整与事实准确
+    const polishedNote = (polishedIndices && polishedIndices.has(i))
+      ? (useEnInstruction
+          ? '\n📝 Note: This entry has been polished by a native-speaker pass for naturalness. Its sentence structure/word order may differ from the source — this is EXPECTED. Check ONLY that all information points are present and facts (numbers/specs/terms) are accurate; do NOT flag structural differences as problems.'
+          : '\n📝 提示：本条已经母语润色（提升自然度）。语序句式与源文不同是预期行为——只校验信息点完整与事实（数字/规格/术语）准确即可，不要把结构差异判为问题。')
+      : ''
+    return `[${i + 1}] (${srcLang}→${targetLang}) ${escapedSource}\n${transLabel}：${proofTmStrippedTranslations[i]}${expansionNote}${prohibitedNote}${polishedNote}`
   }).join('\n\n')
 
   // ⛔ 校对环节术语反补全闭环：术语 hint 的 label 不含反补全指令，
@@ -1990,6 +2370,7 @@ export async function proofreadBatch(
     sourceLang: detectedProofreadSource,              // v11.5: 变体对条件注入
     hasExpansionFlags: !!expansionFlags && expansionFlags.size > 0,  // v11.5: 超长提示条件注入
     hasProhibitedFix: !!prohibitedFixMap && prohibitedFixMap.size > 0,  // v11.12: 违禁词全局块条件注入
+    hasPolished: !!polishedIndices && polishedIndices.size > 0,  // v12.3: 已润色条目 CHECK 1R 分叉
   })
 
   const apiKey = config.proofreadApiKey || config.apiKey
@@ -2172,6 +2553,15 @@ export async function proofreadBatch(
         { idx: i, targetLang, translation: resultTexts[i].slice(0, 50) },
       )
       resultTexts[i] = items[i].translatedText
+    }
+  }
+
+  // v12.4: ™ 散弹兜底 — 校对 LLM 若仍输出散弹（源/译剥离后理论上不该发生，防御层），
+  // 剥离散弹™恢复干净文本。校对已剥离™直发，正常输出应无™；散弹出现即异常，剥了即可。
+  for (let i = 0; i < resultTexts.length; i++) {
+    if (hasTrademarkSpam(resultTexts[i])) {
+      console.warn(`[proofreadBatch] ⛔ ™散弹兜底剥离: [${i}] "${resultTexts[i].slice(0, 60)}"`)
+      resultTexts[i] = resultTexts[i].replace(/[®™©]/g, '')
     }
   }
 

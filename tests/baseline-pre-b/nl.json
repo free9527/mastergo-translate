@@ -1,0 +1,1270 @@
+{
+  "lang": "nl",
+  "csv": "Card 卡类-OW&AMZ小语种翻译 - PLAY PRO microSD.csv",
+  "timestamp": "2026-08-25T11:15:54.837Z",
+  "methodology": "judge=LLM人设模拟(judge-personas.ts)，置信度低于真人母语评审；fidelity以代码校验为准，judge仅软信号；只允许差分对比结论，不允许绝对分数结论",
+  "cells": [
+    {
+      "index": 0,
+      "source": "Power Up Your Play\nLexar® PLAY PRO microSDXC™ Express Card",
+      "mine": "Geef je game een boost\nGeheugenkaart Lexar® PLAY PRO microSDXC™ Express",
+      "official": "Geef uw game een boost\n Lexar® PLAY PRO microSDXC™ Express-kaart",
+      "mineJudgement": {
+        "index": 0,
+        "runs": [
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "De slogan kan nog net, maar de productnaam in omgekeerde volgorde voelt meteen als vertaalde catalogustekst."
+          },
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Klinkt oké, maar 'geheugenkaart ... Express' voelt als een vertaalde titel in plaats van een nette productnaam."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 0,
+            "naturalness": 5,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Klinkt kort en duidelijk, al is het wel typisch game-marketingtaal."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Klinkt vlot genoeg en ik snap meteen dat het om een snelle kaart voor gamen gaat."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.75,
+          "tone": 3.5,
+          "fidelity": 4.75
+        },
+        "variance": {
+          "naturalness": 0.6875,
+          "tone": 0.25,
+          "fidelity": 0.1875
+        },
+        "personaGap": 1.5,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 0,
+        "runs": [
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 2,
+            "fidelity": 4,
+            "note": "“Geef uw game een boost” klinkt alsof een marketeer met Google Translate naar gamers probeert te praten."
+          },
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 2,
+            "fidelity": 4,
+            "note": "Begrijpelijk, maar “uw game een boost” klinkt als stijve marketing en niet als iets voor gamers."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Klinkt best oké, maar ‘uw game’ voelt wat stijf voor zo’n gamingkaartje."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Klinkt best oké, al voelt ‘uw game een boost’ wat stijf voor gametekst."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.5,
+          "tone": 2.5,
+          "fidelity": 4.25
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.25,
+          "fidelity": 0.1875
+        },
+        "personaGap": 1,
+        "flags": []
+      }
+    },
+    {
+      "index": 1,
+      "source": "Good for Today, Great for Tomorrow\n\nRevolutionary Performance\n\nPeace of Mind Extras\n\nLevel-up Your Handheld Gaming Experience\nRead speed up to 900MB/s\n\nCut Your Download Times\nWrite speed up to 600MB/s\n\nMassive Capacity up to 1TB\n\nProtection Built in",
+      "mine": "Klaar voor vandaag, sterk voor morgen\nRevolutionaire prestaties\nExtra zekerheid\nTil je handheld-game-ervaring naar een hoger niveau\nLeessnelheid tot 900MB/s\nVerkort je downloadtijden\nSchrijfsnelheid tot 600MB/s\nEnorme capaciteit tot 1TB\nIngebouwde bescherming",
+      "official": "Goed voor vandaag, geweldig voor morgen\n \n Revolutionaire prestaties\n \n Extra’s voor gemoedsrust\n \n Breng uw draagbare game-ervaring naar een hoger niveau\n Leessnelheid tot 900 MB/s\n \n Verkort uw downloadtijden\n Schrijfsnelheid tot 600 MB/s\n \n Enorme capaciteit tot 1 TB\n \n Ingebouwde bescherming",
+      "mineJudgement": {
+        "index": 1,
+        "runs": [
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Alles klopt inhoudelijk, maar termen als ‘revolutionaire prestaties’ en ‘game-ervaring naar een hoger niveau’ klinken erg generiek."
+          },
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Alle specs staan erin, maar het is vooral generieke marketingtaal met wat letterlijke koppen."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "Prima scanbare kopjes, maar 'Extra zekerheid' voelt wat vaag tegenover de rest."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Dit leest als nette verkooptekst, al blijft het wel een beetje standaard marketingtaal."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.5,
+          "tone": 3.5,
+          "fidelity": 4.75
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.25,
+          "fidelity": 0.1875
+        },
+        "personaGap": 1,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 1,
+        "runs": [
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "De specs kloppen, maar “Extra’s voor gemoedsrust” en “draagbare game-ervaring” voelen erg vertaald en stijf."
+          },
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "De specs staan er wel, maar zinnen als “Extra’s voor gemoedsrust” en “breng uw ervaring naar een hoger niveau” ruiken naar vertaalmachine."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Ik snap de punten snel, maar ‘extra’s voor gemoedsrust’ ruikt wel naar vertaalwerk."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Ik snap het meteen, maar ‘Extra’s voor gemoedsrust’ klinkt voor mij nogal vertaald."
+          }
+        ],
+        "mean": {
+          "naturalness": 2.5,
+          "tone": 2.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 1,
+        "flags": []
+      }
+    },
+    {
+      "index": 2,
+      "source": "What is SD Express and how does it works?\n\nSD Express is a new SD card standard. It adopts the PCI Express 3.0 and NVMe 1.3 interfaces, which significantly enhances the data processing capability of SD cards. The working principle of SD Express is based on the PCI Express interface and the NVMe protocol. The PCIe interface supports high-speed data transmission, while the NVMe protocol optimizes storage access efficiency. SD Express uses the second row of contacts at the interface to transmit PCIe signals and is backwards-compatible with UHS-I through the first row of contacts. After being connected to a computer that supports SD Express products, SD Express will be recognized as a standard NVMe device, similar to a modern NVMe SSD.",
+      "mine": "Wat is SD Express en hoe werkt het?\nSD Express is een nieuwe SD-kaartstandaard. Deze maakt gebruik van PCI Express 3.0- en NVMe 1.3-interfaces, waardoor de gegevensverwerkingscapaciteit van SD-kaarten aanzienlijk wordt verbeterd. Het werkingsprincipe van SD Express is gebaseerd op de PCI Express-interface en het NVMe-protocol. De PCIe-interface ondersteunt snelle gegevensoverdracht, terwijl het NVMe-protocol de efficiëntie van opslagtoegang optimaliseert. SD Express gebruikt de tweede rij contacten bij de interface om PCIe-signalen te verzenden en is via de eerste rij contacten achterwaarts compatibel met UHS-I. Na aansluiting op een computer die SD Express-producten ondersteunt, wordt SD Express herkend als een standaard NVMe-apparaat, vergelijkbaar met een moderne NVMe-SSD.",
+      "official": "Wat is SD Express en hoe werkt het?\n \n SD Express is een nieuwe SD-kaartstandaard. Het maakt gebruik van de PCI Express 3.0- en NVMe 1.3-interfaces, wat de gegevensverwerkingscapaciteit van SD-kaarten aanzienlijk verbetert. Het werkingsprincipe van SD Express is gebaseerd op de PCI Express-interface en het NVMe-protocol. De PCIe-interface ondersteunt snelle gegevensoverdracht, terwijl het NVMe-protocol de efficiëntie van de opslagtoegang optimaliseert. SD Express gebruikt de tweede rij contacten op de interface om PCIe-signalen te verzenden en is achterwaarts compatibel met UHS-I via de eerste rij contacten. Nadat SD Express is aangesloten op een computer die SD Express-producten ondersteunt, wordt SD Express herkend als een standaard NVMe-apparaat, vergelijkbaar met een moderne NVMe SSD.",
+      "mineJudgement": {
+        "index": 2,
+        "runs": [
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Dit leest technisch redelijk strak en betrouwbaar, al zitten er een paar wat letterlijke formuleringen in."
+          },
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Technisch klopt het en ik kan ermee werken, maar zinnen als 'opslagtoegang optimaliseert' lezen nogal vertaald."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "Dit is zo'n technisch blok tekst waar ik snel overheen lees, al klopt het Nederlands grotendeels wel."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "De feiten lijken te kloppen, maar zo'n lang technisch blok sla ik als koper al snel half over."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.25,
+          "tone": 3.25,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.6875,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 2,
+        "runs": [
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Technisch is dit prima te volgen, maar zinnen als “Het maakt gebruik” en “op de interface” verraden duidelijk vertaalwerk."
+          },
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Technisch klopt het en de uitleg is bruikbaar, al zitten er wat houterige formuleringen in zoals “Het maakt gebruik” en “op de interface”."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "Veel te technisch en langdradig voor mij, al lijken de specificaties wel netjes overgenomen."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "Dit is zo’n lange technische lap tekst waar ik als koper snel overheen zou lezen."
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 2.75,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.6875,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 3,
+      "source": "Revolutionary Performance\n\nThanks to its next-gen tech of PCIe and NVMe interface technologies that deliver up to 900MB/s read speed*, the PLAY PRO microSDXC™ Express Card is a stunning 4x faster than typical UHS-I microSD cards.\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "Revolutionaire prestaties\nDankzij de next-gen PCIe- en NVMe-interfacetechnologieën, die leessnelheden tot 900MB/s* leveren, is de PLAY PRO microSDXC™ Express-geheugenkaart maar liefst 4x sneller dan gebruikelijke UHS-I microSD-kaarten.\n*Gebaseerd op interne tests. Werkelijke prestaties kunnen variëren.",
+      "official": "Revolutionaire prestaties\n \n Dankzij de next-gen technologie van PCIe- en NVMe-interfacetechnologieën die een leessnelheid tot 900 MB/s* leveren, is de PLAY PRO microSDXC™ Express-kaart maar liefst 4x sneller dan typische UHS-I microSD-kaarten.\n \n *Gebaseerd op interne tests. Daadwerkelijke prestaties kunnen variëren.",
+      "mineJudgement": {
+        "index": 3,
+        "runs": [
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Prima te volgen en de specs zijn duidelijk, maar ‘revolutionaire prestaties’ en ‘maar liefst’ zijn wel typische marketingstandjes."
+          },
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "De informatie is duidelijk, alleen 'revolutionaire prestaties' en 'maar liefst' voelen als standaard marketingblabla."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Best overtuigend, alleen 'next-gen' erin geplakt voelt een beetje reclameachtig."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Best overtuigend, alleen 'next-gen' en al die afkortingen maken het wat reclametaalachtig."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.75,
+          "tone": 3.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 3,
+        "runs": [
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "“Next-gen technologie van PCIe- en NVMe-interfacetechnologieën” is precies het soort dubbele marketingbrij waarop ik afhaak."
+          },
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "“Next-gen technologie van PCIe- en NVMe-interfacetechnologieën” is precies het soort dubbelop vertaalproza waardoor ik afhaak."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Die zin met ‘next-gen technologie’ en ‘interfacetechnologieën’ leest echt alsof hij uit een vertaalmachine komt."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "‘Next-gen technologie van interfacetechnologieën’ voelt echt als vertaalde marketingtaal."
+          }
+        ],
+        "mean": {
+          "naturalness": 2,
+          "tone": 2.25,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 4,
+      "source": "*Comparison of the theoretical maximum speeds under different interface forms (Data source: SDA)",
+      "mine": "* Vergelijking van de theoretische maximumsnelheden bij verschillende interfacetypen (gegevensbron: SDA)",
+      "official": "*Vergelijking van de theoretische maximumsnelheden onder verschillende interfacevormen (Gegevensbron: SDA)",
+      "mineJudgement": {
+        "index": 4,
+        "runs": [
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 0,
+            "naturalness": 5,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Kort, duidelijk en technisch netjes; hier struikel ik nergens over."
+          },
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Prima voetnoot, kort en technisch genoeg zonder rare poespas."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Als voetnoot is dit duidelijk genoeg, maar het doet verder weinig voor mij."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Als voetnoot is dit prima duidelijk, maar het doet verder weinig voor mijn vertrouwen."
+          }
+        ],
+        "mean": {
+          "naturalness": 4.25,
+          "tone": 3.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 4,
+        "runs": [
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Als voetnoot is het begrijpelijk, maar “interfacevormen” klinkt niet als een term die ik zelf zou gebruiken."
+          },
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Kort en inhoudelijk oké, maar “onder verschillende interfacevormen” klinkt niet echt Nederlands."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Als voetnoot is het begrijpelijk, maar ‘interfacevormen’ klinkt niet echt lekker Nederlands."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Begrijpelijk, maar ‘interfacevormen’ is niet echt een woord waar ik warm van word."
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 3,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 5,
+      "source": "Good for Today, Great for Tomorrow\n\nThe PLAY PRO microSDXC™ Express Card is backwards-compatible with UHS-I and UHS-II host devices (at UHS-I speeds) so you can use it with your current handheld gaming consoles – and it's ideal for the microSD Express devices coming soon.",
+      "mine": "Klaar voor vandaag, sterk voor morgen\nDe PLAY PRO microSDXC™ Express-geheugenkaart is achterwaarts compatibel met UHS-I- en UHS-II-hostapparaten (op UHS-I-snelheden), zodat je hem kunt gebruiken met je huidige handheld-gameconsoles – en hij is ideaal voor de microSD Express-apparaten die binnenkort verschijnen.",
+      "official": "Goed voor vandaag, geweldig voor morgen\n \n De PLAY PRO microSDXC™ Express-kaart is achterwaarts compatibel met UHS-I- en UHS-II-hostapparaten (met UHS-I-snelheden), zodat u hem kunt gebruiken met uw huidige draagbare gameconsoles - en hij is ideaal voor de microSD Express-apparaten die binnenkort verschijnen.",
+      "mineJudgement": {
+        "index": 5,
+        "runs": [
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Deze klinkt best natuurlijk en geeft de compatibiliteit helder weer zonder te veel poespas."
+          },
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Dit leest redelijk natuurlijk en geeft precies de compatibiliteit die ik wil checken."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Dit geeft me wel vertrouwen omdat duidelijk staat waar de kaart nu en straks mee werkt."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Dit is handig en duidelijk, vooral omdat ik wil weten of hij ook in oudere apparaten werkt."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 4,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 5,
+        "runs": [
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Deze leest redelijk netjes en de compatibiliteit is duidelijk, al blijft het formele “u” wat afstandelijk voor gaminghardware."
+          },
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "De boodschap komt over, alleen maken “hostapparaten” en het formele “u” het wat afstandelijk voor gaminghardware."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Deze is duidelijk genoeg, alleen blijft het door ‘hostapparaten’ en ‘uw’ wat afstandelijk."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Deze leest redelijk normaal en vertelt me duidelijk waarom de kaart nu en straks bruikbaar is."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.75,
+          "tone": 3.25,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      }
+    },
+    {
+      "index": 6,
+      "source": "Level-up Your Handheld Gaming Experience\n\nUp to 900MB/s* read speed, the PLAY PRO microSDXC™ Express Card is a stunning 4x faster than typical UHS-I microSD cards – meaning that games load faster and also ensuring a smooth, lag-free experience.\n\nRead speed up to 900MB/s*\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "Til je handheld-game-ervaring naar een hoger niveau\nMet een leessnelheid tot 900MB/s* is de PLAY PRO microSDXC™ Express-geheugenkaart maar liefst 4x sneller dan gebruikelijke UHS-I microSD-kaarten. Dat betekent dat games sneller laden en je verzekerd bent van een soepele ervaring zonder lag.\nLeessnelheid tot 900MB/s*\n*Gebaseerd op interne tests. Werkelijke prestaties kunnen variëren.",
+      "official": "Breng uw draagbare game-ervaring naar een hoger niveau\n \n Met een leessnelheid tot 900 MB/s* is de PLAY PRO microSDXC™ Express-kaart maar liefst 4x sneller dan typische UHS-I microSD-kaarten - wat betekent dat games sneller laden en ook zorgen voor een soepele, vertragingsvrije ervaring.\n \n Leessnelheid tot 900 MB/s*\n \n *Gebaseerd op interne tests. Daadwerkelijke prestaties kunnen variëren.",
+      "mineJudgement": {
+        "index": 6,
+        "runs": [
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "De feiten staan goed, maar ‘handheld-game-ervaring’ en ‘zonder lag’ voelen wat geforceerd in dezelfde zin."
+          },
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "De specs zijn goed vertaald, maar 'til je ervaring naar een hoger niveau' is zo'n uitgekauwde vertaalzin."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 0,
+            "naturalness": 5,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Lekker duidelijk: sneller laden en geen lag is precies wat ik wil weten."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Vlot en begrijpelijk, met precies de belofte die je bij gamen verwacht."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.75,
+          "tone": 3.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.6875,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 1.5,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 6,
+        "runs": [
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 4,
+            "note": "De zin ontspoort bij “games sneller laden en ook zorgen”, waardoor het ondanks de juiste cijfers slordig overkomt."
+          },
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "De zin loopt niet lekker en “games laden sneller en zorgen voor een ervaring” klinkt duidelijk vertaald."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "De boodschap is duidelijk, maar de lange zin loopt grammaticaal niet lekker en voelt vertaald."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "De boodschap is duidelijk, maar de zin met ‘games sneller laden en ook zorgen’ loopt niet lekker."
+          }
+        ],
+        "mean": {
+          "naturalness": 2.25,
+          "tone": 2.5,
+          "fidelity": 4.75
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.25,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0.5,
+        "flags": []
+      }
+    },
+    {
+      "index": 7,
+      "source": "Cut Your Download Times\n\nThe PLAY PRO microSDXC™ Express Card also delivers 600MB/s write speeds* when paired with the Lexar microSD Express card reader so you can download a AAA game in less time than it'll take you to order a pizza!\n\nWrite speed up to 600MB/s*\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "Verkort je downloadtijden\nDe PLAY PRO microSDXC™ Express-geheugenkaart levert ook schrijfsnelheden van 600MB/s* in combinatie met de Lexar microSD Express-kaartlezer, zodat je een AAA-game in minder tijd downloadt dan het kost om een pizza te bestellen!\nSchrijfsnelheid tot 600MB/s*\n*Gebaseerd op interne tests. Werkelijke prestaties kunnen variëren.",
+      "official": "Verkort uw downloadtijden\n \n De PLAY PRO microSDXC™ Express-kaart levert ook schrijfsnelheden van 600 MB/s* in combinatie met de Lexar microSD Express-kaartlezer, zodat u een AAA-game kunt downloaden in minder tijd dan u nodig hebt om een pizza te bestellen!\n \n Schrijfsnelheid tot 600 MB/s*\n \n *Gebaseerd op interne tests. Daadwerkelijke prestaties kunnen variëren.",
+      "mineJudgement": {
+        "index": 7,
+        "runs": [
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "De pizza-zin is wat Amerikaans-marketingachtig, maar de vertaling zelf loopt redelijk en de specs blijven intact."
+          },
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Best vlot en duidelijk, al is de pizzavergelijking natuurlijk wat gimmicky."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "De pizzavergelijking is wat Amerikaans, maar ik snap meteen het voordeel."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "De pizzavergelijking is leuk, maar in de eerste zin klinkt 600MB/s iets te absoluut."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 3.75,
+          "fidelity": 4.75
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.1875,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 7,
+        "runs": [
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Dit is best leesbaar en de pizzavergelijking werkt nog wel, maar het blijft net iets te formeel door “u”."
+          },
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Deze leest redelijk vlot en de pizzavergelijking werkt, maar het formele “u” blijft wat suf voor deze doelgroep."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Deze leest vlotter en die pizzavergelijking maakt het voor mij meteen wat menselijker."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Deze klinkt vlotter en die pizzavergelijking maakt het voor mij wat menselijker."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 3.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 8,
+      "source": "Massive Capacity up to 1TB\n\nSome of your favorite games are probably pretty big in file size. Well, with up to 1TB capacity, juggling games just got easier. You can fit many games on a 1TB card.\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "Enorme capaciteit tot 1TB\nSommige van je favoriete games zijn waarschijnlijk behoorlijk groot. Met een capaciteit tot 1TB wordt games beheren een stuk makkelijker. Op een kaart van 1TB passen veel games.\n*Gebaseerd op interne tests. Werkelijke prestaties kunnen variëren.",
+      "official": "Enorme capaciteit tot 1 TB\n \n Sommige van uw favoriete games zijn waarschijnlijk behoorlijk groot in bestandsgrootte. Met een capaciteit tot 1 TB is jongleren met games nu nog eenvoudiger. Op een kaart van 1 TB passen veel games.\n \n *Gebaseerd op interne tests. Daadwerkelijke prestaties kunnen variëren.",
+      "mineJudgement": {
+        "index": 8,
+        "runs": [
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Klinkt prima en duidelijk, al zou ik eerder 'opslagruimte' dan 'capaciteit' verwachten."
+          },
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "Leest prima en zonder veel poeha, al mis ik expliciet ‘bestandsgrootte’ bij die grote games."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Klinkt best soepel en ik snap meteen dat er veel spellen op passen, zonder gedoe."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Dit leest lekker simpel en ik snap meteen dat er veel games op passen."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 4,
+          "fidelity": 4.75
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 8,
+        "runs": [
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "Specs kloppen, maar ‘groot in bestandsgrootte’ en ‘jongleren met games’ voelen echt als vertaald marketing-Nederlands."
+          },
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "De specs kloppen, maar 'groot in bestandsgrootte' en 'jongleren met games' voelen meteen als vertaalcopy."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Ik snap het wel, maar 'groot in bestandsgrootte' en 'jongleren met games' voelt echt vertaald."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Ik snap het wel, maar 'groot in bestandsgrootte' en 'jongleren met games' klinkt voor mij duidelijk vertaald."
+          }
+        ],
+        "mean": {
+          "naturalness": 2,
+          "tone": 2.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 9,
+      "source": "Protection Built in\n\nThe PLAY PRO microSD Express card is IPX7 waterproof, wearproof, temperature-proof, x-ray-proof, vibration-resistant, magnetic-proof, shockproof, and drop-proof.*\n\nWearout resistance\n*up to 10,000 times of plugging and unplugging\nWaterproof\n*IPX7,1m deep water for 30min\nTemperature resistance\n*Operation: -25℃~85℃, Storage: -40℃~85℃\nShock resistance\n*1500G Shock\nAnti-vibration\n*10-2000Hz\nAnti-magnetic\n*15000Gauss\nX-ray protection\n*up to 100mGy\n(equivalent to airport X-ray machine exposure)\nDrop protection\n*1.5m drop",
+      "mine": "Ingebouwde bescherming\nDe PLAY PRO microSD Express-geheugenkaart is IPX7-waterdicht, slijtvast, temperatuurbestendig, röntgenbestendig, trillingsbestendig, magneetbestendig, schokbestendig en valbestendig.*\nSlijtagebestendigheid\n*tot 10.000 keer insteken en uitnemen\nWaterdicht\n*IPX7, 1m diep water gedurende 30min\nTemperatuurbestendigheid\n*Gebruik: -25°C~85°C, opslag: -40°C~85°C\nSchokbestendigheid\n*1500G schok\nTrillingsbestendig\n*10-2000Hz\nAntimagnetisch\n*15000Gauss\nRöntgenbescherming\n*tot 100mGy\n(gelijk aan blootstelling aan een röntgenapparaat op een luchthaven)\nValbescherming\n*val van 1,5m",
+      "official": "Ingebouwde bescherming\n  \n  De PLAY PRO microSD Express-kaart is IPX7 waterdicht, slijtvast, temperatuurbestendig, röntgenbestendig, trillingsbestendig, magnetisch, schokbestendig en valbestendig.*\n \n Slijtagebestendig\n  *Tot 10.000 keer aansluiten en loskoppelen\n Waterdicht\n  *IPX7,1 m diep water gedurende 30 minuten\n Temperatuurbestendig\n  *Bedrijf: -25°C~85°C, Opslag: -40℃~85℃\n Schokbestendig\n  *1500G schok\n Anti-vibratie\n  *10-2000 Hz\n Anti-magnetisch\n  *15000 Gauss\n Röntgenbescherming\n  *tot 100 mGy\n  (gelijk aan blootstelling aan röntgenapparatuur op luchthavens)\n Valbescherming\n  *1,5 m val",
+      "mineJudgement": {
+        "index": 9,
+        "runs": [
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "De specs kloppen, maar de opsomming voelt wat letterlijk vertaald en rommelig qua eenheden en formulering."
+          },
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "De specs lijken te kloppen, maar termen als ‘magneetbestendig’ en ‘1m diep water gedurende 30min’ voelen behoorlijk vertaald."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "De opsomming geeft vertrouwen, maar sommige stukjes zoals 'insteken en uitnemen' en '30min' voelen wat vertaald en technisch."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "De lijst met bescherming is duidelijk, maar voelt wel erg technisch en een beetje vertaald aan."
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 3,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 9,
+        "runs": [
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 3,
+            "note": "De lijst is scanbaar, maar ‘magnetisch’ is inhoudelijk fout en termen als ‘1,5 m val’ lezen nogal stroef."
+          },
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 3,
+            "note": "Dit is precies zo'n specblok waar ik op afhaak door slordige termen als 'magnetisch' in plaats van beschermd tegen magnetisme."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "De specs zijn duidelijk genoeg, maar 'magnetisch' in plaats van bestand tegen magneten maakt me meteen wantrouwig."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "De lijst met bescherming is handig, maar woorden als 'magnetisch' en '1,5 m val' maken me toch wat wantrouwig."
+          }
+        ],
+        "mean": {
+          "naturalness": 2.75,
+          "tone": 2.75,
+          "fidelity": 3.5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.1875,
+          "fidelity": 0.25
+        },
+        "personaGap": 0.5,
+        "flags": []
+      }
+    },
+    {
+      "index": 10,
+      "source": "Peace of Mind Extras\n\nThis card undergoes strict testing in the Lexar Quality Lab and we're so confident in it that it comes with a limited lifetime warranty. Plus we offer lifetime access to the Lexar Recovery Tool which you can use to restore accidentally deleted and formatted files.",
+      "mine": "Extra zekerheid\nDeze kaart wordt streng getest in het Lexar Quality Lab en we hebben er zoveel vertrouwen in dat hij wordt geleverd met een beperkte levenslange garantie. Bovendien bieden we levenslange toegang tot de Lexar Recovery Tool, waarmee je per ongeluk verwijderde en geformatteerde bestanden kunt herstellen.",
+      "official": "Extra’s voor gemoedsrust\n \n Deze kaart ondergaat strenge tests in het Lexar Quality Lab en wij hebben er zoveel vertrouwen in dat er een beperkte levenslange garantie op wordt geleverd. Bovendien bieden wij levenslange toegang tot de Lexar Recovery Tool die u kunt gebruiken om per ongeluk verwijderde en geformatteerde bestanden te herstellen.",
+      "mineJudgement": {
+        "index": 10,
+        "runs": [
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "Best soepel en betrouwbaar, alleen 'geformatteerde bestanden' klinkt technisch net niet lekker."
+          },
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "Best geloofwaardig en duidelijk, alleen ‘geformatteerde bestanden’ klinkt net iets te letterlijk en dubbelzinnig."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Dit leest prettig en die garantie plus hersteltool zouden mij als koper wel geruststellen."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Dit geeft vertrouwen, vooral die garantie en hersteltool, al is de zin wat lang."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 4,
+          "fidelity": 4.5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0.25
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 10,
+        "runs": [
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Begrijpelijk, maar ‘Extra’s voor gemoedsrust’ en het formele ‘wij/u’ klinken wat gemaakt en niet echt tech-copy."
+          },
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "'Extra’s voor gemoedsrust' klinkt gekunsteld en te Amerikaans, al is de inhoud verder duidelijk."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Dit leest netjes, alleen wat formeel en afstandelijk met dat 'wij' en 'u'."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Het klinkt netjes en betrouwbaar, maar 'Extra’s voor gemoedsrust' voelt wel erg letterlijk vertaald."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.25,
+          "tone": 2.75,
+          "fidelity": 4.75
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.1875,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0.5,
+        "flags": []
+      }
+    },
+    {
+      "index": 11,
+      "source": "Rigorously Tested\n\nAll Lexar products undergo extensive testing in the Lexar Quality Labs, facilities with thousands of different cameras and digital devices to ensure performance, quality, compatibility, and reliability.",
+      "mine": "Grondig getest\nAlle Lexar-producten worden uitgebreid getest in de Lexar Quality Labs, faciliteiten met duizenden verschillende camera's en digitale apparaten om prestaties, kwaliteit, compatibiliteit en betrouwbaarheid te waarborgen.",
+      "official": "Grondig getest\n \n Alle Lexar-producten worden uitgebreid getest in de Lexar Quality Labs, faciliteiten met duizenden verschillende camera's en digitale apparaten om prestaties, kwaliteit, compatibiliteit en betrouwbaarheid te garanderen.",
+      "mineJudgement": {
+        "index": 11,
+        "runs": [
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Duidelijk genoeg, maar 'faciliteiten met duizenden verschillende camera's' leest nog wat vertaald en generiek."
+          },
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Netjes en zakelijk, al is ‘faciliteiten met duizenden verschillende camera’s’ een tikje Engels opgebouwd."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Begrijpelijk, maar 'faciliteiten met duizenden...' klinkt voor mij als een letterlijke vertaling uit een brochure."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Ik begrijp het wel, maar die lange zin met 'faciliteiten met' klinkt niet helemaal als normale Nederlandse verkooptekst."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.5,
+          "tone": 3.25,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 1,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 11,
+        "runs": [
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Dit leest redelijk netjes en de feiten blijven intact, al is het nog steeds vrij generieke producttaal."
+          },
+          {
+            "persona": "nl-amsterdam-dev",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Best prima en duidelijk, alleen 'faciliteiten met duizenden...' leest nog net iets te letterlijk vertaald."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Begrijpelijke tekst, maar de lange zin met 'faciliteiten met' klinkt niet helemaal als gewoon Nederlands."
+          },
+          {
+            "persona": "nl-rotterdam-dad",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Deze tekst leest redelijk normaal, al is het meer droge productspecificatie dan iets dat me echt overtuigt."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.75,
+          "tone": 3,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      }
+    }
+  ],
+  "summary": {
+    "mine": {
+      "naturalness": 3.7291666666666665,
+      "tone": 3.5625,
+      "fidelity": 4.875
+    },
+    "official": {
+      "naturalness": 2.9791666666666665,
+      "tone": 2.7708333333333335,
+      "fidelity": 4.770833333333333
+    },
+    "unstableCells": 0,
+    "personaSensitiveCells": 0
+  }
+}

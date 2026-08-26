@@ -43,6 +43,22 @@ const debugLog = (...args: unknown[]) => DEBUG_MODE && console.log(...args)
 const debugWarn = (...args: unknown[]) => DEBUG_MODE && console.warn(...args)
 
 // ============================================================
+// v12.4: ™ 散弹检测（形式信号，代码管形式）
+// 判据：™/®/© 出现在字母后且后面紧跟更多字母（逐字母模式中间位），累计 ≥2 次。
+//   如 S™I™L™V™E™R™（大写逐字母）/ S™o™n™y™（大小写混合逐字母）/ p™l™a™y™s（小写逐字母）。
+//   合法™只跟在完整品牌词尾（Lexar®/CFexpress™/Sony™），™后是空格/标点/数字边界——不命中。
+// ============================================================
+const TM_SPAM_RE = /[A-Za-z][®™©](?=[A-Za-z])/g
+
+/** 检测译文是否含 ™ 散弹（逐字母™模式）。20 语言通吃（纯字符形式信号）。 */
+export function hasTrademarkSpam(text: string): boolean {
+  const re = new RegExp(TM_SPAM_RE.source, 'g')
+  const m1 = re.exec(text)
+  if (!m1) return false
+  return re.exec(text) !== null  // 第二个命中即确认
+}
+
+// ============================================================
 // 商标符号还原
 // 将原文中的 ® ™ © 符号还原到译文中
 // 策略：找到符号前紧邻的单词，在译文中定位该单词并补回符号
@@ -51,6 +67,13 @@ export function restoreTrademarkSymbols(sourceTexts: string[], translatedTexts: 
   return translatedTexts.map((translated, i) => {
     const source = sourceTexts[i] || ''
     if (!source) return translated
+
+    // v12.4: 译文已含 ™ 散弹 → 先剥离所有 ™®© 及其后紧跟的空格，再走正常定位插入流程。
+    // 散弹是 LLM 输出的垃圾模式（如 "S™ I™ L™..." 或 "S™I™L™..."），保留=把错误锚定进最终译文。
+    // 剥离后 restore 按源文重新定位正确位置（源文有几个™译文就恢复几个）。
+    if (hasTrademarkSpam(translated)) {
+      translated = translated.replace(/[®™©]\s*/g, '')
+    }
 
     // 提取原文中所有商标符号及其前导词
     // 使用 [^\s®™©]+ 排除符号字符，避免贪婪匹配吞噬相邻符号（如 "Lexar®™" 中 ® 被 \S+ 吃掉）
@@ -73,26 +96,41 @@ export function restoreTrademarkSymbols(sourceTexts: string[], translatedTexts: 
     let result = translated
 
     for (const { word, symbol } of symbols) {
-      // 检查译文是否已有该符号，如果已有则跳过插入
-      // 但需要先检查符号位置是否正确（前面不应有空格）
-      if (result.includes(symbol)) {
-        // 符号已存在，验证其位置：符号前不应有空格
-        const symbolIdx = result.indexOf(symbol)
-        if (symbolIdx > 0 && result[symbolIdx - 1] === ' ') {
-          // 符号前有空格，去掉空格使符号紧跟前一个词
-          result = result.slice(0, symbolIdx - 1) + result.slice(symbolIdx)
-        }
-        continue
-      }
-
       // 在译文中查找该词（不区分大小写）
       const escapedWord = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
       const wordRegex = new RegExp(escapedWord, 'i')
       const wordMatch = wordRegex.exec(result)
 
+      // v12.4: 该词在译文中的"专属符号位置"检查——只有词后跟™（词尾位置）才算已有，
+      // 译文中其他位置的™（如 CFexpress™ 的™）不能算在 Sony 头上。
+      // 旧逻辑 result.includes(symbol) 是全局检查，会把 CFexpress™ 的™当成 Sony™ 跳过插入（B5 bug）。
+      if (wordMatch) {
+        const insertPos = wordMatch.index + wordMatch[0].length
+        if (result[insertPos] === symbol) {
+          // 词后已有该符号（合法位置）→ 验证符号前无空格即可
+          if (result[insertPos - 1] === ' ') {
+            result = result.slice(0, insertPos - 1) + result.slice(insertPos)
+          }
+          continue
+        }
+      }
+
+      // v12.4: 插入前检查目标位置是否处于"逐字母大写"模式（S-I-L-V-E-R 的 I 位置）。
+      // 源文词（如 SILVER/Sony/Lexar）在译文中被拆成单字母时，逐字母位置插入™=散弹。
+      // 命中则放弃本次插入（找不到正确位置，符号丢失风险远小于™泛滥——与144行注释同哲学）。
+      // 判据：插入点前后都是大写字母 → 处于连续大写序列中间（逐字母模式）。
+      //   完整品牌词（SILVER）的插入点在词尾（后字符是空格/标点/小写），不会触发。
+      const isSpamPosition = (pos: number): boolean => {
+        if (pos <= 0 || pos >= result.length) return false
+        const before = result[pos - 1]
+        const after = result[pos]
+        return /[A-Z]/.test(before) && /[A-Z]/.test(after)
+      }
+
       if (wordMatch) {
         // 找到该词，在它后面插入符号
         const insertPos = wordMatch.index + wordMatch[0].length
+        if (isSpamPosition(insertPos)) continue  // v12.4: 逐字母模式位置，放弃插入
         // 如果后面紧跟标点，符号放在标点后
         const after = result.slice(insertPos)
         const punctMatch = after.match(/^(\s*[.,;:!?)]?)/)
@@ -107,6 +145,7 @@ export function restoreTrademarkSymbols(sourceTexts: string[], translatedTexts: 
           const prefixMatch = prefixRe.exec(result)
           if (prefixMatch && prefixMatch.index < Math.min(40, result.length)) {
             const insertPos = prefixMatch.index + prefixMatch[0].length
+            if (isSpamPosition(insertPos)) continue  // v12.4: 逐字母模式位置，放弃插入
             const after = result.slice(insertPos)
             const punctMatch = after.match(/^(\s*[.,;:!?)]?)/)
             const punctLen = punctMatch ? punctMatch[0].length : 0
@@ -121,6 +160,7 @@ export function restoreTrademarkSymbols(sourceTexts: string[], translatedTexts: 
           const firstCapitalized = result.match(/^[^A-Za-z]*([A-Z][a-z]{2,})/)
           if (firstCapitalized && firstCapitalized.index !== undefined && firstCapitalized.index < 20) {
             const insertPos = firstCapitalized.index! + firstCapitalized[1].length
+            if (isSpamPosition(insertPos)) continue  // v12.4: 逐字母模式位置，放弃插入
             const after = result.slice(insertPos)
             const punctMatch = after.match(/^(\s*[.,;:!?)]?)/)
             const punctLen = punctMatch ? punctMatch[0].length : 0
@@ -136,6 +176,7 @@ export function restoreTrademarkSymbols(sourceTexts: string[], translatedTexts: 
           const coreMatch = coreRe.exec(result)
           if (coreMatch && coreMatch.index < 60) {
             const insertPos = coreMatch.index + coreMatch[0].length
+            if (isSpamPosition(insertPos)) continue  // v12.4: 逐字母模式位置，放弃插入
             const after = result.slice(insertPos)
             const punctMatch = after.match(/^(\s*[.,;:!?)]?)/)
             const punctLen = punctMatch ? punctMatch[0].length : 0
@@ -586,6 +627,136 @@ function postProcessThai(text: string): string {
 }
 
 // ============================================================
+// 泰文断行结构硬锁（v12.1 已回退，函数保留为占位——管道不调用）
+// ============================================================
+// 背景：judge 基线（迭代 1）发现 th naturalness 2.69 崩塌式低分，根因是
+//       LLM 对泰文多行文本的断行决策——把源文 N 个独立标题/卖点合并成 1-2 行
+//       泰文长句（换行保留率 41% vs 其他语种 65%）。
+//
+// ⚠️ 2026-08-25 回退决定：断点选择需要泰文分词器（dictionary-based
+//    segmentation），元音规则近似会在前导元音（เ แ โ ใ ไ）场景切错词
+//    （"ค↵ุณ"），断错词比连写更糟（judge 评"ข้อความแตกคำ"质量事故）。
+//    可靠性第一原则：不为排版美观冒切词风险。管道调用已移除（llm-api.ts
+//    S5 + proofreadBatch 两处），函数保留——未来若引入泰文分词能力可重启。
+//
+// 遗留问题（记录在 HANDOFF 迭代 1）：th 断行问题标记为「需泰文分词器，
+// 超当前架构」；th naturalness 2.6 为已知薄弱点，方案 B 处理搭配问题。
+// ============================================================
+
+/** 泰文字符判定（U+0E00–U+0E7F） */
+function isThaiChar(ch: string): boolean {
+  const code = ch.charCodeAt(0)
+  return code >= 0x0e00 && code <= 0x0e7f
+}
+
+/** 泰文元音/符号（断点安全位置——元音前切开不切词） */
+function isThaiVowel(ch: string): boolean {
+  const code = ch.charCodeAt(0)
+  // 泰文元音 U+0E30–U+0E39, U+0E40–U+0E44（สระ）
+  return (code >= 0x0e30 && code <= 0x0e39) || (code >= 0x0e40 && code <= 0x0e44)
+}
+
+/**
+ * 泰文断行结构硬锁：译文换行数不足时按源文断行位置强制拆分。
+ * ⚠️ 已回退不在管道调用（2026-08-25，断点切词风险），保留为占位。
+ * @param source 源文（英文，含 \n）
+ * @param translated 译文（泰文，LLM 输出）
+ * @returns 拆分后的译文（换行数 ≥ 源文时原样返回）
+ */
+export function enforceThaiLineBreaks(source: string, translated: string): string {
+  const sourceBreaks = (source.match(/\n/g) || []).length
+  if (sourceBreaks === 0) return translated  // 源文无换行，不干预
+  const translatedBreaks = (translated.match(/\n/g) || []).length
+  if (translatedBreaks >= sourceBreaks) return translated  // LLM 已合法断行，不干预
+
+  // 源文按换行切段（滤空段——源文常见 标题\n\n正文 格式，空段不占断行位置）
+  const sourceSegs = source.split(/\n+/).map(s => s.trim()).filter(Boolean)
+  if (sourceSegs.length <= 1) return translated
+
+  // 译文按现有换行切段（保留 LLM 已有的断行）
+  const transSegs = translated.split(/\n+/)
+  if (transSegs.length >= sourceSegs.length) return translated  // 段数已够，不干预
+
+  // 需要拆分的段数差：把译文的某些长段按源文段数比例再切
+  // 策略：译文总字符数按源文各段字符数占比映射边界，在译文对应位置找最近安全断点
+  const sourceTotalLen = sourceSegs.reduce((a, s) => a + s.length, 0)
+  if (sourceTotalLen === 0) return translated
+  const transTotalLen = translated.replace(/\n/g, '').length
+
+  // 源文各段的累积字符比例（用于映射到译文位置）
+  const boundaries: number[] = []  // 源文第 i 段结束时的累积比例
+  let acc = 0
+  for (let i = 0; i < sourceSegs.length - 1; i++) {  // 最后一段不需要边界
+    acc += sourceSegs[i].length
+    boundaries.push(acc / sourceTotalLen)
+  }
+
+  // 在译文中按边界比例找拆分点（跳过 LLM 已有换行位置——按字符数近似）
+  // 简化处理：把译文视为一个整体（合并已有换行为单空格标记），按边界切
+  // 已有换行位置计入"已拆分"，只补足不够的边界数
+  const needBreaks = sourceSegs.length - 1  // 源文段数-1 = 需要的断行数
+  const haveBreaks = translatedBreaks
+  const toAdd = needBreaks - haveBreaks
+  if (toAdd <= 0) return translated
+
+  // 在译文中按边界比例插入断行（从后往前插，防位置漂移）
+  // 先算出每个边界在译文中的目标字符位置
+  const targetPositions = boundaries.map(r => Math.round(r * transTotalLen))
+  // 已有换行位置（字符级）
+  const existingBreakPos: number[] = []
+  {
+    let pos = 0
+    for (const ch of translated) {
+      if (ch === '\n') existingBreakPos.push(pos)
+      pos++
+    }
+  }
+  // 过滤掉与已有换行位置过近的边界（±15% 总长内视为已覆盖）
+  const margin = Math.max(10, Math.round(transTotalLen * 0.15))
+  const toInsert = targetPositions.filter(tp =>
+    !existingBreakPos.some(eb => Math.abs(eb - tp) <= margin)
+  ).slice(0, toAdd)  // 只补够数量
+
+  if (toInsert.length === 0) return translated
+
+  // 从后往前插入（防位置漂移）
+  const sorted = [...toInsert].sort((a, b) => b - a)
+  let result = translated
+  for (const pos of sorted) {
+    // 在 pos 附近找最近的安全断点（优先：泰文元音前 / 数字或英文前 / 空格处）
+    let cut = -1
+    const searchRadius = Math.max(15, Math.round(transTotalLen * 0.05))
+    // 向后搜（切分点落在这段的开头更安全）
+    for (let d = 0; d <= searchRadius && pos + d < result.length; d++) {
+      const idx = pos + d
+      const ch = result[idx]
+      const prev = result[idx - 1] || ''
+      // 安全断点：泰文元音前（前一个是辅音）、英文/数字前（前一个是泰文）、空格处
+      if (isThaiVowel(ch) && isThaiChar(prev) && !isThaiVowel(prev)) { cut = idx; break }
+      if ((/[A-Za-z0-9]/.test(ch)) && isThaiChar(prev)) { cut = idx; break }
+      if (ch === ' ') { cut = idx; break }
+    }
+    // 向后找不到就向前搜
+    if (cut < 0) {
+      for (let d = 1; d <= searchRadius && pos - d > 0; d++) {
+        const idx = pos - d
+        const ch = result[idx]
+        const prev = result[idx - 1] || ''
+        if (isThaiVowel(ch) && isThaiChar(prev) && !isThaiVowel(prev)) { cut = idx; break }
+        if ((/[A-Za-z0-9]/.test(ch)) && isThaiChar(prev)) { cut = idx; break }
+        if (ch === ' ') { cut = idx; break }
+      }
+    }
+    if (cut > 0) {
+      // 插入换行（吃掉断点处的空格）
+      result = result.slice(0, cut).replace(/\s+$/, '') + '\n' + result.slice(cut).replace(/^\s+/, '')
+    }
+  }
+
+  return result
+}
+
+// ============================================================
 // 俄语 (ru)
 // ============================================================
 function postProcessRussian(text: string): string {
@@ -600,6 +771,14 @@ function postProcessRussian(text: string): string {
   result = result.replace(/(\d+)\s*GB\b(?!\/)/gi, '$1 ГБ')
   result = result.replace(/(\d+)\s*MB\b(?!\/)/gi, '$1 МБ')
   result = result.replace(/(\d+)\s*TB\b(?!\/)/gi, '$1 ТБ')
+
+  // v12.1: 时间/物理单位俄语化（judge 基线发现 1m, 30min, 15000Gauss 未本地化）
+  // min → мин（分钟），m → м（米，只在数字后），Gauss → Гс（高斯）
+  result = result.replace(/(\d+)\s*min\b/gi, '$1 мин')
+  result = result.replace(/(\d+)\s*m\b(?!\w)/gi, '$1 м')
+  result = result.replace(/(\d+)\s*Gauss\b/gi, '$1 Гс')
+  // 数字千分位空格（10,000 → 10 000）
+  result = result.replace(/\b(\d{1,3}),(\d{3})\b/g, '$1 $2')
 
   return result
 }
@@ -653,6 +832,21 @@ function postProcessEuropeanNumbers(text: string, lang: string): string {
   if (sep && sep !== ',') {
     // 仅对5位数及以上添加千位分隔，避免 7400 → 7.400
     result = result.replace(/\b\d{5,}\b/g, (n) => n.replace(/\B(?=(\d{3})+(?!\d))/g, sep))
+
+    // v12.1: LLM 输出的英文千分位格式（10,000）→ 本地化格式（10.000 / 10 000）
+    // 只在千分位语境替换（数字后跟恰好3位数字），避免误伤小数（1,5）或版本号
+    result = result.replace(/\b(\d{1,3}),(\d{3})\b/g, `$1${sep}$2`)
+
+    // v12.1: 小数点本地化（de/es/it/pt/nl/tr 用小数逗号，fr/pl/sv 已用空格不处理小数点）
+    const decimalCommaLangs = ['de', 'es', 'it', 'pt', 'pt-BR', 'nl', 'tr']
+    if (decimalCommaLangs.includes(lang)) {
+      // 英文小数点（1.5m）→ 本地化（1,5 m）——只在小数语境（数字.数字）替换
+      result = result.replace(/\b(\d+)\.(\d+)\s*(m|mm|cm|km|g|kg|W|V|A|Hz|GB|MB|TB|MB\/s|GB\/s)\b/gi, '$1,$2 $3')
+    }
+
+    // v12.1: 单位前空格规范化（de/es 等欧洲语言单位前应有空格：1,5 m 而非 1,5m）
+    // 只处理 LLM 漏加空格的场景（数字紧连单位字母）
+    result = result.replace(/(\d)(m|mm|cm|km|g|kg|W|V|A|Hz)\b(?!\w)/g, '$1 $2')
   }
 
   return result

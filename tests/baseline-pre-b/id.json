@@ -1,0 +1,690 @@
+{
+  "lang": "id",
+  "csv": "Card 卡类-OW&AMZ小语种翻译 - PLAY PRO microSD.csv",
+  "timestamp": "2026-08-25T14:28:59.701Z",
+  "methodology": "judge=LLM人设模拟(judge-personas.ts)，置信度低于真人母语评审；fidelity以代码校验为准，judge仅软信号；只允许差分对比结论，不允许绝对分数结论",
+  "cells": [
+    {
+      "index": 0,
+      "source": "Power Up Your Play\nLexar® PLAY PRO microSDXC™ Express Card",
+      "mine": "Tingkatkan Sesi Nge-game Anda\nKartu Memori Lexar® PLAY PRO microSDXC™ Express",
+      "official": "",
+      "mineJudgement": {
+        "index": 0,
+        "runs": [
+          {
+            "persona": "id-jakarta-gamer",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Masih kebaca copy terjemahan, apalagi campuran 'Anda' sama 'nge-game' terasa agak maksa."
+          },
+          {
+            "persona": "id-jakarta-gamer",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Judulnya masih kebaca terjemahan, apalagi campuran 'Nge-game' tapi pakai 'Anda' terasa nanggung."
+          },
+          {
+            "persona": "id-surabaya-driver",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Judulnya cukup enak dibaca, cuma campuran 'Anda' sama 'nge-game' agak terasa iklan toko resmi."
+          },
+          {
+            "persona": "id-surabaya-driver",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "Judulnya cukup enak dibaca, cuma campuran 'Anda' sama 'nge-game' agak setengah resmi setengah santai."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.5,
+          "tone": 3.5,
+          "fidelity": 4.75
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.25,
+          "fidelity": 0.1875
+        },
+        "personaGap": 1,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 1,
+      "source": "Good for Today, Great for Tomorrow\n\nRevolutionary Performance\n\nPeace of Mind Extras\n\nLevel-up Your Handheld Gaming Experience\nRead speed up to 900MB/s\n\nCut Your Download Times\nWrite speed up to 600MB/s\n\nMassive Capacity up to 1TB\n\nProtection Built in",
+      "mine": "Siap untuk Hari Ini, Mantap untuk Besok\nPerforma Revolusioner\nEkstra yang Bikin Tenang\nNaikkan Level Pengalaman Gaming Handheld Anda\nKecepatan baca hingga 900MB/s\nPangkas Waktu Download Anda\nKecepatan tulis hingga 600MB/s\nKapasitas Besar hingga 1TB\nPerlindungan Terintegrasi",
+      "official": "",
+      "mineJudgement": {
+        "index": 1,
+        "runs": [
+          {
+            "persona": "id-jakarta-gamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Lumayan enak buat halaman produk gaming, walau beberapa frasa seperti 'Perlindungan Terintegrasi' masih terasa template."
+          },
+          {
+            "persona": "id-jakarta-gamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Cukup enak dibaca dan poin speknya jelas, walau beberapa frasa seperti 'Ekstra yang Bikin Tenang' masih agak kaku."
+          },
+          {
+            "persona": "id-surabaya-driver",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Poin-poinnya jelas dan cepat kebaca, jadi saya langsung nangkap spek pentingnya."
+          },
+          {
+            "persona": "id-surabaya-driver",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Poin-poinnya gampang ditangkap dan speknya jelas, meski beberapa frasa masih terasa gaya brosur terjemahan."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 4,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 2,
+      "source": "What is SD Express and how does it works?\n\nSD Express is a new SD card standard. It adopts the PCI Express 3.0 and NVMe 1.3 interfaces, which significantly enhances the data processing capability of SD cards. The working principle of SD Express is based on the PCI Express interface and the NVMe protocol. The PCIe interface supports high-speed data transmission, while the NVMe protocol optimizes storage access efficiency. SD Express uses the second row of contacts at the interface to transmit PCIe signals and is backwards-compatible with UHS-I through the first row of contacts. After being connected to a computer that supports SD Express products, SD Express will be recognized as a standard NVMe device, similar to a modern NVMe SSD.",
+      "mine": "Apa itu SD Express dan bagaimana cara kerjanya?\nSD Express adalah standar kartu SD baru. Standar ini mengadopsi antarmuka PCI Express 3.0 dan NVMe 1.3, yang secara signifikan meningkatkan kemampuan pemrosesan data kartu SD. Prinsip kerja SD Express didasarkan pada antarmuka PCI Express dan protokol NVMe. Antarmuka PCIe mendukung transmisi data berkecepatan tinggi, sementara protokol NVMe mengoptimalkan efisiensi akses penyimpanan. SD Express menggunakan baris kontak kedua pada antarmuka untuk mentransmisikan sinyal PCIe dan kompatibel mundur dengan UHS-I melalui baris kontak pertama. Setelah terhubung ke komputer yang mendukung produk SD Express, SD Express akan dikenali sebagai perangkat NVMe standar, mirip dengan SSD NVMe modern.",
+      "official": "",
+      "mineJudgement": {
+        "index": 2,
+        "runs": [
+          {
+            "persona": "id-jakarta-gamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Bagian teknisnya jelas dan informatif, cuma istilah seperti 'kompatibel mundur' kedengaran agak kaku buat pembaca Indonesia."
+          },
+          {
+            "persona": "id-jakarta-gamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Bagian teknisnya rapi dan informatif, cuma istilah seperti 'kompatibel mundur' masih terasa agak textbook."
+          },
+          {
+            "persona": "id-surabaya-driver",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "Ini kepanjangan dan kaku banget, kalau saya paling cuma lihat angka speed sama kompatibilitasnya."
+          },
+          {
+            "persona": "id-surabaya-driver",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "Ini kepanjangan dan kaku banget buat saya, paling saya cuma lirik angka speknya lalu lanjut lihat harga."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.5,
+          "tone": 3,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 1,
+          "fidelity": 0
+        },
+        "personaGap": 1,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 3,
+      "source": "Revolutionary Performance\n\nThanks to its next-gen tech of PCIe and NVMe interface technologies that deliver up to 900MB/s read speed*, the PLAY PRO microSDXC™ Express Card is a stunning 4x faster than typical UHS-I microSD cards.\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "Performa Revolusioner\nBerkat teknologi generasi terbaru melalui antarmuka PCIe dan NVMe yang menghadirkan kecepatan baca hingga 900MB/s*, Kartu Memori PLAY PRO microSDXC™ Express tampil mengesankan dengan kecepatan 4x lebih cepat dibanding kartu microSD UHS-I pada umumnya.\n*Berdasarkan pengujian internal. Performa aktual dapat bervariasi.",
+      "official": "",
+      "mineJudgement": {
+        "index": 3,
+        "runs": [
+          {
+            "persona": "id-jakarta-gamer",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Faktanya aman, tapi gaya 'performa revolusioner' dan 'tampil mengesankan' berasa banget hasil translate marketing Inggris."
+          },
+          {
+            "persona": "id-jakarta-gamer",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Faktanya aman, tapi 'Performa Revolusioner' dan 'tampil mengesankan' terasa banget seperti copy global yang diterjemahkan."
+          },
+          {
+            "persona": "id-surabaya-driver",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Masih paham maksudnya, tapi kalimatnya terasa terjemahan brosur dan agak muter."
+          },
+          {
+            "persona": "id-surabaya-driver",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Masih paham maksudnya, tapi kalimat 'tampil mengesankan' terasa bukan bahasa toko online yang biasa saya percaya."
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 3,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 4,
+      "source": "*Comparison of the theoretical maximum speeds under different interface forms (Data source: SDA)",
+      "mine": "* Perbandingan kecepatan maksimum teoretis pada berbagai bentuk antarmuka (Sumber data: SDA)",
+      "official": "",
+      "mineJudgement": {
+        "index": 4,
+        "runs": [
+          {
+            "persona": "id-jakarta-gamer",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Bisa dipahami sebagai catatan kaki, tapi 'bentuk antarmuka' terdengar kurang natural dibanding bahasa spek yang biasa dipakai."
+          },
+          {
+            "persona": "id-jakarta-gamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Sebagai catatan teknis, kalimatnya jelas meski 'bentuk antarmuka' terdengar sedikit literal."
+          },
+          {
+            "persona": "id-surabaya-driver",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Catatan teknisnya oke, cuma frasa 'bentuk antarmuka' agak asing di telinga saya."
+          },
+          {
+            "persona": "id-surabaya-driver",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Catatan kecilnya oke dan jelas, walau bahasanya tetap agak teknis."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.5,
+          "tone": 3.25,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 5,
+      "source": "Good for Today, Great for Tomorrow\n\nThe PLAY PRO microSDXC™ Express Card is backwards-compatible with UHS-I and UHS-II host devices (at UHS-I speeds) so you can use it with your current handheld gaming consoles – and it's ideal for the microSD Express devices coming soon.",
+      "mine": "Siap untuk Hari Ini, Mantap untuk Besok\nKartu Memori PLAY PRO microSDXC™ Express kompatibel mundur dengan perangkat host UHS-I dan UHS-II (pada kecepatan UHS-I), sehingga Anda bisa menggunakannya dengan konsol gaming handheld Anda saat ini — dan kartu ini ideal untuk perangkat microSD Express yang segera hadir.",
+      "official": "",
+      "mineJudgement": {
+        "index": 5,
+        "runs": [
+          {
+            "persona": "id-jakarta-gamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Pesannya nyampe dan cukup meyakinkan, meski 'perangkat host' dan 'kompatibel mundur' masih agak teknis-kaku."
+          },
+          {
+            "persona": "id-jakarta-gamer",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Informasinya lengkap, tapi istilah 'perangkat host' dan 'kompatibel mundur' bikin copy terasa kurang lokal."
+          },
+          {
+            "persona": "id-surabaya-driver",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Info kompatibelnya penting, tapi kata 'kompatibel mundur' dan 'perangkat host' terasa kaku."
+          },
+          {
+            "persona": "id-surabaya-driver",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Informasinya lengkap, tapi istilah seperti 'kompatibel mundur' dan 'perangkat host' bikin terasa hasil terjemahan."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.25,
+          "tone": 3.25,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 6,
+      "source": "Level-up Your Handheld Gaming Experience\n\nUp to 900MB/s* read speed, the PLAY PRO microSDXC™ Express Card is a stunning 4x faster than typical UHS-I microSD cards – meaning that games load faster and also ensuring a smooth, lag-free experience.\n\nRead speed up to 900MB/s*\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "Naikkan Level Pengalaman Gaming Handheld Anda\nDengan kecepatan baca hingga 900MB/s*, Kartu Memori PLAY PRO microSDXC™ Express tampil mengesankan dengan kecepatan 4x lebih cepat dibanding kartu microSD UHS-I pada umumnya — artinya game dimuat lebih cepat sekaligus memastikan pengalaman yang mulus dan bebas lag.\nKecepatan baca hingga 900MB/s*\n*Berdasarkan pengujian internal. Performa aktual dapat bervariasi.",
+      "official": "",
+      "mineJudgement": {
+        "index": 6,
+        "runs": [
+          {
+            "persona": "id-jakarta-gamer",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Copy-nya jelas, tapi 'game dimuat' dan judulnya terasa literal, bukan bahasa promo gaming yang bener-bener lokal."
+          },
+          {
+            "persona": "id-jakarta-gamer",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Pesannya nyampe, tapi frasa seperti 'game dimuat' dan 'tampil mengesankan' kurang natural buat halaman produk gaming."
+          },
+          {
+            "persona": "id-surabaya-driver",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Spek 900MB/s jelas, tapi 'game dimuat' dan gaya kalimatnya masih berasa hasil translate."
+          },
+          {
+            "persona": "id-surabaya-driver",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Spek 900MB/s-nya jelas, tapi kalimat promosinya agak kaku dan kurang ngalir buat dibaca cepat."
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 3,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 7,
+      "source": "Cut Your Download Times\n\nThe PLAY PRO microSDXC™ Express Card also delivers 600MB/s write speeds* when paired with the Lexar microSD Express card reader so you can download a AAA game in less time than it'll take you to order a pizza!\n\nWrite speed up to 600MB/s*\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "Pangkas Waktu Download Anda\nKartu Memori PLAY PRO microSDXC™ Express juga menghadirkan kecepatan tulis 600MB/s* saat dipasangkan dengan card reader Lexar microSD Express, sehingga Anda bisa download game AAA dalam waktu yang lebih singkat daripada waktu yang dibutuhkan untuk memesan pizza!\nKecepatan tulis hingga 600MB/s*\n*Berdasarkan pengujian internal. Performa aktual dapat bervariasi.",
+      "official": "",
+      "mineJudgement": {
+        "index": 7,
+        "runs": [
+          {
+            "persona": "id-jakarta-gamer",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Idenya seru soal download game AAA dan pizza, tapi kalimatnya kepanjangan dan masih terasa diterjemahkan mentah."
+          },
+          {
+            "persona": "id-jakarta-gamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Bagian ini lumayan hidup dan relevan buat gamer, walau gaya 'Anda bisa download' masih agak campur formal-santai."
+          },
+          {
+            "persona": "id-surabaya-driver",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Bagian ini lumayan menjual dan gampang dipahami, meski contoh pesan pizza agak kebarat-baratan."
+          },
+          {
+            "persona": "id-surabaya-driver",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "Bagian ini lumayan enak karena ada contoh pizza, cuma klaim 600MB/s di kalimat utama sebaiknya tetap pakai 'hingga' biar nggak terasa melebih-lebihkan."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.75,
+          "tone": 3.75,
+          "fidelity": 4.75
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.1875,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 8,
+      "source": "Massive Capacity up to 1TB\n\nSome of your favorite games are probably pretty big in file size. Well, with up to 1TB capacity, juggling games just got easier. You can fit many games on a 1TB card.\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "Kapasitas Besar hingga 1TB\nBeberapa game favorit Anda mungkin punya ukuran file yang cukup besar. Dengan kapasitas hingga 1TB, mengatur koleksi game jadi lebih mudah. Anda bisa menyimpan banyak game dalam kartu 1TB.\n*Berdasarkan pengujian internal. Performa aktual dapat bervariasi.",
+      "official": "",
+      "mineJudgement": {
+        "index": 8,
+        "runs": [
+          {
+            "persona": "id-jakarta-gamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Ini cukup enak dibaca buat halaman storage gaming, cuma masih agak formal dan kurang nendang."
+          },
+          {
+            "persona": "id-jakarta-gamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Ini cukup enak dibaca dan jelas buat gamer, cuma masih agak formal pakai 'Anda' jadi belum terasa copy lokal banget."
+          },
+          {
+            "persona": "id-surabaya-driver",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Bahasanya cukup enak dan jelas, saya langsung nangkep kapasitas 1TB buat simpan banyak game."
+          },
+          {
+            "persona": "id-surabaya-driver",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Bahasanya cukup enak dibaca dan langsung jelas buat tahu kapasitasnya besar."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 4,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 9,
+      "source": "Protection Built in\n\nThe PLAY PRO microSD Express card is IPX7 waterproof, wearproof, temperature-proof, x-ray-proof, vibration-resistant, magnetic-proof, shockproof, and drop-proof.*\n\nWearout resistance\n*up to 10,000 times of plugging and unplugging\nWaterproof\n*IPX7,1m deep water for 30min\nTemperature resistance\n*Operation: -25℃~85℃, Storage: -40℃~85℃\nShock resistance\n*1500G Shock\nAnti-vibration\n*10-2000Hz\nAnti-magnetic\n*15000Gauss\nX-ray protection\n*up to 100mGy\n(equivalent to airport X-ray machine exposure)\nDrop protection\n*1.5m drop",
+      "mine": "Perlindungan Terintegrasi\nKartu Memori PLAY PRO microSD Express tahan air IPX7, tahan aus, tahan suhu, terlindungi dari sinar-X, tahan getaran, tahan magnet, tahan guncangan, dan tahan jatuh.*\nKetahanan aus\n*hingga 10,000 kali pasang-cabut\nTahan air\n*IPX7, air sedalam 1m selama 30min\nKetahanan suhu\n*Pengoperasian: -25°C~85°C, Penyimpanan: -40°C~85°C\nKetahanan guncangan\n*Guncangan 1500G\nAnti-getaran\n*10-2000Hz\nAnti-magnet\n*15000Gauss\nPerlindungan sinar-X\n*hingga 100mGy\n(setara dengan paparan mesin sinar-X bandara)\nPerlindungan jatuh\n*jatuh dari 1.5m",
+      "official": "",
+      "mineJudgement": {
+        "index": 9,
+        "runs": [
+          {
+            "persona": "id-jakarta-gamer",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Speknya kebaca lengkap, tapi banyak frasa kayak 'tahan aus' dan '30min' yang terasa hasil terjemahan mentah."
+          },
+          {
+            "persona": "id-jakarta-gamer",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Speknya lengkap, tapi banyak frasa kayak 'Perlindungan Terintegrasi' dan format angka Inggris bikin berasa hasil translate brosur teknis."
+          },
+          {
+            "persona": "id-surabaya-driver",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Speknya lengkap tapi rasanya kaku dan kebanyakan istilah, saya paling cuma cek tahan air, tahan jatuh, sama angkanya."
+          },
+          {
+            "persona": "id-surabaya-driver",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Isinya lengkap tapi terasa kaku seperti spek teknis, jadi saya cuma lihat poin tahan air dan tahan bantingnya."
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 3,
+          "fidelity": 4.75
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 10,
+      "source": "Peace of Mind Extras\n\nThis card undergoes strict testing in the Lexar Quality Lab and we're so confident in it that it comes with a limited lifetime warranty. Plus we offer lifetime access to the Lexar Recovery Tool which you can use to restore accidentally deleted and formatted files.",
+      "mine": "Ekstra yang Bikin Tenang\nKartu ini menjalani pengujian ketat di Lab Kualitas Lexar, dan kami sangat yakin dengan kualitasnya sehingga kartu ini dilengkapi garansi terbatas seumur hidup. Selain itu, kami menawarkan akses seumur hidup ke Lexar Recovery Tool yang dapat Anda gunakan untuk memulihkan file yang tidak sengaja terhapus maupun terformat.",
+      "official": "",
+      "mineJudgement": {
+        "index": 10,
+        "runs": [
+          {
+            "persona": "id-jakarta-gamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Bagian ini lumayan natural dan bikin percaya, walau campuran 'bikin tenang' dengan gaya 'Anda' agak nanggung."
+          },
+          {
+            "persona": "id-jakarta-gamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "Judulnya lumayan kena, tapi bagian 'file yang terformat' agak janggal karena maksudnya file dari media yang ke-format."
+          },
+          {
+            "persona": "id-surabaya-driver",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Ini lumayan bikin percaya karena ada garansi dan recovery tool, walau kalimatnya agak panjang."
+          },
+          {
+            "persona": "id-surabaya-driver",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Judulnya lumayan meyakinkan dan garansi seumur hidupnya bikin lebih percaya."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 4,
+          "fidelity": 4.75
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 11,
+      "source": "Rigorously Tested\n\nAll Lexar products undergo extensive testing in the Lexar Quality Labs, facilities with thousands of different cameras and digital devices to ensure performance, quality, compatibility, and reliability.",
+      "mine": "Diuji Secara Ketat\nSemua produk Lexar menjalani pengujian menyeluruh di Lab Kualitas Lexar, fasilitas dengan ribuan kamera dan perangkat digital berbeda untuk memastikan performa, kualitas, kompatibilitas, dan keandalan.",
+      "official": "",
+      "mineJudgement": {
+        "index": 11,
+        "runs": [
+          {
+            "persona": "id-jakarta-gamer",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Masih jelas maksudnya, tapi judul dan kalimat 'fasilitas dengan ribuan kamera' terasa kaku khas copy hasil translate."
+          },
+          {
+            "persona": "id-jakarta-gamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Masih kebaca rapi dan faktanya aman, tapi nadanya generik banget seperti copy korporat yang diterjemahkan."
+          },
+          {
+            "persona": "id-surabaya-driver",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Masih jelas, tapi nadanya standar banget seperti brosur resmi, bukan yang bikin saya langsung yakin beli."
+          },
+          {
+            "persona": "id-surabaya-driver",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Masih agak formal, tapi pesannya jelas kalau produk ini sudah dites banyak perangkat."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.75,
+          "tone": 3,
+          "fidelity": 4.5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0,
+          "fidelity": 0.25
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": null
+    }
+  ],
+  "summary": {
+    "mine": {
+      "naturalness": 3.5208333333333335,
+      "tone": 3.3958333333333335,
+      "fidelity": 4.875
+    },
+    "official": null,
+    "unstableCells": 0,
+    "personaSensitiveCells": 0
+  }
+}

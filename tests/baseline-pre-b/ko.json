@@ -1,0 +1,690 @@
+{
+  "lang": "ko",
+  "csv": "Card 卡类-OW&AMZ小语种翻译 - PLAY PRO microSD.csv",
+  "timestamp": "2026-08-25T10:56:47.524Z",
+  "methodology": "judge=LLM人设模拟(judge-personas.ts)，置信度低于真人母语评审；fidelity以代码校验为准，judge仅软信号；只允许差分对比结论，不允许绝对分数结论",
+  "cells": [
+    {
+      "index": 0,
+      "source": "Power Up Your Play\nLexar® PLAY PRO microSDXC™ Express Card",
+      "mine": "플레이를 더 강력하게\nLexar® PLAY PRO microSDXC™ Express 카드",
+      "official": "",
+      "mineJudgement": {
+        "index": 0,
+        "runs": [
+          {
+            "persona": "ko-seoul-streamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "짧은 헤드라인이라 나쁘진 않은데 '플레이를 더 강력하게'는 살짝 번역투 느낌이 납니다."
+          },
+          {
+            "persona": "ko-seoul-streamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "짧은 카피라 무난하고 게이밍 느낌도 나지만, 살짝 번역 슬로건 같은 맛은 있어요."
+          },
+          {
+            "persona": "ko-busan-officeworker",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "짧아서 거슬리진 않지만 ‘플레이’ 같은 표현은 살짝 광고 문구 느낌이 납니다."
+          },
+          {
+            "persona": "ko-busan-officeworker",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "짧고 무난하지만 ‘더 강력하게’는 살짝 광고 문구 느낌이라 크게 와닿진 않습니다."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 3.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 1,
+      "source": "Good for Today, Great for Tomorrow\n\nRevolutionary Performance\n\nPeace of Mind Extras\n\nLevel-up Your Handheld Gaming Experience\nRead speed up to 900MB/s\n\nCut Your Download Times\nWrite speed up to 600MB/s\n\nMassive Capacity up to 1TB\n\nProtection Built in",
+      "mine": "오늘도 든든하게, 내일은 더 강력하게\n혁신적인 퍼포먼스\n안심하고 쓰는 추가 혜택\n휴대용 게임 경험을 레벨업\n최대 900MB/s 읽기 속도\n다운로드 시간을 단축\n최대 600MB/s 쓰기 속도\n최대 1TB의 대용량\n내장된 보호 기능",
+      "official": "",
+      "mineJudgement": {
+        "index": 1,
+        "runs": [
+          {
+            "persona": "ko-seoul-streamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "스펙 포인트는 잘 보이는데 '내장된 보호 기능' 같은 표현은 조금 딱딱해서 상세페이지 번역 느낌이 있습니다."
+          },
+          {
+            "persona": "ko-seoul-streamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "스펙 포인트가 한눈에 들어오고 표현도 대체로 자연스러운데, '경험을 레벨업'은 조금 덜 다듬어진 느낌이에요."
+          },
+          {
+            "persona": "ko-busan-officeworker",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "숫자와 기능이 바로 보여서 보기 편하고, 문구도 크게 번역투 같진 않습니다."
+          },
+          {
+            "persona": "ko-busan-officeworker",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "항목별로 속도와 용량이 바로 보여서 보기 편하고, 과한 말도 비교적 적어서 괜찮습니다."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 4,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 2,
+      "source": "What is SD Express and how does it works?\n\nSD Express is a new SD card standard. It adopts the PCI Express 3.0 and NVMe 1.3 interfaces, which significantly enhances the data processing capability of SD cards. The working principle of SD Express is based on the PCI Express interface and the NVMe protocol. The PCIe interface supports high-speed data transmission, while the NVMe protocol optimizes storage access efficiency. SD Express uses the second row of contacts at the interface to transmit PCIe signals and is backwards-compatible with UHS-I through the first row of contacts. After being connected to a computer that supports SD Express products, SD Express will be recognized as a standard NVMe device, similar to a modern NVMe SSD.",
+      "mine": "SD Express란 무엇이며 어떻게 작동하나요?\nSD Express는 새로운 SD 카드 표준입니다. PCI Express 3.0 및 NVMe 1.3 인터페이스를 채택해 SD 카드의 데이터 처리 능력을 크게 향상합니다. SD Express의 작동 원리는 PCI Express 인터페이스와 NVMe 프로토콜을 기반으로 합니다. PCIe 인터페이스는 고속 데이터 전송을 지원하고, NVMe 프로토콜은 스토리지 접근 효율을 최적화합니다. SD Express는 인터페이스의 두 번째 접점 행을 사용해 PCIe 신호를 전송하며, 첫 번째 접점 행을 통해 UHS-I와 하위 호환됩니다. SD Express 제품을 지원하는 컴퓨터에 연결하면, SD Express는 최신 NVMe SSD와 유사한 표준 NVMe 장치로 인식됩니다.",
+      "official": "",
+      "mineJudgement": {
+        "index": 2,
+        "runs": [
+          {
+            "persona": "ko-seoul-streamer",
+            "run": 0,
+            "naturalness": 5,
+            "tone": 5,
+            "fidelity": 5,
+            "note": "기술 설명이 깔끔하고 PCIe/NVMe 같은 핵심 스펙도 정확해서 신뢰가 갑니다."
+          },
+          {
+            "persona": "ko-seoul-streamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 5,
+            "fidelity": 5,
+            "note": "기술 설명이 정확하고 차분해서 저장장치 상세페이지로는 신뢰가 가지만, 일부 용어는 살짝 딱딱해요."
+          },
+          {
+            "persona": "ko-busan-officeworker",
+            "run": 0,
+            "naturalness": 5,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "기술 설명이 길긴 해도 PCIe 3.0, NVMe 1.3 같은 핵심 수치가 정확해서 신뢰가 갑니다."
+          },
+          {
+            "persona": "ko-busan-officeworker",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "문장은 좀 길지만 PCIe, NVMe 같은 핵심 설명이 정확해서 제품 이해에는 도움이 됩니다."
+          }
+        ],
+        "mean": {
+          "naturalness": 4.5,
+          "tone": 4.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 3,
+      "source": "Revolutionary Performance\n\nThanks to its next-gen tech of PCIe and NVMe interface technologies that deliver up to 900MB/s read speed*, the PLAY PRO microSDXC™ Express Card is a stunning 4x faster than typical UHS-I microSD cards.\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "혁신적인 퍼포먼스\n최대 900MB/s 읽기 속도*를 제공하는 차세대 PCIe 및 NVMe 인터페이스 기술 덕분에 PLAY PRO microSDXC™ Express 카드는 일반 UHS-I microSD 카드보다 놀랍게도 4배 더 빠릅니다.\n*내부 테스트 기준입니다. 실제 성능은 다를 수 있습니다.",
+      "official": "",
+      "mineJudgement": {
+        "index": 3,
+        "runs": [
+          {
+            "persona": "ko-seoul-streamer",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "'기술 덕분에'와 '놀랍게도 4배'가 좀 직역 광고문 같아서 스펙은 맞지만 카피는 덜 자연스럽습니다."
+          },
+          {
+            "persona": "ko-seoul-streamer",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "'제공하는', '놀랍게도' 같은 표현이 좀 번역투라 스펙은 믿겠는데 카피는 덜 매끄러워 보여요."
+          },
+          {
+            "persona": "ko-busan-officeworker",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "내용은 맞는데 ‘놀랍게도’ 같은 표현은 좀 과장돼 보여서 저는 속도 수치만 보게 됩니다."
+          },
+          {
+            "persona": "ko-busan-officeworker",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "수치는 믿을 만한데 ‘놀랍게도’ 같은 표현과 긴 문장 때문에 번역 광고문처럼 느껴집니다."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.25,
+          "tone": 3,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 4,
+      "source": "*Comparison of the theoretical maximum speeds under different interface forms (Data source: SDA)",
+      "mine": "* 인터페이스 형식별 이론상 최대 속도 비교(데이터 출처: SDA)",
+      "official": "",
+      "mineJudgement": {
+        "index": 4,
+        "runs": [
+          {
+            "persona": "ko-seoul-streamer",
+            "run": 0,
+            "naturalness": 5,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "각주 문구로는 간결하고 정보도 그대로라 거슬리는 부분은 거의 없습니다."
+          },
+          {
+            "persona": "ko-seoul-streamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "각주 문구로는 깔끔하지만 별표 뒤 띄어쓰기 같은 디테일이 살짝 거슬려요."
+          },
+          {
+            "persona": "ko-busan-officeworker",
+            "run": 0,
+            "naturalness": 5,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "짧고 자료 출처가 명확해서 제품 설명 보조 문구로 무난합니다."
+          },
+          {
+            "persona": "ko-busan-officeworker",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "출처와 비교 기준이 명확해서 짧지만 신뢰감은 있습니다."
+          }
+        ],
+        "mean": {
+          "naturalness": 4.5,
+          "tone": 4,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 5,
+      "source": "Good for Today, Great for Tomorrow\n\nThe PLAY PRO microSDXC™ Express Card is backwards-compatible with UHS-I and UHS-II host devices (at UHS-I speeds) so you can use it with your current handheld gaming consoles – and it's ideal for the microSD Express devices coming soon.",
+      "mine": "오늘도 든든하게, 내일은 더 강력하게\nPLAY PRO microSDXC™ Express 카드는 UHS-I 및 UHS-II 호스트 장치와 하위 호환되며(UHS-I 속도), 현재 사용 중인 휴대용 게임 콘솔에서도 사용할 수 있습니다. 또한 곧 출시될 microSD Express 장치에도 적합합니다.",
+      "official": "",
+      "mineJudgement": {
+        "index": 5,
+        "runs": [
+          {
+            "persona": "ko-seoul-streamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "호환성 설명이 필요한 만큼 들어가 있고, '오늘도 든든하게' 카피도 한국어로 무난하게 먹힙니다."
+          },
+          {
+            "persona": "ko-seoul-streamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "호환성 설명이 명확해서 좋고, 지금 기기와 차기 기기 둘 다 챙긴다는 메시지도 잘 살아 있어요."
+          },
+          {
+            "persona": "ko-busan-officeworker",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "지금 기기와 앞으로 나올 기기 호환성을 구체적으로 말해줘서 실사용 관점에서 괜찮습니다."
+          },
+          {
+            "persona": "ko-busan-officeworker",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "호환 기기와 속도 조건을 분명히 써줘서 실제 구매 판단에 도움이 됩니다."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 4,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 6,
+      "source": "Level-up Your Handheld Gaming Experience\n\nUp to 900MB/s* read speed, the PLAY PRO microSDXC™ Express Card is a stunning 4x faster than typical UHS-I microSD cards – meaning that games load faster and also ensuring a smooth, lag-free experience.\n\nRead speed up to 900MB/s*\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "휴대용 게임 경험을 레벨업\n최대 900MB/s* 읽기 속도를 제공하는 PLAY PRO microSDXC™ Express 카드는 일반 UHS-I microSD 카드보다 놀랍게도 4배 더 빠릅니다. 게임 로딩이 더 빨라지고, 렉 없이 부드러운 플레이를 경험할 수 있습니다.\n최대 900MB/s* 읽기 속도\n*내부 테스트 기준입니다. 실제 성능은 다를 수 있습니다.",
+      "official": "",
+      "mineJudgement": {
+        "index": 6,
+        "runs": [
+          {
+            "persona": "ko-seoul-streamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "'렉 없이 부드러운 플레이'처럼 게이머한테 익숙한 표현이 있어서 꽤 괜찮지만 제목은 살짝 어색합니다."
+          },
+          {
+            "persona": "ko-seoul-streamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "로딩·렉 얘기가 게이머 입장에서 와닿지만, '놀랍게도 4배'는 광고 번역 느낌이 조금 납니다."
+          },
+          {
+            "persona": "ko-busan-officeworker",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "900MB/s와 4배 빠름이 바로 보여서 좋지만 ‘놀랍게도’는 조금 힘이 들어간 느낌입니다."
+          },
+          {
+            "persona": "ko-busan-officeworker",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "900MB/s와 4배 빠름이 바로 보여 좋지만 ‘놀랍게도’는 조금 과장스럽게 들립니다."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 4,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 7,
+      "source": "Cut Your Download Times\n\nThe PLAY PRO microSDXC™ Express Card also delivers 600MB/s write speeds* when paired with the Lexar microSD Express card reader so you can download a AAA game in less time than it'll take you to order a pizza!\n\nWrite speed up to 600MB/s*\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "다운로드 시간을 단축\nPLAY PRO microSDXC™ Express 카드는 Lexar microSD Express 카드 리더와 함께 사용하면 600MB/s 쓰기 속도*도 제공해, 피자를 주문하는 시간보다 더 짧은 시간에 AAA 게임을 다운로드할 수 있습니다!\n최대 600MB/s* 쓰기 속도\n*내부 테스트 기준입니다. 실제 성능은 다를 수 있습니다.",
+      "official": "",
+      "mineJudgement": {
+        "index": 7,
+        "runs": [
+          {
+            "persona": "ko-seoul-streamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "피자 주문 비유가 재미는 있는데 문장이 약간 번역체라 완전히 찰지진 않습니다."
+          },
+          {
+            "persona": "ko-seoul-streamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 5,
+            "fidelity": 5,
+            "note": "피자 주문 시간 비유가 살아 있어서 딱 게이머 대상 카피 같고 속도 스펙도 명확해요."
+          },
+          {
+            "persona": "ko-busan-officeworker",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "600MB/s 쓰기 속도는 좋게 보이지만 피자 주문 비유는 제 취향엔 좀 가벼운 광고처럼 느껴집니다."
+          },
+          {
+            "persona": "ko-busan-officeworker",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "600MB/s 쓰기 속도는 좋지만 피자 주문 비유는 좀 억지스러운 해외 광고 느낌입니다."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 3.75,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.6875,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 8,
+      "source": "Massive Capacity up to 1TB\n\nSome of your favorite games are probably pretty big in file size. Well, with up to 1TB capacity, juggling games just got easier. You can fit many games on a 1TB card.\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "최대 1TB의 대용량\n좋아하는 게임 중 일부는 파일 용량이 꽤 클 수 있습니다. 최대 1TB 용량이면 게임을 옮겨가며 관리하기가 훨씬 쉬워집니다. 1TB 카드 하나에 많은 게임을 담을 수 있습니다.\n*내부 테스트 기준입니다. 실제 성능은 다를 수 있습니다.",
+      "official": "",
+      "mineJudgement": {
+        "index": 8,
+        "runs": [
+          {
+            "persona": "ko-seoul-streamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "살짝 번역투가 있긴 한데 1TB에 게임 많이 넣는다는 포인트는 바로 들어와서 무난하게 믿고 읽힙니다."
+          },
+          {
+            "persona": "ko-seoul-streamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "스펙 핵심은 잘 들어오고 문장도 무난한데, 살짝 번역체 느낌은 남아 있어요."
+          },
+          {
+            "persona": "ko-busan-officeworker",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "군더더기 적고 1TB 기준이 바로 보여서 믿고 읽히지만, '옮겨가며 관리'는 약간 번역투 느낌이 납니다."
+          },
+          {
+            "persona": "ko-busan-officeworker",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "숫자와 용량이 바로 보여서 믿음은 가고, 문장도 크게 거슬리진 않습니다."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 4,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 9,
+      "source": "Protection Built in\n\nThe PLAY PRO microSD Express card is IPX7 waterproof, wearproof, temperature-proof, x-ray-proof, vibration-resistant, magnetic-proof, shockproof, and drop-proof.*\n\nWearout resistance\n*up to 10,000 times of plugging and unplugging\nWaterproof\n*IPX7,1m deep water for 30min\nTemperature resistance\n*Operation: -25℃~85℃, Storage: -40℃~85℃\nShock resistance\n*1500G Shock\nAnti-vibration\n*10-2000Hz\nAnti-magnetic\n*15000Gauss\nX-ray protection\n*up to 100mGy\n(equivalent to airport X-ray machine exposure)\nDrop protection\n*1.5m drop",
+      "mine": "내장된 보호 기능\nPLAY PRO microSD Express 카드는 IPX7 방수, 삽입/제거 내구성, 온도 내성, X-ray 보호, 진동 내성, 자기장 내성, 충격 방지, 낙하 방지 기능을 갖췄습니다.*\n삽입/제거 내구성\n*최대 10,000회 삽입 및 제거\n방수\n*IPX7, 수심 1m에서 30분\n온도 내성\n*작동: -25°C~85°C, 보관: -40°C~85°C\n충격 내성\n*1500G 충격\n진동 내성\n*10-2000Hz\n자기장 내성\n*15000Gauss\nX-ray 보호\n*최대 100mGy\n(공항 X-ray 검색대 노출량에 해당)\n낙하 보호\n*1.5m 낙하",
+      "official": "",
+      "mineJudgement": {
+        "index": 9,
+        "runs": [
+          {
+            "persona": "ko-seoul-streamer",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "스펙은 다 맞아 보이지만 ‘삽입/제거 내구성’ 같은 표현이 좀 딱딱해서 상세페이지라기보다 매뉴얼 표를 읽는 느낌입니다."
+          },
+          {
+            "persona": "ko-seoul-streamer",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "방수·내구성 수치가 정확해서 좋지만 '삽입/제거 내구성' 같은 표현은 상세페이지에서 좀 딱딱하게 느껴져요."
+          },
+          {
+            "persona": "ko-busan-officeworker",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "문구는 좀 딱딱하지만 방수 깊이, 온도, 충격 수치가 촘촘해서 제품 설명으로는 신뢰가 갑니다."
+          },
+          {
+            "persona": "ko-busan-officeworker",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 5,
+            "fidelity": 5,
+            "note": "보호 항목이 수치로 쭉 정리돼 있어서 침대 옆 NAS용 메모리처럼 안정성을 볼 때 신뢰가 갑니다."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.25,
+          "tone": 3.75,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.6875,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 10,
+      "source": "Peace of Mind Extras\n\nThis card undergoes strict testing in the Lexar Quality Lab and we're so confident in it that it comes with a limited lifetime warranty. Plus we offer lifetime access to the Lexar Recovery Tool which you can use to restore accidentally deleted and formatted files.",
+      "mine": "안심하고 쓰는 추가 혜택\n이 카드는 Lexar Quality Lab에서 엄격한 테스트를 거치며, 그만큼 자신 있게 제한적 평생 보증을 제공합니다. 또한 실수로 삭제되거나 포맷된 파일을 복원할 수 있는 Lexar Recovery Tool 평생 이용 혜택도 제공합니다.",
+      "official": "",
+      "mineJudgement": {
+        "index": 10,
+        "runs": [
+          {
+            "persona": "ko-seoul-streamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "보증이랑 복구 툴 얘기는 신뢰감 있게 전달되는데 ‘그만큼 자신 있게’ 부분만 약간 번역문처럼 걸립니다."
+          },
+          {
+            "persona": "ko-seoul-streamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "보증이랑 복구 툴 혜택이 깔끔하게 전달돼서 저장장치 살 때 신뢰감은 꽤 줍니다."
+          },
+          {
+            "persona": "ko-busan-officeworker",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "보증과 복구툴 혜택이 깔끔하게 전달돼서 안심은 되지만, '그만큼 자신 있게'는 살짝 광고 번역체 같습니다."
+          },
+          {
+            "persona": "ko-busan-officeworker",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "평생 보증과 복구 툴이 명확해서 좋지만 ‘제한적 평생 보증’은 살짝 번역투 느낌이 납니다."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 4,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 11,
+      "source": "Rigorously Tested\n\nAll Lexar products undergo extensive testing in the Lexar Quality Labs, facilities with thousands of different cameras and digital devices to ensure performance, quality, compatibility, and reliability.",
+      "mine": "철저한 테스트 완료\n모든 Lexar 제품은 성능, 품질, 호환성, 신뢰성을 보장하기 위해 수천 종의 다양한 카메라와 디지털 장치를 갖춘 Lexar Quality Labs에서 광범위한 테스트를 거칩니다.",
+      "official": "",
+      "mineJudgement": {
+        "index": 11,
+        "runs": [
+          {
+            "persona": "ko-seoul-streamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "내용은 정확하고 깔끔하지만 ‘성능, 품질, 호환성, 신뢰성’ 나열이 흔한 직역 광고 문구처럼 좀 심심합니다."
+          },
+          {
+            "persona": "ko-seoul-streamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "테스트 랩 얘기는 신뢰 포인트로 잘 읽히고, 긴 문장치고는 크게 거슬리지 않아요."
+          },
+          {
+            "persona": "ko-busan-officeworker",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "뜻은 맞는데 한 문장에 정보가 몰려 있어 읽다가 살짝 피곤하고, 평범한 회사 소개 문구처럼 느껴집니다."
+          },
+          {
+            "persona": "ko-busan-officeworker",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "테스트 환경 설명은 괜찮지만 ‘보장하기 위해’는 실제 보증처럼 들려 조금 과하게 느껴집니다."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.75,
+          "tone": 3.5,
+          "fidelity": 4.75
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.25,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": null
+    }
+  ],
+  "summary": {
+    "mine": {
+      "naturalness": 3.9375,
+      "tone": 3.8333333333333335,
+      "fidelity": 4.979166666666667
+    },
+    "official": null,
+    "unstableCells": 0,
+    "personaSensitiveCells": 0
+  }
+}

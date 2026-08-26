@@ -1,0 +1,1270 @@
+{
+  "lang": "vi",
+  "csv": "Card 卡类-OW&AMZ小语种翻译 - PLAY PRO microSD.csv",
+  "timestamp": "2026-08-25T11:23:34.022Z",
+  "methodology": "judge=LLM人设模拟(judge-personas.ts)，置信度低于真人母语评审；fidelity以代码校验为准，judge仅软信号；只允许差分对比结论，不允许绝对分数结论",
+  "cells": [
+    {
+      "index": 0,
+      "source": "Power Up Your Play\nLexar® PLAY PRO microSDXC™ Express Card",
+      "mine": "Tăng sức mạnh cho cuộc chơi\nThẻ Lexar® PLAY PRO microSDXC™ Express",
+      "official": "Cải Thiện Hiệu Suất Chơi Game\n Thẻ Lexar® PLAY PRO microSDXC™ Express",
+      "mineJudgement": {
+        "index": 0,
+        "runs": [
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Cụm “Tăng sức mạnh cho cuộc chơi” nghe hơi dịch thẳng từ slogan tiếng Anh, đọc vẫn hiểu nhưng chưa cuốn."
+          },
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "“Tăng sức mạnh cho cuộc chơi” nghe hơi dịch slogan tiếng Anh, chưa đủ cuốn với dân chơi game."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Nghe khá ổn kiểu slogan quảng cáo, hơi dịch chữ “Power Up” nhưng vẫn dễ hiểu."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Câu slogan hơi kiểu dịch nhưng nhìn nhanh vẫn ổn, tên sản phẩm rõ ràng."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.5,
+          "tone": 3.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 1,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 0,
+        "runs": [
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 3,
+            "note": "Nghe ổn nhưng câu headline hơi kiểu dịch marketing chung chung, chưa có chất gaming."
+          },
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 3,
+            "note": "Nghe như dịch headline tiếng Anh, không sai hẳn nhưng chưa có chất gaming tự nhiên."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 3,
+            "note": "Nghe ổn nhưng hơi chung chung, chưa có cảm giác câu slogan game thật sự bắt tai."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "Nghe ổn kiểu tiêu đề bán hàng, dù câu 'Power Up Your Play' dịch hơi chung chung chứ chưa thật bắt tai."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.5,
+          "tone": 3.25,
+          "fidelity": 3.25
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.1875,
+          "fidelity": 0.1875
+        },
+        "personaGap": 1,
+        "flags": []
+      }
+    },
+    {
+      "index": 1,
+      "source": "Good for Today, Great for Tomorrow\n\nRevolutionary Performance\n\nPeace of Mind Extras\n\nLevel-up Your Handheld Gaming Experience\nRead speed up to 900MB/s\n\nCut Your Download Times\nWrite speed up to 600MB/s\n\nMassive Capacity up to 1TB\n\nProtection Built in",
+      "mine": "Dùng tốt hôm nay, sẵn sàng cho ngày mai\nHiệu năng đột phá\nAn tâm hơn với tiện ích đi kèm\nNâng tầm trải nghiệm gaming cầm tay\nTốc độ đọc lên đến 900MB/s\nRút ngắn thời gian tải xuống\nTốc độ ghi lên đến 600MB/s\nDung lượng lớn lên đến 1TB\nTích hợp khả năng bảo vệ",
+      "official": "Nâng Cao Chất Lượng Mỗi Ngày\n \n Hiệu Suất Mang Tính Cách Mạng\n \n An Tâm Hơn\n \n Nâng Cấp Trải Nghiệm Chơi Game Cầm Tay\n Tốc độ đọc lên đến 900MB/s\n \n Cắt Giảm Thời Gian Tải Xuống\n Tốc độ ghi lên đến 600MB/s\n \n Dung Lượng Khổng Lồ lên đến 1TB\n \n Tích Hợp Tính Năng Bảo Vệ",
+      "mineJudgement": {
+        "index": 1,
+        "runs": [
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Các headline khá ổn với dân chơi handheld, chỉ có vài cụm như “Tích hợp khả năng bảo vệ” hơi cứng."
+          },
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Đọc khá ổn, có hơi quảng cáo an toàn nhưng các ý chính về tốc độ, dung lượng và bảo vệ đều rõ."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Các ý chính rõ, đọc lướt nắm được thông số, chỉ hơi lấn cấn chữ “gaming cầm tay”."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Các ý chính gọn, dễ quét thông số, chỉ có vài cụm như “gaming cầm tay” hơi lai tiếng Anh."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 4,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 1,
+        "runs": [
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 3,
+            "note": "Đọc hiểu được nhưng nhiều cụm viết hoa và dịch sát như brochure, đặc biệt câu 'Nâng Cao Chất Lượng Mỗi Ngày' bị lệch ý."
+          },
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 3,
+            "note": "Đọc hiểu được nhưng nhiều cụm kiểu 'Hiệu Suất Mang Tính Cách Mạng' và 'Cắt Giảm Thời Gian Tải Xuống' khá Google Dịch."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 3,
+            "note": "Các ý chính đọc được nhưng tiêu đề và vài cụm nghe hơi sáo, thiếu ý dùng tốt cho tương lai."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 3,
+            "note": "Đọc hiểu nhanh được nhưng nhiều cụm nghe như dịch từng ý, nhất là tiêu đề 'Nâng Cao Chất Lượng Mỗi Ngày' không ra ý hôm nay-ngày mai."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.25,
+          "tone": 3,
+          "fidelity": 3
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      }
+    },
+    {
+      "index": 2,
+      "source": "What is SD Express and how does it works?\n\nSD Express is a new SD card standard. It adopts the PCI Express 3.0 and NVMe 1.3 interfaces, which significantly enhances the data processing capability of SD cards. The working principle of SD Express is based on the PCI Express interface and the NVMe protocol. The PCIe interface supports high-speed data transmission, while the NVMe protocol optimizes storage access efficiency. SD Express uses the second row of contacts at the interface to transmit PCIe signals and is backwards-compatible with UHS-I through the first row of contacts. After being connected to a computer that supports SD Express products, SD Express will be recognized as a standard NVMe device, similar to a modern NVMe SSD.",
+      "mine": "SD Express là gì và hoạt động như thế nào?\nSD Express là một tiêu chuẩn thẻ SD mới. Tiêu chuẩn này sử dụng giao tiếp PCI Express 3.0 và NVMe 1.3, giúp nâng cao đáng kể khả năng xử lý dữ liệu của thẻ SD. Nguyên lý hoạt động của SD Express dựa trên giao tiếp PCI Express và giao thức NVMe. Giao tiếp PCIe hỗ trợ truyền dữ liệu tốc độ cao, trong khi giao thức NVMe tối ưu hóa hiệu quả truy cập lưu trữ. SD Express sử dụng hàng tiếp điểm thứ hai trên giao tiếp để truyền tín hiệu PCIe và tương thích ngược với UHS-I thông qua hàng tiếp điểm thứ nhất. Sau khi được kết nối với máy tính hỗ trợ sản phẩm SD Express, SD Express sẽ được nhận diện là một thiết bị NVMe tiêu chuẩn, tương tự như ổ SSD NVMe hiện đại.",
+      "official": "SD Express là gì và hoạt động như thế nào?\n \n SD Express là một tiêu chuẩn thẻ SD mới. Thẻ này sử dụng giao diện PCI Express 3.0 và NVMe 1.3, giúp tăng cường đáng kể khả năng xử lý dữ liệu của thẻ SD. Nguyên lý hoạt động của SD Express dựa trên giao diện PCI Express và giao thức NVMe. Giao diện PCIe hỗ trợ truyền dữ liệu tốc độ cao, trong khi giao thức NVMe tối ưu hóa hiệu quả truy cập lưu trữ. SD Express sử dụng hàng tiếp điểm thứ hai tại giao diện để truyền tín hiệu PCIe và tương thích ngược với UHS-I thông qua hàng tiếp điểm thứ nhất. Sau khi được kết nối với máy tính hỗ trợ các sản phẩm SD Express, SD Express sẽ được nhận dạng là thiết bị NVMe tiêu chuẩn, tương tự như NVMe SSD hiện đại.",
+      "mineJudgement": {
+        "index": 2,
+        "runs": [
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Đoạn kỹ thuật đủ thông tin nhưng nhiều câu bị kiểu tài liệu dịch, nhất là “hàng tiếp điểm thứ hai trên giao tiếp” nghe không tự nhiên."
+          },
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Đoạn giải thích kỹ thuật khá mượt, chỉ hơi sách vở ở vài cụm như “hàng tiếp điểm” và “giao tiếp”."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Đoạn kỹ thuật khá đúng nhưng dài và có vài cụm như “thiết bị chủ” nghe hơi tài liệu dịch, tôi dễ bỏ qua."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Đọc như đoạn tài liệu kỹ thuật dịch ra, hiểu được nhưng khá dài và hơi khô với người mua bình thường."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.25,
+          "tone": 3.25,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 2,
+        "runs": [
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Đoạn kỹ thuật khá rõ ràng và đúng ý, chỉ có vài chỗ như 'tại giao diện' nghe hơi cứng."
+          },
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Đoạn kỹ thuật này ổn, hơi sách vở nhưng thông tin chuẩn và đọc không quá cấn."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Thông tin kỹ thuật có vẻ đúng và rõ, nhưng đoạn dài kiểu tài liệu nên tôi sẽ chỉ lướt qua."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Đoạn kỹ thuật hơi dài nhưng viết khá rõ, đủ thông tin để tôi tin phần mô tả chuẩn."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 3.75,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 3,
+      "source": "Revolutionary Performance\n\nThanks to its next-gen tech of PCIe and NVMe interface technologies that deliver up to 900MB/s read speed*, the PLAY PRO microSDXC™ Express Card is a stunning 4x faster than typical UHS-I microSD cards.\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "Hiệu năng đột phá\nNhờ công nghệ thế hệ mới với giao tiếp PCIe và NVMe cho tốc độ đọc lên đến 900MB/s*, thẻ PLAY PRO microSDXC™ Express nhanh hơn đáng kể, gấp 4 lần so với thẻ nhớ microSD UHS-I thông thường.\n*Dựa trên thử nghiệm nội bộ. Hiệu năng thực tế có thể thay đổi.",
+      "official": "Hiệu Suất Mang Tính Cách Mạng\n \n Nhờ công nghệ giao diện PCIe và NVMe thế hệ mới mang lại tốc độ đọc lên đến 900MB/s*, Thẻ PLAY PRO microSDXC™ Express nhanh hơn gấp 4 lần so với thẻ UHS-I microSD thông thường.\n \n *Dựa trên kết quả thử nghiệm của chúng tôi. Hiệu năng thực tế có thể khác biệt.",
+      "mineJudgement": {
+        "index": 3,
+        "runs": [
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Câu bán hiệu năng đọc ổn, dù “nhanh hơn đáng kể, gấp 4 lần” hơi dư chữ nhưng vẫn đáng tin."
+          },
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Nghe đúng kiểu copy sản phẩm công nghệ, dù câu “nhanh hơn đáng kể, gấp 4 lần” hơi thừa chữ."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Câu quảng cáo mượt và có số liệu rõ, chỉ hơi dư chữ ở đoạn “nhanh hơn đáng kể, gấp 4 lần”."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Thông tin tốc độ và so sánh rõ, câu “nhanh hơn đáng kể, gấp 4 lần” hơi dư nhưng vẫn thuyết phục."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 4,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 3,
+        "runs": [
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Thông tin chính đúng nhưng 'Hiệu Suất Mang Tính Cách Mạng' và câu mở đầu nghe rất Google Dịch."
+          },
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Thông số đúng nhưng câu 'mang lại hiệu suất' kiểu brochure dịch máy nên chưa tạo cảm giác xịn."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Câu mô tả hiểu được nhưng cấu trúc hơi dịch máy, nhất là đoạn mở đầu quá dài."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Thông số đúng nhưng cách viết hoa và câu 'Nhờ công nghệ...' làm tôi thấy hơi mùi dịch máy."
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 3,
+          "fidelity": 4.75
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 4,
+      "source": "*Comparison of the theoretical maximum speeds under different interface forms (Data source: SDA)",
+      "mine": "* So sánh tốc độ tối đa trên lý thuyết giữa các dạng giao tiếp khác nhau (Nguồn dữ liệu: SDA)",
+      "official": "*So sánh tốc độ tối đa theo lý thuyết dưới các dạng giao diện khác nhau (Nguồn dữ liệu: SDA)",
+      "mineJudgement": {
+        "index": 4,
+        "runs": [
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Chú thích này dịch đúng và dễ hiểu, chỉ mang giọng kỹ thuật khô chứ không có gì đặc biệt."
+          },
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Câu chú thích gọn và đúng nghĩa, không bị mùi Google Dịch nhiều."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Chú thích này hiểu được và đúng ý, nhưng chỉ mang tính thông tin khô khan."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Dòng chú thích ổn, đúng kiểu footnote, không có gì gây khó chịu."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 3.25,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 4,
+        "runs": [
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Câu chú thích ổn, hơi khô nhưng đúng kiểu ghi chú kỹ thuật."
+          },
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Chú thích đúng ý nhưng cụm 'dưới các dạng giao diện' nghe hơi lủng củng."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Dòng chú thích này ổn, hơi khô nhưng đúng kiểu thông tin kỹ thuật."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Câu ngắn nên hiểu được, nhưng 'dạng giao diện' nghe không tự nhiên bằng 'chuẩn giao tiếp'."
+          }
+        ],
+        "mean": {
+          "naturalness": 3.5,
+          "tone": 3.25,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 5,
+      "source": "Good for Today, Great for Tomorrow\n\nThe PLAY PRO microSDXC™ Express Card is backwards-compatible with UHS-I and UHS-II host devices (at UHS-I speeds) so you can use it with your current handheld gaming consoles – and it's ideal for the microSD Express devices coming soon.",
+      "mine": "Dùng tốt hôm nay, sẵn sàng cho ngày mai\nThẻ PLAY PRO microSDXC™ Express tương thích ngược với các thiết bị chủ UHS-I và UHS-II (ở tốc độ UHS-I), nên bạn có thể dùng với máy chơi game cầm tay hiện tại – đồng thời cũng lý tưởng cho các thiết bị microSD Express sắp ra mắt.",
+      "official": "Nâng Cao Chất Lượng Mỗi Ngày\n \n Thẻ PLAY PRO microSDXC™ Express tương thích ngược với các thiết bị lưu trữ UHS-I và UHS-II (ở tốc độ UHS-I), nhờ đó bạn có thể sử dụng thẻ này với các máy chơi game cầm tay đang có – và đây cũng là lựa chọn lý tưởng cho các thiết bị microSD Express sắp ra mắt.",
+      "mineJudgement": {
+        "index": 5,
+        "runs": [
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Ý tương thích hiện tại và chuẩn tương lai được truyền tải rõ, dù “thiết bị chủ” hơi chuyên ngành với người mua phổ thông."
+          },
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Thông điệp tương thích hiện tại và đón thiết bị mới nghe ổn, chỉ “thiết bị chủ” hơi kỹ thuật quá với trang bán hàng."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Nói rõ chuyện tương thích thiết bị hiện tại và tương lai, đủ thuyết phục dù “thiết bị chủ” hơi cứng."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Nội dung dễ hiểu và đúng nhu cầu nâng cấp, chỉ cụm “thiết bị chủ” nghe hơi kỹ thuật."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 4,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 5,
+        "runs": [
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 3,
+            "note": "Đoạn này đọc tạm được nhưng dịch 'host devices' thành 'thiết bị lưu trữ' là sai và headline cũng lệch vibe tương lai."
+          },
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 3,
+            "note": "Tiêu đề lệch ý và 'thiết bị lưu trữ UHS-I/UHS-II' làm mình hơi nghi về độ hiểu sản phẩm."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 3,
+            "note": "Đọc tạm được nhưng cụm “thiết bị lưu trữ UHS-I và UHS-II” làm tôi hơi khựng vì nghe không đúng ngữ cảnh."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 3,
+            "note": "Nội dung chính còn nắm được nhưng dịch 'host devices' thành 'thiết bị lưu trữ' làm tôi hơi lấn cấn về độ chuẩn."
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 3,
+          "fidelity": 3
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 6,
+      "source": "Level-up Your Handheld Gaming Experience\n\nUp to 900MB/s* read speed, the PLAY PRO microSDXC™ Express Card is a stunning 4x faster than typical UHS-I microSD cards – meaning that games load faster and also ensuring a smooth, lag-free experience.\n\nRead speed up to 900MB/s*\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "Nâng tầm trải nghiệm gaming cầm tay\nVới tốc độ đọc lên đến 900MB/s*, thẻ PLAY PRO microSDXC™ Express nhanh hơn đáng kể, gấp 4 lần so với thẻ nhớ microSD UHS-I thông thường – giúp game tải nhanh hơn và mang lại trải nghiệm mượt mà, hạn chế giật lag.\nTốc độ đọc lên đến 900MB/s*\n*Dựa trên thử nghiệm nội bộ. Hiệu năng thực tế có thể thay đổi.",
+      "official": "Nâng Cấp Trải Nghiệm Chơi Game Cầm Tay\n \n Tốc độ đọc lên đến 900MB/s*, Thẻ PLAY PRO microSDXC™ Express nhanh hơn gấp 4 lần so với các thẻ UHS-I microSD thông thường – nghĩa là trò chơi tải nhanh hơn và cũng đảm bảo trải nghiệm mượt mà, không bị trễ.\n \n Tốc độ đọc lên đến 900MB/s*\n \n *Dựa trên kết quả thử nghiệm của chúng tôi. Hiệu năng thực tế có thể khác biệt.",
+      "mineJudgement": {
+        "index": 6,
+        "runs": [
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "Nghe khá hợp gu gaming, nhưng “hạn chế giật lag” yếu hơn “lag-free” nên cảm giác hơi né cam kết."
+          },
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "Đoạn này khá hợp gu gaming, nhưng “hạn chế giật lag” nhẹ hơn claim “lag-free” của bản gốc."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "Đọc khá cuốn và đúng kiểu bán thẻ tốc độ cao, nhưng “hạn chế giật lag” nhẹ hơn ý “lag-free” của bản gốc."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "Đọc khá mượt và hợp dân chơi game, nhưng “hạn chế giật lag” nhẹ hơn ý “lag-free” của bản gốc."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 4,
+          "fidelity": 4
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 6,
+        "runs": [
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "Câu 'Tốc độ đọc lên đến..., Thẻ...' rất gượng, còn 'không bị trễ' nghe không đúng cách gamer Việt nói về lag."
+          },
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Ý và số liệu đúng nhưng cách nói 'không bị trễ' với game nghe không tự nhiên bằng 'không giật/lag'."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Thông số rõ nhưng câu đầu gượng và “không bị trễ” nghe kém tự nhiên hơn cách nói về game bị lag."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Thông số đầy đủ nhưng câu mở đầu bị cụt và 'không bị trễ' nghe không tự nhiên bằng 'không giật lag'."
+          }
+        ],
+        "mean": {
+          "naturalness": 2.75,
+          "tone": 2.75,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      }
+    },
+    {
+      "index": 7,
+      "source": "Cut Your Download Times\n\nThe PLAY PRO microSDXC™ Express Card also delivers 600MB/s write speeds* when paired with the Lexar microSD Express card reader so you can download a AAA game in less time than it'll take you to order a pizza!\n\nWrite speed up to 600MB/s*\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "Rút ngắn thời gian tải xuống\nThẻ PLAY PRO microSDXC™ Express cũng đạt tốc độ ghi 600MB/s* khi kết hợp với đầu đọc thẻ Lexar microSD Express, giúp bạn tải một game AAA nhanh hơn cả thời gian đặt một chiếc pizza!\nTốc độ ghi lên đến 600MB/s*\n*Dựa trên thử nghiệm nội bộ. Hiệu năng thực tế có thể thay đổi.",
+      "official": "Cắt Giảm Thời Gian Tải Xuống\n \n Thẻ PLAY PRO microSDXC™ Express còn cung cấp tốc độ ghi 600MB/s* khi kết hợp với đầu đọc thẻ Lexar microSD Express, nhờ đó bạn có thể tải xuống một game AAA trong thời gian còn ngắn hơn cả thời gian để gọi một chiếc pizza!\n \n Tốc độ ghi lên đến 600MB/s*\n \n *Dựa trên kết quả thử nghiệm của chúng tôi. Hiệu năng thực tế có thể khác biệt.",
+      "mineJudgement": {
+        "index": 7,
+        "runs": [
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 5,
+            "fidelity": 5,
+            "note": "Đoạn ví dụ tải game AAA nhanh hơn đặt pizza nghe vui và đúng chất bán cho gamer, chỉ “một chiếc pizza” hơi gượng nhẹ."
+          },
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Câu ví với pizza vui và dễ hiểu, dù “đặt một chiếc pizza” nghe hơi cứng so với cách nói đời thường."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Ví dụ tải game nhanh hơn đặt pizza nghe đời thường và dễ hình dung, thông số cũng rõ ràng."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "Câu ví dụ pizza khá vui nhưng hơi lạ tai, và chỗ tốc độ ghi nên giữ rõ là “lên đến”."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 4.25,
+          "fidelity": 4.75
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.1875,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 7,
+        "runs": [
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Ý và thông số đúng nhưng 'cung cấp tốc độ ghi' với ví dụ gọi pizza nghe dịch thẳng và hơi lạc giọng ở Việt Nam."
+          },
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Câu pizza có cố vui nhưng bản Việt dài và gượng, vẫn còn mùi dịch từng cụm."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Ý vui về đặt pizza có giữ lại nhưng cách nói “gọi một chiếc pizza” nghe hơi dịch và chưa mượt."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "Đoạn này khá dễ đọc và có chút vui, chỉ hơi cứng ở cụm gọi pizza và câu đầu thiếu rõ 'lên đến'."
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 3.25,
+          "fidelity": 4.5
+        },
+        "variance": {
+          "naturalness": 0.5,
+          "tone": 0.1875,
+          "fidelity": 0.25
+        },
+        "personaGap": 1,
+        "flags": []
+      }
+    },
+    {
+      "index": 8,
+      "source": "Massive Capacity up to 1TB\n\nSome of your favorite games are probably pretty big in file size. Well, with up to 1TB capacity, juggling games just got easier. You can fit many games on a 1TB card.\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "Dung lượng lớn lên đến 1TB\nMột số tựa game bạn yêu thích có lẽ có dung lượng khá nặng. Với dung lượng lên đến 1TB, việc xoay vòng game giờ đây dễ dàng hơn. Bạn có thể lưu nhiều game trên một chiếc thẻ 1TB.\n*Dựa trên thử nghiệm nội bộ. Hiệu năng thực tế có thể thay đổi.",
+      "official": "Dung Lượng Khổng Lồ lên đến 1TB\n \n Một số game yêu thích của bạn có thể có kích thước tệp khá lớn. Với dung lượng lên đến 1TB, việc chơi game sẽ trở nên dễ dàng hơn. Bạn có thể tải nhiều game trên thẻ 1TB.\n \n *Dựa trên kết quả thử nghiệm của chúng tôi. Hiệu năng thực tế có thể khác biệt.",
+      "mineJudgement": {
+        "index": 8,
+        "runs": [
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Đọc khá mượt và đúng kiểu quảng cáo thẻ nhớ gaming, chỉ hơi lấn cấn cụm “xoay vòng game”."
+          },
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Đọc ổn và đúng ý, nhưng cụm “xoay vòng game” nghe hơi dịch chứ dân chơi game thường không nói vậy."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Đọc khá ổn và dễ hiểu, chỉ hơi cấn cụm “xoay vòng game” với “dung lượng nặng”."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Đọc ổn và dễ hiểu, chỉ hơi lấn cấn cụm “xoay vòng game” nhưng không làm mất niềm tin."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 4,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 8,
+        "runs": [
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Đọc vẫn hiểu nhưng mấy cụm như “kích thước tệp” với “việc chơi game sẽ dễ dàng hơn” nghe hơi dịch máy, chưa đúng vibe dân chơi game."
+          },
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 3,
+            "note": "Đọc hiểu được nhưng mấy cụm như “kích thước tệp” với “việc chơi game dễ dàng hơn” nghe dịch máy và chưa đúng ý xoay vòng game."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 3,
+            "note": "Đọc hiểu được nhưng cụm “kích thước tệp” và “việc chơi game dễ hơn” nghe hơi dịch, chưa nói đúng ý khỏi phải xóa đổi game."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 3,
+            "note": "Đọc hiểu được nhưng có mấy chỗ như “kích thước tệp” và “tải nhiều game trên thẻ” nghe hơi dịch, tôi sẽ lướt nhanh qua."
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 3,
+          "fidelity": 3.25
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 9,
+      "source": "Protection Built in\n\nThe PLAY PRO microSD Express card is IPX7 waterproof, wearproof, temperature-proof, x-ray-proof, vibration-resistant, magnetic-proof, shockproof, and drop-proof.*\n\nWearout resistance\n*up to 10,000 times of plugging and unplugging\nWaterproof\n*IPX7,1m deep water for 30min\nTemperature resistance\n*Operation: -25℃~85℃, Storage: -40℃~85℃\nShock resistance\n*1500G Shock\nAnti-vibration\n*10-2000Hz\nAnti-magnetic\n*15000Gauss\nX-ray protection\n*up to 100mGy\n(equivalent to airport X-ray machine exposure)\nDrop protection\n*1.5m drop",
+      "mine": "Tích hợp khả năng bảo vệ\nThẻ PLAY PRO microSD Express có khả năng chống nước IPX7, chống hao mòn, chịu nhiệt, chống tia X, chống rung, chống từ, chống sốc và chống rơi.*\nChống hao mòn\n*lên đến 10,000 lần cắm/rút\nChống nước\n*IPX7, ngâm nước sâu 1m trong 30min\nChịu nhiệt\n*Hoạt động: -25°C~85°C, Lưu trữ: -40°C~85°C\nChống sốc\n*Sốc 1500G\nChống rung\n*10-2000Hz\nChống từ\n*15000Gauss\nChống tia X\n*lên đến 100mGy\n(tương đương mức phơi nhiễm từ máy quét tia X tại sân bay)\nChống rơi\n*rơi từ độ cao 1.5m",
+      "official": "Tích Hợp Tính Năng Bảo Vệ\n  \n  Thẻ nhớ PLAY PRO microSD Express có khả năng chống nước IPX7, chống mài mòn, chống nhiệt độ, chống tia X, chống rung, chống từ tính, chống va đập và chống rơi.*\n  \n Chống mòn\n  *lên đến 10.000 lần cắm và rút\n Chống nước\n  *IPX7, nước sâu 1m trong 30 phút\n Chịu nhiệt\n  *Vận hành: -25℃~85℃, Bảo quản: -40℃~85℃\n Chống va đập\n  *Va Đập 1500G\n Chống rung\n  *10-2000Hz\n Kháng từ\n  *15000Gauss\n Bảo vệ chống tia X\n  *lên đến 100mGy\n  (tương đương với việc tiếp xúc với máy chụp X-quang tại sân bay)\n Bảo vệ chống rơi\n  *Rơi từ độ cao 1,5m",
+      "mineJudgement": {
+        "index": 9,
+        "runs": [
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Thông số thì đủ nhưng nhiều cụm như “chống từ”, “Sốc 1500G”, “30min” nghe khá dịch máy và khô."
+          },
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Thông số đủ nhưng văn phong kiểu datasheet dịch lại, nhất là “Tích hợp khả năng bảo vệ” với “30min” nhìn hơi cứng."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Thông số đầy đủ nhưng văn hơi liệt kê kiểu dịch, có chỗ như “30min” làm tôi thấy kém chỉn chu."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Thông số đầy đủ nhưng văn hơi khô và vài chỗ như “30min”, “chống từ” nghe chưa thật tự nhiên."
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 3,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 9,
+        "runs": [
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "Thông số thì đủ nhưng câu chữ kiểu “chống nhiệt độ”, “chống từ tính” và tiêu đề nghe cứng như catalogue dịch thẳng."
+          },
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "Thông số có vẻ đủ nhưng câu chữ kiểu “chống nhiệt độ”, “Va Đập 1500G” rất catalog dịch thô, không tạo cảm giác xịn."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Danh sách thông số khá đầy đủ nhưng vài cụm như “chống nhiệt độ”, “Va Đập 1500G” làm tôi thấy giống bản dịch hơn là mô tả bán hàng."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Thông số đầy đủ nhưng cách viết kiểu liệt kê máy móc, tôi chỉ nhìn các chuẩn IPX7, nhiệt độ, chống sốc để quyết định."
+          }
+        ],
+        "mean": {
+          "naturalness": 2.5,
+          "tone": 2.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 1,
+        "flags": []
+      }
+    },
+    {
+      "index": 10,
+      "source": "Peace of Mind Extras\n\nThis card undergoes strict testing in the Lexar Quality Lab and we're so confident in it that it comes with a limited lifetime warranty. Plus we offer lifetime access to the Lexar Recovery Tool which you can use to restore accidentally deleted and formatted files.",
+      "mine": "An tâm hơn với tiện ích đi kèm\nThẻ này trải qua quy trình kiểm tra nghiêm ngặt tại Lexar Quality Lab, và chúng tôi tự tin đến mức sản phẩm đi kèm bảo hành giới hạn trọn đời. Ngoài ra, chúng tôi còn cung cấp quyền truy cập trọn đời vào Lexar Recovery Tool, giúp bạn khôi phục các tệp vô tình bị xóa hoặc bị mất do định dạng.",
+      "official": "An Tâm Hơn\n \n Thẻ này trải qua quá trình kiểm tra nghiêm ngặt tại Phòng Thí Nghiệm Chất Lượng Lexar, chúng tôi rất tự tin vào chiếc thẻ nên đã cung cấp chế độ bảo hành trọn đời có giới hạn cho thẻ. Ngoài ra, chúng tôi còn cung cấp quyền truy cập trọn đời vào Công Cụ Khôi Phục Lexar mà bạn có thể sử dụng để khôi phục các tệp đã xóa và định dạng nhầm.",
+      "mineJudgement": {
+        "index": 10,
+        "runs": [
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Câu này ổn, tạo cảm giác yên tâm, dù “tệp” và “bị mất do định dạng” hơi văn dịch một chút."
+          },
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Câu này khá mượt và tạo cảm giác yên tâm, chỉ có đoạn “tự tin đến mức” hơi lộ cấu trúc tiếng Anh."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "Nghe khá đáng tin, dù câu “tự tin đến mức” vẫn hơi giống văn dịch."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Câu chữ khá mượt, tạo cảm giác yên tâm về bảo hành và cứu dữ liệu."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 4,
+          "fidelity": 4.75
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 10,
+        "runs": [
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Ý chính ổn nhưng viết hoa và cách nói “Công Cụ Khôi Phục” với “tệp đã xóa và định dạng nhầm” làm mình thấy khá Tây hóa."
+          },
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Nội dung ổn nhưng câu dài và cách viết “Phòng Thí Nghiệm Chất Lượng”, “Công Cụ Khôi Phục” nghe cứng, hơi thiếu chất thương hiệu."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Ý bảo hành và cứu dữ liệu có vẻ ổn, nhưng câu dài và cụm “tệp đã xóa và định dạng nhầm” nghe không tự nhiên lắm."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "Ý bảo hành và khôi phục dữ liệu có ích nhưng câu dài và cụm “tệp đã xóa và định dạng nhầm” nghe không tự nhiên lắm."
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 3,
+          "fidelity": 4
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      }
+    },
+    {
+      "index": 11,
+      "source": "Rigorously Tested\n\nAll Lexar products undergo extensive testing in the Lexar Quality Labs, facilities with thousands of different cameras and digital devices to ensure performance, quality, compatibility, and reliability.",
+      "mine": "Được kiểm tra nghiêm ngặt\nTất cả sản phẩm Lexar đều trải qua quá trình kiểm tra toàn diện tại Lexar Quality Labs, các cơ sở có hàng nghìn máy ảnh và thiết bị kỹ thuật số khác nhau nhằm đảm bảo hiệu năng, chất lượng, khả năng tương thích và độ tin cậy.",
+      "official": "Đã qua thử nghiệm nghiêm ngặt\n \n Tất cả các sản phẩm của Lexar đều được thử nghiệm rộng rãi tại Phòng thí nghiệm chất lượng của Lexar, các cơ sở với hàng nghìn máy ảnh và thiết bị kỹ thuật số khác nhau để đảm bảo hiệu suất, chất lượng, khả năng tương thích và độ tin cậy.",
+      "mineJudgement": {
+        "index": 11,
+        "runs": [
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Dễ hiểu và đúng ý, nhưng giọng khá corporate, chưa có gì khiến mình thấy thương hiệu thật sự gần gũi."
+          },
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Nghe chuyên nghiệp và đáng tin, dù “các cơ sở có hàng nghìn...” vẫn hơi giống câu dịch từ brochure."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Câu này gọn và đúng kiểu mô tả thương hiệu, chỉ hơi dài nhưng vẫn đọc được."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "Nghe đáng tin và đúng kiểu mô tả sản phẩm, dù câu hơi dài theo kiểu giới thiệu hãng."
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 3.75,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": {
+        "index": 11,
+        "runs": [
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Nội dung đúng nhưng câu “các cơ sở với hàng nghìn...” rất lủng củng, đọc giống bản dịch hơn là copy tiếng Việt xịn."
+          },
+          {
+            "persona": "vi-hanoi-gamer",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "Câu “các cơ sở với hàng nghìn…” lộ nguyên cấu trúc tiếng Anh, đọc như bản dịch hơn là copy tiếng Việt tử tế."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Nội dung đúng nhưng câu “các cơ sở với hàng nghìn…” rất gượng, đọc là biết dịch máy."
+          },
+          {
+            "persona": "vi-hcm-office",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "Nội dung ổn nhưng văn hơi khô và có mùi dịch, nhất là đoạn “các cơ sở với hàng nghìn máy ảnh”."
+          }
+        ],
+        "mean": {
+          "naturalness": 2.25,
+          "tone": 2.75,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      }
+    }
+  ],
+  "summary": {
+    "mine": {
+      "naturalness": 3.8125,
+      "tone": 3.75,
+      "fidelity": 4.875
+    },
+    "official": {
+      "naturalness": 3.0625,
+      "tone": 3.0416666666666665,
+      "fidelity": 4.229166666666667
+    },
+    "unstableCells": 0,
+    "personaSensitiveCells": 0
+  }
+}

@@ -1,0 +1,690 @@
+{
+  "lang": "th",
+  "csv": "Card 卡类-OW&AMZ小语种翻译 - PLAY PRO microSD.csv",
+  "timestamp": "2026-08-25T15:13:11.309Z",
+  "methodology": "judge=LLM人设模拟(judge-personas.ts)，置信度低于真人母语评审；fidelity以代码校验为准，judge仅软信号；只允许差分对比结论，不允许绝对分数结论",
+  "cells": [
+    {
+      "index": 0,
+      "source": "Power Up Your Play\nLexar® PLAY PRO microSDXC™ Express Card",
+      "mine": "เพิ่มพลังให้การเล่นของค\nุณเมมโมรี่การ์ด Lexar® PLAY PRO microSDXC™ Express",
+      "official": "",
+      "mineJudgement": {
+        "index": 0,
+        "runs": [
+          {
+            "persona": "th-bangkok-gamer",
+            "run": 0,
+            "naturalness": 1,
+            "tone": 2,
+            "fidelity": 4,
+            "note": "เห็นคำว่า “ของค ุณเมมโมรี่การ์ด” แล้วรู้เลยว่าไม่ได้เกลาไทย หน้าสินค้าดูหลุดมาก"
+          },
+          {
+            "persona": "th-bangkok-gamer",
+            "run": 1,
+            "naturalness": 1,
+            "tone": 2,
+            "fidelity": 4,
+            "note": "เห็นคำขาดกลางคำกับชื่อสินค้าติดกันแล้วรู้สึกเหมือนก๊อปแปลมาแบบไม่ตรวจหน้าเว็บเลย"
+          },
+          {
+            "persona": "th-chiangmai-shop",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "อ่านแล้วสะดุดตรงตัดคำกลางคำ ดูเหมือนแปลมาแต่ยังพอรู้ว่าเป็นการ์ดรุ่นอะไร"
+          },
+          {
+            "persona": "th-chiangmai-shop",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "เห็นคำว่าคุณโดนตัดบรรทัดแล้วรู้สึกเหมือนเอาแปลเครื่องมาลง ไม่ค่อยน่าไว้ใจแม้ข้อมูลสินค้าจะครบ"
+          }
+        ],
+        "mean": {
+          "naturalness": 1.5,
+          "tone": 2.25,
+          "fidelity": 4.5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.1875,
+          "fidelity": 0.25
+        },
+        "personaGap": 1,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 1,
+      "source": "Good for Today, Great for Tomorrow\n\nRevolutionary Performance\n\nPeace of Mind Extras\n\nLevel-up Your Handheld Gaming Experience\nRead speed up to 900MB/s\n\nCut Your Download Times\nWrite speed up to 600MB/s\n\nMassive Capacity up to 1TB\n\nProtection Built in",
+      "mine": "พร้อมใช้วันนี้พร้อมกว่าเดิมสำหรับวันพร\nุ่งนี้ประสิทธิภาพสุดล้ำคว\nามอุ่นใจที่มากกว่ายกร\nะดับประสบการณ์เกมมิ่งบนเครื่องพกพาของคุณความเร็วอ่านสูงสุด 900MB/s\nลดเวลาในการดาวน์โหลดความเร็วเขียนสูงสุด 600MB/s\nความจุขนาดใหญ่สูงสุด 1TB\nมาพร้อมการปกป้องในตัว",
+      "official": "",
+      "mineJudgement": {
+        "index": 1,
+        "runs": [
+          {
+            "persona": "th-bangkok-gamer",
+            "run": 0,
+            "naturalness": 1,
+            "tone": 2,
+            "fidelity": 4,
+            "note": "ข้อความติดกันเป็นพรืดแถมตัดคำมั่ว อ่านเหมือนเอาหัวข้ออังกฤษมาโยนแปลตรง ๆ"
+          },
+          {
+            "persona": "th-bangkok-gamer",
+            "run": 1,
+            "naturalness": 1,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "ข้อความติดกันยาวเป็นพรืด อ่านแล้วเหนื่อยมาก ถึงสเปกจะครบแต่ฟีลเหมือนแปลอัตโนมัติชัดเจน"
+          },
+          {
+            "persona": "th-chiangmai-shop",
+            "run": 0,
+            "naturalness": 1,
+            "tone": 2,
+            "fidelity": 4,
+            "note": "หัวข้อไหลติดกันหมด อ่านยากมากจนผมคงเลื่อนดูแค่ราคาแทน"
+          },
+          {
+            "persona": "th-chiangmai-shop",
+            "run": 1,
+            "naturalness": 1,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "ข้อความติดกันยาวและคำขาดกลางหลายจุด อ่านแล้วเหนื่อยจนผมคงข้ามไปดูแค่ราคาและรีวิว"
+          }
+        ],
+        "mean": {
+          "naturalness": 1,
+          "tone": 2,
+          "fidelity": 4.5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0.25
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 2,
+      "source": "What is SD Express and how does it works?\n\nSD Express is a new SD card standard. It adopts the PCI Express 3.0 and NVMe 1.3 interfaces, which significantly enhances the data processing capability of SD cards. The working principle of SD Express is based on the PCI Express interface and the NVMe protocol. The PCIe interface supports high-speed data transmission, while the NVMe protocol optimizes storage access efficiency. SD Express uses the second row of contacts at the interface to transmit PCIe signals and is backwards-compatible with UHS-I through the first row of contacts. After being connected to a computer that supports SD Express products, SD Express will be recognized as a standard NVMe device, similar to a modern NVMe SSD.",
+      "mine": "SD Express คืออะไรและทำงานอย่างไร?\nSD Express คือมาตรฐานใหม่ของการ์ด SD โดยใช้อินเทอร์เฟซ PCI Express 3.0 และ NVMe 1.3 ซึ่งช่วยเพิ่มความสามารถในการประมวลผลข้อมูลของการ์ด SD ได้อย่างมากหลักการทำงานของ SD Express อิงตามอินเทอร์เฟซ PCI Express และโปรโตคอล NVMe อินเทอร์เฟซ PCIe รองรับการส่งข้อมูลความเร็วสูงส่วนโปรโตคอล NVMe ช่วยเพิ่มประสิทธิภาพการเข้าถึงพื้นที่จัดเก็บข้อมูล SD Express ใช้แถวหน้าสัมผัสที่สองที่อินเทอร์เฟซเพื่อส่งสัญญาณ PCIe และรองรับการใช้งานย้อนหลังกับ UHS-I ผ่านแถวหน้าสัมผัสแรกเมื่อเชื่อมต่อกับคอมพิวเตอร์ที่รองรับผลิตภัณฑ์ SD Express แล้ว SD Express จะถูกตรวจพบเป็นอุปกรณ์ NVMe มาตรฐานคล้ายกับ SSD ภายใน NVMe รุ่นใหม่",
+      "official": "",
+      "mineJudgement": {
+        "index": 2,
+        "runs": [
+          {
+            "persona": "th-bangkok-gamer",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "เนื้อหาเทคนิคพอเข้าใจได้ แต่ประโยคยาวและกลิ่นแปลยังชัด โดยเฉพาะคำพวกอินเทอร์เฟซกับแถวหน้าสัมผัส"
+          },
+          {
+            "persona": "th-bangkok-gamer",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 4,
+            "note": "พออ่านรู้เรื่องในเชิงเทคนิค แต่คำอย่างแถวหน้าสัมผัสกับประโยคยาวติดกันทำให้ไม่ค่อยเหมือนคนไทยเขียนเอง"
+          },
+          {
+            "persona": "th-chiangmai-shop",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 2,
+            "fidelity": 4,
+            "note": "ข้อมูลครบแต่ยาวและแข็งแบบคู่มือ ผมอ่านไม่จบแน่ถ้าเลือกซื้อของหน้าร้าน"
+          },
+          {
+            "persona": "th-chiangmai-shop",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 2,
+            "fidelity": 4,
+            "note": "พอเข้าใจสเปก แต่ยาวและเป็นภาษาคู่มือมากเกินไปสำหรับหน้าขายของ แถมอ่านแล้วรู้สึกแปลตรง ๆ"
+          }
+        ],
+        "mean": {
+          "naturalness": 3,
+          "tone": 2.5,
+          "fidelity": 4
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 3,
+      "source": "Revolutionary Performance\n\nThanks to its next-gen tech of PCIe and NVMe interface technologies that deliver up to 900MB/s read speed*, the PLAY PRO microSDXC™ Express Card is a stunning 4x faster than typical UHS-I microSD cards.\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "ประสิทธิภาพสุดล้ำด้วยเทค\nโนโลยีเจเนอเรชันใหม่ของอินเทอร์เฟซ PCIe และ NVMe ที่ให้ความเร็วอ่านสูงสุด 900MB/s* การ์ด PLAY PRO microSDXC™ Express จึงเร็วกว่าการ์ด microSD UHS-I ทั่วไปถึง 4 เท่าอย่างน่าทึ่ง\n*อ้างอิงจากการทดสอบภายในประสิทธิภาพจริงอาจแตกต่างกันไป",
+      "official": "",
+      "mineJudgement": {
+        "index": 3,
+        "runs": [
+          {
+            "persona": "th-bangkok-gamer",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "สเปกถูกครบ แต่คำโปรโมตอย่าง “ประสิทธิภาพสุดล้ำ” กับการเว้นวรรคพัง ๆ ทำให้ดูไม่ค่อยพรีเมียม"
+          },
+          {
+            "persona": "th-bangkok-gamer",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "ข้อมูลตรงและพอขายของได้ แต่ยังมีสำนวนแปล ๆ อย่างประสิทธิภาพสุดล้ำกับอย่างน่าทึ่งที่ฟังไม่ค่อยเนียน"
+          },
+          {
+            "persona": "th-chiangmai-shop",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "พอเข้าใจจุดขายเรื่องเร็วกว่า 4 เท่า แต่เว้นวรรคไม่ดีทำให้ดูไม่ค่อยมืออาชีพ"
+          },
+          {
+            "persona": "th-chiangmai-shop",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "ใจความเรื่องเร็ว 900MB/s และ 4 เท่าชัด แต่การเว้นวรรคกับประโยคติดกันทำให้ดูไม่เนียน"
+          }
+        ],
+        "mean": {
+          "naturalness": 2.75,
+          "tone": 3,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 4,
+      "source": "*Comparison of the theoretical maximum speeds under different interface forms (Data source: SDA)",
+      "mine": "* การเปรียบเทียบความเร็วสูงสุดตามทฤษฎีภายใต้รูปแบบอินเทอร์เฟซต่างๆ (แหล่งข้อมูล: SDA)",
+      "official": "",
+      "mineJudgement": {
+        "index": 4,
+        "runs": [
+          {
+            "persona": "th-bangkok-gamer",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "บรรทัดเชิงหมายเหตุอ่านรู้เรื่องและค่อนข้างโอเค แม้ยังดูเป็นภาษาแปลนิดหน่อย"
+          },
+          {
+            "persona": "th-bangkok-gamer",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "ประโยคสั้น ๆ นี้โอเค เข้าใจง่าย แม้จะยังเป็นโทนเทคนิคแห้ง ๆ มากกว่าโฆษณา"
+          },
+          {
+            "persona": "th-chiangmai-shop",
+            "run": 0,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "ประโยคเชิงหมายเหตุอ่านได้ปกติ แม้จะดูเป็นภาษาสเปกมากกว่าภาษาขาย"
+          },
+          {
+            "persona": "th-chiangmai-shop",
+            "run": 1,
+            "naturalness": 4,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "บรรทัดนี้อ่านรู้เรื่องและตรงสเปกดี ถึงจะเป็นภาษาทางการนิดหน่อย"
+          }
+        ],
+        "mean": {
+          "naturalness": 4,
+          "tone": 3,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 5,
+      "source": "Good for Today, Great for Tomorrow\n\nThe PLAY PRO microSDXC™ Express Card is backwards-compatible with UHS-I and UHS-II host devices (at UHS-I speeds) so you can use it with your current handheld gaming consoles – and it's ideal for the microSD Express devices coming soon.",
+      "mine": "พร้อมใช้วันนี้พร้อมกว่าเดิมสำหรับว\nันพรุ่งนี้การ์ด PLAY PRO microSDXC™ Express รองรับการใช้งานย้อนหลังกับอุปกรณ์โฮสต์ UHS-I และ UHS-II (ที่ความเร็ว UHS-I) คุณจึงใช้กับเครื่องเล่นเกมแบบพกพาที่มีอยู่ตอนนี้ได้และยังเหมาะสำหรับอุปกรณ์ microSD Express ที่กำลังจะมาถึง",
+      "official": "",
+      "mineJudgement": {
+        "index": 5,
+        "runs": [
+          {
+            "persona": "th-bangkok-gamer",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "ใจความสเปกครบ แต่หัวข้อกับย่อหน้าติดกันและคำว่า “อุปกรณ์โฮสต์” ทำให้อ่านแข็ง ๆ"
+          },
+          {
+            "persona": "th-bangkok-gamer",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "หัวข้อแปลแข็งและติดกับเนื้อหา แต่เนื้อความเรื่องรองรับ UHS-I/UHS-II ยังพออ่านรู้เรื่อง"
+          },
+          {
+            "persona": "th-chiangmai-shop",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "ใจความเรื่องใช้กับเครื่องเก่าได้ยังอยู่ แต่ประโยคติดกันยาวจนไม่น่าอ่าน"
+          },
+          {
+            "persona": "th-chiangmai-shop",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "ข้อมูลรองรับ UHS-I/UHS-II ครบ แต่หัวข้อกับประโยคติดกันจนเหมือนข้อความแปลที่ยังไม่จัดหน้า"
+          }
+        ],
+        "mean": {
+          "naturalness": 2,
+          "tone": 3,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 6,
+      "source": "Level-up Your Handheld Gaming Experience\n\nUp to 900MB/s* read speed, the PLAY PRO microSDXC™ Express Card is a stunning 4x faster than typical UHS-I microSD cards – meaning that games load faster and also ensuring a smooth, lag-free experience.\n\nRead speed up to 900MB/s*\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "ยกระดับประสบการณ์เกมมิ่งบนเครื่องพกพาของค\nุณด้วยความเร็วอ่านสูงสุด 900MB/s* การ์ด PLAY PRO microSDXC™ Express จึงเร็วกว่าการ์ด microSD UHS-I ทั่วไปถึง 4 เท่าอย่างน่าทึ่งหมายความว่าเกมโหลดได้เร็วขึ้นพร้อมช่วยให้เล่นได้ลื่นไหลไม่สะดุดความเร็วอ่านสูงสุด 900MB/s*\n*อ้างอิงจากการทดสอบภายในประสิทธิภาพจริงอาจแตกต่างกันไป",
+      "official": "",
+      "mineJudgement": {
+        "index": 6,
+        "runs": [
+          {
+            "persona": "th-bangkok-gamer",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "โทนเกมมิ่งพอได้ แต่ประโยคยาวติดกันจนเหมือนแปลแล้วไม่ได้จัดหน้า ทำให้ความน่าเชื่อลดลง"
+          },
+          {
+            "persona": "th-bangkok-gamer",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "มีคำขาดกลางคำและประโยคติดกันจนเสียจังหวะ อ่านแล้วไม่รู้สึกพรีเมียมสำหรับสินค้าเกมมิ่งเลย"
+          },
+          {
+            "persona": "th-chiangmai-shop",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "จุดขายชัดว่าโหลดเกมเร็วและลื่น แต่คำติดกันทำให้รู้สึกเหมือนข้อความแปลอัตโนมัติ"
+          },
+          {
+            "persona": "th-chiangmai-shop",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "ตัวเลขความเร็วครบ แต่ประโยคยาวติดกันและคำโดนตัด ทำให้ผมไม่อยากอ่านต่อ"
+          }
+        ],
+        "mean": {
+          "naturalness": 2,
+          "tone": 2.75,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 7,
+      "source": "Cut Your Download Times\n\nThe PLAY PRO microSDXC™ Express Card also delivers 600MB/s write speeds* when paired with the Lexar microSD Express card reader so you can download a AAA game in less time than it'll take you to order a pizza!\n\nWrite speed up to 600MB/s*\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "ลดเวลาในการดาวน์โหลดก\nาร์ด PLAY PRO microSDXC™ Express ยังมอบความเร็วเขียน 600MB/s* เมื่อใช้งานร่วมกับการ์ดรีดเดอร์ Lexar microSD Express ให้คุณดาวน์โหลดเกม AAA ได้ในเวลาน้อยกว่าการสั่งพิซซ่าหนึ่งถาด!\nความเร็วเขียนสูงสุด 600MB/s*\n*อ้างอิงจากการทดสอบภายในประสิทธิภาพจริงอาจแตกต่างกันไป",
+      "official": "",
+      "mineJudgement": {
+        "index": 7,
+        "runs": [
+          {
+            "persona": "th-bangkok-gamer",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "ไอเดียสั่งพิซซ่าดูสนุก แต่ภาษาอย่าง “มอบความเร็วเขียน” และการตัดคำทำให้ยังไม่เหมือนคนไทยเขียนขายของจริง"
+          },
+          {
+            "persona": "th-bangkok-gamer",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "ไอเดียเรื่องโหลดเกมเร็วกว่าเวลาสั่งพิซซ่ายังพอสนุก แต่คำแตกกับสำนวนมอบความเร็วทำให้ดูแปลตรงมาก"
+          },
+          {
+            "persona": "th-chiangmai-shop",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 4,
+            "fidelity": 5,
+            "note": "มุกพิซซ่าพอทำให้น่าสนใจ แต่คำว่า การ์ดรีดเดอร์ และการตัดบรรทัดยังดูไม่เป็นไทยธรรมชาติ"
+          },
+          {
+            "persona": "th-chiangmai-shop",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 4,
+            "fidelity": 4,
+            "note": "ประโยคเรื่องโหลดเกมเร็วกว่าเวลาสั่งพิซซ่าฟังขายของดี แต่ยังมีคำตัดบรรทัดและคำว่า card reader แปลแข็ง ๆ"
+          }
+        ],
+        "mean": {
+          "naturalness": 2.5,
+          "tone": 3.5,
+          "fidelity": 4.75
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.25,
+          "fidelity": 0.1875
+        },
+        "personaGap": 1,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 8,
+      "source": "Massive Capacity up to 1TB\n\nSome of your favorite games are probably pretty big in file size. Well, with up to 1TB capacity, juggling games just got easier. You can fit many games on a 1TB card.\n\n*Based on internal testing. Actual performance may vary.",
+      "mine": "ความจุขนาดใหญ่สูงสุด 1TB\nเกมโปรดของคุณบางเกมอาจมีขนาดไฟล์ค่อนข้างใหญ่แต่ด้วยความจุสูงสุด 1TB การจัดการเกมหลายเกมก็ง่ายขึ้นคุณสามารถเก็บเกมได้มากมายบนการ์ด 1TB\n*อ้างอิงจากการทดสอบภายในประสิทธิภาพจริงอาจแตกต่างกันไป",
+      "official": "",
+      "mineJudgement": {
+        "index": 8,
+        "runs": [
+          {
+            "persona": "th-bangkok-gamer",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "อ่านรู้เรื่องแต่ติดกลิ่นแปลตรง ๆ และเว้นวรรค/จังหวะประโยคไม่ค่อยเนียนเหมือนหน้าสินค้าที่ทำมาเพื่อคนไทยจริง ๆ"
+          },
+          {
+            "persona": "th-bangkok-gamer",
+            "run": 1,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "อ่านรู้เรื่องแต่ประโยคยาวติดกันและคำว่า “การจัดการเกมหลายเกม” ฟังเหมือนแปลตรงจากอังกฤษมากไปหน่อย"
+          },
+          {
+            "persona": "th-chiangmai-shop",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "อ่านรู้เรื่องแต่ประโยคติดกันยาว ๆ เหมือนแปลมา ทำให้ผมดูแค่ความจุ 1TB กับราคาเป็นหลัก"
+          },
+          {
+            "persona": "th-chiangmai-shop",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "อ่านรู้เรื่องแต่ประโยคติดกันยาว ๆ เหมือนแปลมา ยังดีที่ตัวเลข 1TB ชัดเจน"
+          }
+        ],
+        "mean": {
+          "naturalness": 2.75,
+          "tone": 3,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.1875,
+          "tone": 0,
+          "fidelity": 0
+        },
+        "personaGap": 0.5,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 9,
+      "source": "Protection Built in\n\nThe PLAY PRO microSD Express card is IPX7 waterproof, wearproof, temperature-proof, x-ray-proof, vibration-resistant, magnetic-proof, shockproof, and drop-proof.*\n\nWearout resistance\n*up to 10,000 times of plugging and unplugging\nWaterproof\n*IPX7,1m deep water for 30min\nTemperature resistance\n*Operation: -25℃~85℃, Storage: -40℃~85℃\nShock resistance\n*1500G Shock\nAnti-vibration\n*10-2000Hz\nAnti-magnetic\n*15000Gauss\nX-ray protection\n*up to 100mGy\n(equivalent to airport X-ray machine exposure)\nDrop protection\n*1.5m drop",
+      "mine": "มาพร้อมการปกป้องในต\nัวการ์ด PLAY PRO microSD Express กันน้ำระดับ IPX7 ทนต่อการสึกหรอทนอุณหภูมิป้องกันรังสีเอกซ์ทนแรงสั่นสะเทือนป้องกันสนามแม่เหล็กทนแรงกระแทกและทนการตกกระแทก*\nทนต่อการสึกหรอ\n*เสียบและถอดได้สูงสุด 10,000 ครั้งกันน้ำ\n*IPX7, น้ำลึก 1m เป็นเวลา 30min\nทนอุณหภูมิ\n*การทำงาน: -25°C~85°C, การจัดเก็บ: -40°C~85°C\nทนแรงกระแทก\n*แรงกระแทก 1500G\nทนแรงสั่นสะเทือน\n*10-2000Hz\nป้องกันสนามแม่เหล็ก\n*15000Gauss\nป้องกันรังสีเอกซ์\n*สูงสุด 100mGy\n(เทียบเท่าการได้รับรังสีจากเครื่องเอกซเรย์ที่สนามบิน)\nป้องกันการตกกระแทก\n*ตกจากความสูง 1.5m",
+      "official": "",
+      "mineJudgement": {
+        "index": 9,
+        "runs": [
+          {
+            "persona": "th-bangkok-gamer",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "สเปกมาครบแต่ข้อความแตกคำและยาวติดกันจนดูเหมือนก๊อปจากไฟล์แปลอัตโนมัติ ยังไม่ค่อยน่าไว้ใจสำหรับสินค้าเกมมิ่ง"
+          },
+          {
+            "persona": "th-bangkok-gamer",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "สเปกมาครบแต่หัวข้อแตกคำและข้อความติดกันจนดูเหมือนก็อปจากไฟล์แปลแบบไม่ตรวจงาน"
+          },
+          {
+            "persona": "th-chiangmai-shop",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 4,
+            "note": "สเปกครบดีแต่หัวข้อแตกคำและข้อความแน่นมากจนไม่น่าอ่าน เหมือนเอาเครื่องแปลมาแปะ"
+          },
+          {
+            "persona": "th-chiangmai-shop",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "สเปกครบแต่ข้อความแตกคำและยาวเป็นพรืด ทำให้ผมไม่ค่อยไว้ใจแม้ตัวเลขดูตรง"
+          }
+        ],
+        "mean": {
+          "naturalness": 2,
+          "tone": 2,
+          "fidelity": 4.75
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0,
+          "fidelity": 0.1875
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 10,
+      "source": "Peace of Mind Extras\n\nThis card undergoes strict testing in the Lexar Quality Lab and we're so confident in it that it comes with a limited lifetime warranty. Plus we offer lifetime access to the Lexar Recovery Tool which you can use to restore accidentally deleted and formatted files.",
+      "mine": "ความอุ่นใจที่มากกว่าก\nาร์ดนี้ผ่านการทดสอบอย่างเข้มงวดในห้องแล็บคุณภาพ Lexar และเรามั่นใจมากจนการ์ดนี้มาพร้อมการรับประกันแบบจำกัดตลอดอายุการใช้งานนอกจากนี้เรายังให้สิทธิ์เข้าถึง Lexar Recovery Tool ได้ตลอดอายุการใช้งานซึ่งคุณสามารถใช้กู้คืนไฟล์ที่ถูกลบโดยไม่ตั้งใจและไฟล์ที่ถูกฟอร์แมตได้",
+      "official": "",
+      "mineJudgement": {
+        "index": 10,
+        "runs": [
+          {
+            "persona": "th-bangkok-gamer",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "ใจความครบแต่คำขึ้นหัวแตกและประโยคยาวลากไปเรื่อย ๆ ทำให้อ่านแล้วรู้สึกเป็นงานแปลมากกว่างานขาย"
+          },
+          {
+            "persona": "th-bangkok-gamer",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "ข้อมูลตรงแต่ภาษาเป็นประโยคยาวทื่อ ๆ แถมหัวข้อหลุดบรรทัด ทำให้แบรนด์ดูไม่ค่อยใส่ใจหน้าสินค้าไทย"
+          },
+          {
+            "persona": "th-chiangmai-shop",
+            "run": 0,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "ใจความเรื่องรับประกันกับกู้ไฟล์มีครบ แต่ประโยคยาวติดกันและหัวข้อขาด ๆ ทำให้ความน่าเชื่อลดลง"
+          },
+          {
+            "persona": "th-chiangmai-shop",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "หัวข้อกับเนื้อหาติดกันและประโยคยาวมาก ฟังดูแปลตรง ๆ มากกว่าจะเป็นคำขายของไทย"
+          }
+        ],
+        "mean": {
+          "naturalness": 2,
+          "tone": 2.5,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0,
+          "tone": 0.25,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    },
+    {
+      "index": 11,
+      "source": "Rigorously Tested\n\nAll Lexar products undergo extensive testing in the Lexar Quality Labs, facilities with thousands of different cameras and digital devices to ensure performance, quality, compatibility, and reliability.",
+      "mine": "ผ่านการทดสอบอย่าง\nเข้มงวดผลิตภัณฑ์ Lexar ทุกชิ้นผ่านการทดสอบอย่างครอบคลุมในห้องแล็บคุณภาพ Lexar ซึ่งเป็นสถานที่ที่มีกล้องและอุปกรณ์ดิจิทัลหลากหลายรุ่นนับพันเพื่อให้มั่นใจในประสิทธิภาพคุณภาพความเข้ากันได้และความเชื่อถือได้",
+      "official": "",
+      "mineJudgement": {
+        "index": 11,
+        "runs": [
+          {
+            "persona": "th-bangkok-gamer",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "พออ่านได้และข้อมูลตรง แต่สำนวนอย่างแล็บคุณภาพกับการเรียงคำยังแข็ง ๆ ไม่ได้รู้สึกเป็นภาษาโฆษณาไทยเนียน ๆ"
+          },
+          {
+            "persona": "th-bangkok-gamer",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 2,
+            "fidelity": 5,
+            "note": "เข้าใจได้แต่สำนวนอย่าง “สถานที่ที่มีกล้อง...” กับการตัดบรรทัดทำให้อ่านแข็งและไม่เนียนเหมือนคนไทยเขียน"
+          },
+          {
+            "persona": "th-chiangmai-shop",
+            "run": 0,
+            "naturalness": 3,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "พอเข้าใจว่าเทสต์มาหนัก แต่สำนวนยังแข็งและยาวแบบโฆษณาแปลมากกว่าเขียนไทยจริง"
+          },
+          {
+            "persona": "th-chiangmai-shop",
+            "run": 1,
+            "naturalness": 2,
+            "tone": 3,
+            "fidelity": 5,
+            "note": "พอเข้าใจว่าเขาทดสอบจริงจัง แต่สำนวนยังแข็งและเว้นวรรคไม่ดี อ่านแล้วสะดุด"
+          }
+        ],
+        "mean": {
+          "naturalness": 2.5,
+          "tone": 2.75,
+          "fidelity": 5
+        },
+        "variance": {
+          "naturalness": 0.25,
+          "tone": 0.1875,
+          "fidelity": 0
+        },
+        "personaGap": 0,
+        "flags": []
+      },
+      "officialJudgement": null
+    }
+  ],
+  "summary": {
+    "mine": {
+      "naturalness": 2.3333333333333335,
+      "tone": 2.6875,
+      "fidelity": 4.791666666666667
+    },
+    "official": null,
+    "unstableCells": 0,
+    "personaSensitiveCells": 0
+  }
+}

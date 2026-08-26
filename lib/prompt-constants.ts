@@ -1850,7 +1850,9 @@ export const LANG_SPECIFIC: Record<string, LangBlock> = {
 - ❌ Compound words split (Arbeitsspeicher → Arbeits Speicher) → ✅ Must be one word
 - ❌ English word order calque → ✅ German word order (verb-final in subordinate clauses)
 - ❌ Informal "du" → ✅ Formal "Sie"
-- ❌ Brand confusion (Lexar ≠ Lexware) → ✅ Accurate brand names`,
+- ❌ Brand confusion (Lexar ≠ Lexware) → ✅ Accurate brand names
+- ❌ Inflated marketing calque (beeindruckende 4-mal schneller) → ✅ Objective statement (bis zu 4-mal schneller / 4× schneller)
+- ❌ English-style long preposed modifiers (Einrichtungen mit Tausenden von unterschiedlichen Kameras) → ✅ Split or restructure (mit Tausenden verschiedener Kameras)`,
     proofreadChecks: `Proofread checks:
 - Check all nouns are capitalized
 - Check compound words are not split
@@ -1866,7 +1868,10 @@ export const LANG_SPECIFIC: Record<string, LangBlock> = {
 - ❌ Latin American terms (computadora) → ✅ Spain terms (ordenador)
 - ❌ Gender/number disagreement → ✅ Proper agreement
 - ❌ Informal "tú" → ✅ Formal "Usted"
-- ❌ Superlatives (el mejor, el más rápido) → ✅ Objective description`,
+- ❌ Superlatives (el mejor, el más rápido) → ✅ Objective description
+- ❌ "Level-up" calque (Suba de nivel su experiencia) → ✅ Natural expression (Mejore su experiencia / Lleve su experiencia al siguiente nivel)
+- ❌ "Peace of Mind" calque (Extras para su tranquilidad) → ✅ Natural expression (Extras para mayor tranquilidad / Extras que le dan tranquilidad)
+- ❌ "Offer" calque (ofrecen velocidades) → ✅ Natural expression (alcanzan velocidades / con velocidades)`,
     proofreadChecks: `Proofread checks:
 - Check for Latin American slang mixing
 - Check Spain Spanish terminology is used
@@ -1976,7 +1981,9 @@ export const LANG_SPECIFIC: Record<string, LangBlock> = {
 - ❌ Special characters lost (ı İ ö ü ç ş ğ) → ✅ Preserve all special characters
 - ❌ i/ı confusion (i → ı) → ✅ Strictly distinguish i/ı and I/İ
 - ❌ Informal colloquial → ✅ Standard formal written language
-- ❌ Superlatives (en iyi, en hızlı) → ✅ Objective description`,
+- ❌ Superlatives (en iyi, en hızlı) → ✅ Objective description
+- ❌ "Level-up" calque (seviye atlat) → ✅ Natural expression (bir üst seviyeye taşı / geliştir)
+- ❌ "Host" calque (ana cihaz) → ✅ Natural expression (cihaz / ana ünite)`,
     proofreadChecks: `Proofread checks:
 - Check all special characters preserved (ı İ ö ü ç ş ğ)
 - Check i/ı and I/İ correctly distinguished
@@ -1990,7 +1997,10 @@ export const LANG_SPECIFIC: Record<string, LangBlock> = {
 - ❌ Not using Cyrillic → ✅ Use Cyrillic throughout (except Lexar and technical symbols)
 - ❌ Noun/adjective case errors (6 cases) → ✅ Correct declension (nominative, genitive, dative, accusative, instrumental, prepositional)
 - ❌ Empty marketing slogans → ✅ Concrete specs and numbers
-- ❌ Superlatives (лучший, самый быстрый) → ✅ Objective description`,
+- ❌ Superlatives (лучший, самый быстрый) → ✅ Objective description
+- ❌ Inflated marketing calque (впечатляюще в 4 раза быстрее) → ✅ Objective statement (до 4 раз быстрее / в 4 раза быстрее)
+- ❌ "Revolutionary" calque (революционная производительность) → ✅ Natural expression (новый уровень производительности / прорывная скорость)
+- ❌ Technical term calque (хост-устройства / текущие консоли) → ✅ Natural expression (устройства / совместимые консоли)`,
     proofreadChecks: `Proofread checks:
 - Check Cyrillic script used (except Lexar and technical symbols)
 - Check noun/adjective case correctness (6 cases)
@@ -2100,7 +2110,7 @@ export const LANG_SPECIFIC: Record<string, LangBlock> = {
 export function renderLangForTranslate(
   targetLang: string,
   productLine?: string | null,
-  includeCommonErrors = true,  // v11.5: 首调传 false——常见错误对照表是补救型内容，移到重试层按需注入
+  includeCommonErrors = true,  // v12.2: 首调+重试都注入——commonErrors 已重新定位为预防型机翻味搭配清单（v11.5 曾移重试层，v12.1 judge 基线实据后回填）
 ): string {
   const block = LANG_SPECIFIC[targetLang]
   if (!block) return ''
@@ -2151,8 +2161,9 @@ export function buildProofreadSystemPrompt(opts: {
   sourceLang?: string          // v11.5: 变体对判定（zh-CN↔zh-TW / pt↔pt-BR 时注入 VARIANT_CHECKS）
   hasExpansionFlags?: boolean  // v11.5: true 时注入 EXPANSION_NOTE（expansionFlags 非空才有意义）
   hasProhibitedFix?: boolean   // v11.12: true 时注入 PROHIBITED_NOTE（prohibitedFixMap 非空才有意义）
+  hasPolished?: boolean        // v12.3: true 时注入 POLISHED_NOTE（polishedIndices 非空才有意义）
 }): string {
-  const { targetLang, productLine, useEnInstruction, glossaryHint = '', sourceLang, hasExpansionFlags = false, hasProhibitedFix = false } = opts
+  const { targetLang, productLine, useEnInstruction, glossaryHint = '', sourceLang, hasExpansionFlags = false, hasProhibitedFix = false, hasPolished = false } = opts
 
   const mission = IDENTITY_MISSION[targetLang] || IDENTITY_MISSION['en'] || ''
   const missionBlock = mission ? `\n[MISSION·${targetLang}]\n${mission}\n` : ''
@@ -2177,7 +2188,12 @@ export function buildProofreadSystemPrompt(opts: {
     ? '\n' + (useEnInstruction ? PROOFREAD_PROHIBITED_NOTE : PROOFREAD_PROHIBITED_NOTE_ZH)
     : ''
 
-  return missionBlock + proofreadPrompt + variantBlock + expansionBlock + prohibitedBlock + glossaryHint + calibrationBlock + langBlock
+  // v12.3: 已润色条目提示仅 polishedIndices 命中时注入（平时是死文本）
+  const polishedBlock = hasPolished
+    ? '\n' + (useEnInstruction ? PROOFREAD_POLISHED_NOTE : PROOFREAD_POLISHED_NOTE_ZH)
+    : ''
+
+  return missionBlock + proofreadPrompt + variantBlock + expansionBlock + prohibitedBlock + polishedBlock + glossaryHint + calibrationBlock + langBlock
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2826,6 +2842,17 @@ Rewrite those entries to avoid EVERY listed word: preserve the original meaning,
 export const PROOFREAD_PROHIBITED_NOTE_ZH = `[违禁词规避] 部分条目带有"平台违禁词"提示并列出具体词。
 请改写这些条目以规避所列全部违禁词：保持原意、语气和所有产品型号/技术术语不变，
 改动越小越好，且不得引入其他违禁词。电商平台（京东/亚马逊各站点）会直接拦截这些词。`
+
+// v12.3: 人设润色后校对分叉（仅批次内确有润色条目时注入）
+export const PROOFREAD_POLISHED_NOTE = `[POLISHED ENTRIES] Some entries have been polished by a native-speaker pass for naturalness.
+Their sentence structure/word order may differ from the source — this is EXPECTED, not an error.
+For these entries: check ONLY that all information points are present and facts (numbers/specs/terms) are accurate.
+Do NOT flag "differs from source" as a problem — polished entries are supposed to read like native copy, not word-for-word translations.`
+
+export const PROOFREAD_POLISHED_NOTE_ZH = `[已润色条目] 部分条目已经过母语润色（提升自然度）。
+这些条目的语序/句式可能与源文不同——这是预期行为，不是错误。
+对这些条目：只校验信息点完整与事实（数字/规格/术语）准确即可。
+不要把"与源文结构不同"判为问题——润色后的条目本来就应该像母语原创，不是逐字对译。`
 // ═══════════════════════════════════════════════════════════════
 // v11.3: 产品名槽位解析 Prompt — LLM 兜底（代码判定失败时的语义裁决）
 // 原则：LLM 只做"是不是产品名+系列名是什么"的判断，不输出译名。
