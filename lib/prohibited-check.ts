@@ -28,6 +28,7 @@
 
 import {
   PROHIBITED_ZH_EXEMPTIONS,
+  PROHIBITED_EN_EXEMPTIONS,
   PROHIBITED_AVOID,
   ProhibitedWord,
 } from './prohibited-words'
@@ -125,6 +126,16 @@ export function detectProhibited(text: string, langCode: string): ProhibitedHit[
   // zh 系：先剔除豁免短语（含繁体形态），再匹配
   if (langCode === 'zh' || langCode === 'zh-CN' || langCode === 'zh-TW') {
     for (const ex of PROHIBITED_ZH_EXEMPTIONS) {
+      const re = getExemptionRegex(ex)
+      if (re.test(t)) t = t.replace(re, ' ')
+    }
+  }
+  // 豁免机制同 zh 侧字符级弹性，但英语修饰词（limited/200 等）是字母——\W* 吞不掉，
+  // 故英文豁免按「锚词内部允许插入单词级修饰」另行处理：
+  //   'Limited Lifetime Warranty'        → 词间 \W+（空格/连字符/句点形态差异）
+  //   'Video Performance Guarantee'      → 尾部允许 " 200"/" 400" 规格数字
+  if (langCode === 'en') {
+    for (const ex of PROHIBITED_EN_EXEMPTIONS) {
       const re = getExemptionRegex(ex)
       if (re.test(t)) t = t.replace(re, ' ')
     }

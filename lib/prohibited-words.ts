@@ -194,6 +194,27 @@ export const PROHIBITED_ZH_EXEMPTIONS: string[] = [
 ]
 
 // ═══════════════════════════════════════════════════════════════
+// 英文豁免短语表（v12.3.3，检测时先剔除再匹配，与 zh 侧同机制）
+// 收录原则同 zh：短语整体有合法/规格语义，且必须真的包含表中违禁词
+// ═══════════════════════════════════════════════════════════════
+export const PROHIBITED_EN_EXEMPTIONS: string[] = [
+  // ── 保修承诺语境（2026-08-26 用户拍板：「终生有限质保这种表述应该可以的
+  // limited lifetime warranty.对应的英文」——品牌官方有限终身保修有官方条款背书，
+  // 非虚假承诺；与 zh 侧「有限终身质保」豁免同型对称。术语库 zh 值即此英文的钦定译法，
+  // 不豁免则英文源文与 zh 译文在同一产品上一边报警一边豁免，自相矛盾。
+  // 裸 'lifetime warranty'/'lifetime guarantee' 无 limited 锚仍命中（豁免不放行裸承诺，
+  // 与 zh 侧裸「终身质保」仍命中同纪律）。
+  // 匹配走 getExemptionRegex 字符级弹性：'limited lifetime warranty.'（句尾点）、
+  // 'Limited-Lifetime-Warranty'（连字符形态）均可被 \W* 吞掉剔除）──
+  'Limited Lifetime Warranty',
+  // ── 视频速度等级认证语境（2026-08-26 用户拍板：VPG200=Video Performance
+  // Guarantee 200 是 CFexpress 协会视频性能等级认证标准名（VPG200/VPG400），
+  // 规格陈述非无据保证。豁免锚定 VPG+数字规格两端，'Video Performance Guarantee'
+  // 展开形态亦覆盖（认证全称）；裸 guarantee 宣称无锚仍命中）──
+  'Video Performance Guarantee',
+]
+
+// ═══════════════════════════════════════════════════════════════
 // 20 语种目标语言词表（亚马逊各站点 + 当地平台通用禁忌）
 // key = messages/types.ts LANGUAGES 的 20 个语言代码，缺一即漏防线
 // ═══════════════════════════════════════════════════════════════
@@ -213,7 +234,7 @@ export const PROHIBITED_AVOID: Record<string, ProhibitedWord[]> = {
     { word: '100%', note: '绝对化宣称' },
     { word: 'guarantee', note: '无据保证' },
     { word: 'guaranteed', note: '无据保证' },
-    { word: 'lifetime warranty', note: '存储行业高频雷：仅品牌官方全球保修政策可验证才可标注' },
+    { word: 'lifetime warranty', note: '存储行业高频雷：仅品牌官方全球保修政策可验证才可标注（Limited 前缀官方有限保修在豁免表）' },
     { word: 'lifetime guarantee', note: '同上（虚假承诺类）' },
     { word: 'cure', note: '医疗声称' },
     { word: 'treat', note: '医疗声称' },
