@@ -27,8 +27,7 @@
 // ============================================================
 
 import {
-  PROHIBITED_ZH_EXEMPTIONS,
-  PROHIBITED_EN_EXEMPTIONS,
+  PROHIBITED_EXEMPTIONS,
   PROHIBITED_AVOID,
   ProhibitedWord,
 } from './prohibited-words'
@@ -111,7 +110,14 @@ function getExemptionRegex(ex: string): RegExp {
   // 挡字母/数字（\w 不在 \W 内）防过度放宽。短语内字面空格亦转为 \W*。
   // 纯中文相邻条目（最佳实践/第一时间…）\W* 恒匹配空串 → 与 includes 剔除语义一致。
   // split('') 而非展开运算符：豁免表全是 BMP 字符，无代理对风险
-  re = new RegExp(ex.split('').map(ch => ch === ' ' ? '\\W*' : escapeRegExp(ch)).join('\\W*'), 'i')
+  // v12.9：'#' 数字锚定——豁免短语含 '#' 时匹配一个及以上数字/千分位逗号
+  //   （'最大#' → 最大2TB/最大12,000回/最大370ニュートン）。
+  //   红线：'最大の性能'（无数字）不豁免——规格上限与绝对化宣称的分界。
+  re = new RegExp(ex.split('').map(ch => {
+    if (ch === ' ') return '\\W*'
+    if (ch === '#') return '[\\d,]+'
+    return escapeRegExp(ch)
+  }).join('\\W*'), 'i')
   exemptionCache.set(ex, re)
   return re
 }
@@ -123,19 +129,13 @@ function getExemptionRegex(ex: string): RegExp {
 export function detectProhibited(text: string, langCode: string): ProhibitedHit[] {
   if (!text) return []
   let t = text
-  // zh 系：先剔除豁免短语（含繁体形态），再匹配
-  if (langCode === 'zh' || langCode === 'zh-CN' || langCode === 'zh-TW') {
-    for (const ex of PROHIBITED_ZH_EXEMPTIONS) {
-      const re = getExemptionRegex(ex)
-      if (re.test(t)) t = t.replace(re, ' ')
-    }
-  }
-  // 豁免机制同 zh 侧字符级弹性，但英语修饰词（limited/200 等）是字母——\W* 吞不掉，
-  // 故英文豁免按「锚词内部允许插入单词级修饰」另行处理：
-  //   'Limited Lifetime Warranty'        → 词间 \W+（空格/连字符/句点形态差异）
-  //   'Video Performance Guarantee'      → 尾部允许 " 200"/" 400" 规格数字
-  if (langCode === 'en') {
-    for (const ex of PROHIBITED_EN_EXEMPTIONS) {
+  // v12.9 豁免通用化：从 zh/en 硬编码白名单改为「该语言有豁免表就执行剔除」。
+  //   PROHIBITED_EXEMPTIONS 是全语种豁免总表（zh/en/ja…），key 对齐 PROHIBITED_AVOID。
+  //   zh-CN/zh-TW 沿用既有「zh」豁免表（简繁共用），'zh' 键亦指向它。
+  const exKey = langCode === 'zh' || langCode === 'zh-CN' || langCode === 'zh-TW' ? 'zh' : langCode
+  const exemptions = PROHIBITED_EXEMPTIONS[exKey]
+  if (exemptions) {
+    for (const ex of exemptions) {
       const re = getExemptionRegex(ex)
       if (re.test(t)) t = t.replace(re, ' ')
     }

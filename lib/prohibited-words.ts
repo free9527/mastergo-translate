@@ -39,6 +39,13 @@
 // 维护：平台规则变化/实机误报漏报 → 往这里加词/删词（不是加到术语库 CSV）。
 // ============================================================
 
+/**
+ * 词表版本戳（v12.11，缓存失效闭环）——词表或豁免表任何增删必须 +1。
+ * 翻译缓存 key 拼入本版本号（App.vue），词表更新后旧译文缓存自然失配重翻，
+ * 防 v10.7 型「旧译文携带旧词表时代的违禁词经缓存复活」缺口。
+ */
+export const PROHIBITED_WORDS_VERSION = 1
+
 export interface ProhibitedWord {
   word: string
   /** 平台/法规依据说明（报告与徽章 hover 展示用） */
@@ -191,6 +198,13 @@ export const PROHIBITED_ZH_EXEMPTIONS: string[] = [
   // prohibited-check 的字符级弹性匹配吞掉（v11.15）——覆盖"Lexar Recovery Tool 专业
   // 数据恢复软件"全部文案形态；裸"数据恢复"宣称（"100%数据恢复，误删秒找回"）无锚仍命中。
   'Recovery Tool 数据恢复',
+  // ── v12.9：速度规格语境（与 ja 侧同型对齐）──
+  // 术语库钦定值「写入速度高达/读取速度高达」本不命中词表（「高达」非违禁词），
+  // 但自由译文写成「最大读取速度/最大写入速度」会命中「最大」——同型规格表述豁免。
+  '最大读取速度',
+  '最大写入速度',
+  // 数字锚定兜底（v12.9 新语法）：最大+数字 恒为规格上限（最大2TB/最大12,000次）
+  '最大#',
 ]
 
 // ═══════════════════════════════════════════════════════════════
@@ -212,7 +226,76 @@ export const PROHIBITED_EN_EXEMPTIONS: string[] = [
   // 规格陈述非无据保证。豁免锚定 VPG+数字规格两端，'Video Performance Guarantee'
   // 展开形态亦覆盖（认证全称）；裸 guarantee 宣称无锚仍命中）──
   'Video Performance Guarantee',
+  // ── 营销绝对化词的语境锚定豁免（2026-08-28 用户拍板 A 方案：与 ja「最大+速度/数字」
+  //   同纪律——豁免锚定语境的短语形态，裸词红线不豁免。
+  //   背景：NM1090 PRO/SILVER CFexpress 产品线 en 源文高频绝对化词 ultimate/best/
+  //   superior/perfect 每批必报（6 张卡实机实锤），全部是产品线官方文案的固定
+  //   搭配/标题锚定形态，非无据宣称。
+  //   红线：裸 'ultimate!'/'best!'/'superior performance'（无产品/语境锚）仍命中；
+  //   'Ultimate Performance for AI PC'（标题锚定）/'perfect match'（固定搭配）/
+  //   'Best Match'（标题锚定）/'superior Gen'（规格语境锚）豁免。
+  //   字符级弹性 regex 特性注意：豁免短语首尾字母后 \W* 可吞标点——
+  //   'Ultimate Performance' 豁免会把 'ultimate performance!'（裸宣称+感叹号）
+  //   也剔除（e 后 \W* 吞 !）。为保「裸词+感叹号」红线，豁免锚定到语境端：
+  //   'ultimate performance for'（for 后字母挡住 \W*，裸宣称无 for 不豁免））──
+  'ultimate performance for',
+  'Unleashing ultimate performance',
+  'perfect match',
+  'Best Match',
+  'superior Gen',
 ]
+
+// ═══════════════════════════════════════════════════════════════
+// v12.9 全语种豁免总表（语言→豁免短语列表）
+//
+// 背景（2026-08-27 用户拍板）：ja 侧裸匹配无豁免表导致术语库钦定值
+// 「書き込み速度最大/読み出し速度最大/厳格なテスト済み」每批必报——
+// 「最大+规格」是存储行业标准上限表述（up to 的钦定译法），非绝对化宣称；
+// 「テスト」在质量背书语境（厳格なテスト/社内テスト）是景品表示法合规形态。
+// 用户三条拍板：①测试素材里已出现的常用表达都没出过问题=合规白名单
+// ②test 是绝对违禁词、最高级是违禁词（裸词红线不豁免）
+// ③术语库的表达都经过检验，不用怀疑（钦定值命中不豁免词表本身，
+//   而由 App.vue 锁定徽章通道消化——见 v12.9 HANDOFF）。
+//
+// 数字锚定语法（v12.9 新增）：豁免短语含 '#' 时匹配一个及以上数字/千分位逗号
+//   ——'最大#' 覆盖 最大2TB/最大12,000回/最大5メートル/最大370ニュートン。
+//   红线：'最大の性能'（无数字锚点）不豁免——上限规格与绝对化宣称的分界。
+//
+// 收录原则（与词表同纪律：宁漏勿滥）：
+//   ✅ 只收测试素材/术语库/实机日志真实出现的形态
+//   ⛔ 不收裸「最大/最高/最速/テスト」宣称形态（红线词表保留）
+// ═══════════════════════════════════════════════════════════════
+export const PROHIBITED_EXEMPTIONS: Record<string, string[]> = {
+  // ── 中文（简/繁目标语检测共用，v11.12 既有表迁入）──
+  'zh': PROHIBITED_ZH_EXEMPTIONS,
+  // ── 英语（v12.3.3 既有表迁入）──
+  'en': PROHIBITED_EN_EXEMPTIONS,
+  // ── 日语（v12.9 新增——ja 侧从裸匹配升级为短语豁免+数字锚定）──
+  'ja': [
+    // 速度规格（术语库钦定值 + 测试素材三产品线官方 ja 文案双形态：
+    //   术语库「書き込み速度最大」/ 素材「最大ライト速度210MB/s」「最大リード速度」）
+    '最大読込速度', '最大読み出し速度', '最大リード速度', '最大リード',
+    '最大書込速度', '最大書き込み速度', '最大ライト速度', '最大ライト',
+    '最大持続書き込み速度', '最大転送速度', '最大記録速度',
+    // 速度值=数字锚定（术语库钦定值形态「書き込み速度最大」「読み出し速度最大」
+    //   ——速度+最大 即规格上限表述，裸「最大の性能」无速度词锚不豁免）
+    '速度最大',
+    // 其他规格上限（素材实证：容量/温度/带宽/最大速度）
+    '最大容量', '最大動作温度', '最大帯域', '最大速度',
+    // 「最大限に」固定搭配（术语库 2 条 ja 值：性能を最大限に発揮/引き出す——惯用非宣称）
+    '最大限に',
+    // 数字锚定兜底：最大+数字 恒为规格上限语境
+    //   （最大2TB/最大12,000回/最大5メートル/最大370ニュートン/最大30000TBW）
+    '最大#',
+    // テスト 质量背书语境（术语库 Rigorously Tested=厳格なテスト済み 钦定值；
+    //   素材脚注「社内テストに基づく」；品质ラボ「広範なテストが実施」；
+    //   裸「テスト」宣称——'完璧なテストで品質保証' 类——仍命中红线，不豁免。
+    //   「厳格なテスト」锚定质量背书结论形态——「厳格なテスト済み」（术语库 Rigorously Tested
+    //   钦定值）与「厳格なテストに合格」（DIAMOND 素材文案）双形态豁免；裸形态
+    //   「厳格なテストを実施」（v1112 B27）仍命中——「を実施」是动作描述非质量背书结论。
+    '厳格なテスト済み', '厳格なテストに', 'テスト済み', '社内テスト', '広範なテスト', '品質テスト',
+  ],
+}
 
 // ═══════════════════════════════════════════════════════════════
 // 20 语种目标语言词表（亚马逊各站点 + 当地平台通用禁忌）
@@ -269,9 +352,34 @@ export const PROHIBITED_AVOID: Record<string, ProhibitedWord[]> = {
     { word: 'giveaway', note: '促销诱导词（亚马逊严禁）' },
     { word: 'free gift', note: '促销诱导词（亚马逊严禁）' },
     { word: 'hot sale', note: '时效促销词（亚马逊严禁）' },
+    // ── v12.11 亚马逊官方清单增补（OEC 违禁词清单，2026-09-03 用户拍板按语言落位）──
+    // 收录审查：全部无合法语义歧义（过宁漏勿滥闸）；拒收项——CTA 类（buy now/click here
+    // 等设计稿合法文案）、sale/new/free 裸词（普通词必误报）、竞品对比（better than，
+    // 既有红线：运营违规非词表问题）、标题合规规则（LLM 分不清标题，用户拍板不做）。
+    { word: 'unbeatable', note: '主观绝对化（亚马逊主观宣称禁令）' },
+    { word: 'amazing', note: '主观宣称（亚马逊主观宣称禁令）' },
+    { word: 'premium', note: '主观宣称（Premium quality 类；Lexar 无 premium 系列名）' },
+    { word: 'award winning', note: '无据奖项宣称' },
+    { word: 'proven', note: '无据实证宣称（英国 ASA 重点审查词）' },
+    { word: 'best seller', note: '排名宣称（词边界正则下不被 best 顺带命中，单独收）' },
+    { word: 'bestselling', note: '排名宣称' },
+    { word: 'discount', note: '促销管控词（亚马逊标题/五点/A+ 严禁）' },
+    { word: 'wholesale', note: '促销管控词' },
+    { word: 'free shipping', note: '促销管控词' },
+    { word: 'buy one get one', note: '促销诱导词' },
+    // ── 存储/电子专项高风险词（OEC 清单类目专项）──
+    { word: '100% waterproof', note: '绝对化防护宣称（应改 IP67/IPX7 等级陈述；裸 waterproof 规格语境合法，不收）' },
+    { word: 'unbreakable', note: '绝对化耐用宣称（应改 drop-tested 参数）' },
+    { word: 'indestructible', note: '绝对化耐用宣称' },
+    { word: 'works with all', note: '绝对化兼容宣称（应改 Compatible with 具体设备列表）' },
+    { word: 'universal compatibility', note: '绝对化兼容宣称' },
+    { word: 'lasts forever', note: '绝对化寿命宣称（应改 TBW/MTTF 参数）' },
+    { word: 'never fails', note: '绝对化可靠性宣称' },
+    { word: 'enterprise grade', note: '无据等级声称（与 military/industrial grade 同族，无认证禁止标注）' },
     // ── 担保承诺短语（亚马逊禁止；单词 guarantee 已在上方收录，此处收高频复合形态）──
     { word: 'satisfaction guarantee', note: '担保承诺短语（亚马逊禁止）' },
     { word: 'money back guarantee', note: '担保承诺短语（亚马逊禁止）' },
+    { word: 'money back', note: '退款承诺（v12.11 OEC 清单增补；亚马逊禁止）' },
     { word: 'full refund', note: '退款承诺（亚马逊禁止）' },
     // ── 欧盟 ECGT 环保词（无第三方认证无条件违规——词表可判；durable/long lasting 条件性违规不收）──
     { word: 'eco-friendly', note: '欧盟 ECGT：无认证环保声称无条件违规' },
@@ -431,6 +539,7 @@ export const PROHIBITED_AVOID: Record<string, ProhibitedWord[]> = {
   // ── 巴西葡语（亚马逊巴西站）──
   'pt-BR': [
     { word: 'teste', note: 'test 对应葡语形态' },
+    { word: 'testes', note: 'test 复数形态（v12.11：BR 站 A+ 真实拦截记录）' },
     { word: 'melhor', note: 'superlativo absoluto' },
     { word: 'perfeito', note: 'afirmação absoluta' },
     { word: 'perfeita', note: 'afirmação absoluta' },
@@ -473,6 +582,8 @@ export const PROHIBITED_AVOID: Record<string, ProhibitedWord[]> = {
     { word: 'perfetta', note: 'affermazione assoluta' },
     { word: 'garantito', note: 'garanzia senza fondamento' },
     { word: 'garantita', note: 'garanzia senza fondamento' },
+    { word: 'garanzia', note: 'garanzia senza fondamento（名词形态；v12.11：IT 站 A+ 真实拦截记录）' },
+    { word: 'certificata', note: 'allégation di certificazione senza fondamento（v12.11：IT 站 A+ 真实拦截记录；只收完整形态——截断 certificazion 形态会误伤 certification 合规词，拒收）' },
     { word: 'garanzia', note: 'garanzia senza fondamento' },
     { word: '100%', note: 'affermazione assoluta' },
     { word: 'numero 1', note: 'rivendicazione di classifica' },
