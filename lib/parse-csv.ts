@@ -103,6 +103,9 @@ export function parseCSVRecords(text: string): string[][] {
 export interface GlossaryCSVEntry {
   source: string
   translations: Record<string, string>
+  /** v12.13: 废弃标记（软删除）——true 时 buildGlossaryMaps 不注册（不注入不遮蔽），
+   *  条目保留在库中可恢复；CSV 列名 `deprecated`（值 yes/true/1 生效），序列化时写回 */
+  deprecated?: boolean
 }
 
 /**
@@ -124,6 +127,9 @@ export function parseGlossaryCSVText(text: string, validLangCodes: Set<string>):
     headerCells.findIndex(h => h.trim() === '产品线'),
     headerCells.findIndex(h => h.trim() === '术语类型'),
   ].filter(i => i >= 0))
+  // v12.13: deprecated 列（废弃标记——不跳过不注册，解析进 entry.deprecated）
+  const deprecatedCol = headerCells.findIndex(h => h.trim() === 'deprecated')
+  if (deprecatedCol >= 0) skipCols.add(deprecatedCol)
   const langCols: string[] = []
   const dataCols: number[] = []
   for (let i = 1; i < headerCells.length; i++) {
@@ -144,7 +150,9 @@ export function parseGlossaryCSVText(text: string, validLangCodes: Set<string>):
       const val = csvDecodeCell((cells[dataCols[j]] || '').trim())
       if (val) translations[langCols[j]] = val
     }
-    entries.push({ source, translations })
+    const depRaw = deprecatedCol >= 0 ? (cells[deprecatedCol] || '').trim().toLowerCase() : ''
+    const deprecated = depRaw === 'yes' || depRaw === 'true' || depRaw === '1'
+    entries.push(deprecated ? { source, translations, deprecated: true } : { source, translations })
   }
   return entries
 }
@@ -155,12 +163,15 @@ export function parseGlossaryCSVText(text: string, validLangCodes: Set<string>):
  * 现用 csvEncodeCell（换行→↵ 占位符，一条记录恒一物理行，与翻译导出同规约）。
  */
 export function serializeGlossaryCSV(entries: GlossaryCSVEntry[], langCodes: string[]): string {
-  const header = ['source', ...langCodes].join(',')
+  // v12.13: 库内含 deprecated 条目时输出 deprecated 列（软删除标记可往返——导出再导入不丢）
+  const hasDeprecated = entries.some(g => g.deprecated)
+  const header = hasDeprecated ? ['source', ...langCodes, 'deprecated'].join(',') : ['source', ...langCodes].join(',')
   const rows = entries.map(g => {
     const cells = [csvEncodeCell(g.source)]
     for (const code of langCodes) {
       cells.push(csvEncodeCell(g.translations[code] || ''))
     }
+    if (hasDeprecated) cells.push(g.deprecated ? 'yes' : '')
     return cells.join(',')
   })
   return [header, ...rows].join('\n')

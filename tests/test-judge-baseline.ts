@@ -84,8 +84,9 @@ const VARIANCE_FLAG = 1.0       // 方差超过此值标记「评分不稳定」
 const PERSONA_GAP_FLAG = 1.5    // 两人设均值差超过此值标记「人设敏感」
 
 // v12.4 迭代 4：--polish 模式（润色灰度验证）——与生产灰度白名单一致
+// v12.12: 白名单对齐生产 v12.10.4（润色全语种生效，闸门已移除）——ja/zh-TW 不再被跳过
 const POLISH_MODE = process.argv.includes('--polish')
-const POLISH_GRAY_LANGS = ['de', 'es', 'ru', 'tr']
+const POLISH_GRAY_LANGS = ['de', 'es', 'ru', 'tr', 'ja', 'zh-TW', 'zh-CN', 'ko', 'fr', 'pt', 'pt-BR', 'it', 'nl', 'pl', 'sv', 'vi', 'th', 'id', 'ar']
 
 // ============================================================
 // CSV 解析（RFC 4180 多行单元格，与 v115 脚本同逻辑）

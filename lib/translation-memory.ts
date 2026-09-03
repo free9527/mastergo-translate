@@ -229,3 +229,126 @@ export function expandBatch(
 
   return result
 }
+
+// ═══════════════════════════════════════════════════════════════
+// v12.13: TM few-shot 检索（方案 2 收窄版——人工验收译文锚定）
+// ═══════════════════════════════════════════════════════════════
+// 职责: 翻译首调前，从「人工验收译文」（corrections origin=user）中检索
+//       与当前批次源文高度相似的历史对，作为 few-shot 注入首调——
+//       项目铁律「抽象形容词对 LLM 无效，具体对照才有效」的机制化：
+//       历史已验收译文是品牌已背书的质量锚点。
+// 收窄红线（2026-09-03 裁决）:
+//   ⛔ 数据源只用 corrections origin='user'（纯人工验收）——
+//      翻译缓存（未验收）/ 校对自动修正（LLM 产物）一律不用，防平庸译文自我强化
+//   ⛔ 相似度 ≥0.90 且源文数字集合必须完全相等（规格错位防线：
+//      "up to 2TB" 绝不锚 "up to 4TB"）
+//   ⛔ 每格最多 1 条、每批最多 MAX_TM_PER_BATCH 条（防注意力稀释 v10.9 教训）
+//   ⛔ 源文 <15 字符不检索（极短标签无 pattern 可学）
+// 语种适配: 拉丁/西里尔/阿拉伯按词级 Jaccard；CJK/泰文（无空格分词）按字符 bigram。
+// 注: 本模块 v7.5.8 起是「同型号不同容量模板匹配」（compressBatch/expandBatch）；
+//     v12.13 追加「人工验收译文检索」——两个职责共享「翻译记忆」语义，同居一文件。
+// ═══════════════════════════════════════════════════════════════
+
+import { TranslationCorrection } from '@messages/types'
+
+export interface TMEntry {
+  /** 历史源文（correction.source） */
+  source: string
+  /** 人工验收译文（correction.correctedTranslation） */
+  target: string
+}
+
+/** 每批最多注入条数（防注意力稀释） */
+export const MAX_TM_PER_BATCH = 2
+/** 相似度阈值（收窄裁决：≥0.90） */
+const TM_THRESHOLD = 0.9
+/** 极短源文不检索（无 pattern 可学） */
+const MIN_SOURCE_LEN = 15
+
+// ── 文字类型自适应分词 ──
+
+/** CJK/泰文（无可靠空格分词）→ 字符 bigram 集合；其余 → 词集合（小写） */
+function tokenizeForSim(text: string): Set<string> {
+  const t = text.toLowerCase().trim()
+  // CJK 统一表意文字/假名/谚文/泰文：按字符 bigram
+  if (/[一-鿿぀-ヿ가-힯฀-๿]/.test(t)) {
+    const chars = t.replace(/\s+/g, '')
+    const bigrams = new Set<string>()
+    for (let i = 0; i < chars.length - 1; i++) bigrams.add(chars.slice(i, i + 2))
+    return bigrams
+  }
+  return new Set(t.split(/\s+/).filter(Boolean))
+}
+
+/** Jaccard 相似度（集合交/并） */
+function jaccardSim(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 || b.size === 0) return 0
+  let inter = 0
+  for (const x of a) if (b.has(x)) inter++
+  return inter / (a.size + b.size - inter)
+}
+
+/** 数字集合（含小数/千分位）——规格错位防线：数字集合不等 → 相似度强制 0 */
+function numberSetKey(text: string): string {
+  return (text.match(/\d+(?:[.,]\d+)?/g) || []).sort().join(',')
+}
+
+/**
+ * TM 相似度（0-1）。数字集合不等 → 0（规格错位防线）。
+ * 拉丁系按词级 Jaccard；CJK/泰文按字符 bigram Jaccard。
+ */
+export function tmSimilarity(a: string, b: string): number {
+  if (!a || !b) return 0
+  if (numberSetKey(a) !== numberSetKey(b)) return 0
+  return jaccardSim(tokenizeForSim(a), tokenizeForSim(b))
+}
+
+/**
+ * 检索翻译记忆：corrections(user 源) × 当前批次 × 同 targetLang × 相似度≥0.90。
+ * @param texts 当前批次源文
+ * @param corrections 全部修正记录（函数内部过滤 origin='user'）
+ * @param targetLang 目标语言（correction.targetLang 严格相等）
+ * @returns 按相似度降序的 TMEntry（≤MAX_TM_PER_BATCH 条，每条服务一个源文，源文不重复）
+ */
+export function retrieveTM(
+  texts: string[],
+  corrections: TranslationCorrection[],
+  targetLang: string,
+): TMEntry[] {
+  // 收窄裁决：只用 origin='user' 的人工验收译文（缺省 origin 按 user 兼容旧记录——types.ts 注释）
+  const pool = corrections.filter(c =>
+    (c.origin ?? 'user') === 'user' &&
+    c.targetLang === targetLang &&
+    c.correctedTranslation && c.correctedTranslation.trim().length > 0 &&
+    c.source && c.source.trim().length >= MIN_SOURCE_LEN,
+  )
+  if (pool.length === 0) return []
+
+  // 每条源文的最佳匹配 + 全局 ≤MAX_TM_PER_BATCH（相似度降序贪心分配，correction 不重复用）
+  interface Candidate { entry: TMEntry; score: number; corrIdx: number }
+  const candidates: Candidate[] = []
+  for (let ci = 0; ci < pool.length; ci++) {
+    let best = 0
+    for (const t of texts) {
+      if (!t || t.trim().length < MIN_SOURCE_LEN) continue
+      const s = tmSimilarity(t, pool[ci].source)
+      if (s > best) best = s
+    }
+    if (best >= TM_THRESHOLD) {
+      candidates.push({ entry: { source: pool[ci].source, target: pool[ci].correctedTranslation }, score: best, corrIdx: ci })
+    }
+  }
+  candidates.sort((a, b) => b.score - a.score)
+
+  // 同一历史源文（近似）只取一条：按 source 归一化去重（防同一句的多次修正重复注入）
+  const seen = new Set<string>()
+  const out: TMEntry[] = []
+  for (const c of candidates) {
+    const key = c.entry.source.toLowerCase().replace(/\s+/g, ' ').trim()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(c.entry)
+    if (out.length >= MAX_TM_PER_BATCH) break
+  }
+  return out
+}
