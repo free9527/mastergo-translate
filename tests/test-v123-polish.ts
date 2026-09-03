@@ -14,7 +14,7 @@
 
 import { isPolishEligible, validatePolishOutput, detectPolarityBreach } from '../lib/polish-guard'
 import { buildProofreadSystemPrompt } from '../lib/prompt-constants'
-import { proofreadBatch, personaJudgeBatch, polishBatch } from '../lib/llm-api'
+import { proofreadBatch, personaJudgeBatch, polishBatch, polishVerifyBatch } from '../lib/llm-api'
 import { LLMConfig } from '../messages/types'
 
 let passed = 0
@@ -262,19 +262,56 @@ async function runD() {
   assert(results[0].text.includes('900MB/s'), 'D2b 润色后文本保留数字/单位')
 }
 
+// D2c: v12.12 按段润色——语义断行保留（拼回 ' ↵ ' 形态）+ 段独立润色
+// 源文语义断行（标题 4 词 ≤5 → 语义断行），段2（8 词正文）润色生效、段1 标题不润（极短段 v12.7 规则）
+{
+  enqueueResponse('{"polished":[{"i":1,"text":"Performansı en üst düzeye çıkarır","changes":[{"issueIndex":0,"before":"c","after":"d"}]}]}')
+  const issuesMap = new Map([[0, [
+    { type: 'calque' as const, span: 'Performance', suggestion: 'Performans' },
+  ]]])
+  const results = await polishBatch(
+    ['Take It Higher ↵ Performance for the next level of your game'],
+    ['Bir Üst Seviye ↵ Performans bir sonraki seviyeye taşır'],
+    [0],
+    issuesMap,
+    'tr',
+    mockConfig,
+  )
+  assert(results[0].polished && results[0].text.includes(' ↵ '), 'D2c 按段润色：语义断行保留（拼回 ↵ 形态）', JSON.stringify(results[0].text))
+  assert(results[0].text.split(' ↵ ').length === 2, 'D2c2 按段润色：段数不变（2 段）')
+  assert(results[0].text.startsWith('Bir Üst Seviye ↵ '), 'D2c3 极短标题段不润（原译文段保留）')
+  assert(results[0].text.includes('Performansı en üst düzeye çıkarır'), 'D2c4 正文段润色生效（LLM 输出写入）')
+}
+
+// D2d: v12.12 段数不等 → 整格不润（源文 1 语义段 vs 译文 2 段——tr 短左段被 lenient 误判段边界，
+// 对位关系丢失时保守整格不润，结构对齐问题让校对管）
+{
+  const issuesMap = new Map([[0, [{ type: 'calque' as const, span: 'performance', suggestion: 'performans' }]]])
+  const results = await polishBatch(
+    ['Take your gaming performance to the ↵ Next Level'],
+    ['Oyun performansınızı bir üst ↵ seviyeye taşıyın'],
+    [0],
+    issuesMap,
+    'tr',
+    mockConfig,
+  )
+  assert(!results[0].polished && (results[0].reason || '').includes('段数不等'), 'D2d 段数不等 → 整格不润（保守）', results[0].reason)
+  assert(results[0].text.includes('↵'), 'D2d2 整格不润时译文原样保留（含 ↵）')
+}
+
 // D3: changes 数量超限 → 回退
 {
   enqueueResponse('{"polished":[{"i":1,"text":"bis zu 4-mal schneller","changes":[{"issueIndex":0,"before":"a","after":"b"},{"issueIndex":1,"before":"c","after":"d"}]}]}')
-  const issuesMap = new Map([[0, [{ type: 'calque' as const, span: 'x', suggestion: 'y' }]]])
+  const issuesMap = new Map([[0, [{ type: 'calque' as const, span: 'Fast', suggestion: 'schneller' }]]])
   const results = await polishBatch(
-    ['Fast speeds'],
-    ['beeindruckende schneller'],
+    ['Fast speeds for gaming'],
+    ['beeindruckende schneller Gaming'],
     [0],
     issuesMap,
     'de',
     mockConfig,
   )
-  assert(!results[0].polished && results[0].reason?.includes('changes'), 'D3 changes 超限回退', results[0].reason)
+  assert(!results[0].polished && (results[0].reason?.includes('changes') || results[0].reason?.includes('段')), 'D3 changes 超限回退', results[0].reason)
 }
 
 // D4: 硬锁失败（数字被改）→ 回退
@@ -307,6 +344,54 @@ async function runD() {
   const reqBody = JSON.parse(mockCalls[mockCalls.length - 1].body)
   const userMsg = reqBody.messages.find((m: { role: string }) => m.role === 'user')?.content || ''
   assert(userMsg.includes('polished') || userMsg.includes('润色'), 'E4 proofreadBatch user prompt 含润色提示')
+}
+
+// D5: 二次判定 factsIntact=false（事实偏移）→ improved 强制 false + 索引透出（v12.10）
+// 实锤案例：プロ仕様性能→プロ向け 语义偏移，旧版 verify 只问自然度会放行
+{
+  enqueueResponse('{"verdicts":[{"i":1,"improved":true,"factsIntact":false,"reason":"プロ向けに意味が変わっている"}]}')
+  const factsBreach = new Set<number>()
+  const verdicts = await polishVerifyBatch(
+    ['CFexpress 4.0 Pro Performance, for All.'],
+    ['すべてのユーザーに CFexpress 4.0 のプロ仕様性能を'],
+    ['すべてのユーザーへ、プロ向け CFexpress 4.0 の性能を'],
+    'ja',
+    mockConfig,
+    null,
+    factsBreach,
+  )
+  assert(verdicts.get(0) === false, 'D5 factsIntact=false → improved 强制 false（事实偏移一票否决）')
+  assert(factsBreach.has(0), 'D5b factsBreachIndices 透出偏移索引（日志区分用）')
+}
+
+// D6: 二次判定旧格式（无 factsIntact 字段）→ 缺省 true 放行（向后兼容）
+{
+  enqueueResponse('{"verdicts":[{"i":1,"improved":true,"reason":"より自然"}]}')
+  const verdicts = await polishVerifyBatch(
+    ['Fast performance'],
+    ['高速なパフォーマンス'],
+    ['圧倒的に速いパフォーマンス'],
+    'ja',
+    mockConfig,
+  )
+  assert(verdicts.get(0) === true, 'D6 旧格式无 factsIntact → 缺省放行（improved=true 生效）')
+}
+
+// D7: 二次判定 improved=true + factsIntact=true → 放行（正常改善路径）
+{
+  enqueueResponse('{"verdicts":[{"i":1,"improved":true,"factsIntact":true,"reason":"自然で事実も保持"}]}')
+  const factsBreach = new Set<number>()
+  const verdicts = await polishVerifyBatch(
+    ['Room for every shot'],
+    ['あらゆるショットを保存できる余裕'],
+    ['思う存分撮れる大容量'],
+    'ja',
+    mockConfig,
+    null,
+    factsBreach,
+  )
+  assert(verdicts.get(0) === true, 'D7 improved=true + factsIntact=true → 放行')
+  assert(!factsBreach.has(0), 'D7b factsIntact=true 不进 breach 集合')
 }
 
 }  // end runD

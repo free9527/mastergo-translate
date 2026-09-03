@@ -113,6 +113,17 @@ export interface LLMConfig {
   /** v12.3.2: 用户手动碰过润色开关的标记——未标记时 enablePolish 随目标语言自动
    *  取默认（de/es/ru/tr 开/其余关）；标记后尊重用户选择不再覆盖 */
   polishUserTouched?: boolean
+  /** v12.10: best-of-2 翻译择优开关（质量地板机制）——v12.10.4 静默执行默认全开+开关撤除。
+   *  高自由度条目（无数字/无术语命中/非合规/非极短）双跑首调+人设择优，
+   *  有形式锁兜底的条目（规格行/合规句/术语命中）不双跑省 token */
+  enableBestOfN?: boolean
+  /** v12.10.5: AI 优化总开关（校对+润色+择优三机制的统一开关）——默认开。
+   *  关时三机制全停（省 token/草稿预览场景）；开时三机制后台自动跑（用户零感知）。
+   *  enableProofread/enablePolish/enableBestOfN 保留为内部字段（向后兼容+细粒度控制），
+   *  UI 层只暴露 enableAiOptimize 一个开关 */
+  enableAiOptimize?: boolean
+  /** v12.10.4: 静默执行一次性迁移标记——未标记时 enablePolish/enableBestOfN 强制全开 */
+  silentDefaultMigrated?: boolean
 }
 
 export interface TranslationCorrection {
@@ -124,11 +135,18 @@ export interface TranslationCorrection {
   /** v11.14: 修正来源 —— user=用户手动编辑（自动入库被拒时提示）；
    *  proofread=AI校对自动修正（被拒时静默，防刷toast）。缺省按 user 兼容旧记录 */
   origin?: 'user' | 'proofread'
+  /** v12.6: 抑制自动入库建议 —— 校对来源的修正只留记录不触发 CORRECTION_SUGGESTION。
+   *  红线：自动入库只收用户手动修正（用户意图是入库的唯一合法来源）；
+   *  校对自动修正量太大（每修一条触发一次），用户反馈「添加到术语库的内容偏多」。 */
+  suppressAutoGlossary?: boolean
 }
 
 export interface GlossaryEntry {
   source: string
   translations: Record<string, string>  // 语言代码 → 翻译
+  /** v12.13: 废弃标记（软删除）——true 时 buildGlossaryMaps 不注册（不注入不遮蔽），
+   *  条目保留在库中可恢复；CSV 列名 `deprecated`（值 yes/true/1 生效） */
+  deprecated?: boolean
 }
 
 // ============================================================

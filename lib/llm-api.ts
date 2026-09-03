@@ -23,7 +23,7 @@ import { getFewShotExamples } from '@lib/few-shot-examples'
 import { isBuiltinThirdPartyWholeText, isBuiltinModelSegment, BUILTIN_THIRD_PARTY_ENTRIES, BUILTIN_THIRD_PARTY_ALL_KEYS } from '@lib/third-party-models'
 import { shouldSkipGlossaryEntry } from '@lib/glossary-guard'
 import { getJudgePersonas } from '@lib/judge-personas'
-import { validatePolishOutput } from '@lib/polish-guard'
+import { validatePolishOutput, COMPLIANCE_KEYWORDS, splitSemanticSegments, stripTmSymbols } from '@lib/polish-guard'
 /**
  * 内置第三方遮蔽表（v11.13）：第三方词条的 source→source identity Map。
  *
@@ -120,7 +120,7 @@ import {
   getScriptClass, getTargetScript, isSameScriptLanguagePair, hasFunctionWords,
   TARGET_SCRIPT_PATTERNS,
 } from '@lib/lang-detect'
-import { isSameLanguageExempt } from '@lib/keep-source'
+import { isSameLanguageExempt, shouldKeepSource } from '@lib/keep-source'
 
 // ============================================================
 // 语言名称映射（英文名，用于英文指令中避免中英混杂）
@@ -787,6 +787,9 @@ export async function translateBatch(
   misspelledIndices?: Set<number>,      // v10.6: 输出参数 — 疑似错词被回退保留原形的条目索引，供 UI 单独标记"疑似拼写错误"（与漏翻区分）
   expansionIndices?: Set<number>,       // v10.8: 输出参数 — 译文显著超长的条目索引，透出给校对层作长度异常 hint（不再自动截断）
   firstCallAnomalyIndices?: Set<number>, // v11.5: 输出参数 — 首调（重试前）检出的异常条目索引（截断+漏翻），供实机观测首调质量（prompt 减肥效果验证）
+  bestOf2 = false,                       // v12.10: 双跑首调+择优（高自由度条目质量地板机制；重试链不双跑）
+  bestOf2StatsOut?: { add: (s: { dualRun: number; judged: number; pickedB: number }) => void }, // v12.10: 择优统计透出（日志用）
+  tmFewShot?: Array<{ source: string; target: string }>, // v12.13: 翻译记忆 few-shot（人工验收译文，替换静态 few-shot；首调限定）
 ): Promise<string[]> {
   // ═══════════════════════════════════════════════════════════
   // S1: 预处理（产出 texts 变体，不动 result）
@@ -957,8 +960,17 @@ export async function translateBatch(
 
   // v8.0: 目标语言 Few-Shot 示例（按场景+风格动态选择类型）
   // v8.6: 使用实际检测到的源语言，而非硬编码 'en'
+  // v12.13: TM few-shot（人工验收译文）非空时替换静态 few-shot——
+  //   真实验收译文 > 通用范例（项目铁律：具体对照才有效），且不追加防 prompt 变长（v11.5 减肥纪律）；
+  //   只在首调注入（forceTranslate 重试层已有补救机制不叠加）。
   const fewShot = getFewShotExamples(detectedSource, targetLang, 2, config.scenePreset, effectiveStyle)
-  const fewShotBlock = fewShot ? `\n[EXAMPLES]\n${fewShot}` : ''
+  let fewShotBlock = fewShot ? `\n[EXAMPLES]\n${fewShot}` : ''
+  if (tmFewShot && tmFewShot.length > 0 && !forceTranslate) {
+    const tmLines = tmFewShot.map(e => `"${e.source}" → "${e.target}"`).join('\n')
+    fewShotBlock = useEnInstruction
+      ? `\n[EXAMPLES — validated past translations, follow their phrasing patterns]\n${tmLines}`
+      : `\n[参考译文——人工验收的历史译文，请沿用其表达范式]\n${tmLines}`
+  }
 
   // System Prompt: IDENTITY → CORE_PRINCIPLES → MISSION → STYLE → FEWSHOT → LANG_RULES → GLOSSARY → OUTPUT
   // v11.5: 统一重试（forceTranslate=true）换用瘦身 prompt——去风格卡/few-shot，补救条款全量回归。
@@ -985,153 +997,216 @@ ${texts.map((t, i) => `${i + 1}. "${t.slice(0, 100)}"`).join('\n')}
     systemPrompt += forceRule
   }
 
-  const temperature = 0.2
+  // v12.10: 0.2→0.1——判定/校对/解析类全部 0.1，翻译的创造性由 prompt 管不由温度管；
+  //   降温收窄采样方差（质量参差对策一环）。激进兜底链 0.3 不动（越到兜底越放宽换跳出局部最优）。
+  const temperature = 0.1
 
   // ═══════════════════════════════════════════════════════════
   // S4: LLM 调用 + 结果解析（产生 result，出口长度归一化到 texts.length）
+  // v12.10: fetch+解析收编为 callFirstLLM 内部函数（best-of-2 复用——
+  //   双跑首调时同一 systemPrompt/textList 并行调两次，行为与单跑完全一致）。
   // ═══════════════════════════════════════════════════════════
-  const res = await fetchWithRetry(config.apiUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${config.apiKey}`,
-    },
-    body: JSON.stringify({
-      model: config.model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: textList },
-      ],
-      temperature,
-      // v12.0 第2步：翻译输出 schema 化——API 层硬约束 JSON object（实测 A/C 段全绿）
-      response_format: { type: 'json_object' },
-    }),
-  })
-
-  if (!res.ok) {
-    uiLog('translate', `❌ API 请求失败 (${res.status}): ${res.text.slice(0, 150)}`)
-    throw new Error(`API 请求失败 (${res.status}): ${res.text.slice(0, 200)}`)
-  }
-
-  const data = res.json as Record<string, unknown>
-  const content: string = (data.choices as Array<{ message?: { content?: string } }>)?.[0]?.message?.content || ''
-
-  if (!_isRetry) {
-    uiLog('translate', `LLM 原始返回(截断600字): ${content.slice(0, 600)}`)
-  } else {
-    uiLog('translate', `重试 LLM 原始返回(截断300字): ${content.slice(0, 300)}`)
-  }
-
-  let result: string[] = []
-
-  // 尝试 JSON 解析（优先，v12.0 起 json_object 模式强制 {"translations":[...]}）
-  // i 映射修复：entry.i（1-based 索引）优先于数组位置——防模型乱序输出时译文错位
-  const jsonMatch = content.match(/\{[\s\S]*"translations"[\s\S]*\}/)
-  if (jsonMatch) {
-    try {
-      const parsed = JSON.parse(jsonMatch[0]) as { translations?: Array<{ i?: number; text?: string }> }
-      if (parsed.translations && Array.isArray(parsed.translations)) {
-        const hasValidIndex = parsed.translations.some(e => typeof e.i === 'number' && e.i >= 1)
-        if (hasValidIndex) {
-          // v12.0: i 索引映射（乱序安全）
-          const byIndex: string[] = []
-          for (const entry of parsed.translations) {
-            if (typeof entry.i === 'number' && entry.i >= 1 && entry.text) byIndex[entry.i - 1] = entry.text.trim()
-          }
-          // 无 i 或 i 越界的按顺序补位（i 缺失场景的保守兜底）
-          let cursor = 0
-          for (const entry of parsed.translations) {
-            if (!entry.text) continue
-            if (typeof entry.i === 'number' && entry.i >= 1) continue
-            while (byIndex[cursor] !== undefined) cursor++
-            byIndex[cursor++] = entry.text.trim()
-          }
-          for (let i = 0; i < byIndex.length; i++) result.push(byIndex[i] ?? '')
-          result = result.filter((_, i) => i < texts.length || byIndex[i] !== undefined)
-        } else {
-          // 旧形态：无 i 字段，按数组位置（v12.0 前模型的偶发 JSON 输出）
-          for (const entry of parsed.translations) {
-            if (entry.text) result.push(entry.text.trim())
-          }
-        }
-      }
-    } catch { /* fall through to line parsing */ }
-  }
-
-  // 后备：逐行解析 "[N] 译文" 或 "N. 译文" 格式
-  // 支持多行译文：LLM 可能输出真正的换行而非 ↵ 标记，导致单条译文跨多行
-  if (result.length === 0) {
-    const lines = content.split('\n')
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i]
-      // 支持 [N] 和 N. 两种格式
-      let match = line.match(/^\s*\[(\d+)\]\s*(.*)/)
-      if (!match) match = line.match(/^\s*(\d+)\.\s*(.*)/)
-      if (match) {
-        let translation = match[2].trim()
-        // 收集后续行直到遇到下一个 [N] 或 N. 标记
-        while (i + 1 < lines.length) {
-          const nextLine = lines[i + 1]
-          if (/^\s*\[\d+\]/.test(nextLine) || /^\s*\d+\./.test(nextLine)) break
-          const continuation = nextLine.trim()
-          if (continuation) {
-            translation += '\n' + continuation
-          }
-          i++
-        }
-        result.push(translation)
-      }
-    }
-  }
-
-  // 最终后备：取非空行
-  if (result.length === 0) {
-    for (const line of content.split('\n')) {
-      const trimmed = line.trim()
-      if (trimmed && !trimmed.startsWith('//') && !trimmed.startsWith('#') && !trimmed.startsWith('{')) {
-        result.push(trimmed)
-      }
-    }
-  }
-
-  while (result.length < texts.length) result.push('')
-  result = result.slice(0, texts.length)
-
-  // v3：含空格源文本用 "[N] \"text\"" 包裹发送，LLM 可能将引号一同输出。
-  // v8.8: 增加语言特有引号回显剥离，带源文对照避免误剥源文本来的引号。
-  // 仅剥高回显率+低源文风险的引号对（„" «» “” 「」 『』），ASCII 引号由下方 v3 逻辑处理。
-  const ECHO_QUOTE_PAIRS: Record<string, string> = {
-    '„': '"',   // 德语/波兰语/荷兰语/捷克语等
-    '«': '»',   // 法语/俄语/瑞士德语/西班牙语（本土）
-    '“': '”',   // 中文 curly quotes
-    '「': '」', // 日语/繁体中文/韩语
-    '『': '』', // 日语/繁体中文（书名/二层引用）
-  }
-  const stripEchoQuotes = (source: string, translation: string): string => {
-    if (translation.length < 2) return translation
-    const open = translation[0]
-    const close = ECHO_QUOTE_PAIRS[open]
-    if (!close || !translation.endsWith(close)) return translation
-    // 源文首尾本来就是这个引号对 → 不是回显 → 保留
-    if (source.startsWith(open) && source.endsWith(close)) return translation
-    // 内部还有同种开引号 → 可能是嵌套结构 → 保守保留
-    const inner = translation.slice(1, -1)
-    if (inner.includes(open)) return translation
-    return inner
-  }
-
-  if (quotedIndices.size > 0) {
-    result = result.map((t, i) => {
-      if (!quotedIndices.has(i)) return t
-      // v3: 仅当首尾是配对 ASCII 双引号时才剥离（避免剥离译文本身包含的引号）
-      if (t.startsWith('"') && t.endsWith('"') && t.length >= 2) {
-        const inner = t.slice(1, -1)
-        // 防止过度剥离：如果内部还有引号（嵌套），保留原样
-        if (!inner.includes('"')) t = inner
-      }
-      // v8.8: 再剥语言特有回显引号（带源文对照）
-      return stripEchoQuotes(texts[i], t)
+  const callFirstLLM = async (): Promise<string[]> => {
+    const res = await fetchWithRetry(config.apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: config.model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: textList },
+        ],
+        temperature,
+        // v12.0 第2步：翻译输出 schema 化——API 层硬约束 JSON object（实测 A/C 段全绿）
+        response_format: { type: 'json_object' },
+      }),
     })
+
+    if (!res.ok) {
+      uiLog('translate', `❌ API 请求失败 (${res.status}): ${res.text.slice(0, 150)}`)
+      throw new Error(`API 请求失败 (${res.status}): ${res.text.slice(0, 200)}`)
+    }
+
+    const data = res.json as Record<string, unknown>
+    const content: string = (data.choices as Array<{ message?: { content?: string } }>)?.[0]?.message?.content || ''
+
+    if (!_isRetry) {
+      uiLog('translate', `LLM 原始返回(截断600字): ${content.slice(0, 600)}`)
+    } else {
+      uiLog('translate', `重试 LLM 原始返回(截断300字): ${content.slice(0, 300)}`)
+    }
+
+    let result: string[] = []
+
+    // 尝试 JSON 解析（优先，v12.0 起 json_object 模式强制 {"translations":[...]}）
+    // i 映射修复：entry.i（1-based 索引）优先于数组位置——防模型乱序输出时译文错位
+    const jsonMatch = content.match(/\{[\s\S]*"translations"[\s\S]*\}/)
+    if (jsonMatch) {
+      try {
+        const parsed = JSON.parse(jsonMatch[0]) as { translations?: Array<{ i?: number; text?: string }> }
+        if (parsed.translations && Array.isArray(parsed.translations)) {
+          const hasValidIndex = parsed.translations.some(e => typeof e.i === 'number' && e.i >= 1)
+          if (hasValidIndex) {
+            // v12.0: i 索引映射（乱序安全）
+            const byIndex: string[] = []
+            for (const entry of parsed.translations) {
+              if (typeof entry.i === 'number' && entry.i >= 1 && entry.text) byIndex[entry.i - 1] = entry.text.trim()
+            }
+            // 无 i 或 i 越界的按顺序补位（i 缺失场景的保守兜底）
+            let cursor = 0
+            for (const entry of parsed.translations) {
+              if (!entry.text) continue
+              if (typeof entry.i === 'number' && entry.i >= 1) continue
+              while (byIndex[cursor] !== undefined) cursor++
+              byIndex[cursor++] = entry.text.trim()
+            }
+            for (let i = 0; i < byIndex.length; i++) result.push(byIndex[i] ?? '')
+            result = result.filter((_, i) => i < texts.length || byIndex[i] !== undefined)
+          } else {
+            // 旧形态：无 i 字段，按数组位置（v12.0 前模型的偶发 JSON 输出）
+            for (const entry of parsed.translations) {
+              if (entry.text) result.push(entry.text.trim())
+            }
+          }
+        }
+      } catch { /* fall through to line parsing */ }
+    }
+
+    // 后备：逐行解析 "[N] 译文" 或 "N. 译文" 格式
+    // 支持多行译文：LLM 可能输出真正的换行而非 ↵ 标记，导致单条译文跨多行
+    if (result.length === 0) {
+      const lines = content.split('\n')
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i]
+        // 支持 [N] 和 N. 两种格式
+        let match = line.match(/^\s*\[(\d+)\]\s*(.*)/)
+        if (!match) match = line.match(/^\s*(\d+)\.\s*(.*)/)
+        if (match) {
+          let translation = match[2].trim()
+          // 收集后续行直到遇到下一个 [N] 或 N. 标记
+          while (i + 1 < lines.length) {
+            const nextLine = lines[i + 1]
+            if (/^\s*\[\d+\]/.test(nextLine) || /^\s*\d+\./.test(nextLine)) break
+            const continuation = nextLine.trim()
+            if (continuation) {
+              translation += '\n' + continuation
+            }
+            i++
+          }
+          result.push(translation)
+        }
+      }
+    }
+
+    // 最终后备：取非空行
+    if (result.length === 0) {
+      for (const line of content.split('\n')) {
+        const trimmed = line.trim()
+        if (trimmed && !trimmed.startsWith('//') && !trimmed.startsWith('#') && !trimmed.startsWith('{')) {
+          result.push(trimmed)
+        }
+      }
+    }
+
+    while (result.length < texts.length) result.push('')
+    result = result.slice(0, texts.length)
+
+    // v3：含空格源文本用 "[N] \"text\"" 包裹发送，LLM 可能将引号一同输出。
+    // v8.8: 增加语言特有引号回显剥离，带源文对照避免误剥源文本来的引号。
+    // 仅剥高回显率+低源文风险的引号对（„" «» “” 「」 『』），ASCII 引号由下方 v3 逻辑处理。
+    const ECHO_QUOTE_PAIRS: Record<string, string> = {
+      '„': '"',   // 德语/波兰语/荷兰语/捷克语等
+      '«': '»',   // 法语/俄语/瑞士德语/西班牙语（本土）
+      '“': '”',   // 中文 curly quotes
+      '「': '」', // 日语/繁体中文/韩语
+      '『': '』', // 日语/繁体中文（书名/二层引用）
+    }
+    const stripEchoQuotes = (source: string, translation: string): string => {
+      if (translation.length < 2) return translation
+      const open = translation[0]
+      const close = ECHO_QUOTE_PAIRS[open]
+      if (!close || !translation.endsWith(close)) return translation
+      // 源文首尾本来就是这个引号对 → 不是回显 → 保留
+      if (source.startsWith(open) && source.endsWith(close)) return translation
+      // 内部还有同种开引号 → 可能是嵌套结构 → 保守保留
+      const inner = translation.slice(1, -1)
+      if (inner.includes(open)) return translation
+      return inner
+    }
+
+    if (quotedIndices.size > 0) {
+      result = result.map((t, i) => {
+        if (!quotedIndices.has(i)) return t
+        // v3: 仅当首尾是配对 ASCII 双引号时才剥离（避免剥离译文本身包含的引号）
+        if (t.startsWith('"') && t.endsWith('"') && t.length >= 2) {
+          const inner = t.slice(1, -1)
+          // 防止过度剥离：如果内部还有引号（嵌套），保留原样
+          if (!inner.includes('"')) t = inner
+        }
+        // v8.8: 再剥语言特有回显引号（带源文对照）
+        return stripEchoQuotes(texts[i], t)
+      })
+    }
+    return result
+  }
+
+  let result: string[]
+  if (!bestOf2 || _isRetry) {
+    // 单跑（默认/重试路径——重试链不双跑，防双倍放大）
+    result = await callFirstLLM()
+  } else {
+    // ═══════════════════════════════════════════════════════════
+    // v12.10 best-of-2：并行双跑首调 → S5 前择优 → 冠军单走 S5-S8
+    //   设计决策（探查论证）：外层调两次 translateBatch 有三重伤——
+    //   ①重试链双倍放大（一条漏翻最坏 5+ 次 API ×2）
+    //   ②输出参数 Set 互相污染（亚军批次异常索引混进冠军）
+    //   ③择优比较的是不同管道层产物（方差来源不纯）。
+    //   内部只双跑首调：两候选都是占位符遮蔽态（™/术语形式差异中性化，
+    //   judge 只看语义/自然度——与 polishVerify 的 stripTm 哲学一致），
+    //   S5-S8 全部确定性代码只跑冠军一份，重试链/输出参数零污染。
+    // ═══════════════════════════════════════════════════════════
+    const [resultA, resultB] = await Promise.all([callFirstLLM(), callFirstLLM()])
+    // v12.10 资格判定（token 纪律：有形式锁兜底/润色空间为零的条目不择优）——
+    //   复用现有纯函数零新判定器：术语短路条目（遮蔽态两路必同，天然免疫）、
+    //   合规关键词（润色权为零同款表）、shouldKeepSource（不可翻译注册表）、
+    //   极短 ≤3 词（标签润色空间为零）、含数字（validateNumbers 锁兜着方差低）。
+    //   只有「无锁高自由度」文本（营销/描述句）才值得择优——这是与润色资格的
+    //   关键差异（润色不管数字，择优要管：数字锁已经把规格行方差压住了）。
+    const isPickEligible = (idx: number): boolean => {
+      if (glossaryMatchedIndices.has(idx)) return false
+      const src = texts[idx]
+      const srcLower = src.toLowerCase()
+      if (COMPLIANCE_KEYWORDS.some(kw => srcLower.includes(kw))) return false
+      if (shouldKeepSource(src.trim(), { targetLang })) return false
+      if (src.trim().split(/\s+/).filter(Boolean).length <= 3) return false
+      if (/\d/.test(src)) return false
+      return true
+    }
+    const pickIndices: number[] = []
+    result = resultA.slice()
+    for (let i = 0; i < texts.length; i++) {
+      // 两路不同 → 候选择优；相同 → 直接采用免判定（术语短路条目遮蔽态两路必同，天然免疫）
+      if ((resultA[i] || '') === (resultB[i] || '')) continue
+      if (!isPickEligible(i)) continue
+      pickIndices.push(i)
+    }
+    if (pickIndices.length > 0) {
+      const pickMap = await translationPickBatch(
+        texts, resultA, resultB, pickIndices, targetLang, config, productLine,
+      )
+      let pickedB = 0
+      for (const i of pickIndices) {
+        if (pickMap.get(i) === 2) { result[i] = resultB[i]; pickedB++ }
+      }
+      bestOf2StatsOut?.add({ dualRun: texts.length, judged: pickIndices.length, pickedB })
+      uiLog('translate', `best-of-2 择优: 双跑${texts.length}条→两路一致${texts.length - pickIndices.length}条→判定${pickIndices.length}条→选第二路${pickedB}条`)
+    } else {
+      bestOf2StatsOut?.add({ dualRun: texts.length, judged: 0, pickedB: 0 })
+      uiLog('translate', `best-of-2 择优: 双跑${texts.length}条→两路全一致，免判定`)
+    }
   }
 
   auditStage('S4', texts, result)
@@ -1900,6 +1975,7 @@ Output ONLY a valid JSON object:
 - Include ALL items — "i" must match the input [N] indices exactly
 - needsPolish=true ONLY if the translation has noticeable translation flavor (calqued collocations, stiff structure, wrong register) — do NOT polish correct translations
 - issues: list the specific problems (empty array if needsPolish=false)
+- issue type must be one of: "calque" (搭配直译), "structure" (语序/结构镜像), "register" (语域/文体/敬语/全角半角错位)
 - confidence: 1=guessing, 5=certain (only flag needsPolish=true when confidence≥3)
 - Raw JSON only, no markdown code blocks`
 }
@@ -2028,6 +2104,333 @@ export async function personaJudgeBatch(
 }
 
 // ═══════════════════════════════════════════════════════════════
+// polishVerifyBatch — 润色后二次判定（闭环验证，v12.8）
+// ═══════════════════════════════════════════════════════════════
+// 机制：润色生效后由同一人设二次判定「改善了吗」——无改善则回退。
+//   防「润色=同义改写」的无效消耗（LLM 把 A 改成 B 但自然度没提升）。
+// 纪律：二次判定是「差分对比」非「绝对评分」——同一人设对润色前后译文做
+//   二选一（which is more natural），形式信号可判（improved=true/false）。
+//   人设方差靠「同一人设+同一批次+差分对比」收敛（非两次独立绝对评分）。
+// ═══════════════════════════════════════════════════════════════
+
+interface PolishVerifyApiResult {
+  verdicts: Array<{
+    i: number
+    improved: boolean
+    factsIntact?: boolean  // v12.10: 事实锚定门——false=语义偏移/事实丢失，一票否决
+    reason?: string
+  }>
+}
+
+function buildVerifyPrompt(personaText: string, targetLang: string): string {
+  return `${personaText}
+
+You will be given pairs of ${targetLang} translations (BEFORE and AFTER polishing) for the same source text.
+Judge whether the AFTER version is more natural than the BEFORE version, AND whether it preserves all facts from the Source.
+
+Output ONLY a valid JSON object:
+{"verdicts":[{"i":<1-based index>,"improved":<true|false>,"factsIntact":<true|false>,"reason":"<brief reason in ${targetLang}>"}]}
+- Include ALL items — "i" must match the input [N] indices exactly
+- improved=true ONLY if the AFTER version is clearly more natural (better collocations, smoother structure, appropriate register)
+- improved=false if the AFTER version is equally natural, less natural, or the change is trivial/synonymous
+- factsIntact=false if the AFTER version drops or alters ANY fact, number, qualifier, or semantic direction from the Source — including who the product is FOR (audience direction), what it does, and any hedges (up to/maximum). A wording change that shifts meaning (e.g. "professional-grade performance for everyone" → "performance aimed at professionals") is factsIntact=false.
+- factsIntact=true if all facts and semantic directions are preserved
+- Raw JSON only, no markdown code blocks`
+}
+
+function buildVerifyUser(sources: string[], befores: string[], afters: string[], startIdx: number): string {
+  const stripTm = (t: string) => t.replace(/[™®©]/g, '').replace(/\n/g, ' ↵ ')
+  return afters.map((after, k) => {
+    const n = startIdx + k + 1
+    return `[${n}] Source: ${stripTm(sources[startIdx + k])}\nBefore: ${stripTm(befores[startIdx + k])}\nAfter: ${stripTm(after)}`
+  }).join('\n\n')
+}
+
+/** 平衡括号提取 {"verdicts":[...]} */
+function extractVerdictsObject(text: string): PolishVerifyApiResult | null {
+  let searchFrom = 0
+  while (true) {
+    const keyIdx = text.indexOf('"verdicts"', searchFrom)
+    if (keyIdx < 0) return null
+    let braceStart = -1
+    for (let k = keyIdx - 1; k >= 0; k--) {
+      if (text[k] === '{') { braceStart = k; break }
+      if (text[k] === '}') break
+    }
+    if (braceStart < 0) { searchFrom = keyIdx + 10; continue }
+    let depth = 0
+    let inStr = false
+    let esc = false
+    for (let k = braceStart; k < text.length; k++) {
+      const c = text[k]
+      if (esc) { esc = false; continue }
+      if (c === '\\' && inStr) { esc = true; continue }
+      if (c === '"') { inStr = !inStr; continue }
+      if (inStr) continue
+      if (c === '{') depth++
+      else if (c === '}') {
+        depth--
+        if (depth === 0) {
+          try {
+            const obj = JSON.parse(text.slice(braceStart, k + 1))
+            if (obj && Array.isArray(obj.verdicts)) return obj
+          } catch { /* 找下一个 */ }
+          break
+        }
+      }
+    }
+    searchFrom = keyIdx + 10
+  }
+}
+
+/**
+ * 润色后二次判定：同一人设对润色前后译文做差分对比「改善了吗」。
+ * @param sources 源文数组
+ * @param befores 润色前译文数组
+ * @param afters 润色后译文数组（与 befores 等长，只含 polished=true 的条目）
+ * @param targetLang 目标语言
+ * @param config LLM 配置
+ * @param productLine 产品线（人设微调用）
+ * @param factsBreachIndices 可选输出参数——v12.10: factsIntact=false（事实偏移）的索引
+ *   会被 add 进此 Set（调用方用于区分日志「事实偏移」vs「无改善」）；不传则不收集。
+ * @returns 批内索引 → improved（true=改善放行，false=无改善/退化/事实偏移回退）。
+ *   v12.10: factsIntact=false（语义偏移/事实丢失）时 improved 强制 false——
+ *   事实锚与自然度同权一票否决（プロ向け 类语义偏移的实锤修复）。
+ */
+export async function polishVerifyBatch(
+  sources: string[],
+  befores: string[],
+  afters: string[],
+  targetLang: string,
+  config: LLMConfig,
+  productLine?: string | null,
+  factsBreachIndices?: Set<number>,
+): Promise<Map<number, boolean>> {
+  const verdictMap = new Map<number, boolean>()
+  if (afters.length === 0) return verdictMap
+  const personas = getJudgePersonas(targetLang, productLine)
+  if (personas.length === 0) return verdictMap
+
+  // 只用第一个人设做二次判定（减少 token 消耗+人设方差——差分对比比绝对评分稳定）
+  const persona = personas[0]
+  const system = buildVerifyPrompt(persona.text, targetLang)
+
+  for (let b = 0; b < afters.length; b += POLISH_JUDGE_BATCH) {
+    const batchAfters = afters.slice(b, b + POLISH_JUDGE_BATCH)
+    const user = buildVerifyUser(sources, befores, batchAfters, b)
+    try {
+      const res = await fetchWithRetry(config.proofreadApiUrl || config.apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${config.proofreadApiKey || config.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: config.proofreadModel || config.model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user },
+          ],
+          temperature: 0.1,
+          response_format: { type: 'json_object' },
+        }),
+      })
+      if (!res.ok) continue
+      const resData = res.json as Record<string, unknown> | undefined
+      const choices = resData?.choices as Array<{ message?: { content?: string } }> | undefined
+      const content = choices?.[0]?.message?.content || res.text || ''
+      const parsed = extractVerdictsObject(content)
+      if (!parsed) continue
+      const byI = new Map<number, PolishVerifyApiResult['verdicts'][0]>()
+      for (const v of parsed.verdicts) byI.set(v.i, v)
+      for (let k = 0; k < batchAfters.length; k++) {
+        const v = byI.get(b + k + 1)
+        if (!v) continue
+        // v12.10: factsIntact 缺省 true（旧格式/未输出时向后兼容放行）；
+        //   显式 false → improved 强制 false（事实偏移一票否决）+ 透出索引供日志区分。
+        const factsOk = v.factsIntact !== false
+        if (!factsOk) factsBreachIndices?.add(b + k)
+        verdictMap.set(b + k, v.improved === true && factsOk)
+      }
+    } catch (e) {
+      debugWarn(`[polishVerifyBatch] 二次判定异常（批${b}）: ${(e as Error).message.slice(0, 80)}`)
+    }
+  }
+
+  return verdictMap
+}
+
+// ═══════════════════════════════════════════════════════════════
+// translationPickBatch — best-of-2 翻译择优判定（v12.10）
+// ═══════════════════════════════════════════════════════════════
+// 机制：双跑首调产出两候选，同一人设差分对比二选一。
+//   与 polishVerifyBatch 的关系：verify 是「润色前 vs 润色后」（有保守锚点=润色前），
+//   择优是「候选 A vs 候选 B」（双向都可能被选中——必须 A/B 位置随机交换消位置偏置）。
+// 纪律：缺省取第一路（API 失败/解析失败/verdict 缺席——向后兼容单跑现状，零事故）；
+//   factsIntact=false 的候选直接判负（事实锚与 verify 同标准——语义偏移一票否决）。
+// ═══════════════════════════════════════════════════════════════
+
+interface TranslationPickApiResult {
+  verdicts: Array<{
+    i: number
+    pick?: number         // 1=候选A更优，2=候选B更优（缺省/缺席=1 保守）
+    factsIntact?: boolean // 所选候选的事实锚（false=该候选语义偏移/事实丢失→判负选另一路）
+    reason?: string
+  }>
+}
+
+function buildPickPrompt(personaText: string, targetLang: string): string {
+  return `${personaText}
+
+You will be given a source text (English) and TWO candidate ${targetLang} translations (A and B) for each item.
+Pick the better translation AS YOUR PERSONA.
+
+Output ONLY a valid JSON object:
+{"verdicts":[{"i":<1-based index>,"pick":<1|2>,"factsIntact":<true|false>,"reason":"<brief reason in ${targetLang}>"}]}
+- Include ALL items — "i" must match the input [N] indices exactly
+- pick=1 if candidate A is better, pick=2 if candidate B is better (judge by: naturalness, collocations, structure, register)
+- factsIntact=false if YOUR PICKED candidate drops or alters ANY fact, number, qualifier, or semantic direction from the Source — including who the product is FOR (audience direction). If your picked candidate has a factual/semantic problem the other candidate does not have, change your pick to the other one and set factsIntact=true.
+- If both are equally good, pick=1 (conservative default)
+- Raw JSON only, no markdown code blocks`
+}
+
+function buildPickUser(
+  sources: string[],
+  candidatesA: string[],
+  candidatesB: string[],
+  pickIndices: number[],
+  swap: boolean[],
+  startIdx: number,
+): string {
+  const stripTm = (t: string) => t.replace(/[™®©]/g, '').replace(/\n/g, ' ↵ ')
+  return pickIndices.map((srcIdx, k) => {
+    const n = startIdx + k + 1
+    // v12.10: A/B 位置随机交换（消位置偏置——judge 可能系统性偏好固定位；
+    //   polishVerify 的 Before 恒前无害=判不出改善即回退是保守方向，择优双向都可能被选中偏置必须消）
+    const a = swap[k] ? candidatesB[srcIdx] : candidatesA[srcIdx]
+    const b = swap[k] ? candidatesA[srcIdx] : candidatesB[srcIdx]
+    return `[${n}] Source: ${stripTm(sources[srcIdx])}\nCandidate A: ${stripTm(a)}\nCandidate B: ${stripTm(b)}`
+  }).join('\n\n')
+}
+
+/** 平衡括号提取 {"verdicts":[...]}（extractVerdictsObject 同款——独立一份防改判定时误伤择优） */
+function extractPickObject(text: string): TranslationPickApiResult | null {
+  let searchFrom = 0
+  while (true) {
+    const keyIdx = text.indexOf('"verdicts"', searchFrom)
+    if (keyIdx < 0) return null
+    let braceStart = -1
+    for (let k = keyIdx - 1; k >= 0; k--) {
+      if (text[k] === '{') { braceStart = k; break }
+      if (text[k] === '}') break
+    }
+    if (braceStart < 0) { searchFrom = keyIdx + 10; continue }
+    let depth = 0
+    let inStr = false
+    let esc = false
+    for (let k = braceStart; k < text.length; k++) {
+      const c = text[k]
+      if (esc) { esc = false; continue }
+      if (c === '\\' && inStr) { esc = true; continue }
+      if (c === '"') { inStr = !inStr; continue }
+      if (inStr) continue
+      if (c === '{') depth++
+      else if (c === '}') {
+        depth--
+        if (depth === 0) {
+          try {
+            const obj = JSON.parse(text.slice(braceStart, k + 1))
+            if (obj && Array.isArray(obj.verdicts)) return obj
+          } catch { /* 找下一个 */ }
+          break
+        }
+      }
+    }
+    searchFrom = keyIdx + 10
+  }
+}
+
+/**
+ * best-of-2 翻译择优：同一人设对两候选差分对比二选一。
+ * @param sources 源文数组（完整批）
+ * @param candidatesA 第一路译文数组（完整批）
+ * @param candidatesB 第二路译文数组（完整批）
+ * @param pickIndices 需要择优的条目索引（两路不同的条目）
+ * @param targetLang 目标语言
+ * @param config LLM 配置
+ * @param productLine 产品线（人设微调用）
+ * @returns 批内索引 → 1|2（1=选第一路【缺省保守】，2=选第二路）
+ */
+export async function translationPickBatch(
+  sources: string[],
+  candidatesA: string[],
+  candidatesB: string[],
+  pickIndices: number[],
+  targetLang: string,
+  config: LLMConfig,
+  productLine?: string | null,
+): Promise<Map<number, number>> {
+  const pickMap = new Map<number, number>()
+  if (pickIndices.length === 0) return pickMap
+
+  const personas = getJudgePersonas(targetLang, productLine)
+  if (personas.length === 0) return pickMap
+
+  // 只用第一个人设（v12.8 差分对比单人设纪律——token 减半+方差更可控）
+  const persona = personas[0]
+  const system = buildPickPrompt(persona.text, targetLang)
+
+  const PICK_BATCH = 8  // 择优批大小（比判定的 4 大——差分对比 prompt 更短，省调用次数）
+  for (let b = 0; b < pickIndices.length; b += PICK_BATCH) {
+    const batchIndices = pickIndices.slice(b, b + PICK_BATCH)
+    // 每条独立决定 swap（随机 50%——消位置偏置的粒度是条目级不是批次级）
+    const swap = batchIndices.map(() => Math.random() < 0.5)
+    const user = buildPickUser(sources, candidatesA, candidatesB, batchIndices, swap, 0)
+    try {
+      const res = await fetchWithRetry(config.proofreadApiUrl || config.apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${config.proofreadApiKey || config.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: config.proofreadModel || config.model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user },
+          ],
+          temperature: 0.1,
+          response_format: { type: 'json_object' },
+        }),
+      })
+      if (!res.ok) continue
+      const resData = res.json as Record<string, unknown> | undefined
+      const choices = resData?.choices as Array<{ message?: { content?: string } }> | undefined
+      const content = choices?.[0]?.message?.content || res.text || ''
+      const parsed = extractPickObject(content)
+      if (!parsed) continue
+      const byI = new Map<number, TranslationPickApiResult['verdicts'][0]>()
+      for (const v of parsed.verdicts) byI.set(v.i, v)
+      for (let k = 0; k < batchIndices.length; k++) {
+        const v = byI.get(k + 1)  // 批内 1-based 索引（buildPickUser startIdx=0 对齐）
+        if (!v) continue  // verdict 缺席 → 缺省第一路（不写 map）
+        // factsIntact=false → 所选候选事实偏移 → 强制选另一路
+        // （prompt 已指引 LLM 改选，本行是代码兜底——LLM 没照做时兜住）
+        let pick = v.pick === 2 ? 2 : 1
+        if (v.factsIntact === false) pick = pick === 2 ? 1 : 2
+        // swap 映射回原始 A/B（swap=true 时 LLM 看到的 A=原始 B）
+        const originalPick = swap[k] ? (pick === 2 ? 1 : 2) : pick
+        pickMap.set(batchIndices[k], originalPick)
+      }
+    } catch (e) {
+      debugWarn(`[translationPickBatch] 择优判定异常（批${b}）: ${(e as Error).message.slice(0, 80)}`)
+    }
+  }
+
+  return pickMap
+}
+
+// ═══════════════════════════════════════════════════════════════
 // polishBatch — 润色 LLM 改写（动作白名单 + issues 结构化传递）
 // ═══════════════════════════════════════════════════════════════
 
@@ -2042,6 +2445,7 @@ export interface PolishResult {
   text: string           // 润色后译文（硬锁失败时=润色前原文）
   polished: boolean      // 是否实际润色（false=硬锁回退）
   reason?: string        // 回退原因
+  segReasons?: string[]  // v12.12: 按段润色时各段回退原因（部分段生效部分回退的混合态透出）
 }
 
 interface PolishApiResult {
@@ -2055,16 +2459,23 @@ interface PolishApiResult {
 function buildPolishSystemPrompt(targetLang: string): string {
   return `You are a native ${targetLang} copywriter polishing translations for a Lexar product listing.
 
-RULES — you may ONLY do these three things (whitelist):
+RULES — you may ONLY do these things (whitelist):
 1. Replace a calqued collocation with the natural ${targetLang} expression (guided by the issues list)
 2. Restructure word order within a sentence
 3. Split a long sentence at a clause boundary
+4. Unify sentence-final style within a segment (e.g. です・ます調 vs 常体 mixing → consistent register)
+5. Normalize full-width/half-width characters to the standard form for ${targetLang} (e.g. half-width katakana → full-width, full-width alphanumeric → half-width where appropriate)
+6. Adjust honorific/politeness level to match the scene (marketing copy vs technical doc) — only when the issues list explicitly flags register mismatch
 
 FORBIDDEN (hard constraints — violation = rejection):
 - Do NOT add, remove, or change any facts (numbers, specs, capacities, speeds, model names, brand terms)
 - Do NOT merge information points across sentences
 - Do NOT change hedges or qualifiers (up to/maximum/approximately must stay)
 - Do NOT change anything not listed in the issues — if it's not in the issues list, leave it alone
+- v12.12: Each input item is a SINGLE segment (one sentence or one bullet) — line breaks are managed
+  by code outside your view. Output the polished segment as ONE continuous line of text, no line breaks.
+- Rules 4-6 are ONLY allowed when the issues list explicitly flags the corresponding problem type
+  (register/style/width). If the issues list only flags calque/structure, do NOT touch style/width/honorifics.
 
 Output ONLY a valid JSON object:
 {"polished":[{"i":<1-based index>,"text":"<polished translation>","changes":[{"issueIndex":<which issue this change addresses>,"before":"<original phrase>","after":"<polished phrase>"}]}]}
@@ -2073,22 +2484,8 @@ Output ONLY a valid JSON object:
 - Raw JSON only, no markdown code blocks`
 }
 
-function buildPolishUser(
-  sources: string[],
-  translations: string[],
-  issuesMap: Map<number, PolishIssue[]>,
-  batchIndices: number[],
-): string {
-  // v12.4: 润色前剥离™®©——润色 LLM 只看表达不看格式，™是格式噪音；
-  // 防止润色 LLM 模仿译文中的™分布输出散弹。硬锁校验/写回前由调用方恢复™。
-  const stripTm = (t: string) => t.replace(/[™®©]/g, '').replace(/\n/g, ' ↵ ')
-  return batchIndices.map((idx, k) => {
-    const n = k + 1
-    const issues = issuesMap.get(idx) || []
-    const issueList = issues.map((it, ii) => `  Issue ${ii}: [${it.type}] "${it.span}" → Suggestion: ${it.suggestion}`).join('\n')
-    return `[${n}] Source: ${stripTm(sources[idx])}\nTranslation: ${stripTm(translations[idx])}\nIssues to fix (ONLY fix these):\n${issueList}`
-  }).join('\n\n')
-}
+// v12.12: buildPolishUser 已随按段化退役（段级 user prompt 在 polishBatch 内联构建——
+//   段粒度与条目粒度的索引体系不同，抽出复用价值为零）
 
 /**
  * 润色 LLM 改写：命中条目按人设反馈的 issues 改写。
@@ -2108,67 +2505,163 @@ export async function polishBatch(
 ): Promise<PolishResult[]> {
   if (batchIndices.length === 0) return []
 
-  const system = buildPolishSystemPrompt(targetLang)
-  const user = buildPolishUser(sources, translations, issuesMap, batchIndices)
-
-  let parsed: PolishApiResult | null = null
-  try {
-    const res = await fetchWithRetry(config.proofreadApiUrl || config.apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.proofreadApiKey || config.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: config.proofreadModel || config.model,
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: user },
-        ],
-        temperature: 0.2,
-        response_format: { type: 'json_object' },
-      }),
-    })
-    if (res.ok) {
-      const resData = res.json as Record<string, unknown> | undefined
-      const choices = resData?.choices as Array<{ message?: { content?: string } }> | undefined
-      const content = choices?.[0]?.message?.content || res.text || ''
-      parsed = extractPolishedObject(content)
+  // v12.12 按段润色（判定方式五条之⑤——润色断行由代码保管，用户拍板 2026-09-03）：
+  //   语义断行处切段（splitSemanticSegments——句中断行已拍平），段一一对应独立润色，
+  //   LLM 物理上碰不到 ↵（结构锁从「校验」升级为「构造保证」——本次灰度 8 次 ↵ 回退
+  //   全是润色合并 bullet 干的，翻译零次：信任只给翻译/校对，润色断行代码保管）。
+  //   段级剥™ → 润色 → restore™ → 段级硬锁 → 按原位拼回（语义断行 100% 保留）。
+  // ① 段规划（LLM 调用前全部代码完成）
+  interface SegJob {
+    idx: number          // 条目批内索引
+    segIdx: number       // 段序号
+    srcSeg: string       // 源文段（原文带™——restore 锚点用）
+    transSeg: string     // 译文段（润色前——prePolish 基线用）
+    issues: PolishIssue[]
+  }
+  const segJobs: SegJob[] = []
+  // 每条目最终段映射：idx → { srcSegs, transSegs（null=该段不润保留原文）, transSegsRaw（拼回用原译文段） }
+  const planMap = new Map<number, { srcSegs: string[]; transSegs: (string | null)[]; transSegsRaw: string[] }>()
+  for (const idx of batchIndices) {
+    const srcSegs = splitSemanticSegments(sources[idx])
+    const transSegsRaw = splitSemanticSegments(translations[idx], 'lenient')  // v12.12: 译文侧放宽（tr 无标点标题形态——段切多无妨，段切少丢对位）
+    const issues = issuesMap.get(idx) || []
+    if (srcSegs.length !== transSegsRaw.length) {
+      // 段数不等（翻译合并/拆分了句子）→ 整格不润（保守，结构对齐问题让校对管）
+      planMap.set(idx, { srcSegs, transSegs: [], transSegsRaw: [] })
+      continue
     }
-  } catch (e) {
-    debugWarn(`[polishBatch] 润色异常: ${(e as Error).message.slice(0, 80)}`)
+    const transSegs: (string | null)[] = [...transSegsRaw]
+    for (let s = 0; s < srcSegs.length; s++) {
+      const segWordCount = srcSegs[s].split(/\s+/).filter(Boolean).length
+      if (segWordCount <= 3) { transSegs[s] = null; continue }  // 极短段（标题）不润——v12.7 规则
+      // issue 归属：span 文本落在哪个段就挂哪个段（大小写不敏感——judge 输出的 span 可能与源文
+      //   大小写形态有出入，如 span 'performance' vs 源文段 'Performance'；v12.12 实锤）；多段命中
+      //   挂多个（各段独立修）；一个段都匹配不上（span 是 LLM 改写过的措辞）挂第一个可润段（保守）
+      const segIssues = issues.filter(it => it.span && srcSegs[s].toLowerCase().includes(it.span.toLowerCase()))
+      const job: SegJob = { idx, segIdx: s, srcSeg: srcSegs[s], transSeg: transSegsRaw[s], issues: segIssues }
+      segJobs.push(job)
+    }
+    // 归属兜底：所有段都没匹配到的 issue 挂第一个可润段
+    const unmatched = issues.filter(it => it.span && !segJobs.some(j => j.idx === idx && j.issues.includes(it)))
+    if (unmatched.length > 0) {
+      const firstJob = segJobs.find(j => j.idx === idx)
+      if (firstJob) firstJob.issues.push(...unmatched)
+    }
+    planMap.set(idx, { srcSegs, transSegs, transSegsRaw })
   }
 
-  return batchIndices.map((idx, k) => {
-    const n = k + 1
-    const original = translations[idx]
-    if (!parsed) {
-      return { index: idx, text: original, polished: false, reason: '润色 LLM 调用/解析失败' }
+  // ② 段级润色（段当条，复用 POLISH_JUDGE_BATCH 批次粒度）
+  const POLISH_BATCH = POLISH_JUDGE_BATCH
+  const system = buildPolishSystemPrompt(targetLang)
+  const jobResults = new Map<number, { text: string; polished: boolean; reason?: string }>()  // segJobs 下标 → 结果
+  for (let b = 0; b < segJobs.length; b += POLISH_BATCH) {
+    const jobBatch = segJobs.slice(b, b + POLISH_BATCH)
+    const user = jobBatch.map((job, k) => {
+      const n = k + 1
+      const issueList = job.issues.length > 0
+        ? job.issues.map((it, ii) => `  Issue ${ii}: [${it.type}] "${it.span}" → Suggestion: ${it.suggestion}`).join('\n')
+        : '  (no specific issues — general native fluency improvement within whitelist rules)'
+      return `[${n}] Source: ${stripTmSymbols(job.srcSeg)}\nTranslation: ${stripTmSymbols(job.transSeg)}\nIssues to fix (ONLY fix these):\n${issueList}`
+    }).join('\n\n')
+    let parsed: PolishApiResult | null = null
+    try {
+      const res = await fetchWithRetry(config.proofreadApiUrl || config.apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${config.proofreadApiKey || config.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: config.proofreadModel || config.model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user },
+          ],
+          temperature: 0.2,
+          response_format: { type: 'json_object' },
+        }),
+      })
+      if (res.ok) {
+        const resData = res.json as Record<string, unknown> | undefined
+        const choices = resData?.choices as Array<{ message?: { content?: string } }> | undefined
+        const content = choices?.[0]?.message?.content || res.text || ''
+        parsed = extractPolishedObject(content)
+      }
+    } catch (e) {
+      debugWarn(`[polishBatch] 段润色异常: ${(e as Error).message.slice(0, 80)}`)
     }
     const byI = new Map<number, PolishApiResult['polished'][0]>()
-    for (const p of parsed.polished) byI.set(p.i, p)
-    const p = byI.get(n)
-    if (!p || !p.text) {
-      return { index: idx, text: original, polished: false, reason: '润色输出缺该条目' }
+    if (parsed) for (const p of parsed.polished) byI.set(p.i, p)
+    for (let k = 0; k < jobBatch.length; k++) {
+      const job = jobBatch[k]
+      const jobKey = b + k
+      const p = byI.get(k + 1)
+      if (!parsed) {
+        jobResults.set(jobKey, { text: job.transSeg, polished: false, reason: '润色 LLM 调用/解析失败' })
+        continue
+      }
+      if (!p || !p.text) {
+        jobResults.set(jobKey, { text: job.transSeg, polished: false, reason: '润色输出缺该段' })
+        continue
+      }
+      // changes 数量校验（无 issue 的段（unmatched 兜底前）允许 ≤1 个 general 改动；
+      //   有 issue 的段 changes ≤ issues——防顺手改别的）
+      const maxChanges = Math.max(job.issues.length, 1)
+      const changes = p.changes || []
+      if (changes.length > maxChanges) {
+        jobResults.set(jobKey, { text: job.transSeg, polished: false, reason: `changes 数量超限（${changes.length} > ${maxChanges}）` })
+        continue
+      }
+      // ③ restore™（源文段锚点——剥离态进 LLM，™ 由代码加回：判定方式五条之②能还原就还原）
+      const restored = restoreTrademarkSymbols([job.srcSeg], [p.text])[0]
+      if (hasTrademarkSpam(restored)) {
+        jobResults.set(jobKey, { text: job.transSeg, polished: false, reason: '™恢复后仍含散弹（hasTrademarkSpam）' })
+        continue
+      }
+      // ④ 段级硬锁（validatePolishOutput 在 restore 后产物上跑——™完整性必然通过，保留兜底；
+      //   第 5 参 prePolish=润色前段译文——第⑧层违禁词对比基线）
+      const validation = validatePolishOutput(job.srcSeg, restored, targetLang, glossaryMap, job.transSeg)
+      if (!validation.ok) {
+        jobResults.set(jobKey, { text: job.transSeg, polished: false, reason: validation.reason })
+        continue
+      }
+      jobResults.set(jobKey, { text: restored, polished: true })
     }
-    // changes 数量校验（防顺手改别的）
-    const issueCount = (issuesMap.get(idx) || []).length
-    const changes = p.changes || []
-    if (changes.length > issueCount) {
-      return { index: idx, text: original, polished: false, reason: `changes 数量超限（${changes.length} > ${issueCount}）` }
+  }
+
+  // ⑤ 拼回（段按原位 ↵ 拼接——语义断行 100% 保留；段内句中断行已拍平不还原）
+  let jobCursor = 0
+  return batchIndices.map(idx => {
+    const original = translations[idx]
+    const plan = planMap.get(idx)!
+    if (plan.transSegs.length === 0) {
+      return { index: idx, text: original, polished: false, reason: '段数不等（源文/译文语义段对不上）→ 整格不润' }
     }
-    // 硬锁校验（validatePolishOutput 用剥离™后的文本跑，校验逻辑本身不做™比较）
-    const validation = validatePolishOutput(sources[idx], p.text, targetLang, glossaryMap)
-    if (!validation.ok) {
-      return { index: idx, text: original, polished: false, reason: validation.reason }
+    const finalSegs: string[] = []
+    let anyPolished = false
+    const segReasons: string[] = []
+    for (let s = 0; s < plan.srcSegs.length; s++) {
+      if (plan.transSegs[s] === null) {
+        // 极短段（标题）不润——保留译文原段
+        finalSegs.push(plan.transSegsRaw[s])
+        continue
+      }
+      const jr = jobResults.get(jobCursor)
+      jobCursor++
+      if (!jr) {
+        finalSegs.push(plan.transSegs[s]!)
+        continue
+      }
+      if (jr.polished) anyPolished = true
+      else if (jr.reason) segReasons.push(`段${s + 1}:${jr.reason}`)
+      finalSegs.push(jr.text)
     }
-    // v12.4: 润色输出剥离™后硬锁通过 → 恢复™再写回（源文有™的位置按 restore 定位加回）
-    const restored = restoreTrademarkSymbols([sources[idx]], [p.text])[0]
-    // 恢复后仍含散弹（理论不该发生——LLM 输出无™时 restore 定位不到散弹位置；防御层）→ 回退
-    if (hasTrademarkSpam(restored)) {
-      return { index: idx, text: original, polished: false, reason: '™恢复后仍含散弹（hasTrademarkSpam）' }
+    if (!anyPolished) {
+      return { index: idx, text: original, polished: false, reason: segReasons[0] || '全部段未润色' }
     }
-    return { index: idx, text: restored, polished: true }
+    // 拼回段（↵ 语义断行——画布写回处与翻译管道 S5 汇合后统一 ↵→\n，此处保持占位符形态）
+    const joined = finalSegs.join(' ↵ ')
+    return { index: idx, text: joined, polished: true, segReasons: segReasons.length > 0 ? segReasons : undefined }
   })
 }
 

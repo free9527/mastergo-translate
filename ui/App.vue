@@ -114,7 +114,7 @@
           <span class="pending-text">
             {{ pendingItems.filter(p => p.type === 'error').length }} 条错误，
             {{ pendingItems.filter(p => p.type === 'placeholder').length }} 条占位符，
-            {{ pendingItems.filter(p => p.type === 'untranslated').length }} 条漏翻待确认<template v-if="pendingItems.some(p => p.type === 'misspelled')">，{{ pendingItems.filter(p => p.type === 'misspelled').length }} 条疑似拼写错误</template><template v-if="pendingItems.some(p => p.type === 'llmFallback')">，{{ pendingItems.filter(p => p.type === 'llmFallback').length }} 条新品名待确认</template><template v-if="pendingItems.some(p => p.type === 'prohibitedSrc')">，{{ pendingItems.filter(p => p.type === 'prohibitedSrc').length }} 条源文含平台违禁词</template><template v-if="pendingItems.some(p => p.type === 'prohibitedTrans')">，{{ pendingItems.filter(p => p.type === 'prohibitedTrans').length }} 条译文含平台违禁词</template><template v-if="pendingItems.some(p => p.type === 'prohibitedLocked')">，{{ pendingItems.filter(p => p.type === 'prohibitedLocked').length }} 条术语库官方值含违禁词（仅提示）</template>
+            {{ pendingItems.filter(p => p.type === 'untranslated').length }} 条漏翻待确认<template v-if="pendingItems.some(p => p.type === 'misspelled')">，{{ pendingItems.filter(p => p.type === 'misspelled').length }} 条疑似拼写错误</template><template v-if="pendingItems.some(p => p.type === 'llmFallback')">，{{ pendingItems.filter(p => p.type === 'llmFallback').length }} 条新品名待确认</template><template v-if="pendingItems.some(p => p.type === 'prohibitedSrc')">，{{ pendingItems.filter(p => p.type === 'prohibitedSrc').length }} 条源文违禁词</template><template v-if="pendingItems.some(p => p.type === 'prohibitedTrans')">，{{ pendingItems.filter(p => p.type === 'prohibitedTrans').length }} 条译文违禁词</template><template v-if="pendingItems.some(p => p.type === 'prohibitedSrc' || p.type === 'prohibitedTrans')">（上传京东/亚马逊会被拦截）</template>
           </span>
           <svg class="chevron" :class="{ open: showPendingList }" width="12" height="12" viewBox="0 0 12 12"><path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
         </div>
@@ -129,7 +129,7 @@
         <div class="pending-list" v-if="showPendingList">
           <div class="pending-item" v-for="p in pendingItems" :key="p.item.nodeIds[0]" :class="p.type">
             <div class="pending-item-source" :title="p.item.sourceText">
-              <span v-if="p.type === 'misspelled'" class="misspelled-tag">疑似拼写错误，请核对源稿：</span><span v-else-if="p.type === 'llmFallback'" class="llm-fallback-tag">新品名待确认（LLM 辅助识别）：</span><span v-else-if="p.type === 'prohibitedSrc'" class="prohibited-tag">源文含平台违禁词（{{ (prohibitedSrcIds.get(p.item.nodeIds[0]) || []).join('、') }}），上传京东/亚马逊会被拦截：</span><span v-else-if="p.type === 'prohibitedTrans'" class="prohibited-tag">译文含平台违禁词（{{ (prohibitedTransIds.get(p.item.nodeIds[0]) || []).join('、') }}）{{ llmConfig.enableProofread ? '，校对尝试改写但回检仍命中' : '，开启 AI 校对可自动规避' }}：</span><span v-else-if="p.type === 'prohibitedLocked'" class="prohibited-tag">译文为术语库官方值，含平台违禁词（{{ (prohibitedLockedIds.get(p.item.nodeIds[0]) || []).join('、') }}），已保留术语库值未自动改写：</span>{{ p.item.sourceText.slice(0, 40) }}{{ p.item.sourceText.length > 40 ? '...' : '' }}
+              <span v-if="p.type === 'misspelled'" class="misspelled-tag">疑似拼写错误，请核对源稿：</span><span v-else-if="p.type === 'llmFallback'" class="llm-fallback-tag">新品名待确认（LLM 辅助识别）：</span><span v-else-if="p.type === 'prohibitedSrc'" class="prohibited-tag">源文违禁词（{{ (prohibitedSrcIds.get(p.item.nodeIds[0]) || []).join('、') }}）：</span><span v-else-if="p.type === 'prohibitedTrans'" class="prohibited-tag">译文违禁词（{{ (prohibitedTransIds.get(p.item.nodeIds[0]) || []).join('、') }}）{{ llmConfig.enableProofread ? '，校对改写后仍命中' : '，开校对可规避' }}：</span>{{ p.item.sourceText.slice(0, 40) }}{{ p.item.sourceText.length > 40 ? '...' : '' }}
             </div>
             <div class="pending-item-trans" :title="p.item.translatedText">{{ p.item.translatedText.slice(0, 40) }}{{ p.item.translatedText.length > 40 ? '...' : '' }}</div>
             <div class="pending-item-actions">
@@ -146,8 +146,8 @@
               <button v-if="p.type === 'llmFallback'" class="btn btn-xs btn-tinted" @click="applyWithoutGlossary(p.item)">应用但不入库</button>
               <!-- prohibitedTrans：首选校对规避（开校对时自动改写），未开校对禁用并提示 -->
               <button v-if="p.type === 'prohibitedTrans'" class="btn btn-xs btn-primary"
-                :disabled="!llmConfig.enableProofread || proofreading || translating"
-                :title="llmConfig.enableProofread ? '运行 AI 校对自动规避违禁词' : '先在配置中开启 AI 校对'"
+                :disabled="!effProofread || proofreading || translating"
+                :title="effProofread ? '运行 AI 校对自动规避违禁词' : '先在配置中开启 AI 优化'"
                 @click="startProofread()">去校对规避</button>
               <button class="btn btn-xs btn-tinted" @click="editPendingItem(p.item)">编辑</button>
               <!-- 知道了：纯提醒类 + 阻塞类的消音出口（misspelled/llmFallback 须显式处置，无此钮） -->
@@ -463,24 +463,17 @@
               <label class="field-label">模型</label>
               <input class="field" v-model="llmConfig.model" placeholder="gpt-4o" />
             </div>
+            <!-- v12.10.5: AI 优化总开关（校对+润色+择优三机制统一开关）——
+                 开=三机制后台自动跑（用户零感知）；关=三机制全停（省 token/草稿预览） -->
             <div class="field-group">
-              <label class="toggle-label" @click="llmConfig.enableProofread = !llmConfig.enableProofread">
-                <span class="toggle" :class="{ on: llmConfig.enableProofread }">
+              <label class="toggle-label" @click="llmConfig.enableAiOptimize = !llmConfig.enableAiOptimize">
+                <span class="toggle" :class="{ on: llmConfig.enableAiOptimize }">
                   <span class="toggle-knob"></span>
                 </span>
-                AI 校对（二次审查 + 平台违禁词规避，建议开启）
+                AI 优化（校对查错 + 润色去机翻感 + 择优取更优，关闭可省 token）
               </label>
             </div>
-            <!-- v12.3: 人设润色开关（去机翻感）——按 judge 基线结果，低分语种默认开，其余默认关；v12.3.2 默认值跟随目标语言自动取，手动切换后锁定 -->
-            <div class="field-group">
-              <label class="toggle-label" @click="togglePolish">
-                <span class="toggle" :class="{ on: llmConfig.enablePolish }">
-                  <span class="toggle-knob"></span>
-                </span>
-                AI 润色（去机翻感，de/es/ru/tr/ja 默认开，其余语种默认关）
-              </label>
-            </div>
-            <template v-if="llmConfig.enableProofread">
+            <template v-if="llmConfig.enableAiOptimize">
               <div class="proof-section-label">校对模型配置</div>
               <div class="field-group">
                 <label class="field-label">校对 API Key（空则复用翻译）</label>
@@ -505,7 +498,7 @@
               <button class="btn btn-gray flex-1" @click="testTranslationConnection" :disabled="testingTrans">
                 {{ testingTrans ? '测试中...' : '测试翻译' }}
               </button>
-              <button v-if="llmConfig.enableProofread" class="btn btn-gray flex-1" @click="testProofConnection" :disabled="testingProof">
+              <button v-if="effProofread" class="btn btn-gray flex-1" @click="testProofConnection" :disabled="testingProof">
                 {{ testingProof ? '测试中...' : '测试校对' }}
               </button>
             </div>
@@ -598,8 +591,8 @@ import { sendMsgToPlugin } from '@messages/ui-sender'
 import { parseGlossaryCSVText, serializeGlossaryCSV } from '@lib/parse-csv'
 import { validateAutoGlossarySource, sanitizeAutoGlossaryValue, isIdentityAutoAddAllowed, shouldSkipGlossaryEntry, hasMalformedTrademark } from '@lib/glossary-guard'
 import { formatCJKSpace } from '@lib/format-text'
-import { postProcessTranslation, restoreTrademarkSymbols, restoreStorageUnitFormatting, enforceGlossaryTerms, detectTranslationExpansion, sanitizeLineBreaks, cleanKey, stripSpuriousAsterisks } from '@lib/post-process'
-import { translateBatch, proofreadBatch, fetchWithRetry, isProofreadScriptMismatch, detectTruncatedTexts, STYLE_PRESETS, SCENE_PRESETS, detectProductLine, buildTaskGlossaryHint, isUntranslatable, isSuspectMisspelledWord, classifyNecessity, getTargetScript, hasFunctionWords, hasSimplifiedOnlyChars, hasTraditionalOnlyChars, personaJudgeBatch, polishBatch } from '@lib/llm-api'
+import { postProcessTranslation, restoreTrademarkSymbols, restoreStorageUnitFormatting, enforceGlossaryTerms, detectTranslationExpansion, sanitizeLineBreaks, cleanKey, stripSpuriousAsterisks, prePolishFormatCleanup } from '@lib/post-process'
+import { translateBatch, proofreadBatch, fetchWithRetry, isProofreadScriptMismatch, detectTruncatedTexts, STYLE_PRESETS, SCENE_PRESETS, detectProductLine, buildTaskGlossaryHint, isUntranslatable, isSuspectMisspelledWord, classifyNecessity, getTargetScript, hasFunctionWords, hasSimplifiedOnlyChars, hasTraditionalOnlyChars, personaJudgeBatch, polishBatch, polishVerifyBatch } from '@lib/llm-api'
 import { startMetricsCollection, recordBatchMetrics, recordProofreadMetrics, finalizeMetrics, formatMetricsReport, createBatchTimer } from '@lib/metrics'
 import { DEFAULT_GLOSSARY_PRODUCTS_CSV } from '@lib/default-glossary'
 import { BUILTIN_THIRD_PARTY_ENTRIES } from '@lib/third-party-models'
@@ -612,7 +605,9 @@ import { generateProductNameTranslations, zhCNtoZhTW } from '@lib/product-name-g
 import { parseProductNameWithLLM } from '@lib/llm-api'
 import { uiLog, getUiLogs, getUiLogVersion, clearUiLogs, formatUiLogs, receiveMainLog, restoreUiLogs, serializeUiLogs, UiLogEntry } from '@lib/ui-debug-log'
 import { detectProhibited, detectSourceLangForProhibited, isGlossaryLockedTranslation } from '@lib/prohibited-check'
-import { isPolishEligible } from '@lib/polish-guard'
+import { PROHIBITED_WORDS_VERSION } from '@lib/prohibited-words'
+import { retrieveTM } from '@lib/translation-memory'
+import { polishExemptReason } from '@lib/polish-guard'
 
 // ============================================================
 // 响应式状态
@@ -691,7 +686,7 @@ function hasPlaceholderResidue(text: string): boolean {
 
 /** v8.9: 待确认条目 — 三类阻塞问题 + v11.3 LLM 兜底新品名（v12.3.1 起术语库差异提示已下线） */
 const pendingItems = computed(() => {
-  const errors: Array<{ item: typeof items.value[0]; type: 'error' | 'placeholder' | 'untranslated' | 'misspelled' | 'llmFallback' | 'prohibitedSrc' | 'prohibitedTrans' | 'prohibitedLocked' }> = []
+  const errors: Array<{ item: typeof items.value[0]; type: 'error' | 'placeholder' | 'untranslated' | 'misspelled' | 'llmFallback' | 'prohibitedSrc' | 'prohibitedTrans' }> = []
   for (const item of items.value) {
     if (appliedNodeIds.value.has(item.nodeIds[0])) continue // 已应用的不参与
     // v11.3: LLM 兜底检出的新品名（整条原文在 llmFallbackTerms 中）
@@ -714,22 +709,23 @@ const pendingItems = computed(() => {
   // v11.12: 违禁词提示独立于阻塞问题链，可与任何类型叠加
   // （平台合规风险与翻译质量问题正交：一条译文既可能漏翻又可能含违禁词）
   // v11.12+: 术语库锁定项优先于普通译文违禁词（两 Map 互斥，else-if 仅兜底防御）
+  // v12.9: prohibitedLocked 退出待确认面板——术语库值经过检验不用怀疑（用户拍板③），
+  //   锁定徽章保留在结果卡片上（上架前可见提醒），但不再进面板要求操作。
   for (const item of items.value) {
     if (appliedNodeIds.value.has(item.nodeIds[0])) continue
-    if (prohibitedLockedIds.value.has(item.nodeIds[0])) errors.push({ item, type: 'prohibitedLocked' })
-    else if (prohibitedTransIds.value.has(item.nodeIds[0])) errors.push({ item, type: 'prohibitedTrans' })
+    if (prohibitedTransIds.value.has(item.nodeIds[0])) errors.push({ item, type: 'prohibitedTrans' })
     else if (prohibitedSrcIds.value.has(item.nodeIds[0])) errors.push({ item, type: 'prohibitedSrc' })
   }
   return errors
 })
 
-/** v8.9: 是否有阻塞批量应用的问题（v11.12: 违禁词三类非阻塞不计入） */
+/** v8.9: 是否有阻塞批量应用的问题（v11.12: 违禁词三类非阻塞不计入；v12.9: prohibitedLocked 已出 panel） */
 const hasPendingBlockingIssue = computed(() =>
-  pendingItems.value.some(p => p.type !== 'prohibitedSrc' && p.type !== 'prohibitedTrans' && p.type !== 'prohibitedLocked')
+  pendingItems.value.some(p => p.type !== 'prohibitedSrc' && p.type !== 'prohibitedTrans')
 )
 /** v11.12: 违禁词等非阻塞提示单独显隐（无阻塞问题时 banner 不出现，提示也要有入口） */
 const hasPendingNonBlockingIssue = computed(() =>
-  pendingItems.value.some(p => p.type === 'prohibitedSrc' || p.type === 'prohibitedTrans' || p.type === 'prohibitedLocked')
+  pendingItems.value.some(p => p.type === 'prohibitedSrc' || p.type === 'prohibitedTrans')
 )
 
 /**
@@ -739,9 +735,17 @@ const hasPendingNonBlockingIssue = computed(() =>
  * 若是产品名 → 直接按术语库译法（v9.9 合规锁已有）；若不是产品名 → 用户手动处理。
  */
 const translationCache = ref<Record<string, string>>({})
-/** v12.3: 润色灰度白名单（judge 基线低分语种 + v12.6 ja 母语调研直訳感实锤）——默认值与管道启用共用单一事实源 */
-const POLISH_GRAY_LANGS = ['de', 'es', 'ru', 'tr', 'ja']
-const llmConfig = ref<LLMConfig>({ apiKey: '', apiUrl: '', model: '', translationStyle: 'standard', translationStyleCustom: '', scenePreset: 'ecommerce', enableProofread: true, proofreadApiKey: '', proofreadApiUrl: '', proofreadModel: '', enablePolish: false })
+/** v12.3: 润色灰度白名单（judge 基线低分语种 + v12.6 ja 母语调研直訳感实锤 + v12.7 zh-TW 基线最高扩展）——默认值与管道启用共用单一事实源 */
+// v12.10.4: POLISH_GRAY_LANGS 灰度白名单废弃——静默执行默认全开，润色/择优 20 语种全生效
+const llmConfig = ref<LLMConfig>({ apiKey: '', apiUrl: '', model: '', translationStyle: 'standard', translationStyleCustom: '', scenePreset: 'ecommerce', enableProofread: true, proofreadApiKey: '', proofreadApiUrl: '', proofreadModel: '', enablePolish: true, enableBestOfN: true, enableAiOptimize: true })
+
+/** v12.10.5: AI 优化总开关 effective 值——enableAiOptimize 是 UI 唯一暴露的开关，
+ *  关时三机制全停（省 token/草稿预览）；开时三机制按各自内部字段跑（默认全开）。
+ *  enableProofread/enablePolish/enableBestOfN 保留为内部字段（向后兼容+细粒度控制），
+ *  但用户不可见——UI 只暴露 enableAiOptimize，防「开关开了但机制没跑」的 UI 空转。 */
+const effProofread = computed(() => llmConfig.value.enableAiOptimize !== false && llmConfig.value.enableProofread)
+const effPolish = computed(() => llmConfig.value.enableAiOptimize !== false && llmConfig.value.enablePolish)
+const effBestOfN = computed(() => llmConfig.value.enableAiOptimize !== false && llmConfig.value.enableBestOfN)
 
 const scanning = ref(false)
 /** v9.1 #11: 扫描进度（main.ts 每 100 节点上报），按钮文案"扫描中(N)..." */
@@ -1479,14 +1483,17 @@ function buildGlossaryMaps(): GlossaryMaps {
     builtin.set(b.source, b.translations['*'] || b.source)
   }
   // EN 视图：内置优先，再叠用户库 EN source（first-wins：内置撞 key 胜出）
+  // v12.13: deprecated 条目不注册（软删除——不注入不遮蔽，保留库中可恢复）
   const en = new Map<string, string>(builtin)
   for (const g of glossary.value) {
+    if (g.deprecated) continue
     const t = g.translations[targetLang.value]
     if (t && !en.has(g.source)) en.set(g.source, t)
   }
   // 全语言视图：EN 优先，再补其他语言列（先到者胜，撞 key 行为确定 + 观测）
   const full = new Map<string, string>(en)
   for (const g of glossary.value) {
+    if (g.deprecated) continue
     const tgtVal = g.translations[targetLang.value]
     if (!tgtVal) continue
     for (const [lang, srcVal] of Object.entries(g.translations)) {
@@ -1733,7 +1740,7 @@ async function startTranslate() {
     }
     // 全部已翻译：如果开启了校对，直接执行校对（支持校对失败后重试）
     persistAdhocProductNames(adhocDetected)  // v11.2.2: 部分短路+部分已译场景同样入库
-    if (llmConfig.value.enableProofread) {
+    if (effProofread.value) {
       showToast('翻译已完成，执行 AI 校对...', 'info')
       try {
         await startProofread()
@@ -1752,7 +1759,9 @@ async function startTranslate() {
   const glossaryHash = glossary.value.map(g => g.source + '|' + (g.translations[targetLang.value] || '')).join(',').slice(0, 200).split('').reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0).toString(36)
   // v11.1: 检测集合进缓存键 — 新产品名一旦被检测保护，旧的"未保护译文"缓存永不命中（防 v10.7 缓存复活）
   const adhocHash = adhocTerms.slice().sort().join(',').slice(0, 200).split('').reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0).toString(36)
-  const cacheKey = (text: string) => normalizeText(text) + '\x00' + targetLang.value + '\x00' + glossaryHash + '\x00' + adhocHash
+  // v12.11: 违禁词表版本戳进缓存键 — 词表/豁免表更新后旧译文缓存自然失配重翻
+  // （防旧词表时代的违禁词译文经缓存复活，v10.7 型缺口的词表维度补件）
+  const cacheKey = (text: string) => normalizeText(text) + '\x00' + targetLang.value + '\x00' + glossaryHash + '\x00' + adhocHash + '\x00' + PROHIBITED_WORDS_VERSION
   let cacheHits = 0
   let failedBatches = 0
   const lastErrors: string[] = []
@@ -1771,7 +1780,7 @@ async function startTranslate() {
   const translationTimer = createBatchTimer()
 
   // ═══ 流水线化：预计算校对参数（翻译开始前就准备好，翻译完一波立即校对） ═══
-  const proofreadEnabled = llmConfig.value.enableProofread
+  const proofreadEnabled = effProofread.value
   let proofreadGlossaryHint: string | undefined
   let proofreadGlossaryMap: Map<string, string> | undefined
   let proofreadNormalizedMap: Map<string, string> | undefined
@@ -1870,7 +1879,16 @@ async function startTranslate() {
             const uniqueMisspelled = new Set<number>()
             // v10.8: 收集译文显著超长的唯一条目 → 透出给校对层作长度异常 hint（不自动截断）
             const uniqueExpansion = new Set<number>()
-            const uniqueResult = await translateBatch(uniqueTexts, targetLang.value, glossaryMap, llmConfig.value, sourceLang.value === 'auto' ? undefined : sourceLang.value, pageName.value || undefined, fileName.value || undefined, crossBatchTerms, taskGlossaryHint, normalizedGlossaryMap, false, false, glossaryEnMap, uniqueUntranslated, uniqueMisspelled, uniqueExpansion)
+            // v12.10: best-of-2 择优统计（日志透出）——开关开时双跑首调
+            // v12.10.3: 闸门扩全语种（用户拍板「别只修一个语言」——机制语种无关，
+            //   择优 prompt 是 ${targetLang} 变量注入模板；getJudgePersonas 未覆盖语种
+            //   时 translationPickBatch 返回空 map → 缺省第一路保守，零事故）
+            const bestOf2On = effBestOfN.value
+            const bestOf2Stats = { dualRun: 0, judged: 0, pickedB: 0 }
+            const bestOf2StatsOut = { add: (s: { dualRun: number; judged: number; pickedB: number }) => { bestOf2Stats.dualRun += s.dualRun; bestOf2Stats.judged += s.judged; bestOf2Stats.pickedB += s.pickedB } }
+            // v12.13: TM few-shot 检索（人工验收译文 origin=user，相似度≥0.90+数字集合相等）
+            const tmFewShot = retrieveTM(uniqueTexts, corrections.value, targetLang.value)
+            const uniqueResult = await translateBatch(uniqueTexts, targetLang.value, glossaryMap, llmConfig.value, sourceLang.value === 'auto' ? undefined : sourceLang.value, pageName.value || undefined, fileName.value || undefined, crossBatchTerms, taskGlossaryHint, normalizedGlossaryMap, false, false, glossaryEnMap, uniqueUntranslated, uniqueMisspelled, uniqueExpansion, undefined, bestOf2On, bestOf2StatsOut, tmFewShot.length > 0 ? tmFewShot : undefined)
             // 将模板译文展开回原始文本
             const expandedResult = expandBatch(uniqueResult, expandData, uncachedTexts.length)
             // v9.11: 唯一模板索引 → 展开后索引（同源文复制项共享同一模板译文，同样视为漏翻）
@@ -1933,21 +1951,42 @@ async function startTranslate() {
           // 缓存结果可能来自旧版本（不含®），必须在此兜底
           translated = restoreTrademarkSymbols(texts, translated)
 
+          // v12.7: 润色前格式净化——™ 去重/品牌词连写拆分/多余空格压缩，
+          //   防格式噪音干扰人设判定（SILVERCFexpress 连写会被 judge 当机翻感 issues 输出）。
+          //   净化是轻量代码修复（形式信号零误判），不动语义；净化后译文直接进判定。
+          const cleanupResult = prePolishFormatCleanup(translated)
+          translated = cleanupResult.texts
+          if (cleanupResult.cleanedCount > 0) {
+            uiLog('polish', `润色前格式净化: ${cleanupResult.cleanedCount}条已修复（™去重/连写拆分/空格压缩）`)
+          }
+
           // v12.3: 人设驱动判定→润色→硬锁（翻译完成后、校对之前）
-          // 只在 enablePolish 开 + 目标语言在灰度白名单（de/es/ru/tr/ja）时启用；
+          // v12.10.4: 静默执行（用户拍板 A 方案）——POLISH_GRAY_LANGS 闸门移除，
+          //   润色机制语种无关（judge prompt 是 ${targetLang} 变量注入模板），
+          //   enablePolish 默认全开 20 语种全生效；getJudgePersonas 未覆盖语种时
+          //   personaJudgeBatch 返回空 map → 无润色，零事故。
           // 资格负面清单（isPolishEligible）过滤掉合规/术语库锁定/不可翻译/极短/含↵条目。
-          if (llmConfig.value.enablePolish && POLISH_GRAY_LANGS.includes(targetLang.value)) {
+          if (effPolish.value) {
             try {
-              // ① 资格负面清单过滤
+              // ① 资格负面清单过滤（v12.10: polishExemptReason 透出豁免原因，日志细分）
               const eligibleIndices: number[] = []
+              const exemptReasons = new Map<number, string>()
               for (let j = 0; j < texts.length; j++) {
-                if (isPolishEligible(texts[j], translated[j] || '', targetLang.value, normalizedGlossaryMap)) {
+                const reason = polishExemptReason(texts[j], translated[j] || '', targetLang.value, normalizedGlossaryMap)
+                if (reason === null) {
                   eligibleIndices.push(j)
+                } else {
+                  exemptReasons.set(j, reason)
                 }
               }
               // v12.3.3: 润色管道可观测性（资格/判定/生效/回退/汇总五点日志，
               // 区分「没开」「开了没触发」「触发但被硬锁回退」三种沉默场景）
-              uiLog('polish', `润色资格: ${texts.length}条→eligible ${eligibleIndices.length}条（豁免 ${texts.length - eligibleIndices.length}：↵多行/合规/术语锁定/极短/不可翻译）`)
+              // v12.7: ↵ 豁免计数细分——整格豁免（段数不等/段内不合规）vs 段内润色（结构锁兜底）
+              // v12.10: 豁免四类细分（合规/术语锁定/极短/不可翻译）——实机日志「其他 9」黑盒无法复盘的修复
+              const countReason = (r: string) => [...exemptReasons.values()].filter(x => x === r).length
+              const arrowExemptCount = countReason('arrow')
+              const exemptTotal = texts.length - eligibleIndices.length
+              uiLog('polish', `润色资格: ${texts.length}条→eligible ${eligibleIndices.length}条（豁免 ${exemptTotal}：↵整格 ${arrowExemptCount} / 合规 ${countReason('compliance')} / 术语锁定 ${countReason('glossary-locked')} / 极短 ${countReason('short') + countReason('empty')} / 不可翻译 ${countReason('keep-source')}）`)
               let polishApplied = 0
               let polishReverted = 0
               if (eligibleIndices.length > 0) {
@@ -1955,19 +1994,62 @@ async function startTranslate() {
                 const eligibleTrans = eligibleIndices.map(j => translated[j] || '')
                 // ② 人设判定
                 const judgeHits = await personaJudgeBatch(eligibleSources, eligibleTrans, targetLang.value, llmConfig.value, detectedProductLine)
-                uiLog('polish', `人设判定: ${eligibleIndices.length}条→命中 ${judgeHits.size}条${judgeHits.size > 0 ? ' ' + [...judgeHits.keys()].map(i => `[${i + 1}]`).join('') : ''}`)
+                // v12.10: 消费顺序稳定化——并发批次完成序进 Map 键序，排序后消费/日志
+                //   消除「判定结果消费顺序」漂移（实机日志 [1][2]...[8][9][10][6][7] 乱序实锤）
+                const sortedHitKeys = [...judgeHits.keys()].sort((a, b) => a - b)
+                uiLog('polish', `人设判定: ${eligibleIndices.length}条→命中 ${judgeHits.size}条${judgeHits.size > 0 ? ' ' + sortedHitKeys.map(i => `[${i + 1}]`).join('') : ''}`)
                 if (judgeHits.size > 0) {
                   // ③ 润色（命中条目按 issues 改写，硬锁失败回退）
-                  const hitIndices = [...judgeHits.keys()]
+                  const hitIndices = sortedHitKeys
                   const polishedResults = await polishBatch(eligibleSources, eligibleTrans, hitIndices, judgeHits, targetLang.value, llmConfig.value, glossaryMap)
-                  // ④ 写回（只写回 polished=true 的条目）
+                  // ④ 二次判定（v12.8：同一人设差分对比「改善了吗」，无改善则回退——防同义改写无效消耗）
+                  // v12.10: factsBreach 透出——factsIntact=false（事实偏移）的日志与「无改善」区分
+                  const polishedIndices = polishedResults.filter(pr => pr.polished).map(pr => pr.index)
+                  const verifyMap = new Map<number, boolean>()
+                  const factsBreachSet = new Set<number>()
+                  if (polishedIndices.length > 0) {
+                    const verifySources = polishedIndices.map(idx => eligibleSources[idx])
+                    const verifyBefores = polishedIndices.map(idx => eligibleTrans[idx])
+                    const verifyAfters = polishedIndices.map(idx => polishedResults.find(pr => pr.index === idx)!.text)
+                    const verifyResults = await polishVerifyBatch(verifySources, verifyBefores, verifyAfters, targetLang.value, llmConfig.value, detectedProductLine, factsBreachSet)
+                    // verifyResults 的索引是 polishedIndices 数组内的索引，映射回 eligible 批内索引
+                    for (let k = 0; k < polishedIndices.length; k++) {
+                      verifyMap.set(polishedIndices[k], verifyResults.get(k) ?? true)  // 缺省放行（二次判定失败不阻塞）
+                    }
+                  }
+                  // ⑤ 写回（只写回 polished=true 且二次判定 improved=true 的条目）
                   for (const pr of polishedResults) {
                     const origIdx = eligibleIndices[pr.index]
                     if (pr.polished) {
+                      const improved = verifyMap.get(pr.index) ?? true
+                      if (!improved) {
+                        polishReverted++
+                        const breach = factsBreachSet.has(pr.index)
+                        uiLog('polish', `二次判定回退: [${origIdx + 1}] ${breach ? '事实偏移（factsIntact=false）' : '润色后无改善'} → 保留润色前译文`)
+                        continue
+                      }
                       polishApplied++
-                      uiLog('polish', `润色生效: [${origIdx + 1}] "${(translated[origIdx] || '').slice(0, 40)}" → "${pr.text.slice(0, 40)}"`)
+                      // v12.12: 按段润色混合态透出——部分段硬锁回退时日志可见（段级原因）
+                      const segNote = pr.segReasons && pr.segReasons.length > 0 ? `（部分段回退: ${pr.segReasons.join('；')}）` : ''
+                      // v12.6: 日志显示实际改动区域（diff 摘要）而非前 40 字符截断——
+                      //   40 字符截断对"改动在句尾"的条目完全不可见（before→after 看起来一样）。
+                      //   策略：找第一个不同字符位置，前后各留 15 字符上下文；
+                      //   完全相同时（理论不该发生）回退到前 40 字符截断。
+                      const beforeText = translated[origIdx] || ''
+                      const afterText = pr.text
+                      let diffStart = 0
+                      while (diffStart < Math.min(beforeText.length, afterText.length) && beforeText[diffStart] === afterText[diffStart]) diffStart++
+                      const ctxStart = Math.max(0, diffStart - 15)
+                      const beforeExcerpt = (ctxStart > 0 ? '…' : '') + beforeText.slice(ctxStart, diffStart + 25) + (diffStart + 25 < beforeText.length ? '…' : '')
+                      const afterExcerpt = (ctxStart > 0 ? '…' : '') + afterText.slice(ctxStart, diffStart + 25) + (diffStart + 25 < afterText.length ? '…' : '')
+                      uiLog('polish', `润色生效: [${origIdx + 1}] "${beforeExcerpt}" → "${afterExcerpt}"${segNote}`)
                       translated[origIdx] = pr.text
                       polishedIds.value.add(batch[origIdx].nodeIds[0])
+                      // v12.11: 润色后重跑违禁词检测——翻译写回处的 updateProhibitedTrans
+                      //   在润色之前已执行（检测的是润色前译文），润色规避掉的违禁词徽章
+                      //   不同步消除会遗留假阳性；润色引入的由硬锁⑧兜底回退（到不了这里）。
+                      //   此处与最终译文对齐，校对 fixMap 取数点（润色后）自然只带真命中。
+                      updateProhibitedTrans(batch[origIdx].nodeIds[0], pr.text)
                     } else {
                       polishReverted++
                       uiLog('polish', `硬锁回退: [${origIdx + 1}] ${pr.reason || '未知原因'} → 保留润色前译文`)
@@ -2149,6 +2231,13 @@ async function startTranslate() {
                           correctedTranslation: fixed,
                           correctedAt: Date.now(),
                           origin: 'proofread',  // v11.14: 校对自动修正来源标记（入库被拒时静默）
+                          // v12.6: 校对来源的修正不再触发自动入库建议（用户反馈「添加到术语库的内容偏多」——
+                          //   校对每修一条就触发一次 CORRECTION_SUGGESTION，虽然 R1 闸拦了大部分，
+                          //   但仍有漏网（短句/无标点句）和用户观感泛滥。
+                          //   红线：自动入库只收【用户手动修正】的条目——用户意图是入库的唯一合法来源；
+                          //   校对自动修正只留 SAVE_CORRECTION 记录（供用户手动审核后决定是否入库），
+                          //   不再触发 CORRECTION_SUGGESTION 自动入库流程。
+                          suppressAutoGlossary: true,
                         })
                       }
                     }
@@ -3186,11 +3275,8 @@ watch(manualProductLine, (val) => {
 }, { immediate: true })
 
 // 目标语言切换时重新计算字体映射
-// v12.3.2: 用户未手动碰过润色开关时，enablePolish 默认值跟随目标语言（de/es/ru/tr/ja 开/其余关）
+// v12.10.4: enablePolish 跟随语言逻辑废弃——静默执行默认全开+开关撤除
 watch(targetLang, () => {
-  if (!llmConfig.value.polishUserTouched) {
-    llmConfig.value.enablePolish = POLISH_GRAY_LANGS.includes(targetLang.value)
-  }
   if (items.value.length > 0) {
     nextTick(() => autoMapFonts())
   }
@@ -3420,6 +3506,9 @@ function useDefaultConfig() {
   llmConfig.value.apiUrl = 'https://aigo.lexar.com/v1/chat/completions'
   llmConfig.value.model = 'gpt-5.5'
   llmConfig.value.enableProofread = true
+  llmConfig.value.enableAiOptimize = true
+  llmConfig.value.enablePolish = true
+  llmConfig.value.enableBestOfN = true
   llmConfig.value.proofreadModel = 'gpt-5.5'
   saveSettings()
   showToast('已恢复默认团队配置并保存', 'success')
@@ -3431,13 +3520,8 @@ function saveSettings() {
   sendMsgToPlugin(UIMessage.SAVE_SETTINGS, JSON.parse(JSON.stringify(llmConfig.value)))
 }
 
-/** v12.3.2: 润色开关手动切换——打 polishUserTouched 标记，此后默认值不再跟随语言覆盖；
- *  落盘保存（与 enableProofread 的 @click 行为对齐——原先只切内存态不保存，重启后漂移） */
-function togglePolish() {
-  llmConfig.value.enablePolish = !llmConfig.value.enablePolish
-  llmConfig.value.polishUserTouched = true
-  saveSettings()
-}
+// v12.10.4: togglePolish/toggleBestOfN 已随开关撤除一并删除——
+//   静默执行默认全开，用户无感知；诊断日志保留可观测（[polish]/[best-of-2] 照写）
 
 async function testTranslationConnection() {
   if (!llmConfig.value.apiKey || !llmConfig.value.apiUrl) {
@@ -3729,14 +3813,22 @@ onMounted(() => {
             raw.enableProofread = true
             raw.proofreadDefaultMigrated = true
           }
-          // v12.3.2: enablePolish 默认值跟随目标语言——用户未手动碰过开关时，
-          // 每次加载按当前 targetLang 取默认（de/es/ru/tr/ja 开/其余关）；
-          // 用户手动改过（polishUserTouched）后尊重其选择不再覆盖。
-          // （v12.3 初版按迁移那一刻的语言一次性定死，切语言不跟随，已修）
-          if (!raw.polishUserTouched) {
-            raw.enablePolish = POLISH_GRAY_LANGS.includes(targetLang.value)
+          // v12.10.4: 静默执行（用户拍板 A 方案）——润色/择优默认全开+开关撤除，
+          //   用户零感知；polishUserTouched/灰度跟随逻辑废弃（开关已撤）。
+          //   老用户一次性迁移：未迁移过 silentDefaultMigrated 时强制全开。
+          if (!raw.silentDefaultMigrated) {
+            raw.enablePolish = true
+            raw.enableBestOfN = true
+            raw.silentDefaultMigrated = true
           }
-          llmConfig.value = { translationStyle: 'standard', translationStyleCustom: '', scenePreset: 'ecommerce', enableProofread: true, proofreadApiKey: '', proofreadApiUrl: '', proofreadModel: '', enablePolish: false, ...(raw as LLMConfig) }
+          // v12.10.5: AI 优化总开关——enableAiOptimize 缺省 true（老用户升级自动全开）；
+          //   enableProofread/enablePolish/enableBestOfN 保留为内部字段（向后兼容），
+          //   UI 层只暴露 enableAiOptimize 一个开关（防「开关开了但机制没跑」的 UI 空转）。
+          // v12.10.6: 默认打开强化——raw.enableAiOptimize 显式 false 时也强制 true
+          //   （用户拍板「设置成默认是打开的」——总开关的「关」只在本会话内有效，
+          //   重启后恢复默认开；防「关了就忘了开回来」的质量静默降级）。
+          raw.enableAiOptimize = true
+          llmConfig.value = { translationStyle: 'standard', translationStyleCustom: '', scenePreset: 'ecommerce', enableProofread: true, proofreadApiKey: '', proofreadApiUrl: '', proofreadModel: '', enablePolish: true, enableBestOfN: true, enableAiOptimize: true, ...(raw as LLMConfig) }
         }
         selectedPreset.value = detectPreset()
         settingsReady = true

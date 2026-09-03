@@ -744,7 +744,10 @@ async function saveCorrection(correction: TranslationCorrection): Promise<void> 
   const sameSource = corrections.filter(
     c => c.source === correction.source && c.targetLang === correction.targetLang
   )
-  if (sameSource.length >= CORRECTION_THRESHOLD) {
+  // v12.6: suppressAutoGlossary 标记的修正（校对来源）只留记录不触发自动入库建议。
+  // 红线：自动入库只收用户手动修正——用户意图是入库的唯一合法来源；
+  // 校对自动修正量太大（每修一条触发一次），用户反馈「添加到术语库的内容偏多」。
+  if (!correction.suppressAutoGlossary && sameSource.length >= CORRECTION_THRESHOLD) {
     sendMsgToUI(PluginMessage.CORRECTION_SUGGESTION, {
       source: correction.source,
       targetLang: correction.targetLang,

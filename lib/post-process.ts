@@ -44,14 +44,19 @@ const debugWarn = (...args: unknown[]) => DEBUG_MODE && console.warn(...args)
 
 // ============================================================
 // v12.4: ™ 散弹检测（形式信号，代码管形式）
-// 判据：™/®/© 出现在字母后且后面紧跟更多字母（逐字母模式中间位），累计 ≥2 次。
+// 判据 1（逐字母模式）：™/®/© 出现在字母后且后面紧跟更多字母（逐字母模式中间位），累计 ≥2 次。
 //   如 S™I™L™V™E™R™（大写逐字母）/ S™o™n™y™（大小写混合逐字母）/ p™l™a™y™s（小写逐字母）。
 //   合法™只跟在完整品牌词尾（Lexar®/CFexpress™/Sony™），™后是空格/标点/数字边界——不命中。
+// 判据 2（同符号紧邻重复，v12.6）：™™/®®/©©——任何场景下同一符号紧邻出现都是异常。
+//   来源：2026-08-27 ja 实机 CFexpress™™ 事故（restore 同词双™恒锚第一个实例的既有 bug，
+//   已修；本判据作为兜底——万一未来 restore 逻辑再出问题，散弹剥离层能兜住）。
 // ============================================================
 const TM_SPAM_RE = /[A-Za-z][®™©](?=[A-Za-z])/g
+const TM_SPAM_DUP_RE = /([®™©])\1/
 
-/** 检测译文是否含 ™ 散弹（逐字母™模式）。20 语言通吃（纯字符形式信号）。 */
+/** 检测译文是否含 ™ 散弹（逐字母™模式 或 同符号紧邻重复）。20 语言通吃（纯字符形式信号）。 */
 export function hasTrademarkSpam(text: string): boolean {
+  if (TM_SPAM_DUP_RE.test(text)) return true  // v12.6: ™™/®®/©© 紧邻重复
   const re = new RegExp(TM_SPAM_RE.source, 'g')
   const m1 = re.exec(text)
   if (!m1) return false
@@ -95,7 +100,23 @@ export function restoreTrademarkSymbols(sourceTexts: string[], translatedTexts: 
 
     let result = translated
 
-    for (const { word, symbol } of symbols) {
+    // v12.6: 同词同符号去重——源文同一商标词出现多次（CFexpress™ 4.0 / CFexpress™ 2.0）时，
+    //   提取的符号列表含多个 {CFexpress,™}；wordRegex.exec 恒锚全文第一个匹配实例，
+    //   重复循环会把™全插进第一个词尾 → CFexpress™™（2026-08-27 ja 实机事故）。
+    // 修复：按 (词小写|符号) 去重，同词同符号只插入一次（锚第一个实例）。
+    //   不同词（microSDHC™/microSDXC™）或不同符号（Lexar®/Lexar™）互不干扰。
+    // 形式信号零语义：只判"已插过没"，不判"该不该有"——漏插风险由散弹检测+最终剥离兜底。
+    const seenGroups = new Set<string>()
+    const uniqueSymbols: Array<{ word: string; symbol: string }> = []
+    for (const s of symbols) {
+      const key = `${s.word.toLowerCase()}|${s.symbol}`
+      if (!seenGroups.has(key)) {
+        seenGroups.add(key)
+        uniqueSymbols.push(s)
+      }
+    }
+
+    for (const { word, symbol } of uniqueSymbols) {
       // 在译文中查找该词（不区分大小写）
       const escapedWord = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
       const wordRegex = new RegExp(escapedWord, 'i')
@@ -196,6 +217,56 @@ export function restoreTrademarkSymbols(sourceTexts: string[], translatedTexts: 
 }
 
 // ============================================================
+// v12.7: 润色前格式净化（轻量，代码管形式零 LLM）
+// 背景：润色判定 LLM 看到格式噪音（SILVERCFexpress 连写/™™/多余空格）会被干扰，
+//   判定质量下降（把格式问题当机翻感 issues 输出，或漏判真实搭配问题）。
+// 原则：只做「形式信号零误判」的修复——™ 去重（hasTrademarkSpam 扩充判据已兜）、
+//   驼峰连写拆分（仅修已知品牌词表内的形态，如 SILVERCFexpress→SILVER CFexpress）、
+//   多余空格压缩。不做语义判断（不断言"该不该连写"）。
+// ============================================================
+
+/** 已知品牌词表（连写拆分白名单——只拆这些词的连写形态，防误伤正常驼峰词） */
+const BRAND_WORDS_FOR_SPLIT = ['SILVER', 'GOLD', 'DIAMOND', 'BLUE', 'PLAY', 'THOR', 'ARES', 'CFexpress', 'Professional', 'Lexar']
+
+/**
+ * 润色前格式净化：™ 去重 + 品牌词连写拆分 + 多余空格压缩。
+ * @param texts 译文数组（restoreTrademarkSymbols 之后、personaJudgeBatch 之前）
+ * @returns 净化后译文数组 + 净化计数（日志用）
+ */
+export function prePolishFormatCleanup(texts: string[]): { texts: string[]; cleanedCount: number } {
+  let cleanedCount = 0
+  const cleaned = texts.map(text => {
+    let result = text
+    const before = result
+
+    // ① ™ 去重（hasTrademarkSpam 扩充判据的主动修复——散弹剥离层是被动兜底，这里是主动净化）
+    if (/([®™©])\1/.test(result)) {
+      result = result.replace(/([®™©])\1+/g, '$1')
+    }
+
+    // ② 品牌词连写拆分（如 SILVERCFexpress → SILVER CFexpress）
+    //   只拆「全大写词+驼峰词」的连写形态（SILVERCFexpress），不拆正常驼峰词（microSDXC）。
+    //   判据：大写字母序列 ≥2 + 紧跟大写字母开头的小写词，且大写序列在品牌词表内。
+    //   v12.7 修复：品牌词表匹配需大小写不敏感——SILVER 是全大写，但 CFexpress 是驼峰，
+    //   连写形态是 SILVERCFexpress（SILVER 全大写 + CFexpress 驼峰），正则需分别处理。
+    for (const brand of BRAND_WORDS_FOR_SPLIT) {
+      if (brand.length < 2) continue
+      // 匹配 brand（任意大小写形态）紧跟另一个大写字母开头的词（无空格）
+      // 如 SILVERCFexpress（SILVER 全大写 + CFexpress 驼峰）、silvercfexpress（全小写，罕见但防御）
+      const re = new RegExp(`\\b(${brand})(?=[A-Z][a-z])`, 'gi')
+      result = result.replace(re, '$1 ')
+    }
+
+    // ③ 多余空格压缩（两个以上连续空格→一个，行首行尾空格剥除）
+    result = result.replace(/ {2,}/g, ' ')
+
+    if (result !== before) cleanedCount++
+    return result
+  })
+  return { texts: cleaned, cleanedCount }
+}
+
+// ============================================================
 // v12.5: LLM 自发星号清理（源文无 * 时）
 // 背景：zh-TW 实机反馈「AI 生成文字中有出现 * 等符号」——LLM 把营销文案当 markdown
 //   输出 *强调* / **粗体** / 孤立 * 脚注符，源文并没有 *。设计稿是画布文本不是
@@ -291,6 +362,16 @@ export function cleanKey(s: string): string {
     .replace(/[-_]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+/**
+ * 写画布前最终还原（v12.12 不变量收敛——判定方式五条之②能还原就还原）。
+ * 任何写画布的文本最后一站统一过此函数：↵ 占位符 → 真实换行（画布需要真换行，
+ * ↵ 只是管道内占位符）。翻译 S5 postProcessTranslation 内联同语义代码既有，
+ * 新增写回路径（润色/择优/未来新 pass）必须调本函数——防 v12.10.2 型「字面 ↵ 上画布」事故。
+ */
+export function finalizeForCanvas(text: string): string {
+  return text.replace(/\s*↵\s*/g, '\n')
 }
 
 export function enforceGlossaryTerms(
