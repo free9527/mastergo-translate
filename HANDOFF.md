@@ -1,7 +1,7 @@
 # 项目交接文档
 
-**日期**: 2026-08-26  
-**版本**: v12.4（v12.3.3 之上 + 迭代 4 灰度工具就绪 + 全部工作已提交 git）  
+**日期**: 2026-09-03  
+**版本**: v12.13（v12.12 按段润色 + TM few-shot 翻译记忆 + deprecated 术语标记）  
 **项目**: Lexar 翻译插件（MasterGo 插件）
 
 ---
@@ -39,7 +39,153 @@ MasterGo 设计工具插件，将 Lexar 产品设计稿从英文翻译成 20 个
 
 ---
 
-## 二、当前版本（v12.3）
+## 二、当前版本（v12.12 / v12.13）
+
+### v12.12 润色按段化（2026-09-03，迭代 4 灰度 32 次回退驱动 + 判定方式五条落地）
+
+**背景**：迭代 4 灰度验证实锤 de/es/ru/tr 人设判定命中 7-9 条/12 格但 **32 次润色全部硬锁回退 0 生效**——™ 丢失 ~19 / ↵ 结构破坏 ~8 / 限定词 1。根因：润色管道是三管道中唯一「裸发™+裸发↵」的（翻译有剥离+restore、校对有 proofTmStripped 双侧剥离），A+ 多行格素材恰好是硬锁⑥⑦最易触发形态。用户拍板**判定方式五条**（详见八点五节·迭代 4 灰度验证结果章节）：判定/匹配层先格式归一 + 还原哲学（能还原就还原不能不强求）+ 断行二分（语义断行保留/句中断行拍平）+ LLM 断行信任只给翻译校对（润色断行代码保管）+ 按段润色。
+
+**改动（一问题一行）**：
+
+| # | 改动 | 要点 | 文件 |
+|---|------|------|------|
+| 1 | **splitSemanticSegments 纯函数** | 断行二分的形式判定：↵ 左段以终结标点结尾（20 语种标点表：拉丁/CJK/阿拉伯/省略号）或 ≤5 词（标题/bullet）→ 语义断行（段边界）；否则 → 句中断行拍平。strict（源文）/lenient（译文 ≤8 词——tr 无标点标题形态实锤）双模式；泰文 ≤20 字符兜底。polishExemptReason ↵ 分支收编为委托（单一事实源） | `lib/polish-guard.ts` |
+| 2 | **polishBatch 按段润色** | 语义断行处切段（代码记住位置）→ 段双侧剥™ → 段当条喂 4 条/批 → restore™（源文段锚点）→ 段级硬锁 → 拼回原位 ↵。**结构锁从「校验」升级为「构造保证」**——LLM 物理上碰不到 ↵。段数不等 → 整格不润（保守）；极短段 ≤3 词不润（v12.7 规则）；issue 按 span 大小写不敏感归属段，归属不上挂第一个可润段 | `lib/llm-api.ts` |
+| 3 | **润色 prompt 段化** | ↵ 结构锁指令改「每条输入是单段（一句或一个 bullet），断行由代码管理——输出单段连续文本」 | `lib/llm-api.ts` |
+| 4 | **finalizeForCanvas 不变量** | 写画布前最终还原（↵→\n）收敛为函数——新增写回路径必须过此函数，防 v12.10.2 型「字面 ↵ 上画布」 | `lib/post-process.ts` |
+| 5 | **App.vue 适配** | 润色生效日志补 segReasons 混合态透出（部分段生效部分回退）；judge 脚本白名单对齐生产全语种（v12.10.4 闸门已移除） | `ui/App.vue` + `tests/test-judge-baseline.ts` |
+
+**测试**：v123 套件 **49/49**（D2c 按段润色语义断行保留+极短标题段不润+正文段生效 / D2d 段数不等整格不润 / D3 changes 超限段级回退）；回归 v1210(31)/v129(89)/v105(46)/v106(46)/v1112(176) 全绿；typecheck 双配置 + build 通过（bundle 验证：段数不等/部分段回退/整格不润/lenient/finalizeForCanvas 进产物）。
+
+**迭代 5 灰度验证（同素材同 judge，六语种并行）**：**存活率 0% → 50-67%**（de 6/9、es 5/8、ru 5/10、tr 6/10、ja 4/7、zh-TW 5/8，合计 31 条生效）。回退只剩三类全部合理：段数不等 12 次（保守整格不润）/ 限定词丢失 4 次（[5] theoretical 各语种同条目）/ 单位丢失 1 次（ru mGy）。™/↵ 回退**清零**。**judge 判定（judge-only 重跑，API 额度恢复后）**：Δnat vs 迭代4（同管道仅润色机制新旧之差）= **de +0.25 / es +0.21 / ja +0.31 / zh-TW +0.33** 四语种达/超 +0.3 有效线，tr +0.09/ru +0.03 弱响应；fidelity 最大跌幅 -0.11（ru）未触 -0.2 红线。**诚实结论（用户确认「润色收益不大」后的修正判定）**：润色机制有效但收益有限——配不上"显著"，配得上"值得"（零事故+成本已拍板+de/es/ru 主力语种真实改善）；定位降级为"锦上添花层"，不再投入进一步优化（tr 判定阈值/段数不等补救——收益封顶）。产物：`tests/tmp-judge-baseline-play-pro-microsd-polish-*.json` + `tests/tmp-iter5-*.log`。
+
+---
+
+### v12.13 翻译记忆（TM few-shot）+ deprecated 术语标记（2026-09-03，三方案裁决之方案 2 收窄版）
+
+**背景**：润色收益封顶后探索更高收益路径——业界对照（APE/QE 门控/best-of-N 已有，**RAG 上下文注入是最大空白**）+ 机翻感四类型复盘（单句维度已尽力，跨格一致性/重复句式掷骰子是洼地）。用户拍板三方案裁决：①一致性 pass（探测版——先报告不修改）②**TM few-shot（收窄版——本次落地）**③judge 词表运营（顺带形态）。方案 2 收窄红线：数据源只用 corrections origin='user'（纯人工验收——翻译缓存未验收/校对自动修正 LLM 产物一律不用，防平庸译文自我强化）；相似度 ≥0.90 + 数字集合必须完全相等（规格错位防线）；每批 ≤2 条（防注意力稀释）；首调限定。
+
+**改动（一问题一行）**：
+
+| # | 改动 | 要点 | 文件 |
+|---|------|------|------|
+| 1 | **TM few-shot 检索** | `lib/translation-memory.ts` 追加（**该文件 v7.5.8 起存在**——同型号不同容量模板匹配 compressBatch/expandBatch，本次追加非新建；教训：新建 lib 文件前必须 git log 确认）：`tmSimilarity`（词级 Jaccard + CJK/泰文 bigram 自适应 + 数字集合相等防线——"up to 2TB"绝不锚"up to 4TB"）+ `retrieveTM`（origin=user / targetLang 严格相等 / ≥0.90 / ≤2 条/批 / 极短 <15 字符不检索 / 同源去重） | `lib/translation-memory.ts` |
+| 2 | **首调注入（替换静态 few-shot）** | translateBatch 第 20 参 `tmFewShot`——非空时替换静态 few-shot（真实验收译文 > 通用范例，且不追加防变长 v11.5 纪律）；forceTranslate 重试层不注入；CJK 目标出中文参考块 | `lib/llm-api.ts` |
+| 3 | **UI 接线** | startTranslate 批次内 `retrieveTM(uniqueTexts, corrections.value, targetLang)` | `ui/App.vue` |
+| 4 | **deprecated 术语标记（软删除）** | CSV `deprecated` 列（yes/true/1）→ buildGlossaryMaps 不注册（不注入不遮蔽），条目保留可恢复，序列化往返保留 | `lib/parse-csv.ts` + `messages/types.ts` + `ui/App.vue` |
+
+**测试**：新套件 `tests/test-v1213-translation-memory.ts` **28/28**（A 相似度 7 含数字防线/CJK/泰文 / B 过滤链 11 含 proofread 拒/数字不等拒/上限/同源去重 / C 注入 6 含替换静态/快照锁/重试不注入/中文块 / D deprecated 4 含解析/往返/无列兼容/无废弃不输出列）；回归 v123(49)/v1210(31)/v129(89)/v1112(176)/v105(46)/v106(46) 全绿；typecheck 双配置 + build 通过（bundle 验证：TM 块/deprecated/人工验收转义/TMVAL 模板内部进产物）。
+
+**测试排障教训（全是测试债非生产 bug）**：①词级 Jaccard 对"一词之差"只给 0.78——0.9 阈值的实际含义是"同句/近同句"，fixture 按真实场景（历史人工修过的源文再次出现）重写 ②坑 13 队列错位：mock 'OK' 译文与源文不同触发统一重试，C 段断言需按"每块占 N 次调用"取段首索引 ③translateBatch 20 参数 off-by-one：少传一个 undefined 致 tmFewShot 落在 bestOf2StatsOut 位置。
+
+**实机验证点**：①人工修正过某条译文后，下次扫描同句源文 → 首调应沿用人修译法（诊断面板看 [EXAMPLES — validated past translations] 块）②术语库 CSV 某条加 deprecated=yes → 该条不再注入/遮蔽 ③非人修来源（校对自动修正）不进 TM。
+
+**遗留（下次迭代接续）**：
+- **方案 1 一致性 pass 探测版**（只报告不修改，实机跑 3-5 批验证病灶密度后再定修改版）——未启动
+- **方案 3 judge 词表运营**（聚合脚本+live-cases 惯例，顺带形态）——未启动
+- **场景化术语译法**（CSV scene 列——v12.3.1 PCIe 5.0 vs Gen5X4 型痛点）——候选未拍板排期
+- TM 冷启动观察（corrections 覆盖率随使用增长——一个月后覆盖率 <10% 归档）
+
+---
+
+## 二、上一版本（v12.11）
+
+### v12.11 亚马逊官方清单增补 + 缓存/时序闭环（2026-09-03，OEC 违禁词清单驱动）
+
+**背景**：亚马逊补充官方违禁词材料（OEC 清单：AMZ 通用 + A+ 历史拦截记录）。用户八条拍板收敛边界：①按语言落位，不做场景区分（插件是通用翻译，区分亚马逊场景代价太大）；中文侧不动（广告法已覆盖），本次=欧盟/英文增补 ②CTA 类拒收（buy now/click here 是设计稿合法文案）③sale/new/free 裸词拒收（普通词必误报），discount/wholesale/free shipping/buy one get one 收 ④`certificazion` 截断形态拒收（防误伤 certification 合规词，只收完整 certificata）⑤✅替代写法不进 prompt（防 LLM 复述违禁词+翻译职责是保原意不是改文案）⑥标题合规规则不做（75字符/禁止字符——LLM 分不清哪些是标题）⑦闭环 A（版本戳）+ B（润色时序）一起落地 ⑧材料不入库（反馈内容直接进词表规则）。
+
+**合规链路复盘结论（改动前的结构性发现）**：
+- **约一半材料代码管不了**：站点差异化（FCC/GPSR/EPR/PSE/技適）、标题新规、广告创意规则是上架运营知识，出插件边界——词表增补只覆盖「文案违禁词」维度
+- **A+ 历史拦截是 Marketplace（站点）概念**：语言 key 近似代理站点（de→DE/pt-BR→BR），注意 pt/pt-BR 对角线
+- **缺口 1（v10.7 型缓存复活）**：翻译缓存 key 不含词表版本——词表更新后旧译文经缓存复活携带旧违禁词
+- **缺口 2（润色↔检测时序）**：翻译写回处 `updateProhibitedTrans` 在润色之前执行（检测的是润色前译文）——润色规避掉的违禁词徽章不消除（假阳性遗留）+ 润色后干净的条目仍被送进校对 fixMap（白烧 token + 改写干净句风险）
+
+**改动（一问题一行）**：
+
+| # | 改动 | 要点 | 文件 |
+|---|------|------|------|
+| 1 | **en 词表 +19 词** | 通用层 12：unbeatable/amazing/premium/award winning/proven（UK ASA 审查词）/best seller/bestselling/discount/wholesale/free shipping/buy one get one/money back；存储专项 8：100% waterproof/unbreakable/indestructible/works with all/universal compatibility/lasts forever/never fails/enterprise grade。**全部过宁漏勿滥闸**（无合法语义歧义）；词边界/重叠取最长机制天然消化（best seller 不报 best、money back 不报 guarantee 系） | `lib/prohibited-words.ts` |
+| 2 | **小语种补缺（A+ 拦截实证）** | pt-BR += `testes`（BR 站真实拦截，test 复数）；it += `garanzia`（名词形态，既有只有 garantito/a）+ `certificata`（完整形态） | `lib/prohibited-words.ts` |
+| 3 | **PROHIBITED_WORDS_VERSION 版本戳** | 新增常量（维护纪律：词表/豁免表任何增删 +1）；`cacheKey` 拼入第 5 段（`\x00` 分隔，与 glossaryHash/adhocHash 同位）——词表更新后旧译文缓存自然失配重翻，堵 v10.7 型复活的词表维度 | `lib/prohibited-words.ts` + `ui/App.vue` |
+| 4 | **润色后重跑违禁词检测** | 润色生效写回处补 `updateProhibitedTrans(nodeId, pr.text)`——润色规避掉的违禁词徽章同步消除；校对 fixMap 取数点（润色后）自然只带真命中；润色引入的由硬锁⑧兜底回退（到不了这里） | `ui/App.vue` |
+
+**拒收清单（用户拍板的红线，测试锁回归）**：CTA 类（buy now/click here/act fast/don't miss out）、sale/new/free 裸词、竞品对比（better than——运营违规非词表问题）、标题合规规则（LLM 分不清标题）、`certificazion` 截断形态、材料归档。
+
+**测试**：v129 套件 +G 段 34 断言（en 新词 19 命中 / 拒收词回归 8：new/free/sale 裸词/CTA 不命中+seller 不命中 best seller+work with all 不命中+for all 不命中 / 既有豁免不回退 3 / pt-BR·it 补缺+it certification 边界 4）→ **89/89**；缓存版本戳临时校验 4/4（用完即删 claude-tmp 纪律）；回归 v1112(176)/v123(45)/v1210(31)/v105(46)/v106(46)/v1115(15)/v115(41)/v122(8) 全绿；双 tsconfig typecheck + build 通过（bundle 实锤：新词进产物、中文 note `\uXXXX` 大写转义、cacheKey 五段 `\0` 结构含版本戳变量）。
+
+**已知代价（用户拍板接受）**：缓存 key 加段后所有既有缓存失效一次（下次启动首批翻译重新调 API，之后恢复正常）——版本戳机制固有代价。
+
+**遗留（下次迭代接续）**：
+- 实机验证：MasterGo 重载插件跑一批 en→en/de/fr 含新词文案（unbeatable/enterprise grade 类），确认源文徽章点亮 + 校对规避链工作
+- 未来词表/豁免表任何增删必须 `PROHIBITED_WORDS_VERSION +1`（否则老用户缓存复活）
+- 材料中运营规则部分（站点注册义务/标题新规/广告创意）归档为业务知识不进代码——若未来设计稿出现 listing 标题场景，再立项「标题合规检测」（形式信号代码可判：75字符/禁止字符/全大写）
+
+---
+
+## 二、上一版本（v12.10）
+
+### v12.10 质量地板机制——verify 事实锚 + best-of-2 择优 + 降温（2026-08-28，实机质量参差驱动）
+
+**一句话**：标语/营销句是全管道形式锁覆盖为零的文本类型（无数字/无术语命中/无合规词/无限定词），质量方差全集中在这里；用「verify 事实锚定门」挡润色语义偏移，用「best-of-2 双跑择优」把单次采样掷骰子变成 N 次采样择优，用「降温 0.2→0.1」收窄采样方差。详见「八点五节·迭代 4」（含改动表/测试/灰度协议/标语三译文母语评审锚点/明确不做边界）。
+
+---
+
+## 二之一、上一版本（v12.9）
+
+### v12.9 违禁词豁免全语种对齐 + 润色违禁词硬锁（2026-08-27，ja 实机违禁词噪音驱动）
+
+**背景（ja 实机测试，用户反馈截图）**：en→ja 一批 48 格出 5 张违禁词待确认卡——3 张术语库锁定（`書き込み速度最大`/`読み出し速度最大`/`厳格なテスト済み` 术语库钦定值命中 ja 词表「最大/テスト」）+ 2 张非锁定（`持続書き込み速度最大`/社内テスト脚注触发校对改写但回检仍命中）。用户三条拍板收敛需求：①测试素材里已出现的常用表达都没出过问题=合规白名单（「最大+速度/数字」是存储行业标准上限表述 up to 的钦定译法，非景品表示法绝对化宣称）②test 是绝对违禁词、最高级是违禁词（裸词红线不豁免）③术语库的表达都经过检验，不用怀疑。
+
+**实据盘点（驱动范围的 4 个发现）**：①ja 侧裸匹配无豁免表（zh/en 都有，ja 是 20 语种里唯一裸奔的）②测试素材 ja 实际速度写法是「最大ライト速度/最大リード速度」（ARMOR GOLD/DIAMOND/PLAY PRO 三产品线官方文案），不是术语库的「書き込み速度最大」——两种写法都要豁免 ③20 语种 × 术语库 192 行交叉检查：命中违禁词表的术语库值不止 ja（Limited Lifetime Warranty 19 语种官方译值全部命中各自 guarantee 系词、Rigorously Tested 15 语种命中 test 系词）——全由 prohibitedLocked 锁定通道消化，本次只把 ja 特有规则收窄 ④机制上零事故（锁定项只提示不改写），本次是消噪音+润色合规补漏，非修漏洞。
+
+**改动（一问题一行）**：
+
+| # | 改动 | 要点 | 文件 |
+|---|------|------|------|
+| 1 | **豁免机制通用化** | 新增 `PROHIBITED_EXEMPTIONS: Record<string, string[]>` 全语种总表（zh/en/ja），zh/en 既有表迁入；`detectProhibited` 豁免分支从 zh/en 硬编码白名单改为「该语言有豁免表就执行剔除」 | `lib/prohibited-words.ts` + `lib/prohibited-check.ts` |
+| 2 | **数字锚定豁免 `#`** | 豁免短语含 `#` 匹配一个及以上数字/千分位逗号——`最大#` 覆盖 最大2TB/最大12,000回/最大5メートル/最大370ニュートン；红线：`最大の性能`（无数字锚点）不豁免 | `lib/prohibited-check.ts` getExemptionRegex |
+| 3 | **ja 豁免表** | 速度规格 11 条（最大読込速度/最大読み出し速度/最大リード速度/最大リード/最大書込速度/最大書き込み速度/最大ライト速度/最大ライト/最大持続書き込み速度/最大転送速度/最大記録速度）+ `速度最大`（术语库钦定值形态「書き込み速度最大」后置形态）+ 规格上限 4 条（最大容量/最大動作温度/最大帯域/最大速度）+ `最大限に`（术语库 2 条 ja 值惯用搭配）+ テスト质量背书 5 形态（厳格なテスト済み/厳格なテストに/テスト済み/社内テスト/広範なテスト/品質テスト） | `lib/prohibited-words.ts` |
+| 4 | **zh 补漏** | `PROHIBITED_ZH_EXEMPTIONS += 最大读取速度/最大写入速度/最大#`（自由译文写成「最大读取速度」此前会命中「最大」，与 ja 同型对齐） | `lib/prohibited-words.ts` |
+| 5 | **prohibitedLocked 退出待确认面板** | 术语库锁定违禁词不再进 pendingItems（用户拍板③——钦定值不用怀疑）；**画布徽章保留**（结果卡片上 ⚠ 术语库违禁词描边徽章，上架前可见提醒非阻塞零操作负担）；面板文案/计数/hasPendingBlockingIssue/hasPendingNonBlockingIssue 同步移除 prohibitedLocked | `ui/App.vue` |
+| 6 | **润色硬锁第⑧层** | `validatePolishOutput` 新增违禁词回检：`detectProhibited(prePolish)` vs `detectProhibited(polished)` 对比命中数，**润色新增违禁词→回退**（润色前本就含违禁词的锁定/豁免条目不背锅）；新增第 5 参 `prePolish`（不传不启用，向后兼容 v12.8）；polishBatch 调用点传 `original`（润色前译文）。**关校对时本层是唯一兜底**（润色产物直接写画布），开校对时与校对改写双保险 | `lib/polish-guard.ts` + `lib/llm-api.ts` |
+
+**红线保留（不豁免）**：ja 词表「最高/最速/最強/一番/No.1/テスト」裸词一个不删——「最大の性能！」「テスト品質保証」裸宣称仍命中。guarantee 系 19 语种词表不动（Limited Lifetime Warranty 官方译值命中由改动 5 锁定徽章通道消化）。ko `완벽한 호환성`/id `Terbaik` 等真最高级术语库值不豁免（徽章保留提示）。
+
+**豁免收窄的边界判断（v1112 B27 回归锁）**：「厳格なテスト」豁免只收质量背书结论形态「厳格なテスト済み」（术语库钦定值）+「厳格なテストに合格」（DIAMOND 素材文案）；裸形态「厳格なテストを実施」（动作描述非质量背书结论）仍命中——豁免收窄防过度放行。
+
+**测试**：新套件 `tests/test-v129-exemption-all-langs.ts` **47/47**（A ja 正例 14 实机 5 卡+素材形态全转绿 / B ja 红线 8 裸宣称仍命中 / C 数字锚定 6 / D zh 对齐+en 回归 9 / E 通用化机制 4 / F 润色两道防线 4——术语库子串篡改回退【新增回归锁】+第⑧层违禁词回检+润色前后同违禁词放行+不传 prePolish 向后兼容）；回归 v1112(176)/v123-polish(38)/v105(46)/v106(46) 全绿；双 tsconfig typecheck + build 通过（dist 18:48 重建，bundle 验证走大写 `\uXXXX` 转义——润色/违禁词/最大リード/润色引入违禁词/术语库官方值确认进 bundle，prohibitedLocked 面板文案「已保留术语库值未自动改写」确认移除）。
+
+**预期效果**：ja 48 格批次待确认面板违禁词卡 5 → 0（豁免覆盖）或 ≤1（脚注「最高」若是裸绝对化宣称仍报，红线保留）；术语库锁定徽章画布上保留但不再进面板要操作。
+
+**遗留（下次迭代接续）**：
+- 实机验证：MasterGo 重载插件跑一批 en→ja，确认 5 张卡消失 + 画布徽章正常
+- 迭代 4 灰度验证仍挂（de/es/ru/tr/ja/zh-TW 六语种，工具就绪）
+- 「最高」脚注卡的最终语境待实机确认（若裸绝对化宣称=正确命中，不豁免）
+
+**v12.9 实机验证记录（2026-08-28，en→ja SILVER CFexpress 4.0 设计稿，48 条目）**：
+
+✅ **面板目标达成**：全日志零违禁词卡——ja 豁免表全部命中实机形态（`最大読み出し速度`/`持続書き込み速度最大`/`社内テストに基づきます`/`最大5m`/`最大12,000回`/`広範なテスト` 零报警）。
+
+✅ **四类硬锁实战立功**（v12.7/v12.6/v12.3 机制首次实机触发）：
+| 锁 | 案例 | 来源版本 |
+|---|---|---|
+| ↵ 结构锁 | 源文 0 个 ↵ 润色后 1 个 → 回退 | v12.7 |
+| ™ 完整性 | CompactFlash® 润色丢 ® → 回退 | v12.6 |
+| 极性锁 | 限定词丢失 → 回退 | v12.3 |
+| 术语锁 | 润色篡改术语库值 → 回退 | v12.3 |
+
+🔍 **新发现（已纳入 v12.10 修复/待办）**：
+1. **判定批次顺序漂移**：命中列表 `[1][2][3][4][5][8][9][10][6][7]`——并发批次完成序进 Map 键序，判定结果消费顺序漂移（→ v12.10 排序稳定化）
+2. **豁免计数黑盒**：「其他 9」混四类（合规/术语锁定/极短/不可翻译）无法复盘（→ v12.10 polishExemptReason 透出）
+3. **短标签白烧**：≤3 词规格标签被 judge 命中后润色空间为零，大概率二次判定回退（第三波 10/10 命中尖峰含多条此类）——判定阈值调整待灰度数据，不脑补
+4. **术语偏离观察**：`Lexar復元ツール` vs 术语库钦定值 `Lexar リカバリーツール`——源文含完整 `Lexar Recovery Tool` 形态应命中遮蔽，LLM 输出偏离（待复验：源文形态变体未命中，还是遮蔽漏网）
+5. **润色语义偏移事故**：标语「CFexpress 4.0 Pro Performance, for All.」润色产物「すべてのユーザーへ、プロ向け CFexpress 4.0 の性能を」——プロ向け=面向专业，与 for All（开放给所有人）内核冲突，**全部硬锁+二次判定放行**（verify 只问自然度不问事实偏移的盲区实锤 → v12.10 verify factsIntact 事实锚的动机来源）
+
+**实机测试素材库惯例（2026-08-28 用户指令）**：今后每次拿到完整实机调试日志，提取源文进 `tests/live-cases/<date>-live-cases.md`（标注原 LLM 输出+润色行为+价值标签+极端句全收），作为 judge 校准/best-of-2 回归锚点。首份：`tests/live-cases/2026-08-28-live-cases.md`（ja 30+ 条 + tr 13 组，含标语三译文母语评审 ⭐ 评分——②「CFexpress 4.0 のプロ仕様性能を、すべての人に」= 5 星锚点）。
+
+---
+
+## 二、历史版本（v12.8 及以前）
 
 ### v12.3 人设驱动判定→润色→硬锁（2026-08-26，去机翻感方案 A 落地）
 
@@ -106,6 +252,102 @@ translateBatch 返回（App.vue startTranslate 波内）
 - **自动入库红线讨论挂起**：v11.14 双闸（入库闸 R1-R5/执行闸）已在工作（本次日志 10 条拦截全是 R1 长度闸拦整句），用户体感「泛滥」待确认具体实例后再定收紧方向（候选：R1 阈值 60字符/6词→40/4；proofread 来源禁入库；入库改待确认；维持现状）
 - **polishedIds 透出校对 CHECK 1R** 已闭环，但润色生效条目在 UI 无视觉标记（仅日志可见）——如需在卡片上加「已润色」徽章，下轮迭代讨论
 
+### v12.5 母语调研反馈落地——ja 纳入润色灰度 + zh-TW 术语/星号修复（2026-08-26，commit 5c6bc02）
+
+**背景**：母语调研反馈（AI Translation Quality Evaluation 问卷）实锤 ja 直訳感问题——ja 基线 naturalness 3.71 虽不在 <3.5 的 GO 名单，但母语者调研反馈「改行タイミングが不自然」「直訳感」集中，用户拍板纳入灰度。
+
+**改动**：
+- **v12.6 ja 润色扩展**（`POLISH_GRAY_LANGS +ja`）：双人设升级（直訳感三条可判信号：文体混在/全角半角/英語語順）+ ja 限定词表（up to→最大/まで 等 5 条）极性丢失一票否决；ja 校对 JA_LAYOUT_NOTE 条件注入（全角半角/読点可顺带规范，↵ 严禁改动）
+- **v12.5 stripSpuriousAsterisks**：源文无 * 时剥 LLM 自发 markdown 星号（成对剥壳/孤立剥除/数字单位后豁免/断行不吞），4 处接入含 translate 收尾安全网
+- **术语库 Response Time 行**（zh-TW=響應時間，母语调研拍板专业译法）
+
+**测试**：v123 38/38（ja 极性 4+硬锁 2+校对注入 2）、v125 16/16、v124 54/54 全绿；双 tsconfig typecheck + build 通过。
+
+**遗留（v12.6 已接续）**：ja 实机测试暴露 ™™/↵ 豁免/自动入库泛滥三事故——见下节。
+
+---
+
+### v12.6 ™™ 根治 + ↵ 豁免修复 + 自动入库红线 + 润色日志改进（2026-08-27，ja 实机事故驱动）
+
+**背景（ja 实机测试三事故）**：①`CFexpress™™` 双™ 上画布（用户截图实锤）②`↵` 多行格进润色（日志 [3] `" ↵ 持続書き込み速度最大"` 被润色生效）③校对自动修正触发术语库自动入库建议泛滥（用户反馈「添加到术语库的内容偏多」）。
+
+**根因与修复（一问题一行）**：
+
+| # | 问题 | 根因 | 修复 | 文件 |
+|---|------|------|------|------|
+| 1 | `CFexpress™™` 双™ | `restoreTrademarkSymbols` 提取源文两个 `{CFexpress,™}`，但插入循环 `wordRegex.exec` 恒锚全文第一个匹配实例 → 两次循环都把™插进第一个词尾 | 按 `(词小写|符号)` 去重，同词同符号只插入一次（锚第一个实例）；`hasTrademarkSpam` 扩充 `/([®™©])\1/` 同符号紧邻重复判据（散弹剥离层兜底） | `lib/post-process.ts` |
+| 2 | `↵` 多行格进润色 | `isPolishEligible` 先 `trim()` 再查 `↵`/`\n`——`trim()` 剥掉首尾 `\n`（JS 标准行为），前导换行被剥后豁免条件整锅失效 | ↵/`\n` 豁免检查移到 `trim()` 之前（用原文判定） | `lib/polish-guard.ts` |
+| 3 | 自动入库泛滥 | 校对每修一条就触发 `CORRECTION_SUGGESTION`（`CORRECTION_THRESHOLD=1`），虽然 R1 闸拦了长句，但短句/无标点句漏网 + 用户观感泛滥 | 红线：自动入库只收**用户手动修正**——`TranslationCorrection` 加 `suppressAutoGlossary` 标记，校对来源修正只留记录不触发建议 | `lib/main.ts` + `messages/types.ts` + `ui/App.vue` |
+| 4 | 润色日志伪生效 | 40 字符截断对"改动在句尾"的条目完全不可见（before→after 看起来一样） | 日志改为 diff 摘要：找第一个不同字符位置，前后各留 15 字符上下文 | `ui/App.vue` |
+
+**™ 防护链（三层）**：
+1. **翻译端主防线**：`restoreTrademarkSymbols` 去重——`™™` 在翻译管道就不可能产生
+2. **散弹检测兜底**：`hasTrademarkSpam` 扩充——万一 restore 未来再出问题，散弹剥离层兜住
+3. **润色硬锁**：`validatePolishOutput` 加 `™` 完整性校验（`checkTrademarkIntegrity`）——源文™词在译文中对应锚点必须有™，缺失即回退；锚点消费制（同词多™按序消费实例，与 restore「锚第一个实例」行为对齐）
+
+**测试**：临时验证脚本 16/16（restore 去重/散弹扩充/润色硬锁完整性/端到端链）+ 5/5（↵ 豁免 trim 边界）全绿，用完即删（claude-tmp 纪律）；双 tsconfig typecheck + build 通过。
+
+**用户拍板决策**（2026-08-27）：①™™ 尽量在翻译端解决（restore 去重是主防线，散弹扩充+硬锁是兜底）②↵ 豁免修复 ③自动入库红线=只收用户手动修正 ④润色日志改 diff 摘要。
+
+**遗留（下次迭代接续）**：
+- ~~**ja 灰度依据确认**~~ **已闭环（2026-08-27）**：ja 纳入灰度是 v12.5 母语调研反馈驱动（`5c6bc02` commit message 实锤「母语调研直訳感实锤」），非代码顺手——ja 基线 3.71 虽不在 <3.5 GO 名单，但母语者调研「改行タイミングが不自然」「直訳感」集中，用户拍板纳入
+- **™ 完整性校验的润色回退率**：修复后 restore 只锚第一个实例，第二个实例™缺失——含同词双™的条目润色会被完整性校验回退（可接受取舍：润色覆盖率下降但零™™事故）
+- **自动入库红线的漏网监控**：校对来源不再触发自动入库，但 SAVE_CORRECTION 记录仍在——用户可在术语库面板手动审核后决定是否入库
+
+---
+
+### v12.8 润色后二次判定闭环 + 动作白名单扩充（2026-08-27，收益中两项落地）
+
+**背景（用户拍板继续推进）**：v12.7 收益高三项落地后，收益中两项接续——①润色后二次判定（闭环验证「润色后是否比润色前更好」，防同义改写无效消耗）②动作白名单扩充（语体统一/全角半角/敬语层级，ja 实机高频问题）。
+
+**改动（一问题一行）**：
+
+| # | 改动 | 要点 | 文件 |
+|---|------|------|------|
+| 1 | **润色后二次判定** | `polishVerifyBatch`（llm-api.ts 新增）：同一人设对润色前后译文做差分对比「改善了吗」（`{"verdicts":[{"i":N,"improved":bool}]}`），只用第一个人设（减少 token+方差——差分对比比绝对评分稳定）。`improved=false` → 回退润色前译文（日志 `二次判定回退`）。缺省放行（二次判定失败不阻塞） | `lib/llm-api.ts` + `ui/App.vue` |
+| 2 | **动作白名单扩充** | 润色 prompt 白名单 3→6 条：+4 语体统一（です・ます混在→统一）+5 全角半角规范化（半角カタカナ→全角等）+6 敬语层级调整（营销 vs 技术文档）。**硬约束**：规则 4-6 仅当 issues 明确标注 register/style/width 类型时才放行（calque/structure 不触发） | `lib/llm-api.ts` |
+| 3 | **judge issue 类型引导** | 判定 prompt 补 issue type 枚举说明：`"calque"`（搭配直译）/`"structure"`（语序结构镜像）/`"register"`（语域文体敬语全角半角错位）——让判定 LLM 输出可归类的 issues，白名单扩充有据可依 | `lib/llm-api.ts` |
+
+**关键设计决策**：
+- **二次判定的差分对比**：同一人设+同一批次+二选一（which is more natural），比两次独立绝对评分方差小；只用第一个人设（非两人设投票）——token 消耗减半，且差分对比对单一人设更稳定。
+- **白名单扩充的约束**：规则 4-6 是「条件放行」非「默认放行」——issues 必须明确标注对应类型才触发，防 LLM 把扩充当「顺手改」的许可证。
+- **缺省放行哲学**：二次判定 API 失败/解析失败时 `improved` 缺省 true（放行）——二次判定是优化层非安全层，失败不该阻塞润色成果。
+
+**测试**：临时验证脚本 7/7（索引映射/缺省放行/硬锁边界）全绿，用完即删（claude-tmp 纪律）；双 tsconfig typecheck + build 通过。
+
+**遗留（下次迭代接续）**：
+- **迭代 4 灰度验证**（de/es/ru/tr/ja/zh-TW 六语种，工具已就绪）
+- **ko/fr/it 扩展**（等 zh-TW/↵ 收窄跑完一轮 judge 基线对比再定）
+- **二次判定的人设方差监控**（实机跑几批看 `二次判定回退` 频率——过高说明人设判定不稳定，需调阈值或换差分对比方式）
+
+---
+
+### v12.7 ↵ 多行格收窄 + zh-TW 扩展 + 润色前格式净化（2026-08-27，收益高优先级落地）
+
+**背景（用户拍板「只做收益高的」）**：v12.6 后润色三大优化方向中，收益高三项落地——①↵ 多行格收窄（真实设计稿 50%+ 豁免的根因）②zh-TW 扩展（基线 4.08 最高，润色最易做好）③润色前格式净化（™™ 事故衍生，判定质量提升）。
+
+**改动（一问题一行）**：
+
+| # | 改动 | 要点 | 文件 |
+|---|------|------|------|
+| 1 | **↵ 多行格收窄**（段内 eligible） | `isPolishEligible` ↵ 豁免改段内判定：源文/译文按 ↵ 切段，段数不等→整格豁免；段数相等→每段独立判定（合规/术语锁定/不可翻译段→整格豁免；极短段→该段不润但不整格豁免；至少一段 eligible→进润色）。`validatePolishOutput` 加 ⑦↵ 结构锁：↵ 个数不变+段内数字/限定词不跨段搬家。润色 prompt 加结构锁指令 | `lib/polish-guard.ts` + `lib/llm-api.ts` |
+| 2 | **zh-TW 扩展** | `POLISH_GRAY_LANGS +zh-TW`（基线 4.08 最高，润色 LLM 最易做好）；`POLARITY_TABLE +zh-TW`（最高/高達/最多/達/最大/上限/理論/相容/兼容/以下/低於）；UI 文案同步 | `ui/App.vue` + `lib/polish-guard.ts` |
+| 3 | **润色前格式净化** | `prePolishFormatCleanup`（post-process.ts 新增）：™ 去重（`/([®™©])\1+/→$1`）+ 品牌词连写拆分（SILVERCFexpress→SILVER CFexpress，品牌词表白名单+大小写不敏感）+ 多余空格压缩。restoreTrademarkSymbols 后、personaJudgeBatch 前插入，日志计数 | `lib/post-process.ts` + `ui/App.vue` |
+
+**关键设计决策**：
+- **↵ 收窄的粒度**：极短段（≤3 词）是标题/标签的正当形态，整格因一个极短段豁免会误伤所有多行格（设计稿主流=标题段+正文段）。收窄为「极短段不润但不整格豁免」——长段润色空间保留。
+- **结构锁的边界**：↵ 个数+位置不变是形式信号零误判；段内数字/限定词不跨段搬家是防「信息点跨段」的硬约束；段内语序/搭配可变是润色正当空间。
+- **格式净化的白名单**：品牌词连写拆分只拆 `SILVER/GOLD/DIAMOND/BLUE/PLAY/THOR/ARES/CFexpress/Professional/Lexar` 表内形态，microSDXC 等正常驼峰不拆（防误伤）。
+
+**测试**：临时验证脚本 11/11（↵ 收窄+结构锁）+ 7/7（zh-TW 限定词+eligible）+ 11/11（格式净化）全绿，用完即删（claude-tmp 纪律）；双 tsconfig typecheck + build 通过。
+
+**遗留（下次迭代接续）**：
+- **迭代 4 灰度验证**（de/es/ru/tr/ja/zh-TW 六语种，工具已就绪：`npx tsx tests/test-judge-baseline.ts --polish de es ru tr ja zh-TW --concurrency 2`）
+- **润色后二次判定**（闭环验证「润色后是否比润色前更好」，防无效消耗——收益中风险中，暂挂）
+- **ko/fr/it 扩展**（基线健康，实机反馈不足，等 zh-TW/↵ 收窄跑完一轮 judge 基线对比再定）
+
+---
+
 ### v12.4 迭代 4 灰度工具 + 工作区全量提交（2026-08-26 收尾）
 
 **① test-judge-baseline.ts `--polish` 模式**：迭代 4 验证工具落地——--polish 时 translateBatch 后、proofreadBatch 前插入生产同款润色管道（isPolishEligible/personaJudgeBatch/polishBatch 全部复用生产函数，与 App.vue 同路径），POLISH_GRAY_LANGS（de/es/ru/tr）白名单与生产一致；每语种打印资格/判定/生效/回退明细；产物 `tmp-judge-baseline-<slug>-polish-<lang>.json` 带后缀不覆盖 B 前基线（tests/baseline-pre-b/）。冒烟验证：import 链 + 资格过滤行为（营销长句 eligible、合规/极短/↵ 豁免）正常。
@@ -117,7 +359,7 @@ translateBatch 返回（App.vue startTranslate 波内）
 #### 待办全景（2026-08-26 盘点，按「等拍板/等实机/长线挂起」三档）
 
 **等用户拍板**：
-1. 自动入库红线收紧方向——v11.14 双闸在工作（实机 10 条拦截全是 R1 长度闸拦整句），用户体感「泛滥」待实例反推或四选一直接定（R1 阈值 60字符/6词→40/4 / proofread 来源禁入库 / 入库改待确认 / 维持现状）
+1. ~~自动入库红线收紧方向~~ **已拍板（2026-08-27）**：红线=自动入库只收用户手动修正（`suppressAutoGlossary` 标记），校对来源只留记录不触发建议——见 v12.6 节
 2. ~~git 提交~~ **已完成（2026-08-26，4 commit 06275b3/0187285/d1a39fa/ec5b8a3）**；未推送远程，待用户指示
 
 **等实机验证**：
@@ -1273,15 +1515,17 @@ v0.1.0 的 `postProcessEuropeanNumbers` 设计假设是"LLM 会输出纯数字�
 |------|------|
 | `lib/prompt-constants.ts` | 提示词常量（STYLE_GUIDES、LANG_SPECIFIC、PRODUCT_LINE_TONE_GUIDES、SCENE_CONSTRAINTS、CORE_PRINCIPLES、PROOFREAD_SYSTEM_PROMPT、v11.3 PRODUCT_NAME_PARSE_PROMPT/ZH LLM 产品名解析、**v11.12 PROOFREAD_PROHIBITED_NOTE/_ZH 违禁词校对全局块**、**v12.3 PROOFREAD_POLISHED_NOTE/_ZH 已润色条目 CHECK 1R 分叉**） |
 | `lib/llm-api.ts` | LLM 调用 + 翻译/校对管道 + 重试逻辑 + v9.5 三层漏翻检测 + v9.9 术语合规校验 + v9.10 双视图分发 + v9.11 批次级标注/untranslatedIndices/最终安全网 + v10.0 re-export lang-detect（兼容层）+ v10.2 截断判定（脚本存在性）+ 子兜底守卫 + 诊断日志埋点 + v10.4 管道阶段化(S1-S8)+auditStage 不变量审计 + v10.5 型号/裸单位豁免(isModelListOrCode/PURE_UNIT_RE)+截断跳过不可翻译+脚本校验豁免术语库已知值 + v10.6 revertMisspelledWordTranslation 疑似错词回退兜底 + v11.3 parseProductNameWithLLM LLM 兜底产品名解析 + **v11.12 proofreadBatch 第 10 参 prohibitedFixMap（per-item 违禁词改写 note）+ v11.12+ 术语库锁定项预豁免（prompt 组装前剪除，破改写→锁回死锁）** + **v12.0 输出 schema 化（双管道 response_format json_object 硬约束 + 翻译 i 索引映射防乱序错位 + extractResultsObject 平衡括号提取器，逐行兜底全保留）** + **v12.3 personaJudgeBatch 人设判定（2 人设×4 条/批 json_object）+ polishBatch 润色（动作白名单+issues 结构化传递+changes 数量校验+硬锁回退）+ proofreadBatch 第 11 参 polishedIndices（CHECK 1R 分叉）** |
-| `lib/polish-guard.ts` | **v12.3 润色资格负面清单+硬锁**（isPolishEligible：合规关键词/isGlossaryLockedTranslation 复用/shouldKeepSource 复用/≤3 词/含↵豁免；POLARITY_TABLE de/es/ru/tr 限定词最小集从实机源文反向提取；detectPolarityBreach 一票否决；validatePolishOutput 四层：validateNumbers/enforceGlossaryTerms/极性/单位保留） |
+| `lib/polish-guard.ts` | **v12.3 润色资格负面清单+硬锁**（isPolishEligible：合规关键词/isGlossaryLockedTranslation 复用/shouldKeepSource 复用/≤3 词/含↵豁免；POLARITY_TABLE de/es/ru/tr 限定词最小集从实机源文反向提取；detectPolarityBreach 一票否决；validatePolishOutput 四层：validateNumbers/enforceGlossaryTerms/极性/单位保留 + **v12.6 ⑤™散弹 ⑥™完整性 + v12.7 ⑦↵结构锁 + v12.9 ⑧违禁词回检**——润色新增违禁词→回退，prePolish 基线对比，关校对时唯一兜底） |
 | `lib/judge-personas.ts` | **v12.1 judge 人设库**（20 语种×2 消费者人设，LANGUAGE_MARKET_NOTES 具身化；getJudgePersonas 返回 2 个防单一人设刻板印象；度量工具（judge 基线）+ 生产组件（personaJudgeBatch 判定）双用途） |
-| `lib/prohibited-words.ts` | **v11.12 违禁词表**（PROHIBITED_ZH 京东/广告法 + PROHIBITED_ZH_EXEMPTIONS 豁免短语 + PROHIBITED_AVOID 20 语种与 LANGUAGES 严格对表；收录红线：宁漏勿滥，有合法语义的普通词不收；**v11.12+ 豁免 +4：有限终身质保/有限终身保修/有限終身保固/有限終身保修**；**v12.3.3 PROHIBITED_EN_EXEMPTIONS 英文豁免表新增：Limited Lifetime Warranty + Video Performance Guarantee（VPG 认证规格），与 zh 侧同型对称**） |
-| `lib/prohibited-check.ts` | **v11.12 违禁词检测纯函数**（detectProhibited/hasProhibited/detectSourceLangForProhibited：拉丁词边界 i flag 无 g flag、CJK 子串、符号词 `(?<!\d)`、zh 先剔豁免、重叠取最长）+ **v11.12+ isGlossaryLockedTranslation 术语库锁定判定（cleanKey 查表+译文严格等值）** + **v12.3.3 en 豁免分支（getExemptionRegex 字符级弹性复用）** |
+| `lib/prohibited-words.ts` | **v11.12 违禁词表**（PROHIBITED_ZH 京东/广告法 + PROHIBITED_ZH_EXEMPTIONS 豁免短语 + PROHIBITED_AVOID 20 语种与 LANGUAGES 严格对表；收录红线：宁漏勿滥，有合法语义的普通词不收；**v11.12+ 豁免 +4：有限终身质保/有限终身保修/有限終身保固/有限終身保修**；**v12.3.3 PROHIBITED_EN_EXEMPTIONS 英文豁免表新增：Limited Lifetime Warranty + Video Performance Guarantee（VPG 认证规格），与 zh 侧同型对称**；**v12.9 PROHIBITED_EXEMPTIONS 全语种豁免总表**（zh/en/ja 迁入统一，ja 新增速度规格/数字锚定/テスト质量背书豁免——`最大#` 数字锚定语法覆盖 最大2TB/最大12,000回）；**v12.11 PROHIBITED_WORDS_VERSION 版本戳**（缓存 key 第 5 段，词表/豁免表任何增删必须 +1）+ **en +19 词**（OEC 亚马逊官方清单：unbeatable/amazing/premium/award winning/proven/best seller/bestselling/discount/wholesale/free shipping/buy one get one/money back + 存储专项 100% waterproof/unbreakable/indestructible/works with all/universal compatibility/lasts forever/never fails/enterprise grade）+ **pt-BR += testes**（BR 站 A+ 拦截实证）+ **it += garanzia/certificata**（IT 站拦截实证；截断 certificazion 拒收防误伤 certification）） |
+| `lib/prohibited-check.ts` | **v11.12 违禁词检测纯函数**（detectProhibited/hasProhibited/detectSourceLangForProhibited：拉丁词边界 i flag 无 g flag、CJK 子串、符号词 `(?<!\d)`、zh 先剔豁免、重叠取最长）+ **v11.12+ isGlossaryLockedTranslation 术语库锁定判定（cleanKey 查表+译文严格等值）** + **v12.3.3 en 豁免分支（getExemptionRegex 字符级弹性复用）** + **v12.9 豁免通用化（PROHIBITED_EXEMPTIONS 总表驱动，zh/en 白名单分支→「有豁免表就剔除」）+ `#` 数字锚定豁免语法** |
 | `lib/lang-detect.ts` | v10.0 语言检测单一事实源（三套检测/词表/字符集分类/同语系对，detectSingleTextLanguage 死代码已修为委托批次级）+ **v10.2 TARGET_SCRIPT_PATTERNS** |
 | `lib/keep-source.ts` | **v10.0 豁免中央注册表**（shouldKeepSource/isSameLanguageExempt，F3b 三重守卫迁入） |
 | `lib/new-product-detect.ts` | **v11.2/v11.3 新产品名检测**（五槽位解析 parseProductName + 五门判定 detectAdhocProductTerms + v11.3 LLM 兜底触发 detectFallbackCandidates）+ **v11.4 系列名 camelCase 品牌形态（nCARD/eSeries）** |
 | `lib/product-name-generator.ts` | **v11.2 产品名 20 语种生成**（五槽位渲染 + CATEGORY_TRANSLATIONS 品类译法表 + WORD_ORDER 语序模板 + detectCategory 品类指纹）+ **v11.4 detectCategory 双遍匹配（大小写不敏感+品名语境守卫）+ core-strip i flag** |
-| `lib/post-process.ts` | 译后处理（enforceGlossaryTerms、detectBrandInjection、restoreTrademarkSymbols、detectTranslationExpansion、cleanKey）+ **v12.3 数字格式修复**（postProcessEuropeanNumbers 补英文千分位/小数点/单位空格 de/es；postProcessRussian 扩充 min/Gauss 俄语化）+ **v12.1 enforceThaiLineBreaks 占位（已回退，泰文断点需分词器超架构）** |
+| `lib/post-process.ts` | 译后处理（enforceGlossaryTerms、detectBrandInjection、restoreTrademarkSymbols、detectTranslationExpansion、cleanKey）+ **v12.3 数字格式修复**（postProcessEuropeanNumbers 补英文千分位/小数点/单位空格 de/es；postProcessRussian 扩充 min/Gauss 俄语化）+ **v12.1 enforceThaiLineBreaks 占位（已回退，泰文断点需分词器超架构）** + **v12.12 finalizeForCanvas（写画布最终还原 ↵→\n 不变量收敛）** |
+| `lib/translation-memory.ts` | **v7.5.8 翻译记忆模板匹配**（同型号不同容量 compressBatch/expandBatch）+ **v12.13 TM few-shot 检索**（tmSimilarity 词级 Jaccard+CJK/泰文 bigram+数字集合相等防线 / retrieveTM origin=user 人工验收单源 ≥0.90 ≤2 条/批——方案 2 收窄版） |
+| `lib/parse-csv.ts` | CSV 原语（parseCSVRecords/csvEncodeCell/术语库解析序列化 v11.14）+ **v12.13 deprecated 术语标记（软删除——解析/buildGlossaryMaps 不注册/序列化往返保留）** |
 | `lib/entity-masker.ts` | 实体/术语遮蔽（maskGlossaryTerms → maskEntities 顺序 v9.2） |
 | `lib/glossary-filter.ts` | 术语过滤（filterRelevantGlossary、normalizeForMatch） |
 | `lib/few-shot-examples.ts` | Few-shot 翻译示例（20语种 × 3 内容类型） |
@@ -1289,7 +1533,7 @@ v0.1.0 的 `postProcessEuropeanNumbers` 设计假设是"LLM 会输出纯数字�
 | `lib/text-normalizer.ts` | 文本预处理（Unicode NFC、全角→半角、零宽字符、↵保护） |
 | `lib/default-glossary.ts` | 默认术语库（140 产品名 + 189 专属术语） |
 | `lib/main.ts` | 插件主线程（扫描/appliedTexts 快照/undoAll 三方对比/selectionchange/**fixRegisterSymbolFont v9.6**） |
-| `ui/App.vue` | UI 主组件（流程编排、sticky 操作区、待确认机制、busyPhase、computeUntranslatedBadge v9.5、buildGlossaryMaps 双视图 v9.10、v11.2 新产品名检测/生成/入库 + v11.3 LLM 兜底集成 + llmFallbackTerms 待确认 + **v11.12 违禁词徽章全链（源文/译文/四个旁路/校对回检/enableProofread 默认翻 true 迁移）+ v11.12+ prohibitedLockedIds 双徽章通道 + routeProhibitedHits 统一路由** + **v12.3 润色管道集成（enablePolish toggle/管道三段/polishedIds 透出两处 proofreadBatch）+ v12.3.2 开关跟随语言+togglePolish 落盘 + v12.3.3 润色五点日志+待确认面板源文/译文 title 悬停全文**） |
+| `ui/App.vue` | UI 主组件（流程编排、sticky 操作区、待确认机制、busyPhase、computeUntranslatedBadge v9.5、buildGlossaryMaps 双视图 v9.10、v11.2 新产品名检测/生成/入库 + v11.3 LLM 兜底集成 + llmFallbackTerms 待确认 + **v11.12 违禁词徽章全链（源文/译文/四个旁路/校对回检/enableProofread 默认翻 true 迁移）+ v11.12+ prohibitedLockedIds 双徽章通道 + routeProhibitedHits 统一路由** + **v12.3 润色管道集成（enablePolish toggle/管道三段/polishedIds 透出两处 proofreadBatch）+ v12.3.2 开关跟随语言+togglePolish 落盘 + v12.3.3 润色五点日志+待确认面板源文/译文 title 悬停全文** + **v12.11 缓存 key 拼入 PROHIBITED_WORDS_VERSION 第 5 段 + 润色生效写回处重跑 updateProhibitedTrans（时序闭环）**） |
 | `ui/styles.css` | 全部样式（Apple 设计令牌、深色覆盖、.footer v9.3 恢复、**v11.12 .prohibited-badge #e8890c + v11.12+ .locked 描边变体**） |
 | `ui/ui.ts` | UI 挂载入口 |
 | `tests/test-untranslated-v3.ts` | **v9.5 三层漏翻检测全量回归（40 用例）** |
@@ -1313,6 +1557,8 @@ v0.1.0 的 `postProcessEuropeanNumbers` 设计假设是"LLM 会输出纯数字�
 | `tests/test-judge-baseline.ts` | **v12.1 judge 基线脚本（去机翻感阶段 C）：judge 人设模拟三维评分（naturalness/tone/fidelity），翻译侧 v115 生产管道 + judge 侧裸 XHR json_object；CLI --csv/--langs/--concurrency/--judge-only/--persona-check；输出 tmp-judge-baseline-*.json（不截断）+ summary.txt** + **v12.4 --polish 模式（迭代 4 灰度工具：translateEntries 插入生产同款润色管道，产物带 -polish 后缀对比 B 前基线）** |
 | `tests/test-v122-mt-flavor.ts` | **v12.2 机翻味反面词表（8 断言：A 首调注入 4 语种 / B 重试回归 / C 校对隔离 2 / D 规模回归）** |
 | `tests/test-v123-polish.ts` | **v12.3 人设驱动判定→润色→硬锁（32 断言：A 资格负面清单 9 / B 硬锁四层 6 / C 否定极性词表 7 / D 判定润色 mock XHR 全链路 6 / E CHECK 1R 注入+快照锁 4）** |
+| `tests/test-v129-exemption-all-langs.ts` | **v12.9 违禁词豁免全语种对齐+润色违禁词硬锁（47 断言：A ja 豁免正例 14 实机卡+素材形态 / B ja 红线反例 8 / C 数字锚定 6 / D zh 对齐+en 回归 9 / E 通用化机制 4 / F 润色两道防线 4）+ v12.11 G 段 34 断言（en 新词 19 命中 / 拒收词回归 8：new/free/sale 裸词+CTA 不命中+seller/work with all/for all 边界 / 既有豁免不回退 3 / pt-BR·it 补缺 4）→ 89 断言** |
+| `tests/test-v1213-translation-memory.ts` | **v12.13 翻译记忆+deprecated 术语标记（28 断言：A tmSimilarity 7 含数字防线/CJK/泰文 / B retrieveTM 过滤链 11 含 proofread 拒/数字不等拒/上限/同源去重 / C translateBatch 注入 6 含替换静态/快照锁/重试不注入/中文块 / D deprecated 4 含解析/往返/无列兼容/无废弃不输出列）** |
 
 ---
 
@@ -1560,7 +1806,107 @@ npx tsx tests/test-schema-live.ts a         # 只跑 A 段
 
 **灰度协议（待实机验证）**：开启后重跑 de/es/ru/tr 四语种 judge 基线（`--judge-only` 复用 B 前基线对比）；**fidelity 掉 >0.2 的语种永久不开**（回退=没润色零事故）；naturalness 升 ≥0.3 判有效；每语种结果写迭代记录（迭代 4）。
 
+---
 
+#### 迭代 4：质量地板机制——verify 事实锚 + best-of-2 择优 + 降温（2026-08-28）——**编码完成，灰度验证待跑**
+
+**动机（实机质量参差实锤）**：en→ja SILVER CFexpress 4.0 实机测试暴露「标语/营销句是全管道形式锁覆盖为零的文本类型」——无数字/无术语命中/无合规词/无限定词，恰是设计稿最显眼文字。标语「CFexpress 4.0 Pro Performance, for All.」三次产出 ⭐⭐~⭐⭐⭐⭐⭐ 不等，润色产物「すべてのユーザーへ、プロ向け CFexpress 4.0 の性能を」**语义偏移**（プロ向け=面向专业，与 for All 内核冲突），全部硬锁+二次判定放行。规格行有锁兜着所以稳，质量方差集中在无锁高自由度区。用户拍板：「在可靠性的同时提升翻译质量是我们应该做的事情」。
+
+**改动（一问题一行）**：
+
+| # | 改动 | 要点 | 文件 |
+|---|------|------|------|
+| 1 | **verify 二次判定加事实锚定门** | verdicts schema 加 `factsIntact: boolean`——借鉴校对 CHECK 1/2 措辞+明示「语义指向」（who the product is FOR 受众指向不得改变）；`improved && factsIntact!==false` 一票否决；缺省 true 向后兼容；`factsBreachIndices` 透出区分日志「事实偏移」vs「无改善」 | `lib/llm-api.ts` + `ui/App.vue` |
+| 2 | **翻译降温 0.2→0.1** | 判定/校对/解析类全 0.1，翻译 0.2 无独立理由（创造性由 prompt 管不由温度管）；激进兜底链 0.3 不动（越到兜底越放宽既有设计） | `lib/llm-api.ts` |
+| 3 | **best-of-2 翻译择优** | **内部首调包一层**（探查论证外层调两次 translateBatch 三重伤：重试链双倍放大/输出参数 Set 污染/比较不同管道层产物）：抽 `callFirstLLM` 内部函数（fetch+解析纯搬迁），`translateBatch` 加 `bestOf2` 参数——并行双跑首调、S5 还原前择优（两候选都是占位符遮蔽态，™/术语形式差异中性化，judge 只看语义/自然度）、冠军单走 S5-S8（重试链/输出参数/术语合规零污染）。**资格判定**（token 纪律）：术语短路/合规关键词/shouldKeepSource/极短 ≤3 词/**含数字**（validateNumbers 锁兜着方差低——与润色资格的关键差异）不择优，只有「无锁高自由度」营销/描述句双跑。新增 `translationPickBatch`：单人设差分二选一（v12.8 纪律）+ **A/B 位置随机交换**（消位置偏置——择优双向都可能被选中，偏置必须消，polishVerify 的 Before 恒前无害=判不出改善即回退是保守方向）+ factsIntact=false 所选判负强制换边（代码兜底）+ 缺省取第一路（判定失败零事故）。`translationPickBatch` 修了一个 indexing bug：buildPickUser 批内 [N] 恒 1-based（startIdx=0），byI lookup 曾错用全局索引 b+k+1 导致批次≥2 恒失配。`firstCallAnomalyIndices` 口径：只采集冠军路 | `lib/llm-api.ts` |
+| 4 | **UI 开关 enableBestOfN** | llmConfig 字段 + toggle 渲染（默认关文案「token 约 +40%」）+ toggleBestOfN 落盘；startTranslate 开关开 + 灰度语种（POLISH_GRAY_LANGS）时 bestOf2=true；择优统计日志 `best-of-2 择优: 双跑N条→两路一致M条→判定K条→选第二路J条` | `ui/App.vue` + `messages/types.ts` |
+| 5 | **判定消费排序稳定化** | 实机日志命中列表 `[1][2]...[8][9][10][6][7]` 乱序——并发批次完成序进 Map 键序致判定结果消费顺序漂移；judgeHits 消费前按 key 排序 | `ui/App.vue` |
+| 6 | **豁免计数细分** | 实机日志「其他 9」黑盒无法复盘——`polishExemptReason` 透出豁免原因（arrow/empty/short/compliance/glossary-locked/keep-source），`isPolishEligible` 收编为委托（单一事实源）；日志 `豁免 9：↵整格 0 / 合规 3 / 术语锁定 1 / 极短 4 / 不可翻译 1` | `lib/polish-guard.ts` + `ui/App.vue` |
+
+**测试**：新套件 `tests/test-v1210-best-of-n.ts` **31/31**（A 择优资格 6 / B 双跑对齐+统计+重试链不双跑 8 / C 择优判定 mock 全链路 6 / D 单跑向后兼容 2——坑 13 教训：判定逻辑改动后队列错位先核对 mock 队列对齐再查代码，本次 3 处失败全是队列残留非生产 bug）；test-v123-polish.ts +5（D5-D7 factsIntact 门）→ **43/43**；回归 v105(46)/v106(46)/v107(14)/v108(21)/v1112(176)/v1115(15)/v129(47) 全绿；双 tsconfig typecheck + build 通过（bundle 验证走 `\uXXXX` 大写转义——事实偏移/择优/双跑/术语锁定/不可翻译/选第二路/润色后无改善确认进产物）。
+
+**灰度协议（待实机验证）**：enableBestOfN 默认关手动开（六语种可选）；开启后重跑 judge 基线对比 B 前基线（`npx tsx tests/test-judge-baseline.ts --polish de es ru tr ja zh-TW --concurrency 2`）；**fidelity 掉 >0.2 永久不开**；naturalness 升 ≥0.3 判有效。
+
+**v12.10.1 补丁（2026-08-28，tr 实机日志驱动——en 绝对化词豁免 + 前缀压缩）**：
+
+| # | 改动 | 要点 | 文件 |
+|---|------|------|------|
+| 1 | **en 绝对化词语境锚定豁免** | tr 实机日志 6 张源文违禁词卡（ultimate×3/best×2/superior×1/perfect×2）——与 ja「最大」完全同型的系统性噪音。用户拍板 A 方案：豁免锚定语境的短语形态，裸词红线不豁免。新增 5 条：`ultimate performance for`（锚定 for 语境端——字符级弹性 regex 首尾字母后 `\W*` 可吞标点，`Ultimate Performance` 会把裸宣称+感叹号也剔除，锚到 for 后字母挡住）+ `Unleashing ultimate performance`（句内锚定）+ `perfect match`（固定搭配）+ `Best Match`（标题锚定）+ `superior Gen`（规格语境锚）。红线：裸 `ultimate!`/`best`/`superior performance` 仍命中 | `lib/prohibited-words.ts` |
+| 2 | **违禁词前缀压缩** | 待确认面板每条前缀「源文含平台违禁词（…），上传京东/亚马逊会被拦截：」~30 字符挤压正文（40 字符截断后只剩 10 字符源文可见）。压缩：前缀改「源文违禁词（…）：/译文违禁词（…）：」（省 ~15 字符），「（上传京东/亚马逊会被拦截）」挪到横幅计数尾部统一说一次（条件注入——只有违禁词条目时才显示） | `ui/App.vue` |
+
+**测试**：v129 套件 +8 断言（D10-D16：5 豁免正例 + 3 红线反例——D14 初版失败实锤字符级弹性 regex 首尾 `\W*` 吞标点特性，豁免锚定到 for 语境端后全绿）→ **55/55**；typecheck + build 通过（bundle 验证：`ultimate performance for`/`superior Gen`/`perfect match`/`Best Match` 确认进产物，旧前缀形态「，上传京东/亚马逊会被拦截：」确认消失，横幅新形态分片转义串确认进产物）。
+
+**tr 实机日志观察（v12.9 构建，非 v12.10）**：
+- tr 灰度润色正常触发（eligible 8/11/6 三波，极性锁/数字锁/二次判定全链实战立功）
+- 判定召回尖峰再现（第三波 11→命中 10）+ 短标签白烧（[2][3] 极短标签命中后回退）——与 ja 同型，判定阈值调整待灰度数据
+- tr 译文侧零违禁词卡——tr LLM 全部成功规避（`üst düzey`/`ideal` 安全表达），检测盲区还是真规避待 tr 母语者抽查
+- `Lexar  DiskMaster` 双空格（v12.7 格式净化应兜住，实机确认净化后单空格）
+
+**明确不做**：❌ tr 判定阈值调整（待灰度数据）❌ tr 译文侧检测盲区扩词表（待母语者抽查确认是真规避还是漏检）。
+
+**v12.10.2 补丁（2026-08-28，tr 实机「Üst Seviye ↵ Performans ↵」事故——润色产物字面 ↵ 上画布）**：
+
+**根因**：翻译管道 `postProcessTranslation`（S5）把 ↵→`\n`，但**润色写回（`translated[origIdx] = pr.text`）在 postProcessTranslation 之后执行**——pr.text 里的字面 ↵ 直接写画布显示为「↵」字符。实机实锤：`Performance for the Next Level` → 润色生效 `Üst Seviye ↵ Performans` → 画布显示「Üst Seviye ↵ Performans ↵」（尾部 ↵ 是源文尾随断行，LLM 回显）。
+
+**修复**：`polishBatch` 写回前 `restored.replace(/\s*↵\s*/g, '\n')`——与翻译管道 `postProcessTranslation` 同语义（↵ 是管道内占位符，画布需要真换行）。
+
+**测试**：v123 +2 断言（D2c/D2c2：润色输出字面 ↵ → 写回前转真实换行 + 写回文本不含字面 ↵）→ **45/45**；typecheck + build 通过（bundle ↵ 转义串确认进产物）。
+
+**v12.10.2 连带排查（无同类缺口）**：best-of-2 择优写回（`result[i] = resultB[i]`）在 translateBatch **内部**（S4 解析后、S5 postProcessTranslation 之前）——S5 正常把 ↵→`\n`，无缺口。润色写回是唯一在 postProcessTranslation 之后的写回点。
+
+**v12.10.3 补丁（2026-08-28，用户拍板「别只修一个语言」——best-of-2 闸门扩全语种）**：
+
+**改动**：`POLISH_GRAY_LANGS.includes(targetLang)` 闸门移除——best-of-2 机制语种无关（择优 prompt 是 `${targetLang}` 变量注入模板），enableBestOfN 开关开时 **20 语种全生效**。`getJudgePersonas` 未覆盖的语种（当前 19/20 覆盖，en 源语言跳过）时 `translationPickBatch` 返回空 map → 缺省第一路保守，零事故。UI 文案「de/es/ru/tr/ja/zh-TW 生效」→「全语种生效」。
+
+**测试**：v1210 回归 31/31 全绿（闸门改动在 App.vue 不在 lib，套件不受影响）；typecheck + build 通过。
+
+**v12.10.4 补丁（2026-08-28，用户拍板 A 方案「静默执行」——润色/择优/校对默认全开+开关撤除）**：
+
+**背景**：用户反馈「翻译择优、AI 校对、AI 润色，会不会选项太多了」——三个开关每次都要想「开哪个、哪个和哪个叠加、不开会怎样」，复杂度推给了用户。用户拍板 A 方案：全静默，默认全开，后台自动跑，用户零感知。
+
+**改动（一问题一行）**：
+
+| # | 改动 | 要点 | 文件 |
+|---|------|------|------|
+| 1 | **润色/择优开关撤除** | 设置面板 AI 润色/翻译择优 toggle 删除（保留 AI 校对 toggle——它管对错是安全网非优化，性质不同必须独立）；togglePolish/toggleBestOfN 函数删除 | `ui/App.vue` |
+| 2 | **默认值全开** | llmConfig 初始值 enablePolish/enableBestOfN 默认 true；SETTINGS_LOADED 迁移 `silentDefaultMigrated` 一次性标记——未迁移过时强制全开（老用户升级自动生效）；polishUserTouched/灰度跟随逻辑废弃 | `ui/App.vue` + `messages/types.ts` |
+| 3 | **润色灰度闸门移除** | `POLISH_GRAY_LANGS.includes(targetLang)` 闸门移除——润色机制语种无关（judge prompt 是 `${targetLang}` 变量注入模板），20 语种全生效；getJudgePersonas 未覆盖语种时 personaJudgeBatch 返回空 map → 无润色，零事故 | `ui/App.vue` |
+
+**关键论证（为什么敢静默）**：
+- **润色回退零事故**：硬锁八层+二次判定+factsIntact 事实锚，失败=没润色，静默不惊动（v10.6 哲学）
+- **择优缺省第一路**：判定失败=单跑现状，零事故
+- **校对只改错不改好**：CORE DIRECTIVE「Do NOT make subjective changes」+ 术语库合规锁，误改有锁兜着
+- **诊断日志全保留**：`[polish]`/`[best-of-2]`/`[proofread]` 日志照写，诊断面板可观测——不看就不存在，要看全都在
+
+**token 成本（静默的对价）**：择优 ~+40%（双跑仅 eligible 子集）+ 润色判定 token——用户拍板接受（「接受这个成本换用户零操作」）。
+
+**保留 AI 校对 toggle 的理由**：校对管「对不对」（漏翻/多翻/术语错/违禁词规避），是安全网非优化——用户可能有「只要快不要校对」的场景（草稿预览），这个选择权保留；润色/择优管「好不好」，是质量优化——正式上架物料场景下质量优化不该是可选项。
+
+**v12.10.5 补丁（2026-08-28，用户拍板「留一个 AI 优化」——三机制统一开关 + effective 闭环）**：
+
+**背景**：用户拍板 A 方案后进一步收敛——「留一个 AI 优化吧，把校对、AI 润色、AI 择优的功能开关都放到这里」。用户同时质疑「开关是否真的做到位了，别只是一个 UI 界面空转没有闭环」。
+
+**改动（一问题一行）**：
+
+| # | 改动 | 要点 | 文件 |
+|---|------|------|------|
+| 1 | **enableAiOptimize 总开关** | llmConfig 新增字段（messages/types.ts）；UI 只暴露一个 toggle「AI 优化（校对查错 + 润色去机翻感 + 择优取更优，关闭可省 token）」；enableProofread/enablePolish/enableBestOfN 保留为内部字段（向后兼容+细粒度控制）但用户不可见 | `messages/types.ts` + `ui/App.vue` |
+| 2 | **effective 闭环保障** | `effProofread/effPolish/effBestOfN` computed——**机制判断点全部走 effective 值**（`enableAiOptimize && enableXxx`），关总开关时三机制全停；防「开关开了但机制没跑」的 UI 空转。机制判断点清单（全部改走 effective）：startTranslate 校对入口（L1738）/ proofreadEnabled 预计算（L1776）/ bestOf2On（L1879）/ enablePolish 润色入口（L1960）/ prohibitedTrans 按钮禁用态（L149）/ 测试校对按钮显示（L501）/ useDefaultConfig 恢复默认（L3492）/ SETTINGS_LOADED 迁移（L3808 enableAiOptimize 缺省 true） | `ui/App.vue` |
+| 3 | **提示文案按实际功能** | toggle 文案「AI 优化（校对查错 + 润色去机翻感 + 择优取更优，关闭可省 token）」——三个子功能一句话说清；prohibitedTrans 按钮 title「先在配置中开启 AI 优化」（原「开启 AI 校对」过时） | `ui/App.vue` |
+
+**测试**：typecheck + build 通过（bundle 验证：enableAiOptimize 12 处引用（toggle+template+机制点+effective computed）、toggle 文案分段转义串「优化（/校对查错/润色去机翻感/择优取更优/关闭可省」全部进产物、旧「AI 校对（二次审查」文案消失）。
+
+**v12.10.6 补丁（2026-08-28，用户拍板「设置成默认是打开的」——默认打开强化）**：
+
+**改动**：`raw.enableAiOptimize = true` 强制赋值（不再只缺省时设 true——显式 false 也强制 true）。**语义**：总开关的「关」只在本会话内有效，重启后恢复默认开——防「关了就忘了开回来」的质量静默降级（用户场景是正式上架物料，质量优化默认开是合理默认；真要省 token 的草稿预览场景，本会话内关掉即可，重启自动恢复）。
+
+**测试**：typecheck + build 通过（bundle 验证：AI 润色/翻译择优 toggle 文案消失、POLISH_GRAY_LANGS 消失、silentDefaultMigrated 进产物、润色/择优机制关键词「润色资格/人设判定/择优/双跑/事实偏移」转义串确认进产物、AI 校对 toggle 保留）。
+
+**标语三译文案例（母语评审锚点）**：`tests/live-cases/2026-08-28-live-cases.md` S1——① すべてのユーザーに…（⭐⭐ 语序颠倒）② CFexpress 4.0 のプロ仕様性能を、すべての人に（⭐⭐⭐⭐⭐ 最佳锚点：产品前置+for All 收尾，日本影像品牌经典标语句式）③ すべてのユーザーへ、プロ向け…（⭐⭐ 语义偏移——verify factsIntact 门的目标案例）。best-of-2 择优在 ①/② 或 ②/③ 间应稳定选 ②。
+
+**明确不做**（本轮边界）：❌ 缓存修复（用户澄清实际运用不会同文档多次翻译同语言，测试场景不需要）❌ 标语句式守则 prompt（迭代 2 已证清单边际 +0.1~0.2，标语由 best-of-2 机制解）❌ 短标签判定阈值调整（待灰度数据）❌ best-of-2 默认开（灰度纪律）。
+
+---
 
 #### 专项立项：th 泰文断行/分段问题排查（2026-08-25，迭代 1 衍生）——**已回退挂起**
 
@@ -1573,6 +1919,36 @@ npx tsx tests/test-schema-live.ts a         # 只跑 A 段
 2. **L2 代码断行硬锁**（post-process.ts enforceThaiLineBreaks，S5 后按源文断行位置强制拆分）→ **回退**：断点选择需要泰文分词器（dictionary-based segmentation），元音规则近似在前导元音（เ แ โ ใ ไ）场景切错词（"ค↵ุณ"），断错词比连写更糟（judge 评"ข้อความแตกคำ"质量事故，naturalness 反降至 2.33）。**可靠性第一原则：不为排版美观冒切词风险**
 
 **最终处置**：管道调用全部移除（llm-api.ts S5 + proofreadBatch 两处 + LANG_SPECIFIC.th.rules prompt 改动），enforceThaiLineBreaks 函数保留在 post-process.ts 作占位（头注标明已回退原因，未来若引入泰文分词能力可重启）。**th 断行问题标记为「需泰文分词器，超当前架构」**；th naturalness 2.6 为已知薄弱点，方案 B 阶段处理搭配问题（"การจัดสรรเกม"类直译搭配），断行问题挂起。
+
+---
+
+#### 迭代 4 灰度验证结果（2026-09-03 跑批）+ 判定方式定稿
+
+**跑批**：`npx tsx tests/test-judge-baseline.ts --polish de es ru tr ja zh-TW --concurrency 2`（产物 `tests/tmp-judge-baseline-play-pro-microsd-polish-*.json`，日志 `tests/tmp-iteration4-polish-run.log`）。注意脚本内白名单仍是 v12.4 的 `POLISH_GRAY_LANGS=['de','es','ru','tr']`——ja/zh-TW 跳过润色只出基线。
+
+**对比 B 前基线（tests/baseline-pre-b/）**：
+
+| 语种 | nat B前 | nat 本次 | Δnat | fid B前 | fid 本次 | Δfid |
+|---|---|---|---|---|---|---|
+| de | 3.25 | 3.27 | +0.02 | 4.77 | 4.81 | +0.04 |
+| es | 3.48 | 3.50 | +0.02 | 4.85 | 4.88 | +0.02 |
+| ru | 3.40 | 3.62 | +0.23 | 4.90 | 4.81 | -0.08 |
+| tr | 3.33 | 3.35 | +0.02 | 4.83 | 4.85 | +0.02 |
+| ja | 3.71 | 3.50 | -0.21 | 4.96 | 4.85 | -0.10 |
+| zh-TW | 4.08 | 3.96 | -0.12 | 4.88 | 4.92 | +0.04 |
+
+**判定（按灰度协议）**：fidelity 最大跌幅 -0.10（ja）未触 -0.2 红线；naturalness 最高 +0.23（ru）未达 +0.3 有效线。**但决定性事实是：de/es/ru/tr 人设判定命中 7-9 条/12 格，32 次润色全部硬锁回退，0 条生效**——Δ 全是管道变量噪音（降温 0.1 等），不能判定润色有效，但**硬锁安全性得到最强实证**（32 次拦截全是真违规：™ 丢失 ~19 / ↵ 结构破坏 ~8 / 限定词丢失 1）。
+
+**根因**：润色管道是三管道中唯一「裸发™+裸发↵」的（翻译有剥离+restore、校对有 proofTmStripped 双侧剥离）；测试素材是 A+ 多行格（™ 高频+↵ 密集），恰好是硬锁⑥⑦最容易触发的形态。
+
+**判定方式定稿（2026-09-03 用户拍板，五条）**：
+1. **判定/匹配层必须先格式归一**——术语库命中（cleanKey 去™/连字符/空白折叠）已是此形态；判定类 LLM（judge/润色/择优）输入同样应先剥离™/断行等格式噪音，只看语义层
+2. **还原哲学：能还原就还原，不能还原不强求**——™ 按源文锚点必还原（restoreTrademarkSymbols，源文有才加、锚第一个实例）；润色后的断行不做「重新断行」（断点选择是语言学判断，泰文两轮回退教训）
+3. **断行二分（用户定义）**：**语义断行**（句间/段落/bullet 列表——两侧各自完整）要保留；**句中断行**（排版换行——一句话被视觉宽度劈开）不保留，拍平。形式判定信号：↵ 左段以终结标点结尾或 ≤5 词（标题/bullet 形态）→ 语义断行保留；否则 → 句中断行拍平
+4. **LLM 断行信任分配（用户问「LLM 翻译会保留语义断行吗」，LLM 自证+实测）**：翻译/校对 LLM 可信（↵ 占位符是强信号+逐句处理天性+实测零断行事故；v12.10.2 是代码写回 bug 非 LLM 丢断行；例外=泰文 41% 保留率是断行决策弱非丢失）；**润色 LLM 不可信**（重写天性会合并 bullet 求流畅——本次 8 次 ↵ 回退全是润色干的，翻译零次）→ 信任只给翻译/校对，润色的断行必须代码保管
+5. **润色断行由代码保管 = 按段润色**：语义断行处切段（代码记住位置）→ 逐段独立润色（段内无 ↵，LLM 物理上不可能毁结构）→ 拼回原位置——结构锁从「校验」升级为「构造保证」，且语义断行 100% 保留、™ 100% 还原、排版零影响
+
+**下一步（迭代 5，已拍板方向）**：润色管道按段化改造——①判定/润色输入双侧剥™（proofTmStripped 范式）+ 润色后 restore™ ②语义断行按段切分/拼回 + 段内句中断行拍平 ③硬锁⑥⑦保留（按段后理论不触发，安全网不拆）④重跑灰度验证存活率（预期 0/32 → 只剩事实层违规被拦）。**明确不做**：重新断行（语言学判断）、翻译/校对管道改动（已对齐）、按整条拍平（语义断行丢失——用户拍板要保留）。
 
 ---
 
@@ -1615,4 +1991,4 @@ User Message：`[N] ({srcLang}→{targetLang}) source\nTrans：translation`
 
 ---
 
-**最后更新**: 2026-08-26
+**最后更新**: 2026-09-03（v12.13）
