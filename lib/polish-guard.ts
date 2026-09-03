@@ -377,9 +377,12 @@ export function validatePolishOutput(
 }
 
 /**
- * v12.6: ™ 完整性校验——源文中的™词，在译文中对应锚点位置必须有™。
- * 锚点消费制：同一词出现多次时，按序消费译文中的匹配实例（第 N 个源文™词对应第 N 个译文匹配）。
- * 与 restoreTrademarkSymbols 的"锚第一个实例"行为对齐：只要求第一个实例词尾有™。
+ * ™ 完整性校验——源文中的每个™实例，在译文中对应锚点位置必须有™。
+ * 锚点消费制（游标逐实例）：同一词出现多次时，按序消费译文中的匹配实例
+ *   （第 N 个源文™实例对应第 N 个译文匹配实例）——与 v12.14 restoreTrademarkSymbols
+ *   的逐实例恢复行为严格对齐（restore 插几个，本校验就要求几个，恒无冲突）。
+ *   v12.6→v12.14 沿革：旧版只校验第一个实例（与旧 restore「锚第一个实例」对齐）；
+ *   v12.14 restore 升级为逐实例恢复后，本校验同步升级——否则润色把第二个™润没了也不拦。
  * @returns ok=true 完整；ok=false 缺失（missing 列出缺失项）
  */
 function checkTrademarkIntegrity(source: string, translated: string): { ok: boolean; missing: string[] } {
@@ -393,21 +396,11 @@ function checkTrademarkIntegrity(source: string, translated: string): { ok: bool
     }
   }
 
-  // 按 词|符号 分组，每组只校验第一个实例（与 restore 去重行为对齐）
-  const seenGroups = new Set<string>()
-  const uniqueSymbols: Array<{ word: string; symbol: string }> = []
-  for (const s of symbols) {
-    const key = `${s.word.toLowerCase()}|${s.symbol}`
-    if (!seenGroups.has(key)) {
-      seenGroups.add(key)
-      uniqueSymbols.push(s)
-    }
-  }
-
+  // v12.14: 不再按 词|符号 去重——逐实例校验（同词同符号出现几次校验几次）
   const missing: string[] = []
   // 译文搜索游标：按序消费匹配实例（防同词多™时所有校验都锚到第一个实例）
   let searchFrom = 0
-  for (const { word, symbol } of uniqueSymbols) {
+  for (const { word, symbol } of symbols) {
     const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     const re = new RegExp(escaped, 'i')
     re.lastIndex = searchFrom

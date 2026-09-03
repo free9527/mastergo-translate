@@ -100,38 +100,44 @@ export function restoreTrademarkSymbols(sourceTexts: string[], translatedTexts: 
 
     let result = translated
 
-    // v12.6: 同词同符号去重——源文同一商标词出现多次（CFexpress™ 4.0 / CFexpress™ 2.0）时，
-    //   提取的符号列表含多个 {CFexpress,™}；wordRegex.exec 恒锚全文第一个匹配实例，
-    //   重复循环会把™全插进第一个词尾 → CFexpress™™（2026-08-27 ja 实机事故）。
-    // 修复：按 (词小写|符号) 去重，同词同符号只插入一次（锚第一个实例）。
-    //   不同词（microSDHC™/microSDXC™）或不同符号（Lexar®/Lexar™）互不干扰。
-    // 形式信号零语义：只判"已插过没"，不判"该不该有"——漏插风险由散弹检测+最终剥离兜底。
-    const seenGroups = new Set<string>()
-    const uniqueSymbols: Array<{ word: string; symbol: string }> = []
-    for (const s of symbols) {
-      const key = `${s.word.toLowerCase()}|${s.symbol}`
-      if (!seenGroups.has(key)) {
-        seenGroups.add(key)
-        uniqueSymbols.push(s)
-      }
-    }
+    // v12.14: 同词同符号逐实例消费（游标锚定，替代 v12.6「锚第一个实例」去重）。
+    // v12.6 旧行为（2026-08-27 ja 事故修复）：同词多™（CFexpress™ 4.0 / CFexpress™ 2.0）去重后
+    //   只插第一个实例——治了 CFexpress™™ 散弹，但埋下反向缺陷：第二个实例的™丢失
+    //   （2026-09-03 zh-TW 实机实锤：上一代 CFexpress™ 2.0 → CFexpress 2.0 丢™）。
+    // v12.14 修复：同词同符号不再去重，每次循环用游标消费译文的下一个匹配实例，
+    //   源文同词出现几次™就恢复几次（有界=源文实例数，™™ 散弹无产生空间）。
+    // ™™ 防线移交（双保险，本函数内不再去重）：
+    //   ① hasTrademarkSpam 同符号紧邻重复判据（v12.6 扩充，™™/®®/©©）——
+    //      LLM 直出散弹/双重™在翻译层（llm-api 1873）、校对层（3055）、润色层
+    //      （validatePolishOutput 第⑤层）一律剥离或回退；
+    //   ② 下方「词后已有该符号 → continue」检查——逐实例消费天然不会在同位置叠™
+    //      （游标推进到实例词尾之后，第二个实例匹配不到第一个实例词尾位置）。
+    const perWordSymbols: Array<{ word: string; symbol: string }> = []
+    for (const s of symbols) perWordSymbols.push(s)
 
-    for (const { word, symbol } of uniqueSymbols) {
-      // 在译文中查找该词（不区分大小写）
+    // v12.14: 译文搜索游标——逐实例消费（每个源文™实例锚定译文的下一个未消费匹配）。
+    // 游标推进到已消费实例词尾（不含符号位），同词下一实例从该位置之后开始找；
+    // 找不到（译文合并了重复产品名/语序大改）→ 静默放弃该实例（漏™风险远小于™泛滥）。
+    let tmCursor = 0
+
+    for (const { word, symbol } of perWordSymbols) {
+      // 在译文中查找该词（不区分大小写，游标之后起找）
       const escapedWord = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
       const wordRegex = new RegExp(escapedWord, 'i')
-      const wordMatch = wordRegex.exec(result)
+      const wordMatch = wordRegex.exec(result.slice(tmCursor))
+      const wordAbsIndex = wordMatch ? tmCursor + wordMatch.index : -1
 
       // v12.4: 该词在译文中的"专属符号位置"检查——只有词后跟™（词尾位置）才算已有，
       // 译文中其他位置的™（如 CFexpress™ 的™）不能算在 Sony 头上。
       // 旧逻辑 result.includes(symbol) 是全局检查，会把 CFexpress™ 的™当成 Sony™ 跳过插入（B5 bug）。
       if (wordMatch) {
-        const insertPos = wordMatch.index + wordMatch[0].length
+        const insertPos = wordAbsIndex + wordMatch[0].length
         if (result[insertPos] === symbol) {
           // 词后已有该符号（合法位置）→ 验证符号前无空格即可
           if (result[insertPos - 1] === ' ') {
             result = result.slice(0, insertPos - 1) + result.slice(insertPos)
           }
+          tmCursor = insertPos  // v12.14: 游标推进到实例词尾——同词下一实例从这里之后找
           continue
         }
       }
@@ -150,13 +156,14 @@ export function restoreTrademarkSymbols(sourceTexts: string[], translatedTexts: 
 
       if (wordMatch) {
         // 找到该词，在它后面插入符号
-        const insertPos = wordMatch.index + wordMatch[0].length
-        if (isSpamPosition(insertPos)) continue  // v12.4: 逐字母模式位置，放弃插入
+        const insertPos = wordAbsIndex + wordMatch[0].length
+        if (isSpamPosition(insertPos)) { tmCursor = insertPos; continue }  // v12.4: 逐字母模式位置，放弃插入（游标仍推进——防死循环复锚同位置）
         // 如果后面紧跟标点，符号放在标点后
         const after = result.slice(insertPos)
         const punctMatch = after.match(/^(\s*[.,;:!?)]?)/)
         const punctLen = punctMatch ? punctMatch[0].length : 0
         result = result.slice(0, insertPos + punctLen) + symbol + result.slice(insertPos + punctLen)
+        tmCursor = insertPos  // v12.14: 游标推进到实例词尾
       } else {
         // v7.5.5: 词未匹配到 → 多重兜底定位
         // Layer A: 词首3字符子串匹配（处理被术语库轻微修改的词）
@@ -189,22 +196,67 @@ export function restoreTrademarkSymbols(sourceTexts: string[], translatedTexts: 
             continue
           }
         }
-        // Layer C: 词形变化匹配（如 Water+Resistance→Wasserfestigkeit 的德语复合词）
-        // 仅在 word >= 5 字符时尝试前 4 字符匹配，限制在前 60 字符内
-        if (word.length >= 5) {
-          const core = escapedWord.slice(0, 4)
-          const coreRe = new RegExp(core.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
-          const coreMatch = coreRe.exec(result)
-          if (coreMatch && coreMatch.index < 60) {
-            const insertPos = coreMatch.index + coreMatch[0].length
-            if (isSpamPosition(insertPos)) continue  // v12.4: 逐字母模式位置，放弃插入
-            const after = result.slice(insertPos)
-            const punctMatch = after.match(/^(\s*[.,;:!?)]?)/)
-            const punctLen = punctMatch ? punctMatch[0].length : 0
-            result = result.slice(0, insertPos + punctLen) + symbol + result.slice(insertPos + punctLen)
+        // v12.14: 词形变化兜底已退役（原 Layer C 前 4 字符全文匹配）。
+        //   根因实锤（2026-09-03 调试）：「找不到词=找不到正确位置」——全词精确匹配都失败了，
+        //   用更弱的前缀信号全文撞位置必然撞进词中间（CFexpress 未匹配时 Layer A 插"CFexp™"，
+        //   Layer C 再撞"CFex™"→ CFex™p™ress 散弹，恰好落在 hasTrademarkSpam 同符号紧邻
+        //   判据的检测盲区——™p™ 跨字符非紧邻）。漏™可接受，散弹不可接受（v7.5.5 同哲学）。
+        //   找不到也不追加到末尾 — 符号丢失风险远小于 ™ 泛滥。
+      }
+    }
+
+    // v12.14: 锚点后检查——™词是不可翻译实体的强不变量终检（品牌词位确认制）。
+    // 业务事实（用户拍板 2026-09-03，两条）：
+    //   ① ™/® 前导词恒为商标（Lexar®/CFexpress™/Sony™），不可翻译——译文恒保留拉丁原形；
+    //   ② ™ 恢复位置恒在品牌词后——游离™（不在任何源文™词词尾的）恒为散弹/误插，一律清除。
+    // 机制（源文实例序列为唯一事实源，确认位白名单制）：
+    //   ① 顺次确认：实例在游标后锚到（词+可选标点+™）→ 记录™位置进白名单，游标推进；
+    //   ② 未锚定 → 该实例「词+™」原子补插在最近已确认实例后（上界达成，不漏™）；
+    //   ③ 全文清场：剥离所有非白名单™®©（兜底层误插/LLM 自插/词中间残骸一律清除）——
+    //      剥后残骸自然合并（CFexp™ress→CFexpress），输出™集合 ⊆ 品牌词尾且与源文同序同数。
+    // 与 LLM 自插™的关系：译文词后™但源文无对应实例（Sony™ 源文无™）——③清场剥除
+    //   （源文无™译文有™历来是散弹管辖，v12.4 职责划分一致）。
+    {
+      const srcSymbolsOrdered: Array<{ word: string; symbol: string }> = []
+      const anchorRe = /([^\s®™©]+)\s*([®™©]+)/g
+      let am: RegExpExecArray | null
+      while ((am = anchorRe.exec(source)) !== null) {
+        const cw = am[1].replace(/[®™©]/g, '')
+        if (cw) for (const sc of am[2]) srcSymbolsOrdered.push({ word: cw, symbol: sc })
+      }
+      if (srcSymbolsOrdered.length > 0) {
+        const confirmed = new Set<number>()  // 确认™位置白名单（™字符的下标）
+        let cursor = 0
+        for (const { word, symbol } of srcSymbolsOrdered) {
+          const esc = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+          const anchoredRe = new RegExp(esc + '[\\s.,;:!?)]?' + symbol, 'i')
+          const m = anchoredRe.exec(result.slice(cursor))
+          if (m) {
+            const symPos = cursor + m.index + m[0].length - 1  // ™字符位置（匹配末位恒为™）
+            confirmed.add(symPos)
+            cursor = symPos + 1
+            continue
           }
-          // 找不到也不追加到末尾 — 符号丢失风险远小于 ™ 泛滥
+          // 未锚定 → 原子补插「词+™」在最近已确认实例后（或句首）
+          const insertPos = confirmed.size > 0 ? Math.max(...confirmed) + 1 : 0
+          const atom = (insertPos > 0 && result[insertPos - 1] !== ' ' ? ' ' : '') + word + symbol
+          result = result.slice(0, insertPos) + atom + result.slice(insertPos)
+          // 插入位移：白名单中 ≥ insertPos 的旧位置全部后移 atom.length
+          const shifted = new Set<number>()
+          for (const p of confirmed) shifted.add(p >= insertPos ? p + atom.length : p)
+          shifted.add(insertPos + atom.length - 1)  // 新补插™的位置
+          confirmed.clear()
+          for (const p of shifted) confirmed.add(p)
+          cursor = insertPos + atom.length
         }
+        // ③ 全文清场：剥离非白名单™®©
+        let cleaned = ''
+        for (let ci = 0; ci < result.length; ci++) {
+          const ch = result[ci]
+          if ((ch === '™' || ch === '®' || ch === '©') && !confirmed.has(ci)) continue
+          cleaned += ch
+        }
+        result = cleaned
       }
     }
 
