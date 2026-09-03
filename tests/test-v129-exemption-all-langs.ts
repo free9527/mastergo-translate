@@ -206,6 +206,34 @@ const glossary = new Map<string, string>([
 }
 
 // ────────────────────────────────────────────────────────────
+console.log('\nH. v12.15 zh「最高+规格」豁免补漏（实机 zh-TW 润色回退实锤驱动）')
+
+// H1-H6 豁免正例（规格语境——数字锚/速度名词锚）
+assert(hits('最高寫入速度高達 1650MB/s，持續寫入速度高達 1300MB/s', 'zh-TW').length === 0, 'H1 zh-TW 最高寫入速度高達1650MB/s（实机回退条目——豁免后不再触发硬锁⑧层）')
+assert(hits('最高写入速度高达 1650MB/s', 'zh-CN').length === 0, 'H2 zh-CN 最高写入速度（简体同型）')
+assert(hits('最高讀取速度 1750MB/s', 'zh-TW').length === 0, 'H3 zh-TW 最高讀取速度')
+assert(hits('容量最高達 2TB，可儲存大量連拍照片', 'zh-TW').length === 0, 'H4 zh-TW 最高達#（数字锚定——实机「容量最高達 2TB」）')
+assert(hits('容量最高达 2TB', 'zh-CN').length === 0, 'H5 zh-CN 最高达#（简体数字锚）')
+assert(hits('耐插拔最高達 12,000 次插入／拔除', 'zh-TW').length === 0, 'H6 zh-TW 最高達 12,000 次（千分位数字锚——实机素材形态）')
+
+// H7-H9 红线反例（裸宣称无规格锚点——仍命中，豁免不开洞）
+assert(hits('最高性能，極致體驗', 'zh-TW').length > 0, 'H7 zh-TW 红线：裸「最高性能」（无数字/速度锚）仍命中')
+assert(hits('最高品質保證', 'zh-TW').length > 0, 'H8 zh-TW 红线：裸「最高品質」仍命中')
+assert(hits('最高速度，業界第一', 'zh-CN').length > 0, 'H9 zh-CN 红线：裸「最高速度」（无讀取/寫入名词锚）仍命中')
+
+// H10 既有豁免交叉回归（v12.15 新条目不破既有）
+assert(hits('读取速度最高可达2050MB/s', 'zh-CN').length === 0, 'H10 既有豁免不回退：最高可达（v12.9 既有）')
+
+// H11 第⑧层闭环：豁免后的润色产物不再触发违禁词回退（实机事故形态全链验证）
+{
+  const src = 'Delivers max write speeds of up to 1650MB/s for pro shooting'
+  const prePolish = '寫入速度高達 1650MB/s，為未來創作需求做好準備，支援不中斷連拍'
+  const polished = '最高寫入速度高達 1650MB/s，為未來創作需求做好準備，支援不中斷連拍'
+  const v = validatePolishOutput(src, polished, 'zh-TW', undefined, prePolish)
+  assert(v.ok, 'H11 第⑧层闭环：潤色引入「最高寫入速度」（豁免形态）→ 放行（实机回退条目转绿）' + (v.ok ? '' : ` — ${v.reason}`))
+}
+
+// ────────────────────────────────────────────────────────────
 console.log(`\n═══════════════════════════════════════════`)
 console.log(`v12.9 结果: ${pass} 通过 / ${fail} 失败`)
 if (fail > 0) process.exit(1)
