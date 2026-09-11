@@ -38,7 +38,7 @@ console.log('\nA. ja 豁免正例（实机 5 张卡 + 素材形态 → 全部转
 // A1-A3 实机截图三张术语库锁定卡（豁免后连锁定徽章都不再有——先决条件是不命中）
 assert(hits('書き込み速度最大', 'ja').length === 0, 'A1 書き込み速度最大（术语库 Write speed up to 钦定值）')
 assert(hits('読み出し速度最大', 'ja').length === 0, 'A2 読み出し速度最大（术语库 Read speed up to 钦定值）')
-assert(hits('厳格なテスト済み', 'ja').length === 0, 'A3 厳格なテスト済み（术语库 Rigorously Tested 钦定值）')
+assert(hits('厳格なテスト済み', 'ja').length === 0, 'A3 厳格なテスト済み（原术语库 Rigorously Tested 钦定值形态，v7 已删词条——豁免保留覆盖素材自由译文）')
 assert(hits('厳格なテストに合格', 'ja').length === 0, 'A3b 厳格なテストに合格（DIAMOND 素材文案——「厳格なテストに」豁免）')
 
 // A4-A5 实机截图两张非锁定卡（豁免后不再产生校对改写卡）
@@ -232,6 +232,62 @@ assert(hits('读取速度最高可达2050MB/s', 'zh-CN').length === 0, 'H10 既�
   const v = validatePolishOutput(src, polished, 'zh-TW', undefined, prePolish)
   assert(v.ok, 'H11 第⑧层闭环：潤色引入「最高寫入速度」（豁免形态）→ 放行（实机回退条目转绿）' + (v.ok ? '' : ` — ${v.reason}`))
 }
+
+// ────────────────────────────────────────────────────────────
+console.log('\nI. v12.17 规格测试语境豁免（20 语种——Bending Test 类实机误报驱动）')
+
+// I1-I3 实机误报条目（2026-09-04 用户实锤——de 译文形态）
+assert(hits('Featuring a bending test of up to 370 Newtons', 'en').length === 0, 'I1 en bending test 规格描述（实机源文）')
+assert(hits('10N Bending Test', 'en').length === 0, 'I2 en 10N Bending Test（规格标题——数字锚定）')
+assert(hits('370N Bending Test', 'en').length === 0, 'I3 en 370N Bending Test（规格标题——数字锚定）')
+
+// I4-I6 拉丁语种（de/it/fr/es——词表含 test 的语种豁免同步生效）
+assert(hits('10N-Biegetest', 'de').length === 0, 'I4 de Biegetest 复合形态（弹性 regex 吞连字符）')
+assert(hits('370N Biegetest', 'de').length === 0, 'I5 de 370N Biegetest（数字锚定）')
+assert(hits('10N Bending Test', 'fr').length === 0, 'I6 fr Bending Test（法语规格标题——拉丁转写锚定）')
+
+// I7-I9 其余词表含 test 语种（pt/pt-BR/ru/nl/pl/sv/tr——拉丁转写锚定）
+assert(hits('10N Bending Test', 'pt').length === 0, 'I7 pt Bending Test（葡语规格标题——拉丁转写锚定）')
+assert(hits('10N Bending Test', 'pt-BR').length === 0, 'I8 pt-BR Bending Test（巴西葡语同型）')
+assert(hits('10N Bending Test', 'nl').length === 0, 'I9 nl Bending Test（荷兰语规格标题）')
+
+// I10-I12 无 test 词表语种（ko/th/id/ar/vi——豁免表存在但词表无 test，零影响回归）
+assert(hits('10N Bending Test', 'ko').length === 0, 'I10 ko 无 test 词表（豁免表存在但零影响）')
+assert(hits('10N Bending Test', 'th').length === 0, 'I11 th 无 test 词表（同左）')
+assert(hits('10N Bending Test', 'id').length === 0, 'I12 id 无 test 词表（同左）')
+
+// I13-I15 红线反例（裸 test 营销声称——豁免不开洞）
+assert(hits('speed test results', 'en').length > 0, 'I13 en 红线：speed test 词表既有收录仍命中')
+assert(hits('stress test results', 'en').length > 0, 'I14 en 红线：stress test 词表既有收录（豁免表未覆盖）仍命中')
+assert(hits('Qualitätsgeprüft', 'de').length === 0, 'I15 de 对照：Qualitätsgeprüft 无 test 词（零命中——非豁免功劳）')
+
+// I16 test 派生形态豁免（tested/testing 营销声称标准写法——词表 test 词边界 regex 命中前缀形态）
+assert(hits('Tested for quality', 'en').length === 0, 'I16 en tested for quality 派生形态豁免（tested 豁免剔除 test 命中）')
+assert(hits('Tested and proven to work!', 'en').length === 1 && hits('Tested and proven to work!', 'en')[0] === 'proven', 'I16b en tested 豁免生效但 proven 独立词表词仍命中（非 test 豁免覆盖范围）')
+
+// I17-I19 v12.17 实机误报豁免（superior 标题锚定 / extensive tests 规格语境 / 行首星号剥离）
+assert(hits('Superior Reliability for Superior Professionals', 'en').length === 0, 'I17 en Superior Reliability 标题锚定豁免（实机 ARMOR GOLD 源文）')
+assert(hits('All Lexar products undergo extensive tests in Lexar Quality Labs', 'en').length === 0, 'I18 en extensive tests 规格语境豁免（实机源文）')
+assert(hits('*Limited lifetime warranty is limited to the original purchaser', 'en').length === 0, 'I19 en 行首星号剥离后 Limited Lifetime Warranty 豁免触发（实机源文）')
+
+// I20 红线反例（裸 superior/tests 仍命中——豁免不开洞）
+assert(hits('superior performance!', 'en').length > 0, 'I20 en 红线：裸 superior 宣称仍命中')
+assert(hits('speed test required', 'en').length > 0, 'I21 en 红线：speed test（词表既有复合词）仍命中')
+
+// I22-I25 v12.17 保守增补（用户拍板保守路线——数字锚定/限定词锚定，裸词不豁免）
+assert(hits('370N Bending Test', 'en').length === 0, 'I22 en 370N Bending Test（# 数字锚定豁免）')
+assert(hits('10N bending tests', 'en').length === 0, 'I23 en 10N bending tests（# 数字锚定复数豁免）')
+assert(hits('During the anti-static tests in the Lexar Quality Labs', 'en').length === 0, 'I24 en anti-static tests（限定词锚定豁免——实机源文）')
+assert(hits('anti-static test', 'en').length === 0, 'I25 en anti-static test（限定词锚定单数豁免）')
+
+// I26 保守路线说明：裸 Bending Test 被既有 'Bending Test' 豁免（v12.17 第一轮），
+//   不是 # 数字锚定豁免——两轮豁免叠加，裸 Bending Test 已豁免（设计行为）
+assert(hits('Bending Test passed', 'en').length === 0, 'I26 en 裸 Bending Test 被既有豁免（v12.17 第一轮——设计行为）')
+assert(hits('quality tests required', 'en').length > 0, 'I27 en 红线：quality tests（无规格限定词锚）仍命中')
+
+// I28 保守路线说明：裸 Bending Test 被既有 'Bending Test' 豁免（v12.17 第一轮），
+//   不是 # 数字锚定豁免——两轮豁免叠加，红线反例需用「无豁免锚点」形态
+assert(hits('marketing test passed', 'en').length > 0, 'I28 en 红线：marketing test（无规格锚）仍命中')
 
 // ────────────────────────────────────────────────────────────
 console.log(`\n═══════════════════════════════════════════`)

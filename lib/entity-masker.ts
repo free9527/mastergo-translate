@@ -348,6 +348,19 @@ export function maskGlossaryTerms(
         const idx = textClean.indexOf(ck, searchPos)
         if (idx === -1) break
 
+        // v12.17: 整词边界守卫（cleanKey 空间）——子串遮蔽「app→__GLOSSARY_0__licability」
+        //   根治（2026-09-04 it 实机：Lexar App 无 Lexar 前缀变体 'app' 切碎 applicability；
+        //   ARMOR/GOLD/THOR/ARES/PLAY/BLUE 同型——armored/golden/thorough/shares/player/
+        //   blueprint 全被切碎，审查脚本 6 处实锤）。
+        // 口径：cleanKey 已把 [-_]→空格、®™© 剥除，故只剩 [a-z0-9] 是「词内字符」，
+        //   两侧非词内字符（空格/标点/字符串边界）才算整词命中。
+        //   多词术语（armor gold sdxc uhs ii card）内部空格天然过检；CJK 术语 cleanKey
+        //   后非 [a-z0-9]，边界恒真不拦截——拉丁术语环境无回归面。
+        const beforeOk = idx === 0 || !/[a-z0-9]/.test(textClean[idx - 1])
+        const afterIdx = idx + ck.length
+        const afterOk = afterIdx >= textClean.length || !/[a-z0-9]/.test(textClean[afterIdx])
+        if (!beforeOk || !afterOk) { searchPos = idx + 1; continue }
+
         // 检查是否与已有区间重叠
         const overlaps = replacedRanges.some(([s, e]) => idx < e && idx + ck.length > s)
         if (overlaps) { searchPos = idx + 1; continue }

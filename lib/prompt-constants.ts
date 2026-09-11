@@ -2171,6 +2171,10 @@ export function buildProofreadSystemPrompt(opts: {
   const calibration = buildProofreadCalibration(targetLang, productLine, useEnInstruction)
   const calibrationBlock = calibration ? `\n${calibration}\n` : ''
   const langBlock = renderLangForProofread(targetLang, productLine)
+  // v12.18: 边界指令仅当 langBlock 非空时注入（无语种规范则边界无的放矢）
+  const boundaryBlock = langBlock
+    ? '\n' + (useEnInstruction ? PROOFREAD_LANG_BOUNDARY_NOTE : PROOFREAD_LANG_BOUNDARY_NOTE_ZH)
+    : ''
 
   // v11.5: 变体专项检查仅变体对注入（其余语种省 10 行死文本）
   const variantPairs = new Set(['zh-CN|zh-TW', 'zh-TW|zh-CN', 'pt|pt-BR', 'pt-BR|pt'])
@@ -2196,7 +2200,7 @@ export function buildProofreadSystemPrompt(opts: {
   // v12.6: ja 排版自然度专项检查（仅 ja 注入；↵ 断行结构严禁改动的边界写在块内）
   const jaLayoutBlock = targetLang === 'ja' ? '\n' + PROOFREAD_JA_LAYOUT_NOTE : ''
 
-  return missionBlock + proofreadPrompt + variantBlock + expansionBlock + prohibitedBlock + polishedBlock + jaLayoutBlock + glossaryHint + calibrationBlock + langBlock
+  return missionBlock + proofreadPrompt + variantBlock + expansionBlock + prohibitedBlock + polishedBlock + jaLayoutBlock + glossaryHint + calibrationBlock + boundaryBlock + langBlock
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2650,7 +2654,6 @@ Fix ALL objective errors. Do NOT make subjective changes.
 [CHECK 2: MEANING & NATURALNESS]
 - Factual errors: Fix wrong numbers, specs, or features.
 - Category errors: Fix wrong category words (SSD≠Card, Reader≠SSD) per reference table.
-- ⚠️ Glossary exact-match OVERRIDES category-word correction.
 - Formatting: Do NOT change symbols/formatting (keep 2x2, do not change to 2×2).
 - Naturalness: Flag translations that sound robotic, awkward, or overly literal.
   ✅ ACCEPTABLE: Rewording to sound native (changing structure, synonyms, local tone).
@@ -2739,7 +2742,6 @@ export const PROOFREAD_SYSTEM_PROMPT_ZH = `[角色]
 [检查2: 语义与自然度]
 - 事实错误：修正错误的数字、规格或功能描述。
 - 品类错误：参照对照表修正错误的品类词（SSD≠卡、读卡器≠SSD）。
-- ⚠️ 术语库精确匹配覆盖品类词修正。
 - 格式：不要修改符号/格式（保留 2x2，不要改为 2×2）。
 - 自然度：标记生硬、别扭或过度直译的译文。
   ✅ 可接受：调整语序以符合母语表达习惯（改变句式、同义替换、本地化语感）。
@@ -2862,6 +2864,27 @@ export const PROOFREAD_JA_LAYOUT_NOTE = `[JA 排版自然度] 以下两条仅作
 - 全角/半角混用（半角カタカナ、全角英数字、不自然空格）可在修正时顺带规范化；
 - 読点（、）位置或断行节奏明显生硬时可微调。
 但：↵ 是换行占位符，其数量与位置严禁改动（动了会破坏设计稿断行结构）。`
+
+// ═══════════════════════════════════════════════════════════════
+// v12.18: 校对的语种规范边界指令（QA 边界声明，双语版）
+// ── 为什么需要 ──
+//   校对 prompt 注入了该语种的 rules/quality/compliance（[VALIDATION] 块）——
+//   这些是翻译生产时已执行的标准。校对若把它们当「改写许可证」，会用生产规则
+//   重写正确译文（v11.0 校准块同款风险：好心信号被读成行动指令）。
+//   本指令建立双边界：用来判定对错，不用来重写表达。
+// ── 与 v11.0 校准块的关系 ──
+//   校准块管「市场原生词不许拦」（防误杀），本指令管「生产规则不许用来重写」（防误改）。
+//   同为双边界结构（白名单非加戏许可证 / 判定边界非改写许可证）。
+// ═══════════════════════════════════════════════════════════════
+export const PROOFREAD_LANG_BOUNDARY_NOTE = `[LANGUAGE RULES BOUNDARY]
+The language-specific rules, quality and compliance notes in [VALIDATION] below are the standards the translation was already produced against.
+Use them ONLY to JUDGE whether the translation is wrong — never use them as a license to rewrite a correct translation into a different but equally valid form.
+If the translation is already correct and natural, leave it unchanged even if another phrasing would also satisfy these rules.`
+
+export const PROOFREAD_LANG_BOUNDARY_NOTE_ZH = `[语种规范边界]
+下方 [VALIDATION] 中的语种规范、语感与合规说明，是翻译生产时已执行的标准。
+仅用它们来【判定】译文是否有错——不得以此为据，把已正确且自然的译文改写成另一种同样合规的表达。
+若译文已正确自然，即使另一种措辞也符合这些规范，仍保持原样。`
 // ═══════════════════════════════════════════════════════════════
 // v11.3: 产品名槽位解析 Prompt — LLM 兜底（代码判定失败时的语义裁决）
 // 原则：LLM 只做"是不是产品名+系列名是什么"的判断，不输出译名。

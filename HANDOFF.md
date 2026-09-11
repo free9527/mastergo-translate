@@ -1,7 +1,7 @@
 # 项目交接文档
 
-**日期**: 2026-09-03  
-**版本**: v12.15（™ 逐实例恢复 + 品牌词位确认制终检 + zh「最高+规格」豁免补漏）  
+**日期**: 2026-09-11  
+**版本**: v12.19（慢问题修复——best-of-2 引号归一化 + 判定类短超时 + consistency fire-and-forget）  
 **项目**: Lexar 翻译插件（MasterGo 插件）
 
 ---
@@ -39,7 +39,127 @@ MasterGo 设计工具插件，将 Lexar 产品设计稿从英文翻译成 20 个
 
 ---
 
-## 二、当前版本（v12.14）
+## 二、当前版本（v12.19）
+
+### v12.19 慢问题修复——best-of-2 引号归一化 + 判定类短超时 + consistency fire-and-forget（2026-09-11，it 批次引号回显 + 网关高负载超时驱动）
+
+**背景**：it 实机两处慢/误判收敛：
+1. **best-of-2 引号不对称误判**：`quotedIndices` 只对含空白条目剥离回显引号，无空白条目保留回显引号，best-of-2 双路各自独立 → 一路 `"Resistente"` 一路 `Resistente`，被引号不对称判为「不同」进 pick，白多一次判定调用。
+2. **consistency 15s 阻塞 + 71% 超时率**：网关高负载下 15s 超时全烧穿，而 consistency 在批尾部 `await` 硬阻塞 → 每批白等 15s；探测层零修改，批尾部不该等它。
+
+**改动（一问题一行）**：
+
+| # | 改动 | 要点 | 文件 |
+|---|------|------|------|
+| 1 | **best-of-2 引号归一化** | pick 比较前对双路同步剥引号：`stripEchoQuotesForPick`（与 callFirstLLM 内 stripEchoQuotes 同逻辑，独立定义外层作用域）+ `.replace(/^"|"$/g,'')` 预剥 ASCII 引号——「"X" vs X」归一为相同免进 pick；单跑路径对无空白条目补兜底剥离（quotedIndices 盲区覆盖） | `lib/llm-api.ts` |
+| 2 | **判定类短超时 30s** | personaJudgeBatch/polishVerifyBatch/translationPickBatch/polishBatch 四判定任务超时 90s→30s——判定失败=保守回退（judge 失败无润色 / verify 失败缺省放行 / pick 失败缺省第一路 / 润色失败回退润色前），不该用生产翻译 90s 超时 | `lib/llm-api.ts` |
+| 3 | **consistency fire-and-forget + 8s** | 批尾部 `void detectConsistencyIssues(...)` 不再 await 阻塞；consistency 超时 15s→8s（健康网关 2-12s 响应足够，网关高负载不值得等 15s） | `ui/App.vue` + `lib/consistency-check.ts` |
+
+**关键设计决策**：
+- **判定层是锦上添花、翻译层是承重墙**——四判定任务失败都走缺省安全路径（无润色/放行/第一路/回退），缩短超时零事故放大风险；生产翻译 90s 超时不动。
+- **引号归一化只用于比较、落地用剥后形态**：双路剥引号后相同 → 落地 `normA`（已剥），回显引号不进最终译文；源文本自带引号的罕见场景由 A1d 锁定（预剥无条件剥 ASCII 首尾引号，不按源文追回——设计稿源文几乎无包裹引号）。
+
+**测试**：新套件 `tests/test-v1219-slow-fix.ts` **10/10**（A 引号归一化 6 项：不对称/双路引号/真实不同不误归一/源文有引号预剥/嵌套引号预剥后归一/法文«» + B 判定类短超时常量 + C fire-and-forget 不阻塞 + D 回归 2 项：v8.8 既有 stripEcho 场景不变/内容完全不同进 pick）；typecheck 双配置 + build 通过。
+
+**实机验证点**：①it 批次引号不对称的 best-of-2 不再误判进 pick（「两路一致」日志数上升）②consistency 不再阻塞批尾部（批完成耗时与探测解耦）③判定任务失败 30s 内回退（原 90s）。
+
+**遗留**：无新增——并发编排（波次重叠）仍待 v12.18 遗留的单独成版。
+
+---
+
+## 二、上一版本（v12.18）
+
+### v12.18 usage token 透出 + 校对骨架边界指令 + 校对批次动态化 + TM 短路（2026-09-09，token/效率优化四件套）
+
+**背景**：用户提出 token 与效率优化六问。方案评审关键事实：
+- **GPT-5.6 prompt caching 在本架构下不通**（用户调研实锤）：坑 1 整个 prompt 逐字节一致才命中（我们 user message 每批必变）+ 坑 2 `json_object` 不写缓存（v12.0 起全管道 json_object）+ 写入 1.25×/读取 0.1×（凑缓存纯亏 25%）。**缓存重排明确不做**。
+- **用户拍板**：并发全不动（波次重叠/CONCURRENCY 调整移出计划）；校对瘦身选 A（全量+边界指令）；TM 短路加术语过期防线。
+- 四步全部非并发改动，风险最高的并发编排未触碰。
+
+**改动（一问题一行）**：
+
+| # | 改动 | 要点 | 文件 |
+|---|------|------|------|
+| 1 | **usage token 透出** | 6 个调用点（callFirstLLM/proofreadBatch/personaJudgeBatch/polishBatch/polishVerifyBatch/translationPickBatch）+ consistency-check 统一 `logUsage(tag, data)`——读 `usage.prompt_tokens/completion_tokens/prompt_tokens_details?.cached_tokens`，uiLog 一行；防御性判空（Azure 代理网关可能剥 usage），字段缺失静默跳过。只读不改，白捡逐函数 token 基线 + 实锤缓存坑 2 是否复现 | `lib/llm-api.ts` + `lib/consistency-check.ts` |
+| 2 | **校对骨架边界指令** | `PROOFREAD_LANG_BOUNDARY_NOTE`/`_ZH` 双语新常量——「[VALIDATION] 中的语种规范是翻译生产时已执行的标准，仅用来判定对错，不得据以重写正确译文」；仅当 langBlock 非空时注入，位置紧贴 langBlock 之前（calibration 之后）。与 v11.0 校准块同构双边界（校准块防误杀/本指令防误改） | `lib/prompt-constants.ts` |
+| 3 | **校对骨架去重** | CHECK 2 删「⚠️ Glossary exact-match OVERRIDES category-word correction」（双语版）——与 [GLOSSARY REFERENCE] 段语义重复，且术语锁定由 v9.9 合规校验代码兜（不靠 prompt 自觉） | `lib/prompt-constants.ts` |
+| 4 | **校对批次动态化** | `chunkProofreadBatches`——批内译文累计字符 >2000 时批大小 8→4（v12.17 实锤批次 4 长文本+违禁词改写链 52.8 秒异常值的针对性修复）；波内+独立校对两处循环接入，进度计数同步改为按实际条目数累计。**并发数/波结构/错误处理零改动**（用户拍板） | `ui/App.vue` |
+| 5 | **TM 短路** | `retrieveTMShortCircuit`——corrections(origin=user) × 当前源文 × 同 targetLang × **相似度 ≥0.99** + 数字集合相等 → 直接用人工验收译文跳过翻译 API（S1 术语短路同款逻辑，省 token 也省时间）；命中条目从 apiTexts 剔除不再占 few-shot 名额；漏翻/错词/超长 Set 索引经 `apiIdxToUnique` 游标换算（防索引错位）。**术语过期防线**：落地前过 `enforceGlossaryTerms`（术语库改译法时做存在性校验；改写非 enforce 职责——过期主闸仍是缓存 key 的 glossaryHash） | `lib/translation-memory.ts` + `ui/App.vue` |
+
+**关键设计决策**：
+- **TM 短路阈值 0.99 而非 0.90**：few-shot 的 0.90 是「当范例让 LLM 参考」（近似句可用）；短路是「直接落地不经过 LLM」（必须同句/仅标点空白差异）。词级 Jaccard 对 20 词长句单标点差异 ≈0.905 落在 few-shot 区间不短路（测试 A2 锁定）
+- **数字书写差异不短路**：`10,000` vs `10000` 数字集合按原始 token 比较视为不等——宁多翻一次不可错锚（保守方向，B3 锁定）
+- **enforceGlossaryTerms 防线语义锁清**：术语过期场景主闸是缓存 key 的 glossaryHash（失效重翻），TM 侧 enforce 只做「术语存在性校验」不做改写（C2 锁定「缺术语不强插」）——避免对 enforce 职责的误用
+
+**测试**：新套件 `tests/test-v1218-tm-shortcircuit.ts` **15/15**（A 过滤链 7 含同句命中/近似句拒/proofread 拒/跨语种拒/极短拒/混合命中 / B 数字防线 3 含 2TB≠4TB/顺序不同不误伤/千分位保守 / C 术语过期防线 3）；v110 套件 +3（边界指令注入+位置+中文版）→ **94/94**；回归 v129(129)/v1112(176)/v123(53)/v1210(31)/v1213(28)/v1214(46)/v1217(28)/v105(46)/v106(46)/v107(14)/v108(21)/v1115(15) 全绿；typecheck 双配置 + build 通过（bundle 验证：边界指令 EN/ZH 转义串/TM 短路日志转义串进 dist/index.html，去重行确认移除）。
+
+**测试排障教训**：①A2a fixture 初版「一词之差」词级 Jaccard 只给 0.78 不达 0.90（v12.13 同款教训复发——0.9 阈值的实际含义是「同句/近同句」，要落在 0.90-0.99 区间需 20 词长句单标点差异 ≈0.905）②C1 初版假设 enforceGlossaryTerms 会「拉回旧译法」——实读代码确认它是「存在性校验+精确锁定」非「改写器」，测试断言按真实行为重写（断言断真实不变量，不断脑补行为）。
+
+**实机验证点**：①诊断面板出现 `tokens: prompt N (cached M) → completion K` 日志（若 usage 全缺=代理网关剥字段，cached 恒 0=缓存坑 2 复现实锤）②校对修改率无异常下降（边界指令若被读成「少拦」信号的第一信号）③长文本批次场景校对尾批耗时下降（v12.17 批次 4 型）④人工修正过某条后，下次扫描同句源文 → 日志出现 `TM 短路: N条` 且该条零 API 调用。
+
+**遗留（下次迭代接续）**：
+- **波次重叠**（波 N 校对与波 N+1 翻译并行）——单项最大时间收益，但属并发编排改动（项目历史事故高发区），用户拍板单独成版单独灰度，本次未做
+- **并发/批次调优**——待 Step 1 实测 token/耗时构成后用数据决定（CONCURRENCY 4→6 是否值得）
+- **TM 冷启动观察**（corrections 覆盖率随使用增长——一个月后覆盖率 <10% 归档，v12.13 既有遗留）
+- **判定类任务模型分流**（proofreadModel 指向更便宜小模型——persona judge/verify/pick/consistency 对模型能力要求低于翻译，候选未拍板）
+
+---
+
+## 二、上一版本（v12.17）
+
+### v12.17 术语遮蔽整词边界守卫 + 校对/一致性可观测性 + 20 语种违禁词豁免补漏 + Microsoft DirectStorage 内置（2026-09-04，it/de 实机四事故驱动）
+
+**背景**：it/de 实机四事故同日爆发，逐环节核代码 + 审查脚本实锤根因：
+1. **`__GLOSSARY_2__licability` 占位符碎片**（de）：术语遮蔽 `indexOf` 子串匹配无整词边界——`Lexar App` 词条 it 列值 `App Lexar` 被注册为遮蔽 key，`app` 子串切碎 `applicability`；普查实锤 ARMOR/GOLD/THOR/ARES/PLAY/BLUE 六个 identity 短词条同型（`armored`/`golden`/`thorough`/`shares`/`player`/`blueprint` 全被切碎）。
+2. **`MicrosoftDirectStorage3` 连写散弹**（de）：`DirectStorage` 入库而 `Microsoft DirectStorage` 没有——LLM 在 `Microsoft __GLOSSARY_0__ 3` 两侧自由发挥，还原后连写，进润色被当「连写错误」二次改写放大（`Microsoft Direct Storage 3` 散弹形态）。
+3. **6 条违禁词误报**（de）：`Bending Test`/`superior`/`Limited lifetime warranty`（行首星号阻挡豁免锚定）/`extensive tests`/`anti-static tests`——词表 `test`/`tests`/`superior` 是「语境违禁词」（规格测试语境合规/营销声称语境违禁），豁免表穷举短语但开放集合穷举不完。
+4. **校对 9 分 20 秒黑盒**（de）：`proofreadBatch`/`consistency-check.ts` 无 `uiLog` 透出——翻译 6 分钟 + 润色后校对窗口零日志，无法定位是轮次串行/违禁词改写链/LLM 响应慢。
+
+**用户拍板**：①整词边界守卫（遮蔽加 `[a-z0-9]` 词内字符两侧不遮蔽）②`Microsoft DirectStorage` 整词内置系统默认术语（跟品牌同层，内置优先）③违禁词豁免**保守路线**（只补实机已确认的规格测试语境，不做语境模式泛化）④`tests` 词表词保留（亚马逊确实拦截）⑤润色不自动拍平 ↵（LLM 分不清标题还是正文，正文换行是事故）⑥判定层语义化是长期方向，单点日志透出不做（ARMOR GOLD S1 短路孤例译文正确，跳过）。
+
+**改动（一问题一行）**：
+
+| # | 改动 | 要点 | 文件 |
+|---|------|------|------|
+| 1 | **maskGlossaryTerms 整词边界守卫** | cleanKey 空间匹配后检查 `idx` 前后字符：`[a-z0-9]` 词内字符两侧不遮蔽（`app` 不再切碎 `applicability`；多词术语内部空格天然过检；CJK 术语不受影响——cleanKey 后非 `[a-z0-9]` 边界恒真） | `lib/entity-masker.ts` |
+| 2 | **遮蔽还原连写检测（只观测不改数据）** | S5 还原后跑术语值连写嫌疑检测（值前紧邻字母/值后紧邻字母数字），命中 `uiLog` 透出——auditStage 同纪律（只报警不改数据），拉丁目标限定 | `lib/llm-api.ts` |
+| 3 | **Microsoft DirectStorage 内置** | `BUILTIN_THIRD_PARTY_TERMS_INTERNAL` 追加——S1 短路/S2 遮蔽/isUntranslatable 三层防线整词锚定，内置优先用户不可覆盖（LLM 物理上碰不到内部空格，连写从构造上不可能） | `lib/third-party-models.ts` |
+| 4 | **proofreadBatch 三点日志透出** | 批次开始（条数/违禁词改写数/已润色数）→ LLM 返回（耗时/内容长度）→ 批次完成（修正数/总耗时）——9 分 20 秒黑盒变可观测（实机验证：校对实际 1 分 27 秒，批次 4 长文本+违禁词改写 52.8 秒为异常值） | `lib/llm-api.ts` |
+| 5 | **consistency-check 三点日志透出** | 裁决调用开始（短语组数）→ LLM 返回（耗时/解析成败）→ 裁决完成（不一致组数/总耗时）——`das Modell Lexar` 类不一致可确认「裁决是否执行」 | `lib/consistency-check.ts` |
+| 6 | **20 语种违禁词豁免补漏（保守路线）** | ①`SPEC_TEST_EXEMPTIONS_EN` 9 条（Bending/Drop/Water/Dust/Shock/Vibration/Temperature/Humidity/Pressure Test——**Stress Test 被 v1112 B12 既有断言拦下未豁免**，用户拍板 test 绝对违禁词）②20 语种全挂拉丁转写锚定（非拉丁形态实机驱动补录）③en 追加 `Superior Reliability`/`Superior Prof`（标题锚定）/`extensive tests`（质量背书规格语境）/`tested`/`testing`（派生形态）④保守增补 `# Bending Test(s)` 数字锚定 + `anti-static test(s)` 限定词锚定 | `lib/prohibited-words.ts` |
+| 7 | **detectProhibited 行首星号剥离** | 源文 `*Limited lifetime warranty...` 的 `*` 阻挡豁免 regex 锚定——`text.replace(/^\*\s*/, '')` 后豁免正常触发（markdown 列表/法律条款星号脚注形态） | `lib/prohibited-check.ts` |
+| 8 | **PROHIBITED_WORDS_VERSION 2→5** | 5 次词表/豁免表增删全 +1（词表维护纪律：否则旧译文缓存复活） | `lib/prohibited-words.ts` |
+
+**测试**：新套件 `tests/test-v1217-glossary-match-audit.ts` **28/28**（A-G 七段：S1 短路 4 种™形态全命中/嵌入句整词遮蔽/app 切碎根因定位/6 短词条切碎普查/脏条目/adhoc 覆盖/连写复现 + H 段 Microsoft DirectStorage 内置验证）；v129 豁免套件扩至 **129/129**（I1-I28：20 语种豁免生效 + 红线反例 + 派生形态 + 保守增补数字锚定/限定词锚定）；回归 v1112(176)/v123(53)/v124(54)/v1210(31)/v1213(28)/v1214(46) 全绿；typecheck 双配置 + build 通过（bundle 验证：v12.17 标记 + Microsoft DirectStorage + Bending Test 进 dist/index.html）。
+
+**实机验证点**：①之前切碎句子（applicability/armored/thorough 等）译文正常 ②`Microsoft DirectStorage` 整词形态（无 `MicrosoftDirectStorage3` 连写）③6 条违禁词误报徽章全消失 ④日志出现 `[proofread]` 批次开始/LLM 返回/批次完成 + `[consistency]` 裁决调用三点 ⑤校对总耗时构成可观测（批次 4 长文本+违禁词改写为异常值）。
+
+**遗留**：
+- ARMOR GOLD S1 短路 `术语短路0条` 孤例——脚本验证代码逻辑全对（4 种™形态全命中/嵌入句整词遮蔽正确），实机译文正确（LLM 自由翻译碰巧对），用户拍板单点日志透出不做，等再现（译文错误）再处理
+- 校对批次 4 的 52.8 秒（长文本+违禁词改写链叠加）——`PROOFREAD_BATCH_SIZE=8` 改 6/4 可降但增批次数，当前 1 分 27 秒可接受，不改
+- `das Modell Lexar` LLM 加戏（一致性探测发现但只报告不修正）——探测版纪律（零修改），一致性日志已透出可确认裁决执行状态
+- **判定层语义化**（语境/语序/开放集合代码判不了的走 LLM 或人工）是长期方向——本次违禁词豁免保守收敛是过渡方案，系统解法待八点五节扩展
+
+---
+
+### v12.16 判定任务批次并行 + 润色违禁词豁免（2026-09-04，判定链串行提速 + 润色/校对改写链边界切清）
+
+**背景**：判定链（人设判定/润色/润色后验证）原串行 for 循环 15-17s/次，eligible 11 条场景 6 次串行累计 92s；同时润色会碰到已被校对违禁词改写链负责的译文，再改写必然触发第⑧层硬锁回退白烧 token。
+
+**改动（一问题一行）**：
+
+| # | 改动 | 要点 | 文件 |
+|---|------|------|------|
+| 1 | **判定任务批次并行** | personaJudgeBatch 人设×批次二维任务打平并行（每函数并发 ≤2×⌈n/4⌉≤6，与翻译 CONCURRENCY=4 同量级）+ polishVerifyBatch/polishBatch 批次并行（⌈n/4⌉≤3 并发）——串行 15-17s/次 → 单次时延 | `lib/llm-api.ts` |
+| 2 | **润色译文侧违禁词豁免** | polishExemptReason 新增 `prohibited-hit` 原因——译文 detectProhibited 命中 → 润色整格豁免（段级断行路径 + 整条级非断行路径两处都挂）。该条已由校对违禁词改写链（fixMap）负责，润色再碰=第⑧层硬锁必然回退白烧 token | `lib/polish-guard.ts` |
+
+**关键设计决策**：判定任务并发上限卡「与翻译同量级」——判定链是锦上添花，不该抢翻译 CONCURRENCY 带宽；润色与校对改写链的边界靠「段责任归属」切清（违禁词归校对、润色不碰）。
+
+**测试**：test-v123-polish.ts +4（A9-A12 译文侧违禁词命中 → 润色豁免）。
+
+**遗留**：无——本版是判定链提速与安全边界，不涉及并发编排改动。
+
+---
 
 ### v12.14 同词多™逐实例恢复 + 品牌词位确认制终检（2026-09-03，zh-TW 实机丢™事故驱动）
 
@@ -2046,4 +2166,4 @@ User Message：`[N] ({srcLang}→{targetLang}) source\nTrans：translation`
 
 ---
 
-**最后更新**: 2026-09-03（v12.13）
+**最后更新**: 2026-09-11（v12.19）

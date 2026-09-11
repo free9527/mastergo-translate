@@ -26,7 +26,7 @@ export const API_RETRY_DELAY_MS = 1000
 export const MAX_CACHE_SIZE = 500
 
 // 术语库版本号（更新 default-glossary.ts 后手动 +1；v11.9 起升级改为合并升级保留用户自定义）
-export const GLOSSARY_VERSION = 6  // 2026-08-13: v11.9 第三方型号下沉代码内置层（CSV 专属库 -16）+ 合并升级
+export const GLOSSARY_VERSION = 7  // 2026-09-04: 删除 Rigorously Tested 词条（钦定值命中 test 系违禁词，术语库↔违禁词打架源头）
 
 // UI 超时（仅用于 toast 消失等非关键逻辑）
 export const TOAST_DURATION_MS = 2500

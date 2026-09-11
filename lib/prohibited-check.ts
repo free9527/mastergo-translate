@@ -128,7 +128,11 @@ function getExemptionRegex(ex: string): RegExp {
  */
 export function detectProhibited(text: string, langCode: string): ProhibitedHit[] {
   if (!text) return []
-  let t = text
+  // v12.17: 行首星号剥离——源文 '*Limited lifetime warranty is limited to...' 的 '*' 阻挡
+  //   'Limited Lifetime Warranty' 豁免 regex 锚定（L 前无 * 匹配位），剥 * 后豁免正常触发。
+  //   只剥行首一个 * + 可选空格（markdown 列表标记/法律条款星号脚注形态），
+  //   文本中间 * 保留（防误剥乘法/通配符语境）。
+  let t = text.replace(/^\*\s*/, '')
   // v12.9 豁免通用化：从 zh/en 硬编码白名单改为「该语言有豁免表就执行剔除」。
   //   PROHIBITED_EXEMPTIONS 是全语种豁免总表（zh/en/ja…），key 对齐 PROHIBITED_AVOID。
   //   zh-CN/zh-TW 沿用既有「zh」豁免表（简繁共用），'zh' 键亦指向它。

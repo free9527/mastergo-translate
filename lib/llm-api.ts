@@ -41,6 +41,22 @@ import { uiLog } from '@lib/ui-debug-log'
 // DEBUG 日志辅助函数
 const debugWarn = (...args: unknown[]) => DEBUG_MODE && console.warn(...args)
 
+/**
+ * v12.18: LLM usage token 透出（只读不改——token 基线观测 + GPT-5.6 缓存命中验证）。
+ * Azure 各部署 usage 字段可能缺失或结构不同（代理网关常剥 usage）——防御性判空，缺失静默跳过。
+ * cached_tokens 验证 GPT-5.6 坑 2（json_object 不写缓存）是否在本部署复现：恒 0 即实锤。
+ */
+export function logUsage(tag: string, data: Record<string, unknown> | undefined): void {
+  const usage = data?.usage as Record<string, unknown> | undefined
+  if (!usage) return
+  const prompt = typeof usage.prompt_tokens === 'number' ? usage.prompt_tokens : null
+  const completion = typeof usage.completion_tokens === 'number' ? usage.completion_tokens : null
+  if (prompt === null && completion === null) return
+  const details = usage.prompt_tokens_details as Record<string, unknown> | undefined
+  const cached = typeof details?.cached_tokens === 'number' ? details.cached_tokens : 0
+  uiLog(tag, `tokens: prompt ${prompt ?? '?'} (cached ${cached}) → completion ${completion ?? '?'}`)
+}
+
 interface XhrResponse {
   ok: boolean
   status: number
@@ -1032,6 +1048,7 @@ ${texts.map((t, i) => `${i + 1}. "${t.slice(0, 100)}"`).join('\n')}
 
     const data = res.json as Record<string, unknown>
     const content: string = (data.choices as Array<{ message?: { content?: string } }>)?.[0]?.message?.content || ''
+    logUsage('translate', data)
 
     if (!_isRetry) {
       uiLog('translate', `LLM 原始返回(截断600字): ${content.slice(0, 600)}`)
@@ -1130,6 +1147,8 @@ ${texts.map((t, i) => `${i + 1}. "${t.slice(0, 100)}"`).join('\n')}
       const close = ECHO_QUOTE_PAIRS[open]
       if (!close || !translation.endsWith(close)) return translation
       // 源文首尾本来就是这个引号对 → 不是回显 → 保留
+      // v12.19: 源文对照按原始源文判定（调用方已按此约定传参）——
+      //   与占位符遮蔽态解耦，防 best-of-2 双路比较时引号残留不对称（实测 it 批次引号回显穿透）
       if (source.startsWith(open) && source.endsWith(close)) return translation
       // 内部还有同种开引号 → 可能是嵌套结构 → 保守保留
       const inner = translation.slice(1, -1)
@@ -1150,7 +1169,33 @@ ${texts.map((t, i) => `${i + 1}. "${t.slice(0, 100)}"`).join('\n')}
         return stripEchoQuotes(texts[i], t)
       })
     }
+    // v12.19: best-of-2 双路比较已在 pick 前同步剥引号（quotedIndices 盲区覆盖），
+    //   但单跑路径（!bestOf2）无空白条目仍可能残留回显引号——此处对无空白条目
+    //   做兜底剥离（保守：仅当源文确实无引号对时才剥）
+    if (!bestOf2 || _isRetry) {
+      result = result.map((t, i) => {
+        if (quotedIndices.has(i)) return t  // 已处理
+        return stripEchoQuotes(texts[i], t)
+      })
+    }
     return result
+  }
+
+  // v12.19: 引号归一化辅助函数（best-of-2 双路比较前同步剥引号——
+  //   与 callFirstLLM 内 stripEchoQuotes 同逻辑，但独立定义在外层作用域，
+  //   供 pick 比较使用；quotedIndices 盲区（无空白条目）的引号残留在此覆盖）
+  const ECHO_QUOTE_PAIRS_OUTER: Record<string, string> = {
+    '„': '"', '«': '»', '“': '”', '「': '」', '『': '』',
+  }
+  const stripEchoQuotesForPick = (source: string, translation: string): string => {
+    if (translation.length < 2) return translation
+    const open = translation[0]
+    const close = ECHO_QUOTE_PAIRS_OUTER[open]
+    if (!close || !translation.endsWith(close)) return translation
+    if (source.startsWith(open) && source.endsWith(close)) return translation
+    const inner = translation.slice(1, -1)
+    if (inner.includes(open)) return translation
+    return inner
   }
 
   let result: string[]
@@ -1189,7 +1234,12 @@ ${texts.map((t, i) => `${i + 1}. "${t.slice(0, 100)}"`).join('\n')}
     result = resultA.slice()
     for (let i = 0; i < texts.length; i++) {
       // 两路不同 → 候选择优；相同 → 直接采用免判定（术语短路条目遮蔽态两路必同，天然免疫）
-      if ((resultA[i] || '') === (resultB[i] || '')) continue
+      // v12.19: 比较前对双路同步剥引号——防「"Resistente" vs Resistente」引号不对称
+      //   被判为不同而进 pick（实测 it 批次引号回显穿透：quotedIndices 只对含空白的
+      //   条目剥离，无空白条目保留回显引号，双路各自独立导致一路有引号一路没有）
+      const normA = stripEchoQuotesForPick(texts[i], (resultA[i] || '').replace(/^"|"$/g, ''))
+      const normB = stripEchoQuotesForPick(texts[i], (resultB[i] || '').replace(/^"|"$/g, ''))
+      if (normA === normB) { result[i] = normA; continue }
       if (!isPickEligible(i)) continue
       pickIndices.push(i)
     }
@@ -1301,6 +1351,30 @@ ${texts.map((t, i) => `${i + 1}. "${t.slice(0, 100)}"`).join('\n')}
 
   // 商标符号还原（兜底：原文有则译文必有，原文无则不添加）
   result = restoreTrademarkSymbols(texts, result)
+
+  // v12.17: 遮蔽还原连写检测（只观测不改数据——auditStage 同纪律）。
+  // 2026-09-04 de 实机实锤：LLM 把数字/字母紧贴占位符书写（__GLOSSARY_1__3），
+  //   unmaskGlossaryTerms 还原后产生术语连写（DirectStorage3 / MicrosoftDirectStorage3），
+  //   进润色管道被当「连写错误」改写（Microsoft Direct Storage 3 散弹形态）。
+  // 正则口径：术语库值（字母/数字结尾）前后紧邻同类字符 = 连写嫌疑。
+  //   只检拉丁形态（CJK 译文与术语值天然相邻无空格，非连写问题——it/de 等拉丁目标限定）。
+  if (termMap.size > 0 && !isCJKTarget(targetLang)) {
+    for (let i = 0; i < result.length; i++) {
+      const t = result[i]
+      if (!t) continue
+      for (const [, termVal] of termMap) {
+        if (!termVal || termVal.length < 3) continue
+        const escaped = termVal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        // 值前紧邻字母（MicrosoftDirectStorage）或值后紧邻字母/数字（DirectStorage3）
+        const re = new RegExp(`[A-Za-z]${escaped}|${escaped}[A-Za-z0-9]`, 'g')
+        const hits = t.match(re)
+        if (hits) {
+          uiLog('translate', `v12.17 遮蔽还原连写检测: [${i + 1}] 术语值 "${termVal.slice(0, 30)}" 连写嫌疑 → "${t.slice(0, 60)}"`)
+          break  // 一条文本报一次足够
+        }
+      }
+    }
+  }
 
   // 数字校验：检测译文中数字是否与源文一致（防止 LLM 幻觉，如 4TB→8TB）
   // v7.3: validateNumbers 只警告不回退，不加入 revertedIndices（避免阻止重试）
@@ -2044,12 +2118,19 @@ export async function personaJudgeBatch(
 
   const hitMap = new Map<number, PolishIssue[]>()
 
+  // v12.16: 人设×批次二维任务打平并行（每函数并发 ≤2×⌈n/4⌉≤6——与翻译 CONCURRENCY=4 同量级；
+  //   原串行 for 循环 15-17s/次，eligible 11 条场景 6 次串行=92s，并行后=单次时延）
+  const judgeTasks: Array<{ persona: typeof personas[0]; b: number }> = []
   for (const persona of personas) {
-    const system = buildJudgePrompt(persona.text, targetLang)
     for (let b = 0; b < translations.length; b += POLISH_JUDGE_BATCH) {
-      const batchTrans = translations.slice(b, b + POLISH_JUDGE_BATCH)
-      const user = buildJudgeUser(sources, batchTrans, b)
-      try {
+      judgeTasks.push({ persona, b })
+    }
+  }
+  await Promise.all(judgeTasks.map(async ({ persona, b }) => {
+    const system = buildJudgePrompt(persona.text, targetLang)
+    const batchTrans = translations.slice(b, b + POLISH_JUDGE_BATCH)
+    const user = buildJudgeUser(sources, batchTrans, b)
+    try {
         const res = await fetchWithRetry(config.proofreadApiUrl || config.apiUrl, {
           method: 'POST',
           headers: {
@@ -2065,13 +2146,15 @@ export async function personaJudgeBatch(
             temperature: 0.1,
             response_format: { type: 'json_object' },
           }),
-        })
-        if (!res.ok) continue
+          // v12.19: 判定类短超时——judge 失败=无润色（保守回退），不该用生产翻译 90s 超时
+        }, API_MAX_RETRIES, API_RETRY_DELAY_MS, 30000)
+        if (!res.ok) return
         const resData = res.json as Record<string, unknown> | undefined
         const choices = resData?.choices as Array<{ message?: { content?: string } }> | undefined
         const content = choices?.[0]?.message?.content || res.text || ''
+        logUsage('polish-judge', resData)
         const parsed = extractJudgementsObject(content)
-        if (!parsed) continue
+        if (!parsed) return
         const byI = new Map<number, PersonaJudgeApiResult['judgements'][0]>()
         for (const j of parsed.judgements) byI.set(j.i, j)
         for (let k = 0; k < batchTrans.length; k++) {
@@ -2097,8 +2180,7 @@ export async function personaJudgeBatch(
       } catch (e) {
         debugWarn(`[personaJudgeBatch] 判定异常（${persona.id} 批${b}）: ${(e as Error).message.slice(0, 80)}`)
       }
-    }
-  }
+  }))
 
   return hitMap
 }
@@ -2215,7 +2297,10 @@ export async function polishVerifyBatch(
   const persona = personas[0]
   const system = buildVerifyPrompt(persona.text, targetLang)
 
-  for (let b = 0; b < afters.length; b += POLISH_JUDGE_BATCH) {
+  // v12.16: 批次并行（⌈n/4⌉≤3 并发——原串行 15-17s/次）
+  const verifyBatches: number[] = []
+  for (let b = 0; b < afters.length; b += POLISH_JUDGE_BATCH) verifyBatches.push(b)
+  await Promise.all(verifyBatches.map(async (b) => {
     const batchAfters = afters.slice(b, b + POLISH_JUDGE_BATCH)
     const user = buildVerifyUser(sources, befores, batchAfters, b)
     try {
@@ -2234,13 +2319,15 @@ export async function polishVerifyBatch(
           temperature: 0.1,
           response_format: { type: 'json_object' },
         }),
-      })
-      if (!res.ok) continue
+        // v12.19: 判定类短超时——verify 失败=缺省放行（保守），不该用生产翻译 90s 超时
+      }, API_MAX_RETRIES, API_RETRY_DELAY_MS, 30000)
+      if (!res.ok) return
       const resData = res.json as Record<string, unknown> | undefined
       const choices = resData?.choices as Array<{ message?: { content?: string } }> | undefined
       const content = choices?.[0]?.message?.content || res.text || ''
+      logUsage('polish-verify', resData)
       const parsed = extractVerdictsObject(content)
-      if (!parsed) continue
+      if (!parsed) return
       const byI = new Map<number, PolishVerifyApiResult['verdicts'][0]>()
       for (const v of parsed.verdicts) byI.set(v.i, v)
       for (let k = 0; k < batchAfters.length; k++) {
@@ -2255,7 +2342,7 @@ export async function polishVerifyBatch(
     } catch (e) {
       debugWarn(`[polishVerifyBatch] 二次判定异常（批${b}）: ${(e as Error).message.slice(0, 80)}`)
     }
-  }
+  }))
 
   return verdictMap
 }
@@ -2402,11 +2489,13 @@ export async function translationPickBatch(
           temperature: 0.1,
           response_format: { type: 'json_object' },
         }),
-      })
+        // v12.19: 判定类短超时——pick 失败=缺省第一路（保守），不该用生产翻译 90s 超时
+      }, API_MAX_RETRIES, API_RETRY_DELAY_MS, 30000)
       if (!res.ok) continue
       const resData = res.json as Record<string, unknown> | undefined
       const choices = resData?.choices as Array<{ message?: { content?: string } }> | undefined
       const content = choices?.[0]?.message?.content || res.text || ''
+      logUsage('translate-pick', resData)
       const parsed = extractPickObject(content)
       if (!parsed) continue
       const byI = new Map<number, TranslationPickApiResult['verdicts'][0]>()
@@ -2554,7 +2643,11 @@ export async function polishBatch(
   const POLISH_BATCH = POLISH_JUDGE_BATCH
   const system = buildPolishSystemPrompt(targetLang)
   const jobResults = new Map<number, { text: string; polished: boolean; reason?: string }>()  // segJobs 下标 → 结果
-  for (let b = 0; b < segJobs.length; b += POLISH_BATCH) {
+  // v12.16: 批次并行（⌈segJobs/4⌉≤3 并发——原串行 15-17s/次）；
+  //   段级 restore/硬锁是纯代码，与 LLM 调用同任务内顺序执行，批间无共享状态
+  const polishBatches: number[] = []
+  for (let b = 0; b < segJobs.length; b += POLISH_BATCH) polishBatches.push(b)
+  await Promise.all(polishBatches.map(async (b) => {
     const jobBatch = segJobs.slice(b, b + POLISH_BATCH)
     const user = jobBatch.map((job, k) => {
       const n = k + 1
@@ -2580,11 +2673,13 @@ export async function polishBatch(
           temperature: 0.2,
           response_format: { type: 'json_object' },
         }),
-      })
+        // v12.19: 判定类短超时——润色失败=回退润色前译文（保守），不该用生产翻译 90s 超时
+      }, API_MAX_RETRIES, API_RETRY_DELAY_MS, 30000)
       if (res.ok) {
         const resData = res.json as Record<string, unknown> | undefined
         const choices = resData?.choices as Array<{ message?: { content?: string } }> | undefined
         const content = choices?.[0]?.message?.content || res.text || ''
+        logUsage('polish', resData)
         parsed = extractPolishedObject(content)
       }
     } catch (e) {
@@ -2601,7 +2696,8 @@ export async function polishBatch(
         continue
       }
       if (!p || !p.text) {
-        jobResults.set(jobKey, { text: job.transSeg, polished: false, reason: '润色输出缺该段' })
+        // v12.16: 与「调用/解析失败」合并同一日志原因（语义同类——本条未润色，零信息量差异）
+        jobResults.set(jobKey, { text: job.transSeg, polished: false, reason: '润色 LLM 调用/解析失败' })
         continue
       }
       // changes 数量校验（无 issue 的段（unmatched 兜底前）允许 ≤1 个 general 改动；
@@ -2627,7 +2723,7 @@ export async function polishBatch(
       }
       jobResults.set(jobKey, { text: restored, polished: true })
     }
-  }
+  }))
 
   // ⑤ 拼回（段按原位 ↵ 拼接——语义断行 100% 保留；段内句中断行已拍平不还原）
   let jobCursor = 0
@@ -2870,6 +2966,10 @@ export async function proofreadBatch(
   const apiUrl = config.proofreadApiUrl || config.apiUrl
   const model = config.proofreadModel || config.model
 
+  // v12.17: 校对可观测性（9 分 20 秒黑盒定位——轮次串行/违禁词改写链/LLM 响应时间全透出）
+  const proofreadStart = Date.now()
+  uiLog('proofread', `批次开始: ${items.length}条 → ${targetLang}${prohibitedFixMap && prohibitedFixMap.size > 0 ? `, 违禁词改写 ${prohibitedFixMap.size}条` : ''}${polishedIndices && polishedIndices.size > 0 ? `, 已润色 ${polishedIndices.size}条` : ''}`)
+
   const res = await fetchWithRetry(apiUrl, {
     method: 'POST',
     headers: {
@@ -2896,6 +2996,8 @@ export async function proofreadBatch(
 
   const data = res.json as Record<string, unknown>
   const content: string = (data.choices as Array<{ message?: { content?: string } }>)?.[0]?.message?.content || ''
+  logUsage('proofread', data)
+  uiLog('proofread', `LLM 返回: ${items.length}条, 耗时 ${Date.now() - proofreadStart}ms, 内容长度 ${content.length}`)
 
   const results: ProofreadResult[] = items.map(() => ({ text: '', reason: '', ambiguous: [] }))
   let jsonParsed = false
@@ -3111,6 +3213,10 @@ export async function proofreadBatch(
       results[j].text = items[j].translatedText  // 回退到翻译管道的输出
     }
   }
+
+  // v12.17: 校对批次完成透出（黑盒闭环——开始/返回/完成三点全记录）
+  const modifiedCount = results.filter((r, i) => r.text && r.text !== items[i].translatedText).length
+  uiLog('proofread', `批次完成: ${items.length}条, 修正 ${modifiedCount}条, 总耗时 ${Date.now() - proofreadStart}ms`)
 
   return results
 }

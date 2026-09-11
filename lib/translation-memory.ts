@@ -352,3 +352,60 @@ export function retrieveTM(
   }
   return out
 }
+
+// ═══════════════════════════════════════════════════════════════
+// v12.18: TM 短路（≥0.99 直接用人工验收译文，跳过翻译 API）
+// ═══════════════════════════════════════════════════════════════
+// 定位: S1 术语短路的同款逻辑——「这条已经人工验收过了，不需要再调 LLM」。
+//   与 few-shot（≥0.90 注入当范例让 LLM 参考）的差别：短路是【直接落地】，
+//   所以阈值必须更高（≥0.99 ≈ 同句/仅空白差异），且数字集合必须完全相等。
+// 安全闸（全部复用现成）:
+//   ⛔ 相似度 ≥0.99（比 few-shot 的 0.90 严——同一句再次出现才短路，近似句只配当范例）
+//   ⛔ 数字集合完全相等（tmSimilarity 内建规格错位防线："up to 2TB" 绝不锚 "up to 4TB"）
+//   ⛔ origin='user' 单源（人工验收译文；校对自动修正 LLM 产物 / 未验收缓存一律不用）
+//   ⛔ targetLang 严格相等（correction 是按语种存的，跨语种绝不短路）
+//   ⛔ 调用方负责【术语过期防线】：落库前过 enforceGlossaryTerms——
+//      术语库后来改了译法时，TM 译文必须被拉回术语库现值（v10.7 缓存复活同型病预防）
+// ═══════════════════════════════════════════════════════════════
+
+/** TM 短路阈值（同句/仅空白差异才短路） */
+export const TM_SHORTCIRCUIT_THRESHOLD = 0.99
+
+/**
+ * TM 短路检索：corrections(user 源) × 当前源文 × 同 targetLang × 相似度≥0.99。
+ * 与 retrieveTM 的差别：few-shot 每批只回 ≤2 条当范例；短路是【逐条判定】，
+ * 每条命中的源文直接用人工验收译文，所以返回 Map 而非列表。
+ * @param texts 当前批次源文
+ * @param corrections 全部修正记录（函数内部过滤 origin='user'）
+ * @param targetLang 目标语言（correction.targetLang 严格相等）
+ * @returns 源文索引 → 人工验收译文（≥0.99 且数字集合相等；同一条源文取相似度最高的一条）
+ */
+export function retrieveTMShortCircuit(
+  texts: string[],
+  corrections: TranslationCorrection[],
+  targetLang: string,
+): Map<number, string> {
+  // 数据源收窄与 retrieveTM 完全一致（origin=user / 同语种 / 非空译文 / 源文 ≥15 字符）
+  const pool = corrections.filter(c =>
+    (c.origin ?? 'user') === 'user' &&
+    c.targetLang === targetLang &&
+    c.correctedTranslation && c.correctedTranslation.trim().length > 0 &&
+    c.source && c.source.trim().length >= MIN_SOURCE_LEN,
+  )
+  if (pool.length === 0) return new Map()
+
+  const out = new Map<number, string>()
+  for (let i = 0; i < texts.length; i++) {
+    const t = texts[i]
+    if (!t || t.trim().length < MIN_SOURCE_LEN) continue
+    let best = 0
+    let bestTarget = ''
+    for (const c of pool) {
+      const s = tmSimilarity(t, c.source)
+      if (s > best) { best = s; bestTarget = c.correctedTranslation }
+    }
+    // 数字集合相等已由 tmSimilarity 内建（不等 → 0），这里只需阈值闸
+    if (best >= TM_SHORTCIRCUIT_THRESHOLD && bestTarget) out.set(i, bestTarget)
+  }
+  return out
+}

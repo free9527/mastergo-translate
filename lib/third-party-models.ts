@@ -86,6 +86,13 @@ const BUILTIN_THIRD_PARTY_TERMS_INTERNAL: string[] = [
   'Hero11 Black', 'Hero10 Black', 'Mavic Pro', 'Mavic Mini', 'Mini 5 Pro', 'Mini2',
   'Mini 3 Pro',
   'Avata 360', 'Lito 1', 'Lito X1',
+  // ── v12.17 实机连写事故补录（2026-09-04 de 实机）──
+  // Microsoft DirectStorage：微软官方技术名整词。之前只有专属 CSV 单词条
+  //   'DirectStorage'（identity），遮蔽时 'Microsoft' 留在占位符外由 LLM 自由发挥，
+  //   产出 'MicrosoftDirectStorage3'/'Microsoft Direct Storage 3' 连写散弹形态，
+  //   进润色被当「连写错误」二次改写放大。整词内置后遮蔽锚定完整技术名，
+  //   LLM 物理上碰不到内部空格。用户拍板：跟品牌一起当系统默认术语。
+  'Microsoft DirectStorage',
 ]
 
 /**

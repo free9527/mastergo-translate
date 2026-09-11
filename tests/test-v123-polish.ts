@@ -12,7 +12,7 @@
  *   TS_NODE_COMPILER_OPTIONS='{"module":"commonjs","esModuleInterop":true,"skipLibCheck":true,"types":["node"],"rootDir":".","importHelpers":false}' TS_NODE_TRANSPILE_ONLY=true npx ts-node -r tsconfig-paths/register tests/test-v123-polish.ts
  */
 
-import { isPolishEligible, validatePolishOutput, detectPolarityBreach } from '../lib/polish-guard'
+import { isPolishEligible, validatePolishOutput, detectPolarityBreach, polishExemptReason } from '../lib/polish-guard'
 import { buildProofreadSystemPrompt } from '../lib/prompt-constants'
 import { proofreadBatch, personaJudgeBatch, polishBatch, polishVerifyBatch } from '../lib/llm-api'
 import { LLMConfig } from '../messages/types'
@@ -80,6 +80,48 @@ assert(
 // A8: 空文本 → 豁免
 assert(!isPolishEligible('', 'text', 'de'), 'A8 空源文豁免')
 assert(!isPolishEligible('text', '', 'de'), 'A8b 空译文豁免')
+
+// A9-A12: v12.16 译文侧违禁词命中 → 润色豁免（校对改写链负责，润色不碰）
+{
+  // A9 fr 实机条目：test 单数形态命中 fr 词表 test → prohibited-hit 豁免
+  //   （词边界设计：test 不命中复数 tests——v11.12 收录原则「宁漏勿滥」；
+  //     实机日志里 tests 脚注句的三连回退根因是违禁词 fixMap 与润色锁竞争，见 HANDOFF）
+  assert(
+    polishExemptReason(
+      '※ Speeds measured during internal test sessions. Actual performance may vary.',
+      '※ Vitesses mesurées lors du test en interne. Les performances réelles peuvent varier.',
+      'fr',
+    ) === 'prohibited-hit',
+    'A9 fr 译文含 test（命中词表）→ prohibited-hit 豁免'
+  )
+  // A10 de：beste 命中 de 词表 beste → 豁免
+  assert(
+    polishExemptReason(
+      'Experience gaming at its finest with lightning-fast load times and smooth performance',
+      'Erleben Sie Gaming in seiner besten Form mit blitzschnellen Ladezeiten und flüssiger Leistung',
+      'de',
+    ) === 'prohibited-hit',
+    'A10 de 译文含 besten（beste 词形）→ prohibited-hit 豁免'
+  )
+  // A11 边界防误伤：豁免形态不命中 → 照常 eligible（ja 厳格なテスト済み 在豁免表内 → 不命中 → 可润）
+  assert(
+    isPolishEligible(
+      'Rigorously tested for reliable performance in demanding conditions',
+      '厳格なテスト済みで過酷な条件下でも信頼できる性能を発揮します',
+      'ja',
+    ),
+    'A11 ja 豁免形态（厳格なテスト済み）不命中 → 照常 eligible'
+  )
+  // A12 干净译文不误伤：正常营销文案无违禁词 → eligible（A1 同型，fr 语境复验）
+  assert(
+    isPolishEligible(
+      'Power up your gaming experience with lightning-fast speeds and massive capacity',
+      'Boostez votre expérience de jeu avec des vitesses fulgurantes et une capacité massive',
+      'fr',
+    ),
+    'A12 fr 干净译文无违禁词 → 照常 eligible（防误伤）'
+  )
+}
 
 // ============================================================
 // B 硬锁校验（validatePolishOutput 四层）

@@ -85,6 +85,7 @@ export type PolishExemptReason =
   | 'short'           // 极短（≤3 词/全极短段）
   | 'compliance'      // 合规关键词
   | 'glossary-locked' // 术语库整条命中
+  | 'prohibited-hit'  // v12.16: 译文侧违禁词命中（校对改写链负责，润色不碰）
   | 'keep-source'     // 不可翻译（纯规格行/型号列表/裸单位）
 
 /**
@@ -114,6 +115,8 @@ export function polishExemptReason(
       const segSrcLower = segSrc.toLowerCase()
       if (COMPLIANCE_KEYWORDS.some(kw => segSrcLower.includes(kw))) return 'compliance'
       if (isGlossaryLockedTranslation(segSrc, segTrans, normalizedGlossaryMap)) return 'glossary-locked'
+      // v12.16: 段译文违禁词命中 → 整格豁免（段责任归校对改写链，润色不碰）
+      if (detectProhibited(segTrans, targetLang).length > 0) return 'prohibited-hit'
       if (shouldKeepSource(segSrc, { targetLang })) return 'keep-source'
       const segWordCount = segSrc.split(/\s+/).filter(Boolean).length
       segEligibility.push(segWordCount > 3)
@@ -133,6 +136,11 @@ export function polishExemptReason(
   if (COMPLIANCE_KEYWORDS.some(kw => srcLower.includes(kw))) return 'compliance'
 
   if (isGlossaryLockedTranslation(src, trans, normalizedGlossaryMap)) return 'glossary-locked'
+
+  // v12.16: 译文侧违禁词命中的条目润色直接豁免——
+  //   该条已由校对违禁词改写链负责（fixMap），润色再碰=第⑧层必然回退白烧 token；
+  //   格式沿用既有 detectProhibited 签名（单条调用，豁免表照常生效——豁免形态不命中则照常可润）。
+  if (detectProhibited(trans, targetLang).length > 0) return 'prohibited-hit'
 
   if (shouldKeepSource(src, { targetLang })) return 'keep-source'
 

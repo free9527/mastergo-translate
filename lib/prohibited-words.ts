@@ -44,7 +44,7 @@
  * 翻译缓存 key 拼入本版本号（App.vue），词表更新后旧译文缓存自然失配重翻，
  * 防 v10.7 型「旧译文携带旧词表时代的违禁词经缓存复活」缺口。
  */
-export const PROHIBITED_WORDS_VERSION = 2  // v12.15: zh 豁免表补「最高達#/最高达#/最高讀取/寫入速度」（词表维护纪律：任何增删 +1，否则旧译文缓存复活）
+export const PROHIBITED_WORDS_VERSION = 5  // v12.17: en 豁免表保守补「# Bending Test(s)/anti-static test(s)」（词表维护纪律：任何增删 +1，否则旧译文缓存复活）
 
 export interface ProhibitedWord {
   word: string
@@ -255,6 +255,31 @@ export const PROHIBITED_EN_EXEMPTIONS: string[] = [
   'perfect match',
   'Best Match',
   'superior Gen',
+  // ── superior 标题锚定（v12.17 实机误报驱动：'Superior Reliability for Superior
+  //   Professionals' 是 ARMOR GOLD 产品线官方文案固定搭配，非裸宣称；
+  //   与既有 'superior Gen' 同纪律——豁免锚定标题/固定搭配形态，裸 superior 仍命中）──
+  'Superior Reliability',
+  'Superior Prof',
+  // ── test 派生形态（v12.17 实机误报驱动：词表 test 词边界 regex 命中
+  //   tested/testing 前缀形态（test 后 ed/ing 非字母边界外字符），
+  //   但 'tested and proven'/'tested for quality' 是营销声称标准写法，
+  //   与裸 test 不同性质——豁免锚定 tested/testing 派生形态，
+  //   裸 test 红线保留（'speed test results' 仍命中））──
+  'tested',
+  'testing',
+  // ── tests 复数规格语境（v12.17 实机误报驱动：'All Lexar products undergo
+  //   extensive tests' 是质量背书规格描述，非营销声称；与 ja 侧「広範なテスト」
+  //   豁免同纪律——锚定 extensive tests 固定搭配，裸 tests 仍命中）──
+  'extensive tests',
+  // ── 保守增补（2026-09-04 用户拍板保守路线）：只补实机已确认的规格测试语境，
+  //   不做语境模式泛化（防误豁免营销声称）。
+  //   数字锚定 # 语法同 ja 侧「最大#」纪律——'370N Bending Test'/'10N bending tests'
+  //   数字+测试名双锚，裸 'Bending Test'（无数字）不豁免。
+  //   'anti-static tests' 实机源文形态（连字符/空格双形态由弹性 regex 覆盖）──
+  '# Bending Test',
+  '# Bending Tests',
+  'anti-static tests',
+  'anti-static test',
 ]
 
 // ═══════════════════════════════════════════════════════════════
@@ -277,11 +302,36 @@ export const PROHIBITED_EN_EXEMPTIONS: string[] = [
 //   ✅ 只收测试素材/术语库/实机日志真实出现的形态
 //   ⛔ 不收裸「最大/最高/最速/テスト」宣称形态（红线词表保留）
 // ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// 规格测试语境豁免（v12.17，20 语种通用结构）
+//
+// 背景（2026-09-04 用户实机实锤）：'Bending Test'/'Drop Test'/'Stress Test'
+//   是产品规格参数（测试标准名称），与 'Read Speed'/'Write Speed' 同性质，
+//   非营销声称。源文写 '370N Bending Test'/'10N Bending Test' 是规格书标准
+//   写法，数字锚定（N=牛顿）进一步确认规格语境。
+// 与 ja 侧「テスト质量背书语境」豁免同纪律：
+//   ✅ 豁免锚定「测试类型名称」（Bending/Drop/Stress/Water/Dust/Shock/Vibration）
+//   ⛔ 裸 'tested for quality'/'quality test' 仍命中红线
+// 匹配走 getExemptionRegex 字符级弹性：'370N Bending Test'/'10N Bending Test'
+//   数字+测试名锚定豁免；'Bending Test' 单独出现（规格标题）亦豁免。
+// ═══════════════════════════════════════════════════════════════
+const SPEC_TEST_EXEMPTIONS_EN: string[] = [
+  'Bending Test',
+  'Drop Test',
+  'Water Test',
+  'Dust Test',
+  'Shock Test',
+  'Vibration Test',
+  'Temperature Test',
+  'Humidity Test',
+  'Pressure Test',
+]
+
 export const PROHIBITED_EXEMPTIONS: Record<string, string[]> = {
   // ── 中文（简/繁目标语检测共用，v11.12 既有表迁入）──
   'zh': PROHIBITED_ZH_EXEMPTIONS,
   // ── 英语（v12.3.3 既有表迁入）──
-  'en': PROHIBITED_EN_EXEMPTIONS,
+  'en': [...PROHIBITED_EN_EXEMPTIONS, ...SPEC_TEST_EXEMPTIONS_EN],
   // ── 日语（v12.9 新增——ja 侧从裸匹配升级为短语豁免+数字锚定）──
   'ja': [
     // 速度规格（术语库钦定值 + 测试素材三产品线官方 ja 文案双形态：
@@ -307,6 +357,38 @@ export const PROHIBITED_EXEMPTIONS: Record<string, string[]> = {
     //   「厳格なテストを実施」（v1112 B27）仍命中——「を実施」是动作描述非质量背书结论。
     '厳格なテスト済み', '厳格なテストに', 'テスト済み', '社内テスト', '広範なテスト', '品質テスト',
   ],
+  // ── 韩语（v12.17 新增——规格测试语境；拉丁转写锚定，韩文形态实机驱动补录）──
+  'ko': [...SPEC_TEST_EXEMPTIONS_EN],
+  // ── 法语（v12.17 新增——规格测试语境；亚马逊法国站产品规格写法与英文同构）──
+  'fr': [...SPEC_TEST_EXEMPTIONS_EN],
+  // ── 德语（v12.17 新增——规格测试语境；'Biegetest'/'Falltest' 复合形态由弹性 regex 覆盖）──
+  'de': [...SPEC_TEST_EXEMPTIONS_EN],
+  // ── 西班牙语（v12.17 新增——规格测试语境）──
+  'es': [...SPEC_TEST_EXEMPTIONS_EN],
+  // ── 葡萄牙语（v12.17 新增——规格测试语境）──
+  'pt': [...SPEC_TEST_EXEMPTIONS_EN],
+  // ── 巴西葡语（v12.17 新增——规格测试语境）──
+  'pt-BR': [...SPEC_TEST_EXEMPTIONS_EN],
+  // ── 俄语（v12.17 新增——规格测试语境；拉丁转写锚定，西里尔形态实机驱动补录）──
+  'ru': [...SPEC_TEST_EXEMPTIONS_EN],
+  // ── 意大利语（v12.17 新增——规格测试语境；亚马逊意大利站产品规格写法与英文同构）──
+  'it': [...SPEC_TEST_EXEMPTIONS_EN],
+  // ── 越南语（v12.17 新增——规格测试语境；拉丁转写锚定）──
+  'vi': [...SPEC_TEST_EXEMPTIONS_EN],
+  // ── 泰语（v12.17 新增——规格测试语境；拉丁转写锚定，泰文形态实机驱动补录）──
+  'th': [...SPEC_TEST_EXEMPTIONS_EN],
+  // ── 印尼语（v12.17 新增——规格测试语境）──
+  'id': [...SPEC_TEST_EXEMPTIONS_EN],
+  // ── 阿拉伯语（v12.17 新增——规格测试语境；拉丁转写锚定，阿文形态实机驱动补录）──
+  'ar': [...SPEC_TEST_EXEMPTIONS_EN],
+  // ── 荷兰语（v12.17 新增——规格测试语境）──
+  'nl': [...SPEC_TEST_EXEMPTIONS_EN],
+  // ── 波兰语（v12.17 新增——规格测试语境）──
+  'pl': [...SPEC_TEST_EXEMPTIONS_EN],
+  // ── 瑞典语（v12.17 新增——规格测试语境）──
+  'sv': [...SPEC_TEST_EXEMPTIONS_EN],
+  // ── 土耳其语（v12.17 新增——规格测试语境）──
+  'tr': [...SPEC_TEST_EXEMPTIONS_EN],
 }
 
 // ═══════════════════════════════════════════════════════════════

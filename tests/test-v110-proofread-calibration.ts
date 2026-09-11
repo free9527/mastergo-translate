@@ -109,6 +109,14 @@ assert(
   'C6 校准块位于 PROOFREAD_PROMPT 之后、VALIDATION 之前',
 )
 
+// v12.18: 语种规范边界指令（langBlock 非空时注入，且紧邻 VALIDATION 之前）
+assert(sysDe.includes('[LANGUAGE RULES BOUNDARY]'), 'C8 组装含语种规范边界指令（英文，langBlock 非空）')
+assert(
+  sysDe.indexOf('[LANGUAGE RULES BOUNDARY]') > sysDe.indexOf('[MARKET CALIBRATION') &&
+  sysDe.indexOf('[LANGUAGE RULES BOUNDARY]') < sysDe.indexOf('[VALIDATION: de]'),
+  'C9 边界指令位于校准块之后、VALIDATION 之前（紧邻生产规则建立 QA 边界）',
+)
+
 const sysNoHint = buildProofreadSystemPrompt({
   targetLang: 'de', productLine: 'gaming_dimm', useEnInstruction: true,
 })
@@ -123,6 +131,8 @@ out.push('D. 指令语言路由')
 const sysJa = buildProofreadSystemPrompt({ targetLang: 'ja', productLine: 'gaming_dimm', useEnInstruction: false })
 assert(sysJa.includes('[角色]'), 'D1 useEnInstruction=false → 中文校对 prompt（[角色]）')
 assert(sysJa.includes('[市场语感校准 · ja]'), 'D2 useEnInstruction=false → 中文校准块头')
+// v12.18: 中文版边界指令
+assert(sysJa.includes('[语种规范边界]'), 'D2b useEnInstruction=false → 中文边界指令（langBlock 非空）')
 
 const sysFr = buildProofreadSystemPrompt({ targetLang: 'fr', productLine: 'gaming_dimm', useEnInstruction: true })
 assert(sysFr.includes('[ROLE]'), 'D3 useEnInstruction=true → 英文校对 prompt')

@@ -593,10 +593,33 @@ import { validateAutoGlossarySource, sanitizeAutoGlossaryValue, isIdentityAutoAd
 import { formatCJKSpace } from '@lib/format-text'
 import { postProcessTranslation, restoreTrademarkSymbols, restoreStorageUnitFormatting, enforceGlossaryTerms, detectTranslationExpansion, sanitizeLineBreaks, cleanKey, stripSpuriousAsterisks, prePolishFormatCleanup } from '@lib/post-process'
 import { translateBatch, proofreadBatch, fetchWithRetry, isProofreadScriptMismatch, detectTruncatedTexts, STYLE_PRESETS, SCENE_PRESETS, detectProductLine, buildTaskGlossaryHint, isUntranslatable, isSuspectMisspelledWord, classifyNecessity, getTargetScript, hasFunctionWords, hasSimplifiedOnlyChars, hasTraditionalOnlyChars, personaJudgeBatch, polishBatch, polishVerifyBatch } from '@lib/llm-api'
+import { detectConsistencyIssues } from '@lib/consistency-check'
 import { startMetricsCollection, recordBatchMetrics, recordProofreadMetrics, finalizeMetrics, formatMetricsReport, createBatchTimer } from '@lib/metrics'
 import { DEFAULT_GLOSSARY_PRODUCTS_CSV } from '@lib/default-glossary'
 import { BUILTIN_THIRD_PARTY_ENTRIES } from '@lib/third-party-models'
 import { TRANSLATE_BATCH_SIZE, PROOFREAD_BATCH_SIZE, TOAST_DURATION_MS, CORRECTION_THRESHOLD, makeFontKey, parseFontKey, normalizeText } from '@lib/constants'
+
+// v12.18: 校对批次动态化——v12.17 实机实锤批次 4（长文本+违禁词改写链叠加）52.8 秒为异常值。
+// 长文本批次单拆小批：LLM 时延随批内总字数近似线性增长，长条挤在 8 条满批里会拖出超长尾批。
+// 纯代码分批逻辑，不动并发数/波结构/错误处理（用户拍板：并发不动）。
+const PROOFREAD_LONG_TEXT_THRESHOLD = 2000  // 批内译文累计字符超过此值视为长文本
+const PROOFREAD_LONG_TEXT_BATCH = 4         // 长文本批次的批大小（默认 8 → 4）
+
+/** 按长文本阈值把待校对条目切成批次（顺序不变；长文本批次缩小批大小） */
+function chunkProofreadBatches<T extends { translatedText: string }>(arr: T[]): T[][] {
+  const batches: T[][] = []
+  let i = 0
+  while (i < arr.length) {
+    let size = PROOFREAD_BATCH_SIZE
+    // 用当前位置起的默认窗口估字数：若累计字符超阈值，本批降为小批
+    let chars = 0
+    for (let j = i; j < Math.min(i + size, arr.length); j++) chars += (arr[j].translatedText || '').length
+    if (chars > PROOFREAD_LONG_TEXT_THRESHOLD) size = PROOFREAD_LONG_TEXT_BATCH
+    batches.push(arr.slice(i, i + size))
+    i += size
+  }
+  return batches
+}
 import { convertStorageUnit } from '@lib/unit-convert'
 import { getAutoFontMapping } from '@lib/font-mapper'
 import { compressBatch, expandBatch } from '@lib/translation-memory'
@@ -606,7 +629,7 @@ import { parseProductNameWithLLM } from '@lib/llm-api'
 import { uiLog, getUiLogs, getUiLogVersion, clearUiLogs, formatUiLogs, receiveMainLog, restoreUiLogs, serializeUiLogs, UiLogEntry } from '@lib/ui-debug-log'
 import { detectProhibited, detectSourceLangForProhibited, isGlossaryLockedTranslation } from '@lib/prohibited-check'
 import { PROHIBITED_WORDS_VERSION } from '@lib/prohibited-words'
-import { retrieveTM } from '@lib/translation-memory'
+import { retrieveTM, retrieveTMShortCircuit } from '@lib/translation-memory'
 import { polishExemptReason } from '@lib/polish-guard'
 
 // ============================================================
@@ -1873,6 +1896,26 @@ async function startTranslate() {
             const uncachedTexts = uncachedIndices.map(idx => texts[idx])
             // 翻译记忆：同型号不同容量/速度的文本压缩为唯一模板，减少 API 调用
             const { uniqueTexts, expandData } = compressBatch(uncachedTexts)
+            // v12.18: TM 短路（≥0.99 + 数字集合相等 + origin=user）——人工验收译文直接落地，
+            //   命中条目从 API 调用中剔除（S1 术语短路的同款逻辑，省 token 也省时间）。
+            //   术语过期防线：落地前过 enforceGlossaryTerms（术语库后来改译法时拉回现值）。
+            const tmShortCircuit = retrieveTMShortCircuit(uniqueTexts, corrections.value, targetLang.value)
+            let tmShortCircuitCount = 0
+            const tmShortCircuitResult = new Map<number, string>()
+            if (tmShortCircuit.size > 0) {
+              for (const [uIdx, tmText] of tmShortCircuit) {
+                // 术语过期防线：TM 译文里若含已被术语库改写的旧译法，enforceGlossaryTerms 拉回现值。
+                // enforceGlossaryTerms 签名是 (sourceTexts, translatedTexts, glossaryMap, skipIndices?, precomputedNormalizedMap?)
+                // ——数组语义，单条也要包成数组传入；源文给原文（它按源文 cleanKey 查表）。
+                const enforcedArr = enforceGlossaryTerms([uniqueTexts[uIdx]], [tmText], glossaryMap, undefined, normalizedGlossaryMap)
+                tmShortCircuitResult.set(uIdx, enforcedArr[0] ?? tmText)
+                tmShortCircuitCount++
+              }
+              if (tmShortCircuitCount > 0) {
+                uiLog('translate', `TM 短路: ${tmShortCircuitCount}条 直接用人工验收译文（≥0.99+数字相等），跳过翻译 API`)
+              }
+            }
+            const apiTexts = uniqueTexts.filter((_, uIdx) => !tmShortCircuitResult.has(uIdx))
             // v9.11: 收集管道最终仍漏翻（保留原文）的唯一条目 → 标记翻译失败（进待确认）
             const uniqueUntranslated = new Set<number>()
             // v10.6: 收集疑似错词（保留原形）的唯一条目 → 单独标记"疑似拼写错误"（与漏翻区分）
@@ -1887,29 +1930,52 @@ async function startTranslate() {
             const bestOf2Stats = { dualRun: 0, judged: 0, pickedB: 0 }
             const bestOf2StatsOut = { add: (s: { dualRun: number; judged: number; pickedB: number }) => { bestOf2Stats.dualRun += s.dualRun; bestOf2Stats.judged += s.judged; bestOf2Stats.pickedB += s.pickedB } }
             // v12.13: TM few-shot 检索（人工验收译文 origin=user，相似度≥0.90+数字集合相等）
-            const tmFewShot = retrieveTM(uniqueTexts, corrections.value, targetLang.value)
-            const uniqueResult = await translateBatch(uniqueTexts, targetLang.value, glossaryMap, llmConfig.value, sourceLang.value === 'auto' ? undefined : sourceLang.value, pageName.value || undefined, fileName.value || undefined, crossBatchTerms, taskGlossaryHint, normalizedGlossaryMap, false, false, glossaryEnMap, uniqueUntranslated, uniqueMisspelled, uniqueExpansion, undefined, bestOf2On, bestOf2StatsOut, tmFewShot.length > 0 ? tmFewShot : undefined)
+            // v12.18: 只检索实际要调 API 的条目（apiTexts——TM 短路命中条目已被剔除，不再占 few-shot 名额）
+            const tmFewShot = retrieveTM(apiTexts, corrections.value, targetLang.value)
+            const apiResult = apiTexts.length > 0
+              ? await translateBatch(apiTexts, targetLang.value, glossaryMap, llmConfig.value, sourceLang.value === 'auto' ? undefined : sourceLang.value, pageName.value || undefined, fileName.value || undefined, crossBatchTerms, taskGlossaryHint, normalizedGlossaryMap, false, false, glossaryEnMap, uniqueUntranslated, uniqueMisspelled, uniqueExpansion, undefined, bestOf2On, bestOf2StatsOut, tmFewShot.length > 0 ? tmFewShot : undefined)
+              : []
+            // v12.18: 合并 TM 短路结果 + API 结果回 uniqueTexts 槽位（显式游标，顺序对齐）
+            // 注意：漏翻/错词/超长 Set（uniqueUntranslated 等）收集的是 translateBatch 内部
+            //   针对 apiTexts 的索引——需先经 apiTexts→uniqueTexts 游标换算再展开（见下方 apiIdxToUnique）
+            const uniqueResult: string[] = []
+            const apiIdxToUnique = new Map<number, number>()  // apiTexts 索引 → uniqueTexts 索引
+            let apiCursor = 0
+            for (let uIdx = 0; uIdx < uniqueTexts.length; uIdx++) {
+              const sc = tmShortCircuitResult.get(uIdx)
+              if (sc !== undefined) { uniqueResult.push(sc); continue }
+              apiIdxToUnique.set(apiCursor, uIdx)
+              uniqueResult.push(apiResult[apiCursor] ?? '')
+              apiCursor++
+            }
             // 将模板译文展开回原始文本
             const expandedResult = expandBatch(uniqueResult, expandData, uncachedTexts.length)
             // v9.11: 唯一模板索引 → 展开后索引（同源文复制项共享同一模板译文，同样视为漏翻）
+            // v12.18: translateBatch 内的索引针对 apiTexts——先经 apiIdxToUnique 换算回 uniqueTexts 索引
             const expandedUntranslated = new Set<number>()
             for (const u of uniqueUntranslated) {
+              const uu = apiIdxToUnique.get(u)
+              if (uu === undefined) continue
               for (let x = 0; x < expandedResult.length; x++) {
-                if (expandedResult[x] !== undefined && expandedResult[x] === uniqueResult[u]) expandedUntranslated.add(x)
+                if (expandedResult[x] !== undefined && expandedResult[x] === uniqueResult[uu]) expandedUntranslated.add(x)
               }
             }
             // v10.6: 疑似错词模板索引 → 展开后索引（同源文复制项同样标记）
             const expandedMisspelled = new Set<number>()
             for (const u of uniqueMisspelled) {
+              const uu = apiIdxToUnique.get(u)
+              if (uu === undefined) continue
               for (let x = 0; x < expandedResult.length; x++) {
-                if (expandedResult[x] !== undefined && expandedResult[x] === uniqueResult[u]) expandedMisspelled.add(x)
+                if (expandedResult[x] !== undefined && expandedResult[x] === uniqueResult[uu]) expandedMisspelled.add(x)
               }
             }
             // v10.8: 超长信号模板索引 → 展开后索引（同源文复制项同样透出给校对）
             const expandedExpansion = new Set<number>()
             for (const u of uniqueExpansion) {
+              const uu = apiIdxToUnique.get(u)
+              if (uu === undefined) continue
               for (let x = 0; x < expandedResult.length; x++) {
-                if (expandedResult[x] !== undefined && expandedResult[x] === uniqueResult[u]) expandedExpansion.add(x)
+                if (expandedResult[x] !== undefined && expandedResult[x] === uniqueResult[uu]) expandedExpansion.add(x)
               }
             }
             // v7.5.7: 追踪关键文本在各环节的值
@@ -1986,7 +2052,7 @@ async function startTranslate() {
               const countReason = (r: string) => [...exemptReasons.values()].filter(x => x === r).length
               const arrowExemptCount = countReason('arrow')
               const exemptTotal = texts.length - eligibleIndices.length
-              uiLog('polish', `润色资格: ${texts.length}条→eligible ${eligibleIndices.length}条（豁免 ${exemptTotal}：↵整格 ${arrowExemptCount} / 合规 ${countReason('compliance')} / 术语锁定 ${countReason('glossary-locked')} / 极短 ${countReason('short') + countReason('empty')} / 不可翻译 ${countReason('keep-source')}）`)
+              uiLog('polish', `润色资格: ${texts.length}条→eligible ${eligibleIndices.length}条（豁免 ${exemptTotal}：↵整格 ${arrowExemptCount} / 合规 ${countReason('compliance')} / 术语锁定 ${countReason('glossary-locked')} / 违禁词 ${countReason('prohibited-hit')} / 极短 ${countReason('short') + countReason('empty')} / 不可翻译 ${countReason('keep-source')}）`)
               let polishApplied = 0
               let polishReverted = 0
               if (eligibleIndices.length > 0) {
@@ -2063,6 +2129,32 @@ async function startTranslate() {
               uiLog('polish', `润色管道异常，用未润色译文继续: ${(e as Error).message.slice(0, 100)}`)
               console.warn('[polish] 润色管道异常，用未润色译文继续:', (e as Error).message.slice(0, 100))
             }
+          }
+
+          // v12.17: 跨格一致性探测（方案 1 探测版——只报告不修改）
+          // 提取本批重复短语（代码形式信号）→ LLM 判定各格渲染是否一致（语义）。
+          // 红线：零修改/零硬锁/一次调用/失败静默；结果只进诊断日志供复盘，
+          // 病灶密度数据收集后再拍板是否做修改版。
+          // v12.19: fire-and-forget——不再 await 阻塞批尾部（实机 71% 超时率 +
+          //   批内硬阻塞 = 每批白等 15s）。探测层零修改，批尾部不该等它。
+          if (llmConfig.value.enableAiOptimize !== false && texts.length > 1) {
+            void detectConsistencyIssues(texts, translated, targetLang.value, llmConfig.value)
+              .then(report => {
+                if (report && report.issues.length > 0) {
+                  uiLog('consistency', `一致性探测: 重复短语 ${report.groupsTotal} 组 → 不一致 ${report.issues.length} 组`)
+                  for (const issue of report.issues.slice(0, 5)) {
+                    const variantStr = issue.variants
+                      .map(v => `"${v.form}"(${v.itemIndices.map(i => `格${i + 1}`).join('/')})`)
+                      .join(' vs ')
+                    uiLog('consistency', `  "${issue.phrase}" → ${variantStr}`)
+                  }
+                } else if (report) {
+                  uiLog('consistency', `一致性探测: 重复短语 ${report.groupsTotal} 组 → 全部一致`)
+                }
+              })
+              .catch(e => {
+                uiLog('consistency', `一致性探测异常（跳过）: ${(e as Error).message.slice(0, 80)}`)
+              })
           }
 
           for (let j = 0; j < batch.length; j++) {
@@ -2153,13 +2245,14 @@ async function startTranslate() {
         proofreadWavePromises.push((async () => {
           try {
             const P_CONCURRENCY = 4
-            for (let p = 0; p < waveItems.length; p += PROOFREAD_BATCH_SIZE * P_CONCURRENCY) {
+            // v12.18: 批次动态化——长文本批次自动降为小批（顺序不变），治 v12.17 批次 4 超长尾批
+            const waveBatches = chunkProofreadBatches(waveItems)
+            for (let p = 0; p < waveBatches.length; p += P_CONCURRENCY) {
               if (cancelFlag.value) break
               const proofPromises: Promise<void>[] = []
               for (let pk = 0; pk < P_CONCURRENCY; pk++) {
-                const pStart = p + pk * PROOFREAD_BATCH_SIZE
-                if (pStart >= waveItems.length) break
-                const pBatch = waveItems.slice(pStart, pStart + PROOFREAD_BATCH_SIZE)
+                if (p + pk >= waveBatches.length) break
+                const pBatch = waveBatches[p + pk]
                 // v10.8: 本批内译文显著超长的条目索引 → 透出给校对作长度异常 hint
                 const pExpansionFlags = new Set<number>()
                 for (let pj = 0; pj < pBatch.length; pj++) {
@@ -2248,7 +2341,8 @@ async function startTranslate() {
                 })())
               }
               await Promise.allSettled(proofPromises)
-              proofreadDoneCount += proofPromises.length * PROOFREAD_BATCH_SIZE
+              // v12.18: 批次动态化后按实际条目数累计（批大小不再恒定）
+              proofreadDoneCount += proofPromises.reduce((n, _, idx) => n + (waveBatches[p + idx]?.length ?? 0), 0)
               if (proofreadTotalEstimate > 0) {
                 proofreadProgress.value = { current: Math.min(proofreadDoneCount, proofreadTotalEstimate), total: proofreadTotalEstimate }
               }
@@ -2426,15 +2520,16 @@ async function startProofread() {
 
     // 并发校对：大幅提速
     const P_CONCURRENCY = 4
-    for (let i = 0; i < total; i += PROOFREAD_BATCH_SIZE * P_CONCURRENCY) {
+    // v12.18: 批次动态化——长文本批次自动降为小批（顺序不变），与波内校对同一分批逻辑
+    const standaloneBatches = chunkProofreadBatches(toCheck)
+    for (let i = 0; i < standaloneBatches.length; i += P_CONCURRENCY) {
       if (cancelFlag.value) break
 
       const concurrentBatchPromises: Promise<void>[] = []
 
       for (let k = 0; k < P_CONCURRENCY; k++) {
-        const batchStart = i + k * PROOFREAD_BATCH_SIZE
-        if (batchStart >= total || cancelFlag.value) break
-        const batch = toCheck.slice(batchStart, batchStart + PROOFREAD_BATCH_SIZE)
+        if (i + k >= standaloneBatches.length || cancelFlag.value) break
+        const batch = standaloneBatches[i + k]
         // v10.8: 本批内译文显著超长的条目索引 → 透出给校对作长度异常 hint
         const expansionFlags = new Set<number>()
         for (let bj = 0; bj < batch.length; bj++) {
@@ -2586,9 +2681,10 @@ async function startProofread() {
       }
 
       await Promise.allSettled(concurrentBatchPromises)
-      // 进度：已校对的项 = 本轮并发覆盖到的最后一项索引
-      const processedSoFar = Math.min(i + PROOFREAD_BATCH_SIZE * P_CONCURRENCY, total)
-      proofreadProgress.value = { current: processedSoFar, total }
+      // 进度：批次动态化后按实际条目数累计（批大小不再恒定）
+      let covered = 0
+      for (let bi = 0; bi < Math.min(i + P_CONCURRENCY, standaloneBatches.length); bi++) covered += standaloneBatches[bi].length
+      proofreadProgress.value = { current: Math.min(covered, total), total }
     }
 
     // 校对后兜底：只处理校对实际修改过的文本（消除三重后处理）
