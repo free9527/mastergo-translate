@@ -144,14 +144,19 @@
               <!-- llmFallback：入库 or 应用但不入库，必须显式处置（无"知道了"） -->
               <button v-if="p.type === 'llmFallback'" class="btn btn-xs btn-primary" @click="confirmLlmFallbackTerm(p.item)">确认入库</button>
               <button v-if="p.type === 'llmFallback'" class="btn btn-xs btn-tinted" @click="applyWithoutGlossary(p.item)">应用但不入库</button>
+              <!-- v12.20: prohibitedSrc「判定合规」= 人为判定源文表述合规，入白名单（源文+译文双豁免）。
+                   真违禁则去 MasterGo 画布改源文后重扫。 -->
+              <button v-if="p.type === 'prohibitedSrc'" class="btn btn-xs btn-primary"
+                title="人为判定该源文表述合规（如规格上限非绝对化宣称），源文+译文均豁免违禁词检测；真违禁请去画布改源文后重扫"
+                @click="whitelistProhibitedSrc(p.item)">判定合规</button>
               <!-- prohibitedTrans：首选校对规避（开校对时自动改写），未开校对禁用并提示 -->
               <button v-if="p.type === 'prohibitedTrans'" class="btn btn-xs btn-primary"
                 :disabled="!effProofread || proofreading || translating"
                 :title="effProofread ? '运行 AI 校对自动规避违禁词' : '先在配置中开启 AI 优化'"
                 @click="startProofread()">去校对规避</button>
               <button class="btn btn-xs btn-tinted" @click="editPendingItem(p.item)">编辑</button>
-              <!-- 知道了：纯提醒类 + 阻塞类的消音出口（misspelled/llmFallback 须显式处置，无此钮） -->
-              <button v-if="p.type !== 'misspelled' && p.type !== 'llmFallback'"
+              <!-- 知道了：纯提醒类 + 阻塞类的消音出口（misspelled/llmFallback/prohibitedSrc 须显式处置，无此钮） -->
+              <button v-if="p.type !== 'misspelled' && p.type !== 'llmFallback' && p.type !== 'prohibitedSrc'"
                 class="btn btn-xs btn-plain" @click="dismissPendingItem(p.item)">知道了</button>
             </div>
           </div>
@@ -742,13 +747,13 @@ const pendingItems = computed(() => {
   return errors
 })
 
-/** v8.9: 是否有阻塞批量应用的问题（v11.12: 违禁词三类非阻塞不计入；v12.9: prohibitedLocked 已出 panel） */
+/** v8.9: 是否有阻塞批量应用的问题（v12.20: 源文违禁词升格为阻塞——须人工处理；译文违禁词仍非阻塞，开校对自动规避） */
 const hasPendingBlockingIssue = computed(() =>
-  pendingItems.value.some(p => p.type !== 'prohibitedSrc' && p.type !== 'prohibitedTrans')
+  pendingItems.value.some(p => p.type !== 'prohibitedTrans')
 )
-/** v11.12: 违禁词等非阻塞提示单独显隐（无阻塞问题时 banner 不出现，提示也要有入口） */
+/** v11.12: 违禁词等非阻塞提示单独显隐（v12.20: 仅译文违禁词非阻塞；源文违禁词已升格阻塞） */
 const hasPendingNonBlockingIssue = computed(() =>
-  pendingItems.value.some(p => p.type === 'prohibitedSrc' || p.type === 'prohibitedTrans')
+  pendingItems.value.some(p => p.type === 'prohibitedTrans')
 )
 
 /**
@@ -815,6 +820,11 @@ const untranslatedDismissedIds = ref<Set<string>>(new Set())
 const retranslatingIds = ref<Set<string>>(new Set())
 /** v11.12: 源文违禁词命中（nodeIds[0] → 命中词列表）— 京东(zh)/亚马逊(en) 平台词表，非阻塞提醒 */
 const prohibitedSrcIds = ref<Map<string, string[]>>(new Map())
+/** v12.20: 源文违禁词人工合规白名单（存 cleanKey）——用户点「判定合规」= 人为判定该源文
+ * 表述合规（如「最高写入速度」是规格上限非绝对化宣称）。豁免源文检测 + 译文检测
+ * （源文合规 → 忠实译文对应表述也合规）。会话内有效，翻译/校对批次不清空（人工判定
+ * 是审计结论，与 dismissedNodeIds 的「消音」性质不同；跨会话持久化后续按需补 clientStorage）。 */
+const prohibitedWhitelist = ref<Set<string>>(new Set())
 /** v11.12: 译文违禁词命中（nodeIds[0] → 命中词列表）— 开校对时进修正链自动规避，关校对只提醒 */
 const prohibitedTransIds = ref<Map<string, string[]>>(new Map())
 /** v11.12+: 术语库锁定违禁词命中（nodeIds[0] → 命中词列表）— 只提示不改写（术语库最高优先级） */
@@ -851,6 +861,12 @@ function updateProhibitedTrans(id: string, text: string) {
 function routeProhibitedHits(id: string, hits: Array<{ word: string; note: string }>, text: string) {
   if (hits.length > 0) {
     const item = items.value.find(it => it.nodeIds[0] === id)
+    // v12.20: 源文人工合规白名单 → 译文违禁词放行（源文已判定合规，忠实译文对应表述也合规）
+    if (item && prohibitedWhitelist.value.has(cleanKey(item.sourceText))) {
+      prohibitedTransIds.value.delete(id)
+      prohibitedLockedIds.value.delete(id)
+      return
+    }
     if (item && isGlossaryLockedTranslation(item.sourceText, text, activeNormalizedGlossaryMap)) {
       prohibitedLockedIds.value.set(id, hits.map(h => h.word))
       prohibitedTransIds.value.delete(id)
@@ -880,6 +896,8 @@ function recheckProhibitedSource() {
     else if (explicit !== 'auto') lang = 'en'
     else lang = detectSourceLangForProhibited(item.sourceText)
     if (!lang) continue
+    // v12.20: 人工合规白名单 → 源文检测跳过（用户已判定该表述合规）
+    if (prohibitedWhitelist.value.has(cleanKey(item.sourceText))) continue
     const hits = detectProhibited(item.sourceText, lang === 'zh' ? 'zh-CN' : 'en')
     if (hits.length > 0) prohibitedSrcIds.value.set(item.nodeIds[0], hits.map(h => h.word))
   }
@@ -1570,6 +1588,14 @@ async function startTranslate() {
     showToast('请先填写大模型 API Key 和 API 地址', 'error')
     showAdvanced.value = true
     showSettings.value = true
+    return
+  }
+
+  // v12.20: 源文违禁词必须人工处理（去画布改源文后重扫 / 点「判定合规」）后才能翻译
+  const blockedSrc = pendingItems.value.filter(p => p.type === 'prohibitedSrc')
+  if (blockedSrc.length > 0) {
+    showToast(`有 ${blockedSrc.length} 条源文含平台违禁词，请先处理（改源文或点「判定合规」）`, 'warning')
+    showPendingList.value = true
     return
   }
 
@@ -3530,6 +3556,22 @@ function confirmKeepSource(item: TextItem) {
     appliedNodeIds.value.add(nid)
   }
   showToast('已确认保留源文', 'success')
+}
+
+/** v12.20：「判定合规」——源文违禁词人工判定出口（区别于 dismissPendingItem 的「消音」）。
+ * 人为判定该源文表述合规（如「最高写入速度」是规格上限非绝对化宣称），入白名单：
+ * 源文检测（recheckProhibitedSource）与译文检测（routeProhibitedHits）双豁免。
+ * 这是审计结论（人工判定合规），不是「我看到了不管」——白名单会话内不清空。
+ * 真违禁场景应去 MasterGo 画布改源文后重扫（recheckProhibitedSource 重跑），不走此出口。 */
+function whitelistProhibitedSrc(item: TextItem) {
+  const id = item.nodeIds[0]
+  prohibitedWhitelist.value.add(cleanKey(item.sourceText))
+  prohibitedSrcIds.value.delete(id)
+  // 译文侧同源豁免：若该条目已有译文且命中违禁词，一并放行（源文合规 → 忠实译文对应表述也合规）
+  prohibitedTransIds.value.delete(id)
+  prohibitedLockedIds.value.delete(id)
+  uiLog('prohibited', `源文违禁词人工判定合规: "${item.sourceText.slice(0, 40)}"`)
+  showToast('已判定为合规表述，源文+译文均豁免违禁词检测', 'success')
 }
 
 /** v11.15（问题5）：「知道了」——只消提示音，不假装已应用。

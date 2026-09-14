@@ -177,6 +177,56 @@ export function isBuiltinThirdPartyWholeText(text: string): boolean {
   return key.length > 0 && WHOLE_TEXT_EXEMPT_SET.has(key)
 }
 
+/**
+ * 相机品牌常规中文名（拉丁名 → 简/繁体中文名）。
+ * v12.21: 兼容性列表双语品牌标签（「佳能 Canon」「尼康 Nikon」）漏翻误报根治——
+ * 中文设计稿常以「中文名 英文名」双写相机品牌，源文已是常规表达、无需翻译；
+ * 但漏翻检测把残留拉丁名误判漏翻 → 统一重试加戏成「佳能 Canon品牌」。
+ * 收录原则：只收「有常规中文名」的相机品牌；英文名即常规名的（RED/GoPro/Insta360…）不在此列，
+ * 裸英文名由术语库 identity（Canon→Canon）已豁免，本表只管「中文名+英文名」双语形态。
+ */
+const CAMERA_BRAND_CJK: Array<{ latin: string; cjk: string[] }> = [
+  { latin: 'canon', cjk: ['佳能'] },
+  { latin: 'nikon', cjk: ['尼康'] },
+  { latin: 'sony', cjk: ['索尼'] },
+  { latin: 'fujifilm', cjk: ['富士'] },
+  { latin: 'panasonic', cjk: ['松下'] },
+  { latin: 'dji', cjk: ['大疆'] },
+  { latin: 'hasselblad', cjk: ['哈苏', '哈蘇'] },
+  { latin: 'olympus', cjk: ['奥林巴斯', '奧林巴斯'] },
+  { latin: 'leica', cjk: ['徕卡', '徠卡'] },
+  { latin: 'ricoh', cjk: ['理光'] },
+  { latin: 'pentax', cjk: ['宾得', '賓得'] },
+  { latin: 'sigma', cjk: ['适马', '適馬'] },
+  { latin: 'tamron', cjk: ['腾龙', '騰龍'] },
+  { latin: 'zeiss', cjk: ['蔡司'] },
+  { latin: 'tokina', cjk: ['图丽', '圖麗'] },
+  { latin: 'samyang', cjk: ['三阳', '三陽'] },
+  { latin: 'godox', cjk: ['神牛'] },
+]
+
+// 中文名 → 拉丁名 反查表（简繁同值都指向同一拉丁名）
+const CAMERA_CJK_TO_LATIN: Map<string, string> = new Map()
+for (const b of CAMERA_BRAND_CJK) {
+  for (const c of b.cjk) CAMERA_CJK_TO_LATIN.set(c, b.latin)
+}
+
+/**
+ * 双语相机品牌标签判定：「佳能 Canon」/「Canon 佳能」两段式（一段常规中文名 + 一段拉丁品牌名），
+ * 且两段映射同一品牌。命中 = 源文已是常规双语表达，翻译/漏翻检测应保留原文（不算漏翻）。
+ */
+export function isBilingualCameraBrand(text: string): boolean {
+  const s = (text || '').replace(/[®™©]/g, '').trim()
+  const tokens = s.split(/\s+/)
+  if (tokens.length !== 2) return false
+  const [a, b] = tokens
+  const aLower = a.toLowerCase()
+  const bLower = b.toLowerCase()
+  if (CAMERA_CJK_TO_LATIN.has(a) && CAMERA_CJK_TO_LATIN.get(a) === bLower) return true
+  if (CAMERA_CJK_TO_LATIN.has(b) && CAMERA_CJK_TO_LATIN.get(b) === aLower) return true
+  return false
+}
+
 /** 展开为 GlossaryEntry（全语言 identity：translations 全列 = source） */
 function identityEntry(source: string): GlossaryEntry {
   return { source, translations: { '*': source } }

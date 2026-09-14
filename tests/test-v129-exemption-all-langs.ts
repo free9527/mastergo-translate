@@ -18,6 +18,9 @@
 //   F 润色两道防线（术语库子串篡改回退【新增回归锁】+ 第⑧层违禁词回检）
 // ============================================================
 
+/// <reference types="node" />
+/// <reference path="../typings/plugin-runtime.d.ts" />
+
 import { detectProhibited } from '../lib/prohibited-check'
 import { validatePolishOutput } from '../lib/polish-guard'
 
@@ -288,6 +291,35 @@ assert(hits('quality tests required', 'en').length > 0, 'I27 en 红线：quality
 // I28 保守路线说明：裸 Bending Test 被既有 'Bending Test' 豁免（v12.17 第一轮），
 //   不是 # 数字锚定豁免——两轮豁免叠加，红线反例需用「无豁免锚点」形态
 assert(hits('marketing test passed', 'en').length > 0, 'I28 en 红线：marketing test（无规格锚）仍命中')
+
+// ────────────────────────────────────────────────────────────
+console.log('\nJ. v12.20 zh-TW「測試/最高」三类锚定豁免补漏（实机误报驱动）')
+
+// J1-J4 质量背书测试（锚定 嚴苛/大量/實驗室/內部 限定词——质量背书结论，非 test sample 声称）
+assert(hits('歷經嚴苛測試，品質值得信賴', 'zh-TW').length === 0, 'J1 zh-TW 嚴苛測試（质量背书）')
+assert(hits('經過大量測試驗證', 'zh-TW').length === 0, 'J2 zh-TW 大量測試（质量背书）')
+assert(hits('實驗室內部測試通過', 'zh-TW').length === 0, 'J3 zh-TW 實驗室測試/內部測試（质量背书；\W* 弹性吞「內部」）')
+assert(hits('內部測試驗證通過', 'zh-TW').length === 0, 'J4 zh-TW 內部測試（质量背书）')
+
+// J5-J6 规格测试名（锚定测试类型名——对齐 en SPEC_TEST_EXEMPTIONS_EN 繁体标准译名）
+assert(hits('通過彎曲測試與跌落測試', 'zh-TW').length === 0, 'J5 zh-TW 彎曲/跌落測試（规格测试名）')
+assert(hits('防水測試、防塵測試、抗震測試全數通過', 'zh-TW').length === 0, 'J6 zh-TW 防水/防塵/抗震測試（规格测试名）')
+
+// J7-J8 带宽规格上限（锚定 理論頻寬 规格名词——最高+带宽 = up to 规格陈述）
+assert(hits('最高理論頻寬 3200MB/s', 'zh-TW').length === 0, 'J7 zh-TW 最高理論頻寬（带宽规格上限）')
+assert(hits('最高理论频宽 3200MB/s', 'zh-CN').length === 0, 'J8 zh-CN 最高理论频宽（简体同型）')
+
+// J9-J11 红线反例（裸詞不豁免——豁免不开洞）
+assert(hits('測試品質保證', 'zh-TW').length > 0, 'J9 zh-TW 红线：裸「測試」宣称仍命中')
+assert(hits('最高性能，極致體驗', 'zh-TW').length > 0, 'J10 zh-TW 红线：裸「最高性能」（无规格锚）仍命中')
+assert(hits('100% 相容', 'zh-TW').length > 0, 'J11 zh-TW 红线：裸「100%」（免责句也保持红线）仍命中')
+
+// J12 边界锁：不加「最高#」数字锚——# 的 \W* 会吞中文修饰词，把「营销词+规格数字」误豁免
+assert(hits('最高性能 2050MB/s', 'zh-TW').length > 0, 'J12 zh-TW 边界：裸「最高性能+数字」仍命中（不补最高# 泛化锚）')
+
+// J13-J14 既有豁免交叉回归（v12.20 新条目不破 v12.15 既有）
+assert(hits('最高寫入速度高達 1650MB/s', 'zh-TW').length === 0, 'J13 既有豁免不回退：最高寫入速度（v12.15）')
+assert(hits('容量最高達 2TB，可儲存大量連拍照片', 'zh-TW').length === 0, 'J14 既有豁免不回退：最高達#（v12.15 H4）')
 
 // ────────────────────────────────────────────────────────────
 console.log(`\n═══════════════════════════════════════════`)

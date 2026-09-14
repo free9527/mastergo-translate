@@ -182,6 +182,10 @@ async function applyTranslations(items: TextItem[]): Promise<void> {
   let failed = 0
   const failedNodeIds: string[] = []
 
+  // 应用耗时观测：此前 apply 段只有「完成」一条日志，45s 静默无法切分。
+  // 起点打点 → 与上一条校对/一致性日志的时差 = UI 侧点击延迟 + 消息传递。
+  mainLog('main:apply', `应用开始：${total} 条待写入`)
+
   const fontSet = new Set<string>()
 
   function applyTextStyle(node: TextNode, item: TextItem) {
@@ -248,6 +252,8 @@ async function applyTranslations(items: TextItem[]): Promise<void> {
   if (fallbackFont) {
     await mg.loadFontAsync(fallbackFont as Parameters<typeof mg.loadFontAsync>[0])
   }
+  // 字体预加载分界：上一打点到这里的时差 = listAvailableFontsAsync + loadFontAsync 字体加载耗时
+  mainLog('main:apply', `字体预加载完成（${fontSet.size} 字体 + 兜底 ${fallbackFont ? fallbackFont.family : '无'}）`)
 
   sendMsgToUI(PluginMessage.APPLY_PROGRESS, { current: 0, total })
 

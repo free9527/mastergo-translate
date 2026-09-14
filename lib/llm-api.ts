@@ -20,7 +20,7 @@ import {
   PRODUCT_NAME_PARSE_PROMPT_ZH,
 } from '@lib/prompt-constants'
 import { getFewShotExamples } from '@lib/few-shot-examples'
-import { isBuiltinThirdPartyWholeText, isBuiltinModelSegment, BUILTIN_THIRD_PARTY_ENTRIES, BUILTIN_THIRD_PARTY_ALL_KEYS } from '@lib/third-party-models'
+import { isBuiltinThirdPartyWholeText, isBuiltinModelSegment, BUILTIN_THIRD_PARTY_ENTRIES, BUILTIN_THIRD_PARTY_ALL_KEYS, isBilingualCameraBrand } from '@lib/third-party-models'
 import { shouldSkipGlossaryEntry } from '@lib/glossary-guard'
 import { getJudgePersonas } from '@lib/judge-personas'
 import { validatePolishOutput, COMPLIANCE_KEYWORDS, splitSemanticSegments, stripTmSymbols } from '@lib/polish-guard'
@@ -3535,6 +3535,10 @@ export function isUntranslatable(s: string, glossaryMap?: Map<string, string>): 
   // 不进遮蔽表（子串遮蔽裸品牌词=大面积过遮蔽，v11.9 红线）。
   // 放在最前：代码内置零成本短路，比任何形态规则都可靠。
   if (isBuiltinThirdPartyWholeText(s)) return true
+
+  // 0.05 双语相机品牌标签（v12.21）— 「佳能 Canon」式「中文名+英文名」已是常规表达，
+  // 保留原文不算漏翻；放在最前与第三方整词豁免同层（判定归一，不依赖术语库）。
+  if (isBilingualCameraBrand(s)) return true
 
   // 0. 纯标点/符号不承载可翻译语义，避免 +、—、• 等触发漏翻重试。
   // 保留字母、数字和占位符中的下划线以免掩盖真正的文本或实体还原失败。
