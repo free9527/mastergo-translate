@@ -64,6 +64,23 @@ MasterGo 设计工具插件，将 Lexar 产品设计稿从英文翻译成 20 个
 
 **实机验证点**：zh-TW 兼容性列表「佳能 Canon」「尼康 Nikon」等 7 条 → 扫描零漏翻徽章、不重试、原样保留（不再出现「佳能 Canon品牌」加戏）。
 
+### v12.21.1 源文违禁词人工合规白名单落盘（v12.20「遗留」闭环）
+
+**背景**：v12.20 的 L0 白名单 `prohibitedWhitelist` 是会话内 `ref<Set>`，跨会话重开插件需重新点「判定合规」（v12.20 遗留待议项）。
+
+**改动**（镜像 corrections/settings 持久化模式，主线程持有 clientStorage）：
+
+| # | 改动 | 要点 | 文件 |
+|---|------|------|------|
+| 1 | 存储 key | `STORAGE_KEY_PROHIBITED_WHITELIST = 'translate_prohibited_whitelist'`（存 cleanKey 字符串列表） | `lib/constants.ts` |
+| 2 | 消息对 | `UIMessage.LOAD/SAVE_PROHIBITED_WHITELIST` + `PluginMessage.PROHIBITED_WHITELIST_LOADED` | `messages/types.ts` |
+| 3 | 主线程读写 | `loadProhibitedWhitelist`（读+过滤非字符串）/ `saveProhibitedWhitelist`（写） + 消息路由两 case | `lib/main.ts` |
+| 4 | UI 接入 | onMounted 发 `LOAD_PROHIBITED_WHITELIST`；`PROHIBITED_WHITELIST_LOADED` 回填 `ref<Set>`；`whitelistProhibitedSrc` 落盘 `SAVE_PROHIBITED_WHITELIST` | `ui/App.vue` |
+
+**语义**：白名单存 cleanKey（规范化源文），用户「判定合规」是审计结论、跨会话仍有效——同一条源文下次扫到仍豁免，不重复打断。cleanKey 已把 ®™©/连字符/空白归一，持久化 key 稳定。
+
+**测试**：typecheck 双配置 + build 通过；test-v129（143）回归绿。持久化行为属跨线程消息+clientStorage，无纯函数单测（与 corrections 持久化同型，靠实机验证）。
+
 ---
 
 ## 二、上一版本（v12.20）
@@ -103,7 +120,7 @@ MasterGo 设计工具插件，将 Lexar 产品设计稿从英文翻译成 20 个
 
 **实机验证点**：①zh-TW 设计稿含「歷經嚴苛測試」「最高理論頻寬 3200MB/s」→ 扫描零违禁词徽章 ②源文含真违禁词（如「最佳性能」）→ 扫描后待处理面板出「判定合规/知道了」双按钮，不点则翻译被拦、点了才放行 ③点「判定合规」后该源文+译文在后续翻译/校对批次均不再触发违禁词检测。
 
-**遗留**：L0 白名单当前会话内有效、未落盘 clientStorage——跨会话重开插件需重新点「判定合规」（待用户确认是否需要持久化，与 v12.13 TM corrections 的 origin=user 人工验收是否打通待议）。
+**遗留**：~~L0 白名单当前会话内有效、未落盘 clientStorage~~ —— **已闭环（v12.21.1）**：白名单落盘 clientStorage，跨会话保留，见 v12.21.1。
 
 ---
 
