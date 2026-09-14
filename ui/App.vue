@@ -2173,6 +2173,15 @@ async function startTranslate() {
                       .map(v => `"${v.form}"(${v.itemIndices.map(i => `格${i + 1}`).join('/')})`)
                       .join(' vs ')
                     uiLog('consistency', `  "${issue.phrase}" → ${variantStr}`)
+                    // v12.21.1: 病灶格源文+译文全文落日志——旧版只报「phrase → 形态(格X)」，
+                    // 实机日志里「Lexar CFexpress 格8 vs 格10 (omitted)」看不到格内全文，
+                    // 无法定位「品牌词被译成雷克沙」还是「整段漏翻」。补全文供下次实机根因。
+                    for (const v of issue.variants) {
+                      for (const i of v.itemIndices) {
+                        uiLog('consistency', `    格${i + 1} 源: ${(texts[i] || '').replace(/\n/g, ' ↵ ').slice(0, 120)}`)
+                        uiLog('consistency', `    格${i + 1} 译: ${(translated[i] || '').replace(/\n/g, ' ↵ ').slice(0, 120)}`)
+                      }
+                    }
                   }
                 } else if (report) {
                   uiLog('consistency', `一致性探测: 重复短语 ${report.groupsTotal} 组 → 全部一致`)
