@@ -3566,6 +3566,8 @@ function confirmKeepSource(item: TextItem) {
 function whitelistProhibitedSrc(item: TextItem) {
   const id = item.nodeIds[0]
   prohibitedWhitelist.value.add(cleanKey(item.sourceText))
+  // v12.21: 白名单落盘 clientStorage（跨会话保留，主线程持有存储）
+  sendMsgToPlugin(UIMessage.SAVE_PROHIBITED_WHITELIST, Array.from(prohibitedWhitelist.value))
   prohibitedSrcIds.value.delete(id)
   // 译文侧同源豁免：若该条目已有译文且命中违禁词，一并放行（源文合规 → 忠实译文对应表述也合规）
   prohibitedTransIds.value.delete(id)
@@ -4011,6 +4013,10 @@ onMounted(() => {
         corrections.value = (data as TranslationCorrection[]) || []
         break
 
+      case PluginMessage.PROHIBITED_WHITELIST_LOADED:
+        prohibitedWhitelist.value = new Set((data as string[]) || [])
+        break
+
       case PluginMessage.CORRECTION_SAVED:
         // 静默保存，不需要提示
         break
@@ -4056,6 +4062,7 @@ onMounted(() => {
   sendMsgToPlugin(UIMessage.LOAD_FONTS)
   sendMsgToPlugin(UIMessage.LOAD_TRANSLATION_CACHE)
   sendMsgToPlugin(UIMessage.LOAD_UI_LOGS)
+  sendMsgToPlugin(UIMessage.LOAD_PROHIBITED_WHITELIST)
 
   if (window.matchMedia) {
     const mq = window.matchMedia('(prefers-color-scheme: dark)')

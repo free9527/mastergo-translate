@@ -1,6 +1,6 @@
 import { PluginMessage, UIMessage, TextItem, LLMConfig, GlossaryEntry, TranslationCorrection } from '@messages/types'
 import { sendMsgToUI } from '@messages/main-sender'
-import { STORAGE_KEY_GLOSSARY_PRODUCTS, STORAGE_KEY_GLOSSARY_EXCLUSIVE, STORAGE_KEY_SETTINGS, STORAGE_KEY_ORIGINALS, STORAGE_KEY_APPLIED, STORAGE_KEY_TRANSLATION_CACHE, STORAGE_KEY_CORRECTIONS, STORAGE_KEY_UI_LOGS, CORRECTION_THRESHOLD, UI_WIDTH, UI_HEIGHT, MAX_CACHE_SIZE, MAX_SCAN_NODES, GLOSSARY_VERSION, makeFontKey, DEBUG_MODE } from '@lib/constants'
+import { STORAGE_KEY_GLOSSARY_PRODUCTS, STORAGE_KEY_GLOSSARY_EXCLUSIVE, STORAGE_KEY_SETTINGS, STORAGE_KEY_ORIGINALS, STORAGE_KEY_APPLIED, STORAGE_KEY_TRANSLATION_CACHE, STORAGE_KEY_CORRECTIONS, STORAGE_KEY_PROHIBITED_WHITELIST, STORAGE_KEY_UI_LOGS, CORRECTION_THRESHOLD, UI_WIDTH, UI_HEIGHT, MAX_CACHE_SIZE, MAX_SCAN_NODES, GLOSSARY_VERSION, makeFontKey, DEBUG_MODE } from '@lib/constants'
 import { collectTextNodes, mergeDuplicates } from '@lib/text-collector'
 import { exportCSV, importCSV } from '@lib/csv-handler'
 import { DEFAULT_GLOSSARY_PRODUCTS_CSV, DEFAULT_GLOSSARY_EXCLUSIVE_CSV } from '@lib/default-glossary'
@@ -766,6 +766,22 @@ async function saveCorrection(correction: TranslationCorrection): Promise<void> 
 }
 
 // ============================================================
+// 源文违禁词人工合规白名单（v12.21 持久化）
+// ============================================================
+// v12.20 引入时是会话内 ref<Set>，用户跨会话重开插件需重新点「判定合规」。
+// v12.21 落盘 clientStorage：白名单存 cleanKey 字符串列表，主线程持有（clientStorage
+// 唯一持有者），UI 经消息读写。语义：用户已人工判定该源文表述合规（审计结论），
+// 跨会话仍有效——同一条源文下次扫到仍豁免，不重复打断用户。
+async function loadProhibitedWhitelist(): Promise<string[]> {
+  const data = await mg.clientStorage.getAsync(STORAGE_KEY_PROHIBITED_WHITELIST)
+  return Array.isArray(data) ? data.filter(k => typeof k === 'string') : []
+}
+
+async function saveProhibitedWhitelist(keys: string[]): Promise<void> {
+  await mg.clientStorage.setAsync(STORAGE_KEY_PROHIBITED_WHITELIST, keys)
+}
+
+// ============================================================
 // 消息路由
 // ============================================================
 type UIMessageEvent = { type?: UIMessage; data?: unknown; pluginMessage?: { type: UIMessage; data: unknown } }
@@ -887,6 +903,12 @@ mg.ui.onmessage = async function (msg: UIMessageEvent) {
     case UIMessage.SAVE_CORRECTION:
       await saveCorrection(data as TranslationCorrection)
       sendMsgToUI(PluginMessage.CORRECTION_SAVED)
+      break
+    case UIMessage.LOAD_PROHIBITED_WHITELIST:
+      sendMsgToUI(PluginMessage.PROHIBITED_WHITELIST_LOADED, await loadProhibitedWhitelist())
+      break
+    case UIMessage.SAVE_PROHIBITED_WHITELIST:
+      await saveProhibitedWhitelist(data as string[])
       break
     case UIMessage.NOTIFY:
       if (isNotifyPayload(data)) {

@@ -30,6 +30,9 @@ export enum UIMessage {
   // v10.3 日志持久化（主线程是唯一 clientStorage 持有者）
   SAVE_UI_LOGS = 'SAVE_UI_LOGS',
   LOAD_UI_LOGS = 'LOAD_UI_LOGS',
+  // v12.21: 源文违禁词人工合规白名单持久化
+  LOAD_PROHIBITED_WHITELIST = 'LOAD_PROHIBITED_WHITELIST',
+  SAVE_PROHIBITED_WHITELIST = 'SAVE_PROHIBITED_WHITELIST',
 }
 
 export interface TestConnectionResult {
@@ -68,6 +71,8 @@ export enum PluginMessage {
   // v10.3 日志持久化：主线程日志推送到 UI 缓冲 + 持久化日志回传
   MAIN_LOG = 'MAIN_LOG',
   UI_LOGS_LOADED = 'UI_LOGS_LOADED',
+  // v12.21: 源文违禁词人工合规白名单回传
+  PROHIBITED_WHITELIST_LOADED = 'PROHIBITED_WHITELIST_LOADED',
 }
 
 export interface TextItem {
