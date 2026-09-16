@@ -25,6 +25,11 @@
 //   ⛔ 竞品品牌名对比/诱导评价/站外引流/隐私间谍词/正品声称词不收
 //      （文案从不写，且属侵权/运营违规非词表问题）
 //
+// 外部清单 diff 备忘（防重复劳动，拿到新版清单先看这里）：
+//   · 2026-09-16 全量 diff《OEC AMZ通用》+《OEC AMZ A+历史操作》（亚马逊违禁词补充/，2026-09-03 版）：
+//     零新增可收——35 项已 exact/subsumed 覆盖；CTA 裸词（buy now/click here 等）与竞品对比
+//     （better than Samsung 等）维持 v12.11 拒收红线；ES garantizada 早已在库（es 表）
+//
 // 匹配规则（检测器 lib/prohibited-check.ts 实现，此处为数据约定）：
 //   · 拉丁/西里尔/越南语词条 → 词边界正则（i flag，无 g flag 防 lastIndex 污染）
 //   · CJK/泰/阿拉伯词条 → 子串匹配（无词边界概念/阿拉伯形态变化需子串）
@@ -697,7 +702,6 @@ export const PROHIBITED_AVOID: Record<string, ProhibitedWord[]> = {
     { word: 'garantita', note: 'garanzia senza fondamento' },
     { word: 'garanzia', note: 'garanzia senza fondamento（名词形态；v12.11：IT 站 A+ 真实拦截记录）' },
     { word: 'certificata', note: 'allégation di certificazione senza fondamento（v12.11：IT 站 A+ 真实拦截记录；只收完整形态——截断 certificazion 形态会误伤 certification 合规词，拒收）' },
-    { word: 'garanzia', note: 'garanzia senza fondamento' },
     { word: '100%', note: 'affermazione assoluta' },
     { word: 'numero 1', note: 'rivendicazione di classifica' },
     { word: 'permanente', note: 'promessa ingannevole' },
