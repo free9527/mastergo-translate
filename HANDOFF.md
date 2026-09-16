@@ -1,7 +1,7 @@
 # 项目交接文档
 
-**日期**: 2026-09-14  
-**版本**: v12.21.1（相机品牌双语标签漏翻根治 + 违禁词白名单落盘 + 一致性探测病灶格日志）  
+**日期**: 2026-09-16  
+**版本**: v12.21.2（亚马逊违禁词清单 diff 收口 + it 表去重 + 实机验证协议落档）  
 **项目**: Lexar 翻译插件（MasterGo 插件）
 
 ---
@@ -39,7 +39,35 @@ MasterGo 设计工具插件，将 Lexar 产品设计稿从英文翻译成 20 个
 
 ---
 
-## 二、当前版本（v12.21.1）
+## 二、当前版本（v12.21.2）
+
+### v12.21.2 亚马逊违禁词清单全量 diff 收口 + it 表 garanzia 去重（2026-09-16，素材入库审查驱动）
+
+**背景**：`亚马逊违禁词补充/` 两份 OEC 清单（2026-09-03 到位）一直未做入库审查；同时工作区有 test-v119 行尾符漂移 M 标记。
+
+**diff 结论（零新增可收，`PROHIBITED_WORDS_VERSION` 6 不 bump）**：
+
+| 清单 | 结论 |
+|------|------|
+| 《OEC AMZ通用》37 项 | 35 项已 exact/subsumed 覆盖（fastest/best/#1/unbeatable/100% waterproof/lifetime guarantee/military grade/perfect/top rated/special offer/money back… 含 v12.11 已收 19 词）；其余为 **v12.11 已拍板拒收红线**：CTA 裸词（buy now/click here/order today/act fast/shop with confidence/don't miss out——设计稿合法文案，G23/G24 回归锁锁定）+ 竞品对比（better than Samsung/beats SanDisk/unlike Kingston——运营违规非词表问题） |
+| 《OEC AMZ A+历史操作》5 项 | BR testes / IT garanzia·certificata / ES garantizada 全部已在库（certificazion 截断形态 v12.11 已拒收） |
+
+**改动（一问题一行）**：
+
+| # | 改动 | 要点 | 文件 |
+|---|------|------|------|
+| 1 | it 表 `garanzia` 重复条目删除 | 删 L700 原版（v12.11 增补时未删旧行），保留 L698 带 IT 站 A+ 拦截记录注释版；同词去重行为零变化，**版本戳不 bump**（去重非增删，缓存译文不受影响） | `lib/prohibited-words.ts` |
+| 2 | diff 结论备忘落头注释 | 「2026-09-16 全量 diff 零新增可收」备忘——防下次拿到更新版清单从头再 diff | `lib/prohibited-words.ts` |
+| 3 | test-v119 行尾符还原 | `git checkout` 还原纯 LF/CRLF 漂移（diff 0 行零内容变化），工作区 M 标记清零 | `tests/test-v119-builtin-third-party.ts` |
+| 4 | 实机验证协议落档 | v12.20-v12.21.1 待验三连 + 品牌词规则缺口备忘，见八节短期第 8 条后 | `HANDOFF.md` |
+
+**明确不做**：❌ CTA/竞品对比入库（v12.11 红线不动）❌ zh-CN 补「测试」（v12.20 刚把測試交还人工白名单，独立决策不夹带）❌ 格8/格10 代码修复（根因未定，实机日志先行）。
+
+**测试**：typecheck 双项目 + build 通过；test-v1112（176）/ test-v129（143，含 G20-G24 拒收回归锁）全绿。
+
+---
+
+## 二、上一版本（v12.21.1）
 
 ### v12.21 相机品牌双语标签漏翻误报根治——「佳能 Canon」式双语名判定归一（2026-09-14，zh-TW 实机 7 相机品牌漏翻驱动）
 
@@ -2271,4 +2299,4 @@ User Message：`[N] ({srcLang}→{targetLang}) source\nTrans：translation`
 
 ---
 
-**最后更新**: 2026-09-11（v12.19）
+**最后更新**: 2026-09-16（v12.21.2）
