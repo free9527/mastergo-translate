@@ -26,7 +26,7 @@ export const API_RETRY_DELAY_MS = 1000
 export const MAX_CACHE_SIZE = 500
 
 // 术语库版本号（更新 default-glossary.ts 后手动 +1；v11.9 起升级改为合并升级保留用户自定义）
-export const GLOSSARY_VERSION = 7  // 2026-09-04: 删除 Rigorously Tested 词条（钦定值命中 test 系违禁词，术语库↔违禁词打架源头）
+export const GLOSSARY_VERSION = 9  // 2026-09-22: 新增 Muse Ultra-Slim Portable SSD 产品名（20 语种，ko=휴의용 SSD）+ Frameo App 专属术语（20 语种钦定形态）
 
 // UI 超时（仅用于 toast 消失等非关键逻辑）
 export const TOAST_DURATION_MS = 2500

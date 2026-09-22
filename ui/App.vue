@@ -626,7 +626,7 @@ function chunkProofreadBatches<T extends { translatedText: string }>(arr: T[]): 
   return batches
 }
 import { convertStorageUnit } from '@lib/unit-convert'
-import { getAutoFontMapping } from '@lib/font-mapper'
+import { getAutoFontMapping, normalizeFontStyle } from '@lib/font-mapper'
 import { compressBatch, expandBatch } from '@lib/translation-memory'
 import { detectAdhocProductTerms, detectFallbackCandidates, parseProductName } from '@lib/new-product-detect'
 import { generateProductNameTranslations, zhCNtoZhTW } from '@lib/product-name-generator'
@@ -2948,29 +2948,8 @@ function syncFontMappings() {
 // ============================================================
 // 自动字体映射：根据目标语言自动替换字体，字重/间距/行距全部继承原文
 // 每次目标语言切换或扫描后重新计算，确保字体替换模块始终预填正确
+// v12.22: 字重映射表移到 @lib/font-mapper（normalizeFontStyle 单一事实源，与 main.ts 共用）
 // ============================================================
-
-/** Avenir → HarmonyOS Sans SC 字重名称映射（两族字体 style name 不一致） */
-const AVENIR_TO_HARMONYOS_STYLE: Record<string, string> = {
-  'Roman': 'Regular',
-  'Extra Light': 'Light',
-  'Extra Light Italic': 'Light Italic',
-  'Heavy': 'Bold',
-  'Heavy Italic': 'Bold Italic',
-}
-
-/** 将源字体 style name 映射为目标字体族支持的 style name */
-function normalizeFontStyle(sourceFamily: string, sourceStyle: string, targetFamily: string): string {
-  const raw = sourceStyle || 'Regular'
-  // Avenir → HarmonyOS Sans SC / HarmonyOS Sans TC: 替换不兼容的字重名
-  if (
-    sourceFamily === 'Avenir' &&
-    (targetFamily === 'HarmonyOS Sans SC' || targetFamily === 'HarmonyOS Sans TC')
-  ) {
-    return AVENIR_TO_HARMONYOS_STYLE[raw] || raw
-  }
-  return raw
-}
 
 function autoMapFonts() {
   for (const item of items.value) {

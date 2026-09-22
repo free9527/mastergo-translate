@@ -6,6 +6,7 @@ import { exportCSV, importCSV } from '@lib/csv-handler'
 import { DEFAULT_GLOSSARY_PRODUCTS_CSV, DEFAULT_GLOSSARY_EXCLUSIVE_CSV } from '@lib/default-glossary'
 import { loadGlossaryWithMerge, saveGlossaryWithVersion } from '@lib/glossary-store'
 import { parseCSVRow } from '@lib/parse-csv'
+import { normalizeFontStyle } from '@lib/font-mapper'
 
 // DEBUG 日志辅助函数
 const debugLog = (...args: unknown[]) => DEBUG_MODE && console.log(...args)
@@ -21,14 +22,8 @@ function mainLog(tag: string, message: string): void {
   })
 }
 
-// Avenir → HarmonyOS 样式名映射（Avenir 用 "Roman"/"Heavy" 等，HarmonyOS 用 "Regular"/"Bold"）
-const AVENIR_TO_HARMONYOS_STYLE: Record<string, string> = {
-  'Roman': 'Regular',
-  'Extra Light': 'Light',
-  'Extra Light Italic': 'Light Italic',
-  'Heavy': 'Bold',
-  'Heavy Italic': 'Bold Italic',
-}
+// v12.22: Avenir → HarmonyOS 字重映射移到 @lib/font-mapper（normalizeFontStyle 单一事实源）。
+// ® 单格的 style 与整条文本走同一张映射表，避免两处实现漂移（旧表 Light/Bold Italic 不存在致异常被吞）。
 
 const originalTexts = new Map<string, string>()
 /** v9.1 #3/#15: 记录每个节点最近一次被插件写入的译文快照。
@@ -43,7 +38,7 @@ function fixRegisterSymbolFont(node: TextNode, rawStyle: string, effectiveFamily
   if (effectiveFamily !== 'Avenir') return
   const text = node.characters
   if (text.indexOf('®') === -1) return
-  const effectiveStyle = AVENIR_TO_HARMONYOS_STYLE[rawStyle] || rawStyle
+  const effectiveStyle = normalizeFontStyle(effectiveFamily, rawStyle, REGISTER_FIX_FAMILY)
   let idx = -1
   while ((idx = text.indexOf('®', idx + 1)) !== -1) {
     try {

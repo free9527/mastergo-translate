@@ -1135,7 +1135,7 @@ export const SCENE_CONSTRAINTS: Record<string, {
     ],
     langOverrides: {
       'ja': [
-        'Japanese: Manuals use 「～してください」 polite form',
+        'Japanese: Manuals use declarative ～します/～する form for steps and descriptions (電源アダプターを接続します); reserve 「～してください」 only for direct commands to the user',
         'Japanese: Warning format: 【警告】【注意】【注釈】',
       ],
       'ko': [
@@ -1159,7 +1159,7 @@ export const SCENE_CONSTRAINTS: Record<string, {
         'French: Warning format: AVERTISSEMENT/ATTENTION/REMARQUE',
       ],
       'es': [
-        'Spanish: Manuals use Usted address',
+        'Spanish: Manuals use tú informal address (Conecta, Añade, prueba), not Usted (Conecte, Añada, pruebe) — consumer electronics manuals address the user informally',
         'Spanish: Warning format: ADVERTENCIA/PRECAUCIÓN/NOTA',
       ],
       'pt': [

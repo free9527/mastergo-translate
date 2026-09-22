@@ -1,8 +1,9 @@
 # 项目交接文档
 
-**日期**: 2026-09-16  
-**版本**: v12.21.2（亚马逊违禁词清单 diff 收口 + it 表去重 + 实机验证协议落档）  
+**日期**: 2026-09-22  
+**版本**: v12.24（说明书场景卡语体指令 + 字重映射根治 + 术语库 v9）  
 **项目**: Lexar 翻译插件（MasterGo 插件）
+
 
 ---
 
@@ -39,7 +40,95 @@ MasterGo 设计工具插件，将 Lexar 产品设计稿从英文翻译成 20 个
 
 ---
 
-## 二、当前版本（v12.21.2）
+## 二、当前版本（v12.24）
+
+### v12.24 说明书/规格书场景优化——实机测试驱动的「语体指令」落点（2026-09-22，说明书翻译需求驱动）
+
+**背景**：用户提出说明书/规格书翻译优化需求。初始假设是「说明书有上下文、详情页是碎句」，要做「上下文注入文档模式」。**经三轮实机测试，假设被数据推翻，落点是完全不同的方案。**
+
+**测试驱动决策链（三层验证，全部产物在 tests/）**：
+
+1. **三组对照实测**（`tests/test-v1223-manual-scenario.ts`，es/ja × 11 条说明书 × 3 配置，对照 CSV 官方译文）：
+   - ①基线（详情页默认）vs ②上下文注入（前1+后1）vs ③精简+上下文
+   - **结论 A**：上下文注入 prompt_tok +38%（es 1199→1651 / ja 1198→1650），但 11 条里仅 1-3 条有实质改进（es 条目6「Supports→Compatible con」、ja 术语假名化），**投入产出比差**。
+   - **结论 B**：②和③ prompt_tok 完全相同（1651/1651）——生产首调 LEAN 已精简，**「prompt 精简」对说明书是伪需求**，token 大头在上下文注入的 user message（4226 vs 2376）。
+
+2. **选择性注入信号验证**（`tests/test-v1223-selective-context.ts`，零 API 纯代码）：形式信号（代词回指/定冠词回指/跨句术语）能否只标记「真需要上下文」的条目。
+   - v1 信号：命中 3/3 但误报 3/6（this product/these magnets 类指被误标）；v2 收窄（限定词排除+法律警告豁免）：误报降到 1/6，但**漏报 idx14（端口规格 Supports 词义消解）**。
+   - **结论**：形式信号能抓「指代/回指」，**抓不住「词义/领域消解」**（Supports=兼容 vs 支持，无表面线索）——这正是「代码管形式，LLM 管语义」的硬边界。选择性注入方案被证伪。
+
+3. **差异深挖**（插件基线 vs 官方译文逐条 diff）：**90% 的差异是「语体定位 + 术语钦定」，不是上下文问题**：
+   - es 官方全部 **tú 亲体**（Conecta/Añade/prueba），插件全部 **usted 敬体**（Conecte/Añada/pruebe）——8/11 条命中；
+   - ja 官方**陈述体为主**（～します/～する），插件一刀切 **～してください**——7/11 条命中；
+   - **且现有场景卡 es 写「Manuals use Usted address」本身就是错误指引**（官方是 tú）。
+
+**落地方案（动作 A，最小改动零风险）**——改场景卡语体指令，而非做上下文注入架构：
+
+| # | 改动 | 文件 |
+|---|------|------|
+| 1 | `operation_guide.langOverrides.es`：删错误「Usted address」→ tú 亲体对照指令（Conecta/Añade/prueba, not Usted） | `lib/prompt-constants.ts` |
+| 2 | `operation_guide.langOverrides.ja`：删一刀切「～してください」→ 陈述体为主（～します/～する）、～してください 仅限命令句 | `lib/prompt-constants.ts` |
+
+**验证**：
+- **前置实机**（`tests/test-v1224-manual-register.ts`）：改动后指令 6/6 贴近官方语体（es 全转 tú / ja 全转陈述体），**ja 还顺带把「Frameoアプリ」假名化问题改善了**。
+- **prompt 断言**（`tests/test-v1224-scene-register.ts`）：15/15（es/ja 新指令 + 渲染输出 + 其余语种 override 回归不变）。
+- typecheck 双项目 + build 通过。
+
+**明确不做（数据证伪的方向）**：❌ 上下文注入文档模式（+38% token 换 1-3 条微调）❌ 选择性注入（形式信号抓不住词义消解）❌ 说明书 prompt 精简（首调已精简，伪需求）。
+
+**方法论沉淀（重要）**：这是「用测试结果做判断」的典型案例——最初假设（做上下文模式）被数据推翻，落到一个**便宜 10 倍、可靠 10 倍**的方案（场景卡语体指令 + 术语库钦定）。**抽象的方向判断（"说明书需要上下文"）必须经实机对照验证，否则容易为假想场景做架构改动。**
+
+---
+
+### v12.22 Avenir→HarmonyOS 字重映射根治（2026-09-22，zh-TW 实机「® 没换字体」事故驱动）
+
+**背景**：zh-TW 实机——`Lexar® THOR 2nd Gen DDR4 Desktop Memory`（Avenir **Book** 字重）应用翻译+替换字体后，**整条仍是 Avenir**（用户最初只看到「® 没换字体」，实为整条没换成）。日志「字体替换成功 1 失败 5」。
+
+**根因（双层）**：
+1. **`AVENIR_TO_HARMONYOS_STYLE` 映射表只覆盖 5 个字重**（Roman/Extra Light/Extra Light Italic/Heavy/Heavy Italic），且其中 `Light Italic`/`Bold Italic` 是 **HarmonyOS 不存在的字重**（HarmonyOS 全家族字重表 = Thin/Light/Regular/Bold/Black，无 Medium 无斜体）。
+2. **表外字重（Book/Medium/Light/Oblique/Black…）原样透传**——`setRangeFontName` 拿到不存在的 style（Book）抛异常、被 catch 静默吞掉 → 整条保持 Avenir。「成功 1」恰好是源字重落在表内（Roman→Regular）。
+
+**解法（单一事实源 + 表外兜底）**：
+
+| # | 改动 | 文件 |
+|---|------|------|
+| 1 | 新增 `normalizeFontStyle` + `AVENIR_TO_HARMONYOS_STYLE`（26 条）到 **lib/font-mapper.ts**——补全 Book/Medium/Light/Black 等表外字重，**斜体降对应正体**（用户拍板方案 A：保字重丢斜体），**表外兜底 Regular**，结果强制 ∈ {Thin,Light,Regular,Bold,Black} | `lib/font-mapper.ts` |
+| 2 | `ui/App.vue` 删本地旧表（含不存在的 Light/Bold Italic），改 import 共享 `normalizeFontStyle` | `ui/App.vue` |
+| 3 | `lib/main.ts` 删本地旧表，`fixRegisterSymbolFont` 改用共享表（® 单格斜体场景一并根治）——**两张重复实现合并为一张**（项目记忆「同一判定多处实现」老毛病的收口） | `lib/main.ts` |
+
+**测试**：`tests/test-v1222-font-style-mapping.ts` 25/25（A 表内映射 / B 斜体降正体 / C 表外兜底 / D 合法性+场景隔离）；typecheck 双项目 + build 通过。
+
+**关键防线**：所有映射值强制落在 HarmonyOS 真实字重表内 + 表外兜底 Regular，`setRangeFontName` 从此不再因 style 不存在抛异常。
+
+---
+
+### v12.23 术语库增补——Muse 产品名 + Frameo App（GLOSSARY_VERSION 7→9，2026-09-22）
+
+**背景**：①用户在 `术语素材/Lexar术语库_产品名.csv` 新增 `Lexar Muse Ultra-Slim Portable SSD`（只有英文+中文），要求按命名规则补全 20 语种；②说明书实测发现「Frameo App」是 App 名，各语种有官方钦定形态，用户拍板入专属库。
+
+**改动**：
+
+| # | 条目 | 处理 | 版本戳 |
+|---|------|------|--------|
+| 1 | **Lexar Muse Ultra-Slim Portable SSD**（产品名库） | `generateProductNameTranslations` 生产函数生成 20 语种，对照已有 Portable SSD 条目核验；zh-CN 保留用户钦定「Lexar Muse缪斯超薄移动固态硬盘」（含营销名「缪斯」），zh-TW 确定性转繁；ko 修正为 `휴의용 SSD`（见下方教训） | 7→8 |
+| 2 | **Frameo App**（专属库） | 从说明书 CSV 提取官方钦定形态 20 语种：ja `Frameoアプリ`/ko `Frameo 앱`/拉丁系 `app Frameo`/ru `приложение Frameo`/pl `aplikację Frameo`/nl `Frameo-app`/其余保留原形 | 8→9 |
+
+**ko 拼写教训（被测试拦住的一次误改）**：初版把 ko 误写成 `휴`（漏字）→ 发现生成器输出 `휴의용` 又误判为「数据错误」改成 `휴 SSD` → **v11.7 品类词测试 E3 回归锁当场抓住**（`ko Portable SSD 必须 = 휴의용 SSD`，v11.7 注释「这是正确拼写，曾误植，专设回归锁」）→ 重新核对 CSV：19 条 Portable SSD 全部 `휴의용 SSD` → 改回正确值。**教训：行为断言锁的价值——差点把正确值改成错的，被测试救回。**
+
+**验证**：v11.7 品类词测试 245/245 全绿（含 E3 ko 拼写回归锁）；typecheck + build 通过；**bundle 分布确认**：产品名库进 dist/index.html（UI 线程 import），专属库只进 dist/main.js（主线程 import）——index.html 搜不到 Frameo App 是正常架构（UI 线程不用专属库），非入库失败。
+
+**merge 流程**（术语库更新到插件的标准动作）：`python -X utf8 scripts/merge-glossary.py`（产品名 141 + 专属 192 合并 → `lib/default-glossary.ts`）→ `GLOSSARY_VERSION +1`（v11.9 起合并升级保留用户自定义）→ typecheck + build。
+
+---
+
+### 后续方向（2026-09-22 用户拍板两条长期方向）
+
+1. **UI 优化 + 不同场景的翻译优化**——规格书、说明书等不同场景的翻译持续优化（v12.24 已落 es/ja 语体指令第一子集；后续按场景逐步扩展，含 UI 层体验优化）。
+2. **持续提升翻译质量**——长期方向，与八点五节「去除机翻感」合并推进（judge 基线 + 场景卡 + 术语库钦定 + 实机测试驱动）。
+
+---
+
+## 二、上一版本（v12.21.2）
 
 ### v12.21.2 亚马逊违禁词清单全量 diff 收口 + it 表 garanzia 去重（2026-09-16，素材入库审查驱动）
 
