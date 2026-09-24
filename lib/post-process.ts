@@ -1122,6 +1122,52 @@ export interface InjectionResult {
   injectedIndices: Set<number>
 }
 
+// v12.25: 数值规格归一化——剥「限定词」后比「数字+单位」集合。
+// 根因（2026-09-24 规格书实机）：源文 "up to 400MB/s" 被 LLM 正确翻成 ja「最大400MB/s」，
+// 「最大」是 up to 的钦定译法，但旧逻辑用正则直接比 src/trans 是否都含「数字+单位」，
+// 限定词差异（up to→最大）导致 srcMatch=false → 误判「LLM 编造规格」→ 整条日文译文
+// 回退英文 → 校对再把英文重翻成日文（翻译层白跑 39s）。
+// 豁免边界：只剥「限定词」，不动数字/单位本身——源文译文数字+单位集合相同仅限定词
+// 不同时豁免；源文真没该数字/单位（编造规格）仍回退，红线不破。
+// 限定词表语种纪律（宁漏勿滥实机驱动）：收录已实锤的 en/ja/zh-TW/zh-CN + 既有 de/es/ru/tr
+// 表；未收录语种的限定词不剥（文本原样），退回现有行为不误伤。
+const MEASURE_QUALIFIERS = [
+  // 英文源文限定词
+  'up to', 'maximum', 'max', 'theoretical', 'approximately', 'approx', 'about', 'around', 'over',
+  // ja 限定词（实锤：最大/まで/最高/上限/約/以下/未満）
+  '最大', 'まで', '最高', '上限', '約', '以下', '未満',
+  // zh-TW/zh-CN 限定词（实锤：最高/最大/高達/最多/達/約/以下/低於/低于）
+  '最高', '最大', '高達', '最多', '約', '低於', '低于',
+  // de 限定词（既有 POLARITY_TABLE 形态）
+  'bis zu', 'maximal', 'höchstens', 'bis', 'unter', 'weniger als',
+  // es 限定词
+  'hasta', 'máximo', 'como máximo', 'menos de', 'bajo', 'inferior a',
+  // ru 限定词
+  'максимум', 'не более', 'до', 'менее',
+  // tr 限定词
+  'maksimum', 'en fazla', 'kadar', 'altında',
+]
+
+/**
+ * v12.25: 剥数值限定词 + 归一单位前空格，供 detectBrandInjection 数值注入检测
+ * 比较「源文译文是否同一数字+单位」。只剥限定词，不动数字/单位本身。
+ * @param text 待归一文本
+ * @returns 剥限定词后的文本（无限定词时原样返回）
+ */
+export function normalizeMeasureText(text: string): string {
+  let t = text
+  for (const q of MEASURE_QUALIFIERS) {
+    // 拉丁限定词用词边界（防 "max" 误伤 "maximum" 残留 "imum"），CJK 限定词直接子串剥
+    const isCJK = /[぀-ヿ一-鿿가-힯]/.test(q)
+    const re = isCJK
+      ? new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')
+      : new RegExp(`\\b${q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi')
+    t = t.replace(re, '')
+  }
+  // 单位前多空格归一为单空格（剥限定词后可能残留双空格）
+  return t.replace(/\s{2,}/g, ' ').trim()
+}
+
 export function detectBrandInjection(
   sourceTexts: string[],
   translatedTexts: string[],
@@ -1179,13 +1225,8 @@ export function detectBrandInjection(
     { re: /\b(2230|2242|2280)\b/, name: 'M.2 form factor size' },
   ]
 
-  // 数值规格注入模式（LLM 编造的带单位的数字：5200MB/s、128GB等）
-  const measurePatterns: Array<{ re: RegExp; name: string }> = [
-    { re: /\d[\d,]*\s*(?:MB\/s|GB\/s|TB\/s|MBps|GBps)\b/i, name: 'speed value' },
-    { re: /\d[\d,]*\s*(?:GB|TB|PB)\b(?!\/s)/i, name: 'capacity value' },
-    { re: /\d[\d,]*\s*(?:MHz|GHz)\b/i, name: 'frequency value' },
-    { re: /\d[\d,]*\s*(?:MB|KB)\b(?!\/s)/i, name: 'size value' },
-  ]
+  // v12.25: measurePatterns 旧表退役——数值注入检测已收编为下方 extractMeasures 数值+单位对校验
+  // （限定词归一化 + 数值篡改红线）。旧表保留会触发 TS6133 unused 报错。
 
   const injectedIndices = new Set<number>()
 
@@ -1240,13 +1281,44 @@ export function detectBrandInjection(
     }
 
     // 3. 数值规格注入检测：译文有带单位的数字但源文没有
-    for (const { re } of measurePatterns) {
-      const transMatch = re.test(trans)
-      const srcMatch = re.test(src)
-      if (transMatch && !srcMatch) {
-        injectedIndices.add(i)
-        return src // 回退到源文
+    // v12.25: 先对 src/trans 做数值限定词归一化再比——源文 "up to 400MB/s" 译文 ja「最大400MB/s」
+    //   「最大」是 up to 的钦定译法，归一后 srcMatch=true → 不误判注入。
+    //   红线不破：源文真没该数字/单位（编造规格）归一后仍 srcMatch=false → 照回退。
+    //   改值红线（v12.25 测试 C2/E3 抓出）：译文每处「数字+单位」的数值必须能在源文找到
+    //   同单位同数值的对应——限定词豁免只豁免「限定词差异」，不豁免「数值篡改」（400→800）。
+    const srcNorm = normalizeMeasureText(src)
+    const transNorm = normalizeMeasureText(trans)
+    // 提取「数字+单位」的数值+单位对（忽略单位内差异的连写/空格），逐处校验数值在源文有对应
+    // v12.25.1: \b 后界改为 (?!\w)——规格书脚标「400MB/s1」「18,000 minutes…video4」源文
+    //   单位后紧跟数字（脚标号），\b 在「s1」词字符边界不成立 → 源文侧提取失败 → 误判注入。
+    //   (?!\w) 等价 \b 且容忍后随数字脚标。
+    // v12.25.2: 单位归一——速度单位（MB/s）与基础单位（MB）视为同单位族比较数值。
+    //   根因：源文「400MB/s1」脚标 1 使正则 alternation 中 MB/s 后 (?!\w) 不成立、回退匹配
+    //   MB（MB 后「/」非 \w 成立）→ 源文记为 400|mb，译文 400|mb/s → 数值对不等误判。
+    //   单位族归一：mb/s→mb、gb/s→gb 等——速度/容量同数值即视为对应（限定词豁免同纪律：
+    //   只豁免「单位族内差异」，数值篡改 400→800 仍回退，红线不破）。
+    const extractMeasures = (t: string): Array<{ num: string; unit: string }> => {
+      const out: Array<{ num: string; unit: string }> = []
+      const re = /(\d[\d,]*)\s*(MB\/s|GB\/s|TB\/s|MBps|GBps|GB|TB|PB|MHz|GHz|MB|KB)(?!\w)/gi
+      let m: RegExpExecArray | null
+      while ((m = re.exec(t)) !== null) {
+        const unit = m[2].toLowerCase().replace(/\/s$|ps$/, '')  // mb/s→mb、mbps→mb 归一单位族
+        out.push({ num: m[1].replace(/,/g, ''), unit })
       }
+      return out
+    }
+    const srcMeasures = extractMeasures(srcNorm)
+    const srcMeasureSet = new Set(srcMeasures.map(m => `${m.num}|${m.unit}`))
+    const transMeasures = extractMeasures(transNorm)
+    // 译文存在「数字+单位」但源文完全没有 → 编造规格（整条回退）
+    const srcHasAnyMeasure = srcMeasures.length > 0
+    let valueTampered = false
+    for (const tm of transMeasures) {
+      if (!srcMeasureSet.has(`${tm.num}|${tm.unit}`)) { valueTampered = true; break }
+    }
+    if ((transMeasures.length > 0 && !srcHasAnyMeasure) || valueTampered) {
+      injectedIndices.add(i)
+      return src // 回退到源文
     }
 
     return trans

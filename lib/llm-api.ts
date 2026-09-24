@@ -1231,6 +1231,8 @@ ${texts.map((t, i) => `${i + 1}. "${t.slice(0, 100)}"`).join('\n')}
       return true
     }
     const pickIndices: number[] = []
+    let identicalCount = 0   // v12.25: 真·两路一致条数（区分资格豁免）
+    let exemptCount = 0      // v12.25: 资格豁免条数（含数字/合规/极短/术语锁定——非真一致）
     result = resultA.slice()
     for (let i = 0; i < texts.length; i++) {
       // 两路不同 → 候选择优；相同 → 直接采用免判定（术语短路条目遮蔽态两路必同，天然免疫）
@@ -1239,8 +1241,8 @@ ${texts.map((t, i) => `${i + 1}. "${t.slice(0, 100)}"`).join('\n')}
       //   条目剥离，无空白条目保留回显引号，双路各自独立导致一路有引号一路没有）
       const normA = stripEchoQuotesForPick(texts[i], (resultA[i] || '').replace(/^"|"$/g, ''))
       const normB = stripEchoQuotesForPick(texts[i], (resultB[i] || '').replace(/^"|"$/g, ''))
-      if (normA === normB) { result[i] = normA; continue }
-      if (!isPickEligible(i)) continue
+      if (normA === normB) { result[i] = normA; identicalCount++; continue }
+      if (!isPickEligible(i)) { exemptCount++; continue }
       pickIndices.push(i)
     }
     if (pickIndices.length > 0) {
@@ -1252,10 +1254,11 @@ ${texts.map((t, i) => `${i + 1}. "${t.slice(0, 100)}"`).join('\n')}
         if (pickMap.get(i) === 2) { result[i] = resultB[i]; pickedB++ }
       }
       bestOf2StatsOut?.add({ dualRun: texts.length, judged: pickIndices.length, pickedB })
-      uiLog('translate', `best-of-2 择优: 双跑${texts.length}条→两路一致${texts.length - pickIndices.length}条→判定${pickIndices.length}条→选第二路${pickedB}条`)
+      uiLog('translate', `best-of-2 择优: 双跑${texts.length}条→一致${identicalCount}条/豁免${exemptCount}条→判定${pickIndices.length}条→选第二路${pickedB}条`)
     } else {
       bestOf2StatsOut?.add({ dualRun: texts.length, judged: 0, pickedB: 0 })
-      uiLog('translate', `best-of-2 择优: 双跑${texts.length}条→两路全一致，免判定`)
+      // v12.25: 区分「真全一致」vs「全豁免跳过」——规格书批次全豁免时不再打假「全一致」
+      uiLog('translate', `best-of-2 择优: 双跑${texts.length}条→一致${identicalCount}条/豁免${exemptCount}条→免判定`)
     }
   }
 
@@ -2002,6 +2005,20 @@ DO NOT return the source text unchanged. Output ONLY the translation, no explana
   uiLog('translate', `S8 最终兜底完成: 返回${result.length}条`)
 
   return result
+}
+
+/**
+ * v12.25: 批次含数字判定——规格书/技术文档特征（含数字条目占比高）时跳过 best-of-2 双跑。
+ * 根因（2026-09-24 规格书实机）：best-of-2 资格判定 isPickEligible 含 /\d/ 豁免——
+ *   含数字条目不择优（数字锁已压住方差）。规格书批次全是数字 → 双跑烧 2 倍 token
+ *   但择优永远空转。此判定在调用方提前跳过双跑，省时间+省 token。
+ * 边界：纯营销句批次（无数字，无锁高自由度）仍双跑——择优是 v12.10 设计本意。
+ * @param texts 批次源文
+ * @returns true = 含数字批次，应跳过双跑走单跑
+ */
+export function shouldSkipBestOf2(texts: string[]): boolean {
+  if (texts.length === 0) return false
+  return texts.some(t => /\d/.test(t))
 }
 
 // ═══════════════════════════════════════════════════════════════

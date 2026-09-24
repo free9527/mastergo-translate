@@ -597,7 +597,7 @@ import { parseGlossaryCSVText, serializeGlossaryCSV } from '@lib/parse-csv'
 import { validateAutoGlossarySource, sanitizeAutoGlossaryValue, isIdentityAutoAddAllowed, shouldSkipGlossaryEntry, hasMalformedTrademark } from '@lib/glossary-guard'
 import { formatCJKSpace } from '@lib/format-text'
 import { postProcessTranslation, restoreTrademarkSymbols, restoreStorageUnitFormatting, enforceGlossaryTerms, detectTranslationExpansion, sanitizeLineBreaks, cleanKey, stripSpuriousAsterisks, prePolishFormatCleanup } from '@lib/post-process'
-import { translateBatch, proofreadBatch, fetchWithRetry, isProofreadScriptMismatch, detectTruncatedTexts, STYLE_PRESETS, SCENE_PRESETS, detectProductLine, buildTaskGlossaryHint, isUntranslatable, isSuspectMisspelledWord, classifyNecessity, getTargetScript, hasFunctionWords, hasSimplifiedOnlyChars, hasTraditionalOnlyChars, personaJudgeBatch, polishBatch, polishVerifyBatch } from '@lib/llm-api'
+import { translateBatch, proofreadBatch, fetchWithRetry, isProofreadScriptMismatch, detectTruncatedTexts, STYLE_PRESETS, SCENE_PRESETS, detectProductLine, buildTaskGlossaryHint, isUntranslatable, isSuspectMisspelledWord, classifyNecessity, getTargetScript, hasFunctionWords, hasSimplifiedOnlyChars, hasTraditionalOnlyChars, personaJudgeBatch, polishBatch, polishVerifyBatch, shouldSkipBestOf2 } from '@lib/llm-api'
 import { detectConsistencyIssues } from '@lib/consistency-check'
 import { startMetricsCollection, recordBatchMetrics, recordProofreadMetrics, finalizeMetrics, formatMetricsReport, createBatchTimer } from '@lib/metrics'
 import { DEFAULT_GLOSSARY_PRODUCTS_CSV } from '@lib/default-glossary'
@@ -1952,7 +1952,7 @@ async function startTranslate() {
             // v12.10.3: 闸门扩全语种（用户拍板「别只修一个语言」——机制语种无关，
             //   择优 prompt 是 ${targetLang} 变量注入模板；getJudgePersonas 未覆盖语种
             //   时 translationPickBatch 返回空 map → 缺省第一路保守，零事故）
-            const bestOf2On = effBestOfN.value
+            const bestOf2On = effBestOfN.value && !shouldSkipBestOf2(apiTexts)
             const bestOf2Stats = { dualRun: 0, judged: 0, pickedB: 0 }
             const bestOf2StatsOut = { add: (s: { dualRun: number; judged: number; pickedB: number }) => { bestOf2Stats.dualRun += s.dualRun; bestOf2Stats.judged += s.judged; bestOf2Stats.pickedB += s.pickedB } }
             // v12.13: TM few-shot 检索（人工验收译文 origin=user，相似度≥0.90+数字集合相等）
