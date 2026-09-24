@@ -1042,85 +1042,170 @@ export const SCENE_CONSTRAINTS: Record<string, {
       'Expression: Technical documents should objectively state performance, avoid overly promotional language',
     ],
     langOverrides: {
+      // v12.26: 仕様書语体扩充（ja 实机评审驱动）——全部无 Expression: 前缀，穿透 getStyleCard
+      //   的 suppressExpression=true（只保留 Format/Terminology/Success）。全部 ❌坏→✅好
+      //   具体对照（v12.24 验证唯一对 LLM 有效的形式），不写抽象形容词。
       'ja': [
         'Japanese: Spec sheets use 常体/である form (vs ecommerce です・ます)',
         'Japanese: Durability terms unified (耐摩耗、耐温度、耐落下衝撃、X線耐性、耐振動、耐磁気、耐衝撃)',
+        'Japanese: 仕様書は敬語を使わない（❌ご利用いただけます → ✅利用可能です；❌お使いいただけます → ✅使用できます）',
+        'Japanese: 宣伝的修飾語は客観的な語に置き換える（❌洗練された → ✅なめらかな；❌お気に入りの → ✅よく使う；❌かんたんに・わずか → 削除）',
+        'Japanese: 修飾語は削除せず意味を保持（❌「洗練された」を削除 → ✅「なめらかな」に置換；❌「お気に入りのデバイス」を「機器」のみに削除 → ✅「よく使う機器」に置換）',
+        'Japanese: 業界慣用表記（コネクター→コネクタ、デバイス→機器、テスト→試験、パソコン→PC/コンピュータ）',
+        'Japanese: 動詞直訳回避（❌互換性を提供する → ✅対応する；❌性能を確保する → ✅性能を保証する；❌容量を用意する → ✅モデルをラインナップ）',
+        'Japanese: 長い連文は主文で区切る（❌～ストレージで、～転送できます → ✅～ストレージです。～転送できます）',
       ],
       'ko': [
         'Korean: Technical docs use 하십시오체 (습니다/ㅂ니다) polite form',
         'Korean: Avoid superlative expressions (최고 → 높은 성능)',
+        // v12.26: 仕様書语体扩充（ja 评审同类问题预防性覆盖）
+        'Korean: 사양서는 경어·광고 표현을 쓰지 않는다（❌사용하실 수 있습니다 → ✅사용 가능합니다；❌세련된 → ✅매끄러운；❌간편하게 → 삭제）',
+        'Korean: 수식어는 삭제하지 말고 의미를 유지하며 객관적 표현으로 바꾼다（❌「세련된」삭제 → ✅「매끄러운」으로 교체）',
+        'Korean: 업계 관용 표기（커넥터 유지、디바이스→기기、테스트→시험）',
+        'Korean: 동사 직역 회피（❌호환성을 제공한다 → ✅호환된다；❌성능을 확보한다 → ✅성능을 보장한다）',
       ],
       'zh-CN': [
         'Chinese (zh-CN): Technical docs avoid extreme words (极致、领先、革命性)',
         'Chinese (zh-CN): Use objective statements (具有XX性能, not "极致性能")',
+        // v12.26: 仕様書语体扩充
+        'Chinese (zh-CN): 规格书不用敬语和广告修饰（❌您可以使用 → ✅可使用；❌精致的 → ✅流畅的；❌轻松 → 删除）',
+        'Chinese (zh-CN): 修饰语不删除、替换为客观表达保持原意（❌删除"精致的" → ✅替换为"流畅的"；❌"您喜爱的设备"删成"设备" → ✅"您常用的设备"）',
+        'Chinese (zh-CN): 动词直译回避（❌提供兼容性 → ✅兼容；❌确保性能 → ✅保证性能；❌提供容量 → ✅提供容量型号）',
       ],
       'zh-TW': [
         'Chinese (zh-TW): Technical docs avoid extreme words, use objective statements',
         'Chinese (zh-TW): Use Taiwan-localized terms (記憶卡、固態硬碟、讀卡機)',
+        // v12.26: 仕様書语体扩充
+        'Chinese (zh-TW): 規格書不用敬語和廣告修飾（❌您可以使用 → ✅可使用；❌精緻的 → ✅流暢的；❌輕鬆 → 刪除）',
+        'Chinese (zh-TW): 修飾語不刪除、替換為客觀表達保持原意（❌刪除"精緻的" → ✅替換為"流暢的"；❌"您喜愛的設備"刪成"設備" → ✅"您常用的設備"）',
+        'Chinese (zh-TW): 動詞直譯回避（❌提供相容性 → ✅相容；❌確保效能 → ✅保證效能；❌提供容量 → ✅提供容量型號）',
       ],
       'de': [
         'German: Technical docs avoid superlatives, prefer objective descriptions',
+        // v12.26: 仕様書语体扩充
+        'German: Spec sheets avoid honorifics/advertising modifiers (❌Sie können verwenden → ✅kann verwendet werden; ❌elegantes → ✅glattes; ❌mühelos → delete)',
+        'German: Do not delete modifiers — replace with objective equivalents to preserve meaning (❌delete "elegant" → ✅replace with "glatt")',
+        'German: Avoid verb calques (❌Kompatibilität bieten → ✅kompatibel mit; ❌Leistung sicherstellen → ✅Leistung garantieren)',
       ],
       'fr': [
         'French: Technical docs avoid superlatives (le plus rapide → haute performance)',
         'French: Decimal comma (7,5 Mo/s)',
         'French: Use Metropolitan French, not Quebec French',
+        // v12.26: 仕様書语体扩充
+        'French: Spec sheets avoid advertising modifiers (❌élégant → ✅lisse; ❌facilement → delete; ❌vos appareils préférés → ✅vos appareils habituels)',
+        'French: Do not delete modifiers — replace with objective equivalents to preserve meaning (❌delete "élégant" → ✅replace with "lisse")',
+        'French: Avoid verb calques (❌offrir une compatibilité → ✅compatible avec; ❌assurer la performance → ✅garantir la performance)',
       ],
       'es': [
         'Spanish: Technical docs use objective descriptions, avoid exaggerated modifiers',
         'Spanish: Use international Castilian Spanish',
+        // v12.26: 仕様書语体扩充
+        'Spanish: Spec sheets avoid advertising modifiers (❌elegante → ✅liso; ❌fácilmente → delete; ❌sus dispositivos favoritos → ✅sus dispositivos habituales)',
+        'Spanish: Do not delete modifiers — replace with objective equivalents to preserve meaning (❌delete "elegante" → ✅replace with "liso")',
+        'Spanish: Avoid verb calques (❌ofrecer compatibilidad → ✅compatible con; ❌asegurar el rendimiento → ✅garantizar el rendimiento)',
       ],
       'pt': [
         'Portuguese: Technical docs use formal expressions',
         'Portuguese: Use European Portuguese',
+        // v12.26: 仕様書语体扩充
+        'Portuguese: Spec sheets avoid advertising modifiers (❌elegante → ✅liso; ❌facilmente → delete)',
+        'Portuguese: Do not delete modifiers — replace with objective equivalents to preserve meaning',
+        'Portuguese: Avoid verb calques (❌oferecer compatibilidade → ✅compatível com; ❌assegurar desempenho → ✅garantir desempenho)',
       ],
       'pt-BR': [
         'Brazilian Portuguese: Technical docs use objective descriptions',
         'Brazilian Portuguese: Use Brazilian Portuguese',
+        // v12.26: 仕様書语体扩充
+        'Brazilian Portuguese: Spec sheets avoid advertising modifiers (❌elegante → ✅liso; ❌facilmente → delete)',
+        'Brazilian Portuguese: Do not delete modifiers — replace with objective equivalents to preserve meaning',
+        'Brazilian Portuguese: Avoid verb calques (❌oferecer compatibilidade → ✅compatível com; ❌assegurar desempenho → ✅garantir desempenho)',
       ],
       'it': [
         'Italian: Technical docs use objective expressions',
         'Italian: Noun-adjective gender/number agreement',
+        // v12.26: 仕様書语体扩充
+        'Italian: Spec sheets avoid advertising modifiers (❌elegante → ✅liscio; ❌facilmente → delete)',
+        'Italian: Do not delete modifiers — replace with objective equivalents to preserve meaning',
+        'Italian: Avoid verb calques (❌offrire compatibilità → ✅compatibile con; ❌assicurare le prestazioni → ✅garantire le prestazioni)',
       ],
       'nl': [
         'Dutch: Technical docs avoid exaggerated expressions',
+        // v12.26: 仕様書语体扩充
+        'Dutch: Spec sheets avoid advertising modifiers (❌elegant → ✅glad; ❌gemakkelijk → delete)',
+        'Dutch: Do not delete modifiers — replace with objective equivalents to preserve meaning',
+        'Dutch: Avoid verb calques (❌compatibiliteit bieden → ✅compatibel met; ❌prestaties waarborgen → ✅prestaties garanderen)',
       ],
       'pl': [
         'Polish: Technical docs use formal expressions',
         'Polish: Preserve all diacritical marks (ą ę ł ń ó ś ź ż)',
+        // v12.26: 仕様書语体扩充
+        'Polish: Spec sheets avoid advertising modifiers (❌elegancki → ✅gładki; ❌łatwo → delete)',
+        'Polish: Do not delete modifiers — replace with objective equivalents to preserve meaning',
+        'Polish: Avoid verb calques (❌oferować kompatybilność → ✅kompatybilny z; ❌zapewniać wydajność → ✅gwarantować wydajność)',
       ],
       'sv': [
         'Swedish: Technical docs use objective descriptions',
         'Swedish: Preserve special characters (å ä ö)',
+        // v12.26: 仕様書语体扩充
+        'Swedish: Spec sheets avoid advertising modifiers (❌elegant → ✅slät; ❌enkelt → delete)',
+        'Swedish: Do not delete modifiers — replace with objective equivalents to preserve meaning',
+        'Swedish: Avoid verb calques (❌erbjuda kompatibilitet → ✅kompatibel med; ❌säkerställa prestanda → ✅garantera prestanda)',
       ],
       'tr': [
         'Turkish: Technical docs use formal written language',
         'Turkish: Preserve all special characters (ı İ ö ü ç ş ğ)',
+        // v12.26: 仕様書语体扩充
+        'Turkish: Spec sheets avoid advertising modifiers (❌şık → ✅pürüzsüz; ❌kolayca → delete)',
+        'Turkish: Do not delete modifiers — replace with objective equivalents to preserve meaning',
+        'Turkish: Avoid verb calques (❌uyumluluk sunmak → ✅uyumlu; ❌performansı sağlamak → ✅performansı garanti etmek)',
       ],
       'ru': [
         'Russian: Technical docs use objective descriptions',
         'Russian: Units in Cyrillic (ГБ, МБ, ТБ)',
         'Russian: Use Cyrillic script; Lexar and tech symbols stay Latin',
+        // v12.26: 仕様書语体扩充
+        'Russian: Spec sheets avoid advertising modifiers (❌элегантный → ✅гладкий; ❌легко → delete)',
+        'Russian: Do not delete modifiers — replace with objective equivalents to preserve meaning',
+        'Russian: Avoid verb calques (❌обеспечивать совместимость → ✅совместим с; ❌обеспечивать производительность → ✅гарантировать производительность)',
       ],
       'vi': [
         'Vietnamese: Technical docs use Northern standard Vietnamese',
         'Vietnamese: Preserve all tone marks',
+        // v12.26: 仕様書语体扩充
+        'Vietnamese: Spec sheets avoid advertising modifiers (❌thanh lịch → ✅mượt mà; ❌dễ dàng → delete)',
+        'Vietnamese: Do not delete modifiers — replace with objective equivalents to preserve meaning',
+        'Vietnamese: Avoid verb calques (❌cung cấp khả năng tương thích → ✅tương thích với; ❌đảm bảo hiệu suất → ✅bảo đảm hiệu suất)',
       ],
       'th': [
         'Thai: Technical docs use general register, avoid royal/religious language',
         'Thai: Preserve all superscript/subscript vowels and tone marks',
+        // v12.26: 仕様書语体扩充
+        'Thai: Spec sheets avoid advertising modifiers (❌หรูหรา → ✅เรียบ; ❌อย่างง่ายดาย → delete)',
+        'Thai: Do not delete modifiers — replace with objective equivalents to preserve meaning',
+        'Thai: Avoid verb calques (❌ให้ความเข้ากันได้ → ✅เข้ากันได้กับ; ❌รับรองประสิทธิภาพ → ✅รับประกันประสิทธิภาพ)',
       ],
       'id': [
         'Indonesian: Technical docs use formal standard Indonesian',
         'Indonesian: Use Anda for address, avoid colloquial expressions',
+        // v12.26: 仕様書语体扩充
+        'Indonesian: Spec sheets avoid advertising modifiers (❌elegan → ✅halus; ❌dengan mudah → delete)',
+        'Indonesian: Do not delete modifiers — replace with objective equivalents to preserve meaning',
+        'Indonesian: Avoid verb calques (❌menawarkan kompatibilitas → ✅kompatibel dengan; ❌memastikan kinerja → ✅menjamin kinerja)',
       ],
       'ar': [
         'Arabic: Technical docs use Modern Standard Arabic (MSA)',
         'Arabic: RTL direction; embedded English/numbers stay LTR',
+        // v12.26: 仕様書语体扩充
+        'Arabic: Spec sheets avoid advertising modifiers; do not delete modifiers — replace with objective equivalents to preserve meaning',
+        'Arabic: Avoid verb calques (provide compatibility → compatible with; ensure performance → guarantee performance)',
       ],
       'en': [
         'English: Technical docs use American spelling, avoid complex clauses',
         'English: Use American English spelling (color, center, fiber)',
+        // v12.26: 仕様書语体扩充
+        'English: Spec sheets avoid advertising modifiers (❌sleek → ✅smooth; ❌easily → delete; ❌your favorite devices → ✅your frequently used devices)',
+        'English: Do not delete modifiers — replace with objective equivalents to preserve meaning (❌delete "sleek" → ✅replace with "smooth")',
+        'English: Avoid verb calques (❌offer compatibility → ✅compatible with; ❌ensure performance → ✅guarantee performance)',
       ],
     },
   },
