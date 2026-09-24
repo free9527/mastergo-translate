@@ -1,9 +1,78 @@
 # 项目交接文档
 
-**日期**: 2026-09-24  
-**版本**: v12.29（质量×效率四杠杆 + 品类词动态注入 + ko 术语规范）  
+**日期**: 2026-09-25  
+**版本**: v12.32（产品名归一+型号提取+品线闭环 + 技术语域卡 + 保英文锁词）  
 **项目**: Lexar 翻译插件（MasterGo 插件）
 
+
+---
+
+## 零、本批次速览（v12.30–v12.32，2026-09-24/25）
+
+| 版本 | 一句话 | commit | 验证 |
+| :--- | :--- | :--- | :--- |
+| **v12.30** | 产品名归一+型号提取归一+品线闭环——C40E 命名事故根治 | 86a1341 | 型号提取 140/140、品线推导 24/24、归一 16/16 |
+| **v12.31** | 技术语域卡——非详情页默认严谨专业，替代营销两层 | 0e99ad6 | 33 断言全绿 |
+| **v12.32** | 保英文品类词锁词——v12.27 Fix 2 遗留根治 | c13dfe2 | 12 断言全绿 |
+
+**主线**：从一条具体事故（Lexar JumpDrive C40E de 译名出错）出发，逐层收敛出「产品名判定→型号提取→品线推导→场景×语域」的完整闭环。全程用户多次拍板纠偏（详见各节「用户拍板」）。
+
+---
+
+### v12.30 产品名归一+型号提取+品线闭环——C40E 命名事故根治（commit 86a1341）
+
+**背景**：`Lexar JumpDrive C40E USB 3.2 Gen 1 Flash Drive`（新品，源文不带®）de 译成 `Lexar JumpDrive A40E ... USB-Stick`——①型号 C40E 被改 ②品类词 USB-Stick 偏离术语库钦定。用户核心澄清：「判断是否是产品名这个有不太完善的地方，因为有可能源文是不带®」「型号字母也有可能是全新的」「只要判定他是产品名就按照产品名的固定翻译方式翻译」。
+
+**用户拍板的管道哲学**：先判断结构是否是产品名（宽松结构）→ 再判断品线（严格产品名组合方式）→ 按规则翻译 → 兜底。「Lexar Professional 和 Lexar 后面更特定就组合大部分都可以判定为产品名」。
+
+**五处落地**：
+1. **产品名判定锚点放宽**（lib/new-product-detect.ts）：`detectFallbackCandidates` 锚点从「Lexar®」放宽为「Lexar / Lexar Professional 开头」（首 token === 'lexar'）。® 从必要条件降为可选——命名规则文档证明®是排版习惯非产品名本质。
+2. **Flash Drive de override**（CATEGORY_WORDS）：`productName.de = 'Flash-Laufwerk'`（术语库 16 条 JumpDrive 全钦定）。**两层分离**：prompt 对照层 de=USB-Stick 与产品名生成层 de=Flash-Laufwerk 值不同是合理设计。
+3. **lib/product-model-extract.ts 新承重墙**：产品名→型号提取归一。xlsx《系列名以及产品命名规则》140 行钦定 Model 列逐条校准，五品线分层规则。回归锁 tests/golden/product-model-extract.json = **140/140**。
+4. **品线闭环**：`deriveProductLineFromModel`（品类词定大类→系列/型号词定细分品线）接入 `detectProductLine`，优先于文本启发式；文件名信号仍最高优先。推导回归 24/24，端到端 6/6。
+5. **安全迁移**：test-v115 实机 API key 去硬编码→环境变量 LEXAR_LIVE_API_KEY/URL/MODEL。**原 key 已进 git 历史视为泄露，需轮换**。
+
+**关键教训**：「和我预期不同」≠「错误」，先对钦定源再下结论——两次伪根因（®锚点/生成器改型号）都被探针证伪后才定位真问题（USB-Stick 偏离钦定）。**型号提取用钦定数据逐条驱动收敛，不追求一条优雅规则**（ARES/THOR 对 DDR 取舍不对称按 xlsx 钦定数据编码）。**Muse 核查**：`Lexar Muse Ultra-Slim Portable SSD → model="Muse"`（无代号→系列即型号，与 Air/Go 同型），**符合命名规则无需改正**。
+
+**测试**：tests/product-model-extract.ts（140/140）+ tests/test-v1230-product-name-unify.ts（16/16）；typecheck+build 绿。
+
+---
+
+### v12.31 技术语域卡——非详情页默认严谨专业，替代营销两层（commit 0e99ad6）
+
+**背景（用户拍板设计初衷复盘）**：「我们设计了翻译配置的选项初衷，**产品线翻译风格都是围绕商品详情页来的。非商品详情页的使用场景默认都是严谨专业的风格**」。证据：PRODUCT_LINE_STYLE_MAP 按详情页营销调映射。但现状 getStyleCard 不分场景，规格书也被注入产品线 tone（营销受众语气）——跑偏。
+
+**方案（用户定边界，收敛不是扩张）**：技术语域卡 = 非详情页的**默认严谨专业语域**（不是「一种风格」，是「去风格」的精确性约束），**替代**营销两层；详情页保持营销两层。
+
+| 场景 | 技术语域卡 | 产品线 tone | style guide |
+| :--- | :--- | :--- | :--- |
+| ecommerce 详情页 | ❌ 跳过 | ✅ 人群语气 | ✅ 营销调 |
+| 规格书/说明书/包装/UI/合规 | ✅ 第1-6条 | ❌ 跳过 | ❌ 跳过 |
+
+**TECHNICAL_REGISTER 常量**（20 语种，6 条存储/3C/相机书写规范，搜索校准官方标准）：①接口/协议名保英文不音译 ②版本命名按官方规范（USB 3.2 Gen 1/Gen 2x2 非 USB 3.0、PCIe Gen4 x4 小写 x4、CFexpress Type A/B）③速度/性能等级代号保留（V30/V60/V90/U1/U3/A1/A2/1667x/2000x）④单位标准半角+空格（500 GB、3,500 MB/s、TBW、DWPD）⑤规格陈述客观化 ⑥可靠性/耐力术语行业标准。
+
+**两次用户质疑驱动收敛**：①「注入这么多会不会幻觉+冲突」→ 全场景叠加收敛为分场景矩阵 ②「翻译配置是围绕详情页的」→ 叠加收敛为替代。**冲突审计 3 护栏**：第6条只非详情页（详情页卖质保不锁死）/第5条限定规格描述（UI 操作指引、包装正面营销不受限）/packaging 复用现有 front-back 分工。
+
+**效果**：非详情页 token 净减少、冲突消除、幻觉风险降；详情页营销 tone 不受干扰。
+
+**测试**：tests/test-v1231-technical-register.ts 33 断言全绿（20语种渲染/场景×营销矩阵/第5条限定/冲突护栏）。
+
+---
+
+### v12.32 保英文品类词锁词——v12.27 Fix 2 遗留根治（commit c13dfe2）
+
+**根因（代码级实锤）**：`buildCategoryTerminology` 旧逻辑 `translated !== en` 才注入对照行 → **「钦定=保英文」的品类词连对照行都不出现**，LLM 不知道要保英文 → 自由音译（ko SSDD 音译事故同型）。命中：vi `Flash Drive`/`Reader`/`Enclosure`（CATEGORY_WORDS vi 钦定=英文源同形）。
+
+**修复（用户拍板：不加遮蔽层）**：保英文条目不再跳过，注入「→ 保留英文不译 / Keep these category terms in English」**显式锁词段**。遵守 v12.27 否决过的「自动派生 identity 遮蔽=第 6 个地方加判定」方向——**零新判定源，复用现有注入链**。CJK 用中文指令、非 CJK 用英文。
+
+**本轮三项决策（用户「你是 LLM 你决策」+ 补充）**：
+1. **详情页风格自动判定 = 不做**——用户封死：翻译风格是详情页内「官网 professional/电商 marketing/其他 standard」的**渠道选择器**，判渠道=判文本外业务意图，代码无信号；且非详情页 UI 已锁 professional、详情页默认 standard+手动切换已闭环。
+2. **vi/ko 保英文锁词 = 做**（本 commit）。
+3. **无场景「裸奔」担忧 = 撤销**——用户澄清 scenePreset 默认 ecommerce，不存在无场景路径；UI onSceneChange 非电商锁 professional 与 v12.31 prompt 层天然对齐。
+
+**ko SSDD 双层对齐定性（关闭 v12.27 Fix 3 观察项）**：**三层不一致是合理设计不是 bug**——prompt 层音译（正文描述性提及用韩区固定词）、productName 层保英文 + CSV 整条保英文（产品名是专名条目）。**「产品名不能动」是硬约束**；正文≠产品名，两层译法不同正确。
+
+**测试**：tests/test-v1232-keep-en-lock.ts 12 断言全绿（vi 锁词/de·zh 对照不受影响/CJK·非CJK指令/校对链路继承）。
 
 ---
 
