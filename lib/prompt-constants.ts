@@ -2368,19 +2368,30 @@ function buildCategoryTerminology(targetLang: string, productLine?: string | nul
   }
 
   const lines: string[] = []
+  const keepEnLines: string[] = []
   for (const [en, entry] of Object.entries(CATEGORY_WORDS)) {
     if (!allowedWords.includes(en)) continue
     // v11.7: entry 含 productName override 字段（Record 类型），须排除——只取语种直值
     const translated = entry[targetLang]
     if (typeof translated === 'string' && translated && translated !== en) {
       lines.push(`  ${en} → ${translated}`)
+    } else if (typeof translated === 'string' && translated === en) {
+      // v12.32: 「钦定=保英文」条目不再跳过（旧逻辑 !== en 才注入 → 保英文真空，
+      //   LLM 不知道要保英文，ko/vi 音译事故同型）。显式锁词：保留英文不译。
+      keepEnLines.push(`  ${en}`)
     }
   }
-  if (lines.length === 0) return ''
+  if (lines.length === 0 && keepEnLines.length === 0) return ''
 
   // v8.6: 标题按指令语言切换 — CJK用中文，非CJK用英文
-  const title = isCJKTarget(targetLang) ? '品类词对照：' : 'Category terms:'
-  return `${title}\n${lines.join('\n')}`
+  const cjk = isCJKTarget(targetLang)
+  const title = cjk ? '品类词对照：' : 'Category terms:'
+  // v12.32: 保英文锁词段——明确告知 LLM 这些品类词保留英文不音译不翻译
+  const keepTitle = cjk ? '以下品类词保留英文不译：' : 'Keep these category terms in English (do not translate/transliterate):'
+  const parts: string[] = []
+  if (lines.length > 0) parts.push(`${title}\n${lines.join('\n')}`)
+  if (keepEnLines.length > 0) parts.push(`${keepTitle}\n${keepEnLines.join('\n')}`)
+  return parts.join('\n')
 }
 
 
