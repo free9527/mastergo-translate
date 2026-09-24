@@ -2676,16 +2676,31 @@ export function getStyleCard(
 ): string {
   const parts: string[] = []
 
-  // 1. AUDIENCE — 来自产品线
-  const productTone = getProductLineTone(productLine || null, targetLang)
+  // v12.31: 技术语域卡 —— 非详情页（规格书/说明书/包装/UI/合规）的默认严谨专业语域。
+  //   这些场景不需要「风格」（营销调/人群语气），需要技术表达准确、行业惯例一致。
+  //   注入矩阵（冲突审计定稿）：
+  //     详情页 ecommerce  → 跳过技术语域卡（营销主战场，第5/6条会与营销冲突）
+  //     非详情页其余      → 注入技术语域卡（第1-6条全量），并跳过营销两层（tone+style）
+  const isEcommerce = scenePreset === 'ecommerce'
+  if (!isEcommerce && scenePreset) {
+    const techRegister = getTechnicalRegister(targetLang)
+    if (techRegister) {
+      parts.push(techRegister)
+    }
+  }
+
+  // 1. AUDIENCE — 来自产品线（营销受众/人群语气，围绕详情页设计）
+  //   v12.31: 非详情页跳过产品线 tone guide——它是详情页营销受众维度，不属于严谨技术语域
+  const productTone = isEcommerce ? getProductLineTone(productLine || null, targetLang) : ''
   if (productTone) {
     parts.push(productTone)
   }
 
-  // 2. TONE — 来自风格指南
+  // 2. TONE — 来自风格指南（营销调，围绕详情页设计）
   // v8.6: 当产品调性存在时，抑制风格指南，避免冲突
   // 例：gaming产品线说"参数精确"，marketing风格说"淡化参数" → 产品调性优先
-  if (!productTone) {
+  // v12.31: 非详情页跳过 style guide——营销调不属于严谨技术语域（技术语域卡已注入）
+  if (isEcommerce && !productTone) {
     const styleGuide = style ? getStyleGuide(style, targetLang) : ''
     if (styleGuide) {
       parts.push(styleGuide)
@@ -2718,6 +2733,83 @@ export function getStyleCard(
   }
 
   return parts.length > 0 ? `\n[STYLE]\n${parts.join('\n\n')}` : ''
+}
+
+// ═══════════════════════════════════════════════════════════════
+// v12.31: TECHNICAL_REGISTER — 技术语域卡（存储/3C/数码行业书写规范）
+// ═══════════════════════════════════════════════════════════════
+// 定位：非详情页场景（规格书/说明书/包装/UI/合规）的「严谨专业」统一底线。
+//   这些场景不需要「风格」（营销调/人群语气），需要的是技术表达准确、
+//   行业惯例一致、规格陈述客观——这是「去风格」的精确性约束，不是风格。
+//
+// 与产品线 tone guide 的关系（用户拍板的闭环）：
+//   · 产品线 tone guide + style guide = 围绕详情页的营销受众/语气设计
+//     → 只在详情页注入（人群话语习惯是营销受众维度）
+//   · 技术语域卡 = 非详情页的默认严谨专业语域
+//     → 非详情页注入，替代营销两层（tone guide + style guide 不注入）
+//
+// 6 条规范 = 消费电子+存储+3C+相机领域书写表达规范（官方标准校准）：
+//   1. 接口/协议名保英文不音译（PCIe/NVMe/SATA/USB/CFexpress/SD/DDR…）
+//   2. 版本/代数命名按官方规范（USB 3.2 Gen 1/Gen 2/Gen 2x2 非"USB 3.0"，
+//      PCIe Gen4 x4 小写 x4 非 X4/×4，CFexpress Type A/B、CFexpress 4.0）
+//   3. 速度/性能等级代号保留（V30/V60/V90、U1/U3、A1/A2、1667x/2000x）
+//   4. 单位标准半角+空格（500 GB、3,500 MB/s、MHz、MT/s、TBW、DWPD）
+//   5. 规格陈述客观化（❌营销修饰 blazing-fast/极致/超强，✅直接给数字/规格）
+//      ——限定「性能/规格描述」，UI 操作指引、包装正面营销文案不在此限
+//   6. 可靠性/耐力术语行业标准（TBW/DWPD/MTBF/有限终身质保，按术语库钦定等价词）
+//      ——详情页卖质保是营销表达，第 6 条只给非详情页
+//
+// 注入矩阵（冲突审计后定稿）：
+//   详情页 ecommerce：第1-4条（纯形式）+ 产品线 tone + style guide；❌第5/6条
+//   非详情页其余：    第1-6条（全量）；❌产品线 tone ❌style guide
+// ═══════════════════════════════════════════════════════════════
+
+/** 技术语域卡（按语种渲染；CJK→母语，其余→英文标签+目标语） */
+export const TECHNICAL_REGISTER: Record<string, string> = {
+  'default': `[Technical Register·Storage Industry]
+- Interface/protocol names stay in English, never transliterate: PCIe, NVMe, SATA, USB, USB-C, Thunderbolt, CFexpress, SD, microSD, DDR4, DDR5.
+- Version/generation per official spec: USB 3.2 Gen 1 / Gen 2 / Gen 2x2 (not "USB 3.0"), PCIe Gen4 x4 / Gen5 x4 (lowercase "x4"), CFexpress Type A / Type B, CFexpress 4.0.
+- Speed/performance class codes stay as-is: V30 / V60 / V90, U1 / U3, Class 10, A1 / A2, 1667x / 2000x.
+- Units standard half-width with a space: 500 GB, 3,500 MB/s, MHz, MT/s, TBW, DWPD.
+- Spec/performance statements objective, no marketing modifiers (❌blazing-fast/ultimate ❌极致/超强 — ✅state the number directly). UI operation guidance & packaging front marketing copy not bound by this.
+- Reliability/endurance per industry standard & glossary: TBW, DWPD, MTBF, limited lifetime warranty, endurance rating.`,
+
+  'zh-CN': `[技术语域·存储行业]
+- 接口/协议名保留英文不音译：PCIe、NVMe、SATA、USB、USB-C、Thunderbolt、CFexpress、SD、microSD、DDR4、DDR5。
+- 版本/代数命名按官方规范：USB 3.2 Gen 1 / Gen 2 / Gen 2x2（非"USB 3.0"）、PCIe Gen4 x4 / Gen5 x4（小写 x4）、CFexpress Type A / Type B、CFexpress 4.0。
+- 速度/性能等级代号保留：V30 / V60 / V90、U1 / U3、Class 10、A1 / A2、1667x / 2000x。
+- 单位标准半角加空格：500 GB、3,500 MB/s、MHz、MT/s、TBW、DWPD。
+- 规格/性能陈述客观化，不加营销修饰（❌极致/超强/ blazing-fast，✅直接给数字/规格）。UI 操作指引、包装正面营销文案不受此限。
+- 可靠性/耐力术语按行业标准与术语库钦定：TBW、DWPD、MTBF、有限终身质保、耐久度。`,
+
+  'zh-TW': `[技術語域·儲存行業]
+- 介面/協定名保留英文不音譯：PCIe、NVMe、SATA、USB、USB-C、Thunderbolt、CFexpress、SD、microSD、DDR4、DDR5。
+- 版本/世代命名按官方規範：USB 3.2 Gen 1 / Gen 2 / Gen 2x2（非"USB 3.0"）、PCIe Gen4 x4 / Gen5 x4（小寫 x4）、CFexpress Type A / Type B、CFexpress 4.0。
+- 速度/效能等級代號保留：V30 / V60 / V90、U1 / U3、Class 10、A1 / A2、1667x / 2000x。
+- 單位標準半形加空格：500 GB、3,500 MB/s、MHz、MT/s、TBW、DWPD。
+- 規格/效能陳述客觀化，不加行銷修飾（❌極致/超強/blazing-fast，✅直接給數字/規格）。UI 操作指引、包裝正面行銷文案不受此限。
+- 可靠性/耐久術語按行業標準與術語庫欽定：TBW、DWPD、MTBF、有限終身保固、耐久度。`,
+
+  'ja': `[技術レジスター·ストレージ業界]
+- インターフェース/プロトコル名は英語のまま（音訳しない）：PCIe、NVMe、SATA、USB、USB-C、Thunderbolt、CFexpress、SD、microSD、DDR4、DDR5。
+- バージョン/世代は公式仕様に従う：USB 3.2 Gen 1 / Gen 2 / Gen 2x2（"USB 3.0"ではない）、PCIe Gen4 x4 / Gen5 x4（小文字 x4）、CFexpress Type A / Type B、CFexpress 4.0。
+- 速度/性能クラスコードはそのまま：V30 / V60 / V90、U1 / U3、Class 10、A1 / A2、1667x / 2000x。
+- 単位は半角スペース付き：500 GB、3,500 MB/s、MHz、MT/s、TBW、DWPD。
+- スペック/性能記述は客観的、マーケティング修飾語なし（❌ blazing-fast/極致 ❌ 最強、✅ 数値を直接記載）。UI 操作案内・パッケージ表面のマーケティングコピーは対象外。
+- 信頼性/耐久性は業界標準と用語集に従う：TBW、DWPD、MTBF、有限生涯保証、耐久性評価。`,
+
+  'ko': `[기술 레지스터·스토리지 업계]
+- 인터페이스/프로토콜명은 영어 유지(음역 금지): PCIe, NVMe, SATA, USB, USB-C, Thunderbolt, CFexpress, SD, microSD, DDR4, DDR5.
+- 버전/세대는 공식 규격 준수: USB 3.2 Gen 1 / Gen 2 / Gen 2x2("USB 3.0" 아님), PCIe Gen4 x4 / Gen5 x4(소문자 x4), CFexpress Type A / Type B, CFexpress 4.0.
+- 속도/성능 클래스 코드 유지: V30 / V60 / V90, U1 / U3, Class 10, A1 / A2, 1667x / 2000x.
+- 단위는 반각 스페이스 포함: 500 GB, 3,500 MB/s, MHz, MT/s, TBW, DWPD.
+- 사양/성능 기술은 객관적으로, 마케팅 수식어 금지(❌ blazing-fast/최강, ✅ 수치 직접 기재). UI 조작 안내·패키지 앞면 마케팅 문구는 제외.
+- 신뢰성/내구성은 업계 표준과 용어집 준수: TBW, DWPD, MTBF, 제한적 평생 보증, 내구성 등급.`,
+}
+
+/** 获取技术语域卡（按目标语言；无该语种时回退英文 default） */
+export function getTechnicalRegister(targetLang: string): string {
+  return TECHNICAL_REGISTER[targetLang] || TECHNICAL_REGISTER['default'] || ''
 }
 
 // ═══════════════════════════════════════════════════════════════
