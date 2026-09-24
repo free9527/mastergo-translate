@@ -969,7 +969,7 @@ export async function translateBatch(
   // v12.2: commonErrors 回填首调——v12.1 起 commonErrors 重新定位为「预防型机翻味搭配清单」
   //        （de/es/ru/tr 四语种 judge 基线实据条目），与 v11.5 搬出的补救型内容（⛔三条/BRAND）
   //        不同物；校对渲染链不含 commonErrors（renderLangForProofread 无此项），零加戏风险
-  const langBlock = renderLangForTranslate(targetLang, productLine, /* includeCommonErrors */ true)
+  const langBlock = renderLangForTranslate(targetLang, productLine, /* includeCommonErrors */ true, /* sourceTexts v12.27 */ texts)
 
   // v8.0: 统一风格卡片（替代分散的 productTone + styleGuide + sceneConstraints）
   const styleCard = getStyleCard(targetLang, productLine, effectiveStyle || 'standard', config.scenePreset)
@@ -2977,6 +2977,7 @@ export async function proofreadBatch(
     hasExpansionFlags: !!expansionFlags && expansionFlags.size > 0,  // v11.5: 超长提示条件注入
     hasProhibitedFix: !!prohibitedFixMap && prohibitedFixMap.size > 0,  // v11.12: 违禁词全局块条件注入
     hasPolished: !!polishedIndices && polishedIndices.size > 0,  // v12.3: 已润色条目 CHECK 1R 分叉
+    sourceTexts,                                                // v12.27: 源文动态品类词检测
   })
 
   const apiKey = config.proofreadApiKey || config.apiKey

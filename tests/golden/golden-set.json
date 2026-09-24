@@ -1,0 +1,82 @@
+{
+  "_meta": {
+    "version": "v12.28",
+    "description": "金标准测试集——质量回归门禁的锚点用例。每条含 expect 形式约束（glossaryLockedTerms/fidelityFloor/mustContain），可选 referenceTranslation 供 judge 对比。",
+    "discipline": "judge 评分是参考信号非真理；形式约束验「管道逻辑没改坏」，非「译文美不美」。",
+    "updated": "2026-09-24"
+  },
+  "cases": [
+    {
+      "id": "ja-slogan-for-all",
+      "comment": "live-cases S1：best-of-2 校准锚点——①语序颠倒⭐⭐/②产品性能前置⭐⭐⭐⭐⭐/③语义偏移(factsIntact=false)",
+      "source": "CFexpress 4.0 Pro Performance, for All.",
+      "scenePreset": "ecommerce",
+      "productLine": "professional_imaging",
+      "targetLang": "ja",
+      "referenceTranslation": "CFexpress 4.0 のプロ仕様性能を、すべての人に",
+      "expect": {
+        "mustContain": ["CFexpress", "プロ"],
+        "fidelityFloor": true
+      }
+    },
+    {
+      "id": "ko-d500-spec-ssdd",
+      "comment": "v12.27 修复锚点：ko Solid State Dual Drive 钦定音译必须经源文动态检测注入（portable_storage 映射外词）",
+      "source": "Built with dual USB-A and USB-C connectors, the Lexar JumpDrive Solid State Dual Drive D500 USB 3.2 Gen 1 Type C delivers fast, easy, plug-and-play storage that works with most of your devices.",
+      "scenePreset": "spec_sheet",
+      "productLine": "portable_storage",
+      "targetLang": "ko",
+      "expect": {
+        "glossaryLockedTerms": ["솔리드 스테이트 듀얼 드라이브"],
+        "fidelityFloor": true
+      }
+    },
+    {
+      "id": "ko-d500-spec-capacity",
+      "comment": "D500 规格书容量段——数字/容量事实锚（up to 1TB 不得丢）",
+      "source": "Available in capacities up to 1TB to store 300,000+ photos, or 18,000 minutes of HD video.",
+      "scenePreset": "spec_sheet",
+      "productLine": "portable_storage",
+      "targetLang": "ko",
+      "expect": {
+        "mustContain": ["1TB"],
+        "fidelityFloor": true
+      }
+    },
+    {
+      "id": "ja-d500-spec-footnote",
+      "comment": "v12.26 锚点：ja 规格书脚标 ※N 格式 + 敬语排除",
+      "source": "Transfer speeds up to 400MB/s¹ are 4X faster than USB 3.0 drives².",
+      "scenePreset": "spec_sheet",
+      "productLine": "portable_storage",
+      "targetLang": "ja",
+      "expect": {
+        "mustContain": ["400MB/s"],
+        "fidelityFloor": true
+      }
+    },
+    {
+      "id": "es-manual-tu-register",
+      "comment": "v12.24 锚点：es 说明书 tú 亲体（非 Usted 敬体）",
+      "source": "Connect the drive to your phone and add your photos.",
+      "scenePreset": "manual",
+      "productLine": "portable_storage",
+      "targetLang": "es",
+      "referenceTranslation": "Conecta la unidad a tu teléfono y añade tus fotos.",
+      "expect": {
+        "fidelityFloor": true
+      }
+    },
+    {
+      "id": "de-slogan-marketing",
+      "comment": "ecommerce 场景营销句——best-of-2/润色应开启（场景策略回归）",
+      "source": "Experience blazing-fast speeds and uncompromising durability, wherever you go.",
+      "scenePreset": "ecommerce",
+      "productLine": "portable_storage",
+      "targetLang": "de",
+      "expect": {
+        "fidelityFloor": true
+      }
+    }
+  ]
+}

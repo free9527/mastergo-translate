@@ -599,6 +599,9 @@ import { formatCJKSpace } from '@lib/format-text'
 import { postProcessTranslation, restoreTrademarkSymbols, restoreStorageUnitFormatting, enforceGlossaryTerms, detectTranslationExpansion, sanitizeLineBreaks, cleanKey, stripSpuriousAsterisks, prePolishFormatCleanup } from '@lib/post-process'
 import { translateBatch, proofreadBatch, fetchWithRetry, isProofreadScriptMismatch, detectTruncatedTexts, STYLE_PRESETS, SCENE_PRESETS, detectProductLine, buildTaskGlossaryHint, isUntranslatable, isSuspectMisspelledWord, classifyNecessity, getTargetScript, hasFunctionWords, hasSimplifiedOnlyChars, hasTraditionalOnlyChars, personaJudgeBatch, polishBatch, polishVerifyBatch, shouldSkipBestOf2 } from '@lib/llm-api'
 import { detectConsistencyIssues } from '@lib/consistency-check'
+import { computeEffectiveToggles, ConsistencyDegrader, preflightSource, PREFLIGHT_CHECKS_ALL } from '@lib/batch-context'
+import { detectProhibited, detectSourceLangForProhibited } from '@lib/prohibited-check'
+import { isBilingualCameraBrand } from '@lib/third-party-models'
 import { startMetricsCollection, recordBatchMetrics, recordProofreadMetrics, finalizeMetrics, formatMetricsReport, createBatchTimer } from '@lib/metrics'
 import { DEFAULT_GLOSSARY_PRODUCTS_CSV } from '@lib/default-glossary'
 import { BUILTIN_THIRD_PARTY_ENTRIES } from '@lib/third-party-models'
@@ -772,8 +775,16 @@ const llmConfig = ref<LLMConfig>({ apiKey: '', apiUrl: '', model: '', translatio
  *  enableProofread/enablePolish/enableBestOfN 保留为内部字段（向后兼容+细粒度控制），
  *  但用户不可见——UI 只暴露 enableAiOptimize，防「开关开了但机制没跑」的 UI 空转。 */
 const effProofread = computed(() => llmConfig.value.enableAiOptimize !== false && llmConfig.value.enableProofread)
-const effPolish = computed(() => llmConfig.value.enableAiOptimize !== false && llmConfig.value.enablePolish)
-const effBestOfN = computed(() => llmConfig.value.enableAiOptimize !== false && llmConfig.value.enableBestOfN)
+// v12.28: 润色/best-of-N 的 effective 值并入「场景策略」（杠杆 1）——
+//   客观陈述类场景（规格书/说明书/合规）场景级关润色+关双跑，与用户开关 AND。
+//   computeEffectiveToggles 集中计算（场景适配层 AND 用户意愿层），此处取切片。
+const effToggles = computed(() => computeEffectiveToggles(llmConfig.value))
+const effPolish = computed(() => effToggles.value.polish)
+const effBestOfN = computed(() => effToggles.value.bestOfN)
+
+// v12.28 杠杆 2 附属：consistency 自适应降级器（会话级单例，跨批次共享）——
+//   连续 ≥3 次超时 → 本会话后续批次 consistency 自动降级为跳过；成功则复位。
+const consistencyDegrader = new ConsistencyDegrader()
 
 const scanning = ref(false)
 /** v9.1 #11: 扫描进度（main.ts 每 100 节点上报），按钮文案"扫描中(N)..." */
@@ -1599,6 +1610,26 @@ async function startTranslate() {
     return
   }
 
+  // v12.28 杠杆 4: 源文体检——场景不匹配 warn + 错词/违禁词/双语 info（只提示不阻塞，D3 手动决策）
+  //   判定器注入（复用现有 isSuspectMisspelledWord/detectProhibited/isBilingualCameraBrand），
+  //   术语库传 full 视图（错词豁免用）。违禁词的「判定合规/阻塞」仍由 v12.20 既有通道处理，不重复造。
+  const preflightFindings = preflightSource(
+    items.value.map(it => it.sourceText),
+    llmConfig.value.scenePreset,
+    PREFLIGHT_CHECKS_ALL,
+    {
+      isSuspectMisspelledWord,
+      detectProhibited,
+      detectSourceLangForProhibited,
+      isBilingual: isBilingualCameraBrand,
+    },
+    buildGlossaryMaps().full,
+  )
+  for (const f of preflightFindings) {
+    uiLog('translate', `源文体检 [${f.kind}/${f.severity}]: ${f.message}${f.fragments && f.fragments.length > 0 ? `（${f.fragments.slice(0, 3).join('、')}${f.fragments.length > 3 ? '…' : ''}）` : ''}`)
+    if (f.severity === 'warn') showToast(f.message, 'warning')
+  }
+
   translating.value = true
   cancelFlag.value = false
   translateErrors.value = new Set()
@@ -2163,9 +2194,20 @@ async function startTranslate() {
           // 病灶密度数据收集后再拍板是否做修改版。
           // v12.19: fire-and-forget——不再 await 阻塞批尾部（实机 71% 超时率 +
           //   批内硬阻塞 = 每批白等 15s）。探测层零修改，批尾部不该等它。
-          if (llmConfig.value.enableAiOptimize !== false && texts.length > 1) {
+          // v12.28: 场景策略 + 自适应降级——场景关 consistency 或连续超时降级时跳过。
+          const consistencySceneOn = effToggles.value.policy.consistency
+          if (llmConfig.value.enableAiOptimize !== false && texts.length > 1 && consistencySceneOn && !consistencyDegrader.isDegraded()) {
             void detectConsistencyIssues(texts, translated, targetLang.value, llmConfig.value)
               .then(report => {
+                // v12.28: 超时/失败计入降级统计；成功复位
+                if (report?.timedOut) {
+                  consistencyDegrader.recordTimeout()
+                  if (consistencyDegrader.isDegraded()) {
+                    uiLog('consistency', `连续 ${consistencyDegrader.timeoutCount} 次超时 → 本会话 consistency 自动降级为跳过（网关恢复后自动复位）`)
+                  }
+                  return
+                }
+                consistencyDegrader.recordSuccess()
                 if (report && report.issues.length > 0) {
                   uiLog('consistency', `一致性探测: 重复短语 ${report.groupsTotal} 组 → 不一致 ${report.issues.length} 组`)
                   for (const issue of report.issues.slice(0, 5)) {
@@ -2188,6 +2230,11 @@ async function startTranslate() {
                 }
               })
               .catch(e => {
+                // v12.28: 异常也计入降级（与超时同型——探测失败的会话级统计）
+                consistencyDegrader.recordTimeout()
+                if (consistencyDegrader.isDegraded()) {
+                  uiLog('consistency', `连续 ${consistencyDegrader.timeoutCount} 次异常 → 本会话 consistency 自动降级为跳过`)
+                }
                 uiLog('consistency', `一致性探测异常（跳过）: ${(e as Error).message.slice(0, 80)}`)
               })
           }

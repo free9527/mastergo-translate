@@ -28,6 +28,9 @@ export interface ConsistencyIssue {
 export interface ConsistencyReport {
   groupsTotal: number                  // 重复短语总组数
   issues: ConsistencyIssue[]           // 不一致组（一致组不报告——探测版只报病灶）
+  /** v12.28: 本次调用是否超时/失败（供 consistency 自适应降级统计——探测版
+   *   哲学是失败静默返回 null，但调用方需要区分「无病灶」与「失败」，用于降级计数） */
+  timedOut?: boolean
 }
 
 /** 单格文本 → 词序列（lowercase、去™®©、拉丁词边界；数字 token 保留用于对齐） */
@@ -229,12 +232,16 @@ Output ONLY a valid JSON object:
       uiLog('consistency', `裁决 LLM 返回: ${phrases.size}组, 耗时 ${Date.now() - consistencyStart}ms, 解析 ${parsed ? '成功' : '失败'}`)
     } else {
       uiLog('consistency', `裁决 LLM 失败 (${res.status}): 耗时 ${Date.now() - consistencyStart}ms——静默跳过`)
+      // v12.28: HTTP 失败也标记 timedOut（供降级统计）
+      return { groupsTotal: phrases.size, issues: [], timedOut: true }
     }
   } catch (e) {
     uiLog('consistency', `裁决调用异常: ${(e as Error).message.slice(0, 60)}, 耗时 ${Date.now() - consistencyStart}ms——静默跳过`)
-    return null  // 探测版哲学：失败静默
+    // v12.28: 失败（含超时）也要让调用方知道——返回带 timedOut 标记的报告而非 null，
+    //   供 consistency 自适应降级统计（探测版「静默」指不改数据，不等于对调用方隐瞒失败）。
+    return { groupsTotal: phrases.size, issues: [], timedOut: true }
   }
-  if (!parsed) return null
+  if (!parsed) return { groupsTotal: phrases.size, issues: [], timedOut: true }
 
   // 按提取顺序对齐 LLM 返回（phrase 字符串匹配，防 LLM 改写短语形态）
   const issues: ConsistencyIssue[] = []

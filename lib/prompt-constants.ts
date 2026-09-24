@@ -1894,7 +1894,7 @@ export const LANG_SPECIFIC: Record<string, LangBlock> = {
 - 检查片假名是否使用业界标准转写`,
   },
   'ko': {
-    rules: `기술 용어는 업계 표준 영어 외래어 우선 사용. 생소한 한자어 강제 사용 금지. 일본어 유래 한자어 사용 금지. 문체는 하십시오체(습니다/ㅂ니다) 통일, 반말 금지. 띄어쓰기 엄수 — 조사는 앞 명사에 붙이고 독립된 단어는 반드시 띄어쓰기. UI 확장: 한국어는 영어보다 10-15% 길어짐 — 짧은 레이블은 축약 표현 사용.`,
+    rules: `기술 용어는 업계 표준 영어 외래어 우선 사용. 생소한 한자어 강제 사용 금지. 일본어 유래 한자어 사용 금지. 문체는 하십시오체(습니다/ㅂ니다) 통일, 반말 금지. 띄어쓰기 엄수 — 조사는 앞 명사에 붙이고 독립된 단어는 반드시 띄어쓰기. UI 확장: 한국어는 영어보다 10-15% 길어짐 — 짧은 레이블은 축약 표현 사용. 용어 정밀(기술 문맥): 신뢰성/표준 시험·검증은 시험(단, 성능·벤치마크 테스트는 테스트 허용; 시험/테스트 한국 기술 문서에 모두 실재)、smartphone은 스마트폰(❌휴지폰 — 「手机」범칭, smartphone 지칭 시 스마트폰 사용).`,
     compliance: `표시·광고의 공정화에 관한 법률 준수: 최고급, 최대, 1위 등 최고급 표현 및 허위·과장 광고 금지.`,
     quality: `한국어 원어민의 감각으로 번역문을 검토하세요 — 자연스럽고 업계 표준 표현에 맞습니까？`,
     commonErrors: `常见错误：
@@ -1902,12 +1902,16 @@ export const LANG_SPECIFIC: Record<string, LangBlock> = {
 - ❌ 半语（해라체）混入 → ✅ 统一使用敬语（하십시오체）
 - ❌ 助词与名词分离 → ✅ 助词紧贴名词
 - ❌ 独立单词未空格 → ✅ 正确空格
+- ❌ 可靠性/标准试验语境滥用外来词 테스트 → ✅ 用 시험（实证：Samsung 保修用 시험 / HPE 规格书用 테스트——性能·benchmark 测试保留 테스트，不一刀切）
+- ❌ smartphone 译成 휴지폰（「手机」泛称） → ✅ 스마트폰（术语精确）
 - ❌ 最高级表达（최고、1위）→ ✅ 客观描述`,
     proofreadChecks: `校对检查项：
 - 检查是否使用了日语由来汉字词
 - 检查文体是否统一为敬语（습니다/ㅂ니다）
 - 检查助词是否正确紧贴名词
-- 检查空格是否正确`,
+- 检查空格是否正确
+- 检查可靠性/标准试验语境是否用 시험（性能·benchmark 测试用 테스트 不拦）
+- 检查 smartphone 是否译作 스마트폰（而非 휴지폰）`,
   },
   'fr': {
     rules: `Use Metropolitan French (France), NOT Quebec French. All nouns must have correct gender, adjectives must agree in gender and number. Non-breaking space before : ; ! ? « ». Decimal separator: comma (7,5 Mo/s). UI expansion: French is 15-25% longer than English — prefer concise phrasing in short labels. Formal "vous" not "tu". Minimize English loanwords; prefer native French technical terms (e.g. micrologiciel NOT firmware).`,
@@ -2196,11 +2200,12 @@ export function renderLangForTranslate(
   targetLang: string,
   productLine?: string | null,
   includeCommonErrors = true,  // v12.2: 首调+重试都注入——commonErrors 已重新定位为预防型机翻味搭配清单（v11.5 曾移重试层，v12.1 judge 基线实据后回填）
+  sourceTexts?: string[],      // v12.27: 源文动态品类词检测（映射外多词品类词强制注入）
 ): string {
   const block = LANG_SPECIFIC[targetLang]
   if (!block) return ''
 
-  const categoryBlock = buildCategoryTerminology(targetLang, productLine)
+  const categoryBlock = buildCategoryTerminology(targetLang, productLine, sourceTexts)
 
   const parts = [categoryBlock, block.rules, includeCommonErrors ? block.commonErrors : ''].filter(Boolean)
   if (parts.length === 0) return ''
@@ -2216,11 +2221,12 @@ export function renderLangForTranslate(
 export function renderLangForProofread(
   targetLang: string,
   productLine?: string | null,
+  sourceTexts?: string[],      // v12.27: 源文动态品类词检测（与翻译链路同参，自动继承）
 ): string {
   const block = LANG_SPECIFIC[targetLang]
   if (!block) return ''
 
-  const categoryBlock = buildCategoryTerminology(targetLang, productLine)
+  const categoryBlock = buildCategoryTerminology(targetLang, productLine, sourceTexts)
 
   // 校对做硬性检查：品类词 + rules + quality + compliance + proofreadChecks
   // quality 让校对 LLM 以母语者视角检查译文自然度
@@ -2247,15 +2253,16 @@ export function buildProofreadSystemPrompt(opts: {
   hasExpansionFlags?: boolean  // v11.5: true 时注入 EXPANSION_NOTE（expansionFlags 非空才有意义）
   hasProhibitedFix?: boolean   // v11.12: true 时注入 PROHIBITED_NOTE（prohibitedFixMap 非空才有意义）
   hasPolished?: boolean        // v12.3: true 时注入 POLISHED_NOTE（polishedIndices 非空才有意义）
+  sourceTexts?: string[]       // v12.27: 源文动态品类词检测（映射外多词品类词强制注入）
 }): string {
-  const { targetLang, productLine, useEnInstruction, glossaryHint = '', sourceLang, hasExpansionFlags = false, hasProhibitedFix = false, hasPolished = false } = opts
+  const { targetLang, productLine, useEnInstruction, glossaryHint = '', sourceLang, hasExpansionFlags = false, hasProhibitedFix = false, hasPolished = false, sourceTexts } = opts
 
   const mission = IDENTITY_MISSION[targetLang] || IDENTITY_MISSION['en'] || ''
   const missionBlock = mission ? `\n[MISSION·${targetLang}]\n${mission}\n` : ''
   const proofreadPrompt = useEnInstruction ? PROOFREAD_SYSTEM_PROMPT : PROOFREAD_SYSTEM_PROMPT_ZH
   const calibration = buildProofreadCalibration(targetLang, productLine, useEnInstruction)
   const calibrationBlock = calibration ? `\n${calibration}\n` : ''
-  const langBlock = renderLangForProofread(targetLang, productLine)
+  const langBlock = renderLangForProofread(targetLang, productLine, sourceTexts)
   // v12.18: 边界指令仅当 langBlock 非空时注入（无语种规范则边界无的放矢）
   const boundaryBlock = langBlock
     ? '\n' + (useEnInstruction ? PROOFREAD_LANG_BOUNDARY_NOTE : PROOFREAD_LANG_BOUNDARY_NOTE_ZH)
@@ -2330,11 +2337,35 @@ export function buildProofreadCalibration(
   ].join('\n')
 }
 
-/** 从 CATEGORY_WORDS 数据源按语言和产品线动态生成品类词对照表 */
-function buildCategoryTerminology(targetLang: string, productLine?: string | null): string {
-  const allowedWords = productLine
+/** 从 CATEGORY_WORDS 数据源按语言和产品线动态生成品类词对照表
+ *
+ *  v12.27: 注入范围从「纯产品线静态映射」扩为「映射 ∪ 源文动态检测」——
+ *  源文出现映射外的多词品类词时（如 D500 是 Solid State Dual Drive，
+ *  portable_storage 映射未含），该词当前语种钦定强制注入，不再裸奔靠 LLM 自觉。
+ *  产品线映射保留（仍承担该产品线统一基线职责），动态检测只补漏词的钦定。
+ *  检测器内联实现（与 product-name-generator.detectCategory 同源 CATEGORY_KEYS，
+ *  但避免 prompt-constants ↔ product-name-generator 循环依赖，故内联多词检测）。 */
+function buildCategoryTerminology(targetLang: string, productLine?: string | null, sourceTexts?: string[]): string {
+  const mapped = productLine
     ? (PRODUCT_LINE_CATEGORY_MAP[productLine] || FALLBACK_CATEGORY_WORDS)
     : FALLBACK_CATEGORY_WORDS
+
+  // v12.27: 并集「源文实际出现的多词品类词」——映射漏词时钦定仍注入（ko 事故根治）。
+  // 只收含空格的多词品类词（正文出现几乎必然是品类语境，误判率≈0）；
+  // 排除单词泛词 Hub/Card/SSD（普通句易误判，且另有遮蔽/生成兜底）。
+  let allowedWords = mapped
+  if (sourceTexts && sourceTexts.length > 0) {
+    const detected = new Set<string>()
+    for (const text of sourceTexts) {
+      if (!text) continue
+      for (const cat of CATEGORY_KEYS_DESC) {
+        if (!cat.includes(' ') || detected.has(cat)) continue
+        const escaped = cat.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        if (new RegExp(`\\b${escaped}\\b`, 'i').test(text)) detected.add(cat)
+      }
+    }
+    if (detected.size > 0) allowedWords = [...new Set([...mapped, ...detected])]
+  }
 
   const lines: string[] = []
   for (const [en, entry] of Object.entries(CATEGORY_WORDS)) {
@@ -2509,6 +2540,10 @@ export const PRODUCT_LINE_CATEGORY_MAP: Record<string, string[]> = {
 }
 
 const FALLBACK_CATEGORY_WORDS = ['SSD', 'Card', 'Flash Drive']
+
+// v12.27: 品类词 key 按长度降序（最长优先）——源文动态检测用，与
+// product-name-generator.CATEGORY_KEYS 同源（都派生自 CATEGORY_WORDS 单一事实源）
+const CATEGORY_KEYS_DESC = Object.keys(CATEGORY_WORDS).sort((a, b) => b.length - a.length)
 
 
 // ═══════════════════════════════════════════════════════════════

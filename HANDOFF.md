@@ -1,7 +1,7 @@
 # 项目交接文档
 
 **日期**: 2026-09-24  
-**版本**: v12.26（规格书场景三件套 + 规格书语体场景卡 20 语种扩充）  
+**版本**: v12.29（质量×效率四杠杆 + 品类词动态注入 + ko 术语规范）  
 **项目**: Lexar 翻译插件（MasterGo 插件）
 
 
@@ -40,7 +40,68 @@ MasterGo 设计工具插件，将 Lexar 产品设计稿从英文翻译成 20 个
 
 ---
 
-## 二、当前版本（v12.26）
+## 二、当前版本（v12.27-v12.29）
+
+### v12.28 质量×效率系统性方案——四杠杆一版本落地（2026-09-24，用户立项「不头痛医头，透过现象看本质」）
+
+**背景**：用户提出「质量+效率系统性解决方案」，要求宏观治理非零散修补。立项分析：质量事故与效率浪费同根——「代码管形式/LLM 管语义」边界被踩（语义判断错交代码→误杀/漏放，形式判断错交 LLM 自觉→音译/加戏；LLM 做代码能秒判的事→烧 token；重复做已做过的判定→浪费）。四杠杆闭环：入口把关→正确处理→不浪费→验证改进。
+
+**核心载体**：新建 `lib/batch-context.ts`（场景矩阵+判定复用+consistency 降级+源文体检+effective 开关计算）。
+
+| 杠杆 | 内容 | 关键设计 | 实机/验证 |
+|---|---|---|---|
+| **1 场景×阶段矩阵** | `SCENE_PIPELINE_POLICY` + `getStagePolicy` + `computeEffectiveToggles`：客观陈述类（technical_doc/operation_guide/compliance_doc）+ 格式敏感类（packaging/software_ui）**关润色**；ecommerce 全开；proofread/consistency 全场景保开 | AND 语义（场景关 OR 用户关→关，永远「更少改写」方向，误杀=没润色零事故）；**校对=质量地板不撤，润色=锦上添花可让位** | **D500 ko 规格书实机：润色整链 ~30s+4 次 LLM 调用纯省掉（13:48 那 4 次 0 生效 2 回退），`[polish]` 段消失、`[proofread]` 保留、ko 译文反而更稳（场景卡+v12.27 命中钦定）** |
+| **2 consistency 自适应降级** | `ConsistencyDegrader`：连续 ≥3 次超时→本会话降级跳过（uiLog），成功复位 | 治实机 100% 8s 超时白等；`consistency-check.ts` 失败/超时改返带 `timedOut` 标记的报告（不再返回 null，调用方区分「无病灶」vs「失败」） | 单批任务未达阈值（设计内）；多批任务第 3 次超时后触发 |
+| **3 质量回归门禁** | `tests/test-v1228-quality-gate.ts` + `tests/golden/`：三模式——结构门禁（默认零 API：金标准集结构校验+判定逻辑回归）/真实门禁（需 `LEXAR_LIVE_API_KEY`+`URL` 环境变量：真实管道+judge 三维评分+基线对比）/`--update-baseline` | **key 一律环境变量读不硬编码**；judge 是参考信号非真理，fidelity 掉>0.2 只标 ⚠️ 不阻塞（用户拍板 D4） | 结构门禁 9 断言实跑全绿；真实模式代码已写未实跑（待配 key） |
+| **4 源文前置体检** | `preflightSource`（纯函数零 LLM）：4 项检查——①场景不匹配（规格书信号脚标※N/上标/Key:Value 密度→warn，只提示不切场景，用户拍板 D3 手动）②可疑错词（复用 isSuspectMisspelledWord，info 前移）③源文违禁词（复用 detectProhibited，info 透出；判定合规/阻塞仍走 v12.20 不重复造）④双语混写（复用 isBilingualCameraBrand，info） | 判定器**依赖注入**（App.vue 注入现有判定器，batch-context 保持纯数据+纯函数低层不反向依赖） | 实机翻译前检出源文 best 违禁词 |
+
+**bestOf2 收窄（用户拍板，「LLM 决策」自我修正）**：初版按场景一刀切关双跑，**后收窄为全列恒 true**——双跑跳过只由 v12.25「含数字批次」精准信号决定，场景不碰双跑（规格书里纯文字描述条目不含数字信号，一刀切错杀择优保护）。**矩阵只保留真有依据的那格（润色），不碰没依据的（双跑）。**
+
+**杠杆 2 判定表接管道降级遗留**：JudgmentTable 构件保留，但**不接管道**——那些重复判定（术语锁定/含数字/合规/极短）全是微秒级内存扫描零 API 零 token，消除它们零效率收益只省代码漂移风险，而要动三处事故高发承重墙（isPickEligible/polishExemptReason/合规校验），**风险>>收益，违背可靠性第一**；未来有「昂贵判定需复用」再接。
+
+**测试**：`tests/test-v1228-batch-context.ts` 53 断言全绿（场景矩阵/判定表/consistency 降级/源文体检 4 项/effective 开关）+ `tests/test-v1228-quality-gate.ts` 9 断言全绿；typecheck 双项目 + build 通过；回归 v12.27/v12.26/v11.7/v12.3/v12.9/v12.10/v11.12/v11.5/v12.25/consistency 全绿（consistency-check B3/B4 对齐 timedOut 新语义）。
+
+---
+
+### v12.27 品类词「裸奔」系统性修复——注入从「产品线静态映射」扩为「映射 ∪ 源文动态检测」（2026-09-24，ko Solid State Dual Drive 音译事故驱动）
+
+**背景**：ko 实机 D500 规格书 `Solid State Dual Drive` 被音译。**初判「保英文真空」被扫描证伪**——CATEGORY_WORDS ko 钦定**本来就是音译**（`솔리드 스테이트 듀얼 드라이브`），LLM 输出符合钦定**非 bug**；详情页那次保英文反而是偏离。**「和我预期不同」≠「错误」，先对钦定源再下结论。**
+
+**真根因**：品类词注入由 `PRODUCT_LINE_CATEGORY_MAP` 静态产品线映射决定，源文出现映射外的品类词时该词钦定不注入 → 裸奔靠 LLM 自觉。D500 是 `Solid State Dual Drive`，`portable_storage` 映射未含 → ko 钦定音译未进 prompt。**与场景无关，与「词是否落在映射子集内」有关。**
+
+**修复（治根）**：`buildCategoryTerminology` 注入范围 = 产品线映射 ∪ 源文动态检测。
+- 检测器**只收含空格的多词品类词**（探针实锤 detectCategory 对 `The Hub connects` 泛词普通句首遍也误判；多词品类词正文出现几乎必然品类语境，误判率≈0），排除单词泛词 Hub/Card/SSD
+- 内联实现于 `prompt-constants.ts`（避免 prompt-constants ↔ product-name-generator 循环依赖），`CATEGORY_KEYS_DESC` 与 product-name-generator 同源单一事实源
+- 透传链：`translateBatch` 传 texts、`renderLangForTranslate`/`renderLangForProofread`/`buildProofreadSystemPrompt` 加 sourceTexts 参
+- **向后兼容**：不传 sourceTexts 行为与旧版完全一致；token 零膨胀（断言锁死）
+
+**诊断教训**：初判方案「自动派生 identity 遮蔽」本质是「在第 6 个地方又加一份判定」——正确方向是**收敛判定所有权**（词×语种裁决单一事实源），不是再加判定源。扫描工具 `tests/audit-category-identity.ts`（产出 claude-tmp/category-identity-audit.txt）。
+
+**测试**：`tests/test-v1227-category-dynamic-inject.ts` 17 断言全绿（映射外多词注入 D500/ko 回归锁/映射内回归/泛词不误注入/无品类词零膨胀/校对链路继承）；typecheck + build 通过；回归 v11.7（245 含 ko E3 拼写锁）/v12.26 全绿。
+
+**遗留（Fix 2/3）**：①ko `Solid State Dual Drive`/`Flash Drive` 双层钦定对齐（prompt 层 USB 메모리 vs productName 层 Flash Drive 不一致）——待查 CSV 官方钦定 ②保英文多词（vi Flash Drive/Reader/Enclosure）identity 遮蔽兜底——和 Fix 3 一起做。
+
+---
+
+### v12.29 ko 术语规范——smartphone→스마트폰 + 신뢰성/표준 시험→시험（2026-09-24，外部 agent ko 评审参考，用户拍板「KO 我自己决策」）
+
+**背景**：外部 agent ko 规格书评审（用户拍板「参考吸收」）。**格式类（全角标点/上标粘连/USB3.0 空格）两验证伪是那个 agent 的转写伪影**（插件真实输出是半角 `. ` `, ` 和 `※1※2※3`，它转写成全角和 `3.02`/`기기 3`）；USB 带空格经术语库 CSV 钦定实锤 ko 列就是 `USB 3.0` 带空格。
+
+**采信两条进 `LANG_SPECIFIC.ko`（rules/commonErrors/proofreadChecks 三处同改，全场景生效）**：
+- `smartphone → 스마트폰`（❌휴지폰）——语义精确性：휴지폰=「手机」泛称，smartphone 指智能手机必须 스마트폰（**语义精确问题不只是语体，最硬**）
+- `신뢰성/표준 시험·검증 → 시험`（❌테스트）——**收窄版**：限定「可靠性/标准试验」语境，性能·benchmark 测试保留 테스트
+
+**为什么收窄（不一刀切）**：Tavily 实证——Samsung 官方 ko 保修用「시험」（부적절한 설치와 시험），但 HPE ko 规格书用「테스트」（엄한 테스트를 거칩니다）。**韩语技术文本 시험/테스트 并存**，那个 agent 说「规格书必须 시험」过强。初版一刀切进 commonErrors 判偏强后收窄为「区分语境」，测试断言同步对齐。
+
+**不采（归档）**：营销副词（무엇보다/쉽게/즐겨 쓰는 类）——涉「删词=漏翻」红线+无钦定源+是「改源文」不是「翻译」；它的整段「规格书修正版」——越界改写作废。
+
+**测试**：`tests/test-v1229-ko-terminology.ts` 10 断言全绿（ko 三处注入/renderLang 双链路/边界「性能·benchmark 测试保留 테스트」/ja 不受影响）；typecheck + build 通过。
+
+**外部 agent 评审采信纪律（方法论）**：格式类先验伪影（两次都中）/语体类方向可参考但尺度待实证/术语类查钦定源（CSV 优先，没有再看语言构词事实+语义精确性）/整段重写作废。**「采纳可形式化/可论证的部分，驳回越界部分」。**
+
+---
+
+## 二、上一版本（v12.26）
 
 ### v12.26 规格书语体场景卡扩充——20 语种 ja 评审同类问题预防性覆盖（2026-09-24，外部 agent ja 规格书评审驱动，commit dfcef43）
 

@@ -189,7 +189,7 @@ async function runB() {
     assert(report !== null && report.issues.length === 0, 'B2 全部一致 → issues 空数组')
   }
 
-  // B3: API 失败 → 静默 null（探测版哲学）
+  // B3: API 失败 → 静默（探测版哲学）；v12.28：返回带 timedOut 标记的报告（供降级统计），不抛异常
   {
     xhrQueue.length = 0
     xhrQueue.push({ ok: false, body: 'server error' })
@@ -199,10 +199,12 @@ async function runB() {
       'zh-TW',
       config,
     )
-    assert(report === null, 'B3 API 失败 → 静默 null（不抛异常）')
+    // v12.28：失败静默语义从「返回 null」改为「返回 timedOut 报告（issues 空）」——
+    //   探测版「静默」指不改数据，但调用方需区分「无病灶」与「失败」以做自适应降级。
+    assert(report !== null && report.timedOut === true && report.issues.length === 0, 'B3 API 失败 → timedOut 报告（issues 空，不抛异常）')
   }
 
-  // B4: 解析失败（返回非 JSON）→ 静默 null
+  // B4: 解析失败（返回非 JSON）→ 静默 timedOut 报告（v12.28 同 B3）
   {
     xhrQueue.length = 0
     xhrQueue.push({ ok: true, body: 'not a json at all' })
@@ -212,7 +214,7 @@ async function runB() {
       'zh-TW',
       config,
     )
-    assert(report === null, 'B4 解析失败 → 静默 null')
+    assert(report !== null && report.timedOut === true && report.issues.length === 0, 'B4 解析失败 → timedOut 报告')
   }
 
   // B5: 无重复短语 → 不调 API 直接 null
