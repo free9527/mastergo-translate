@@ -2508,4 +2508,66 @@ User Message：`[N] ({srcLang}→{targetLang}) source\nTrans：translation`
 
 ---
 
-**最后更新**: 2026-09-16（v12.21.2）
+## 十、环境联网搜索排查与定案（2026-09-24）
+
+> 本节与翻译管道无关，是**开发环境（Claude Code）联网搜索能力**的排障交接。结论先行：**本环境原生 WebSearch/WebFetch 修不好，外部搜索一律走 Tavily**。
+
+### 10.1 结论（受托决策，已定案）
+
+**原生 WebSearch / WebFetch 在当前通道下无法修复**——不是配置问题，是架构问题：
+
+- 这两个功能**不是 Claude Code 本地实现**，是 Anthropic 服务器端能力。WebSearch 用 Google 后端、WebFetch 用域名安全验证，都发生在 `api.anthropic.com`。
+- 本环境用 **CC Switch 接入 kimi/kimi-k3**，`ANTHROPIC_BASE_URL` 被导到 `https://aigo.lexar.com`（自建网关）。网关只实现了「聊天补全」，**没实现 web_search 工具和域名验证服务**（实测 `/v1/search`、`/api/web/domain_info` 等全 404/403）。
+- claude.exe 二进制逆向证实：WebFetch 域名验证地址 `https://api.anthropic.com/api/web/domain_info?domain=` **硬编码**，无环境变量可覆盖，且标注「residency-gated / firstPartyApi」强制走第一方。
+- **唯一让原生功能回来的方法 = 官方 Anthropic API**（官方 key + api.anthropic.com）——但那就不是 kimi 模型了，与需求冲突。
+- **硬约束：用 kimi 模型 + 原生 WebSearch/WebFetch 二者不可兼得。**
+
+### 10.2 排查证据链（可复验）
+
+| 测试 | 结果 | 含义 |
+|---|---|---|
+| `curl https://claude.ai/` | 302 | 网络本身**通畅**（自家电脑，无企业限制） |
+| `node fetch('https://claude.ai/')` | 200 | Node TLS 也通 |
+| 内置 WebFetch claude.ai | ❌ "Unable to verify domain" | **连自家域名都不让 fetch** → 拦它的是验证环节不是网络 |
+| 内置 WebSearch | ⚠️ 永远空文本 | 请求被网关吞掉 |
+| `aigo.lexar.com/v1/search` 等 | 404 | 网关无搜索端点 |
+
+**曾踩的一个坑（已排除并修复）**：初期误以为是「证书吊销检查离线（CRYPT_E_REVOCATION_OFFLINE）」+ 僵尸代理 `127.0.0.1:7897`（Clash 残留，ProxyEnable=1 但端口无监听）所致。**已修**：`HKCU\...\Internet Settings` ProxyEnable 置 0（备份在案）。修复后全系统 TLS 恢复正常、claude.ai 直连通，**但 WebSearch/WebFetch 依旧不可用**——证明根因是网关功能缺失，与吊销检查/代理无关。
+
+### 10.3 定案方案：Tavily 双通道（已配好）
+
+| 通道 | 形态 | 状态 | 额度 |
+|---|---|---|---|
+| **Tavily MCP（主）** | 官方 remote MCP server，已注册到 user 级（所有项目可用） | ✅ Connected | 免费 1000 次/月 |
+| **Tavily 脚本（备）** | `claude-tmp/tavily-search.ts`，Bash 直调 API，多 key 轮询 | ✅ 实测正常 | 同上（3 个 key） |
+
+**MCP 注册命令**（已执行，重启 Claude Code 后生效）：
+```
+claude mcp add --transport http --scope user tavily "https://mcp.tavily.com/mcp/?tavilyApiKey=<KEY>"
+# 验证: claude mcp list → tavily (HTTP) ✔ Connected
+```
+
+**脚本用法**（无需重启，立即可用）：
+```
+npx tsx claude-tmp/tavily-search.ts "查询关键词"
+npx tsx claude-tmp/tavily-search.ts "query" --depth advanced --max 8
+```
+
+### 10.4 后续可选项（未做，下次再聊）
+
+| 方案 | 可行性 | 取舍 |
+|---|---|---|
+| **本地 Bing CLI 抓取脚本** | ✅ 已验证可行 | `cn.bing.com` 在本网络**直连可抓**（www.bing 302→cn.bing，能拿到 `b_algo` 结果条目）。可写成 `claude-tmp/bing-search.ts` 无限免费、无 key。但不如 Tavily 稳（Bing 改版断解析/频抓触发验证码/国内出口结果偏中文）。**定位：Tavily 额度不够时的补充** |
+| Chrome/Playwright MCP | ❌ 救不了搜索 | 浏览器只是渲染工具，google.com 在本机直连超时，打开 Google 照样白屏。适合「登录后抓页面」不适合「当搜索引擎」 |
+| SearXNG 自托管 | ⚠️ 需配置 | Docker 未装；Python 3.13 可裸跑，但默认聚合的 Google/DDG 在本网络都不通，得改成只用 Bing 引擎，本质是 Bing 套壳 |
+| DuckDuckGo/Google CLI | ❌ | html/lite.duckduckgo.com、google.com 均 12s 超时 |
+
+**网络可达性备忘**（本机实测）：Bing ✅ / Ecosia ⚠️301 / Google·DuckDuckGo·Brave·国外公开 SearXNG 实例 ❌ 全超时。
+
+### 10.5 安全提醒
+
+- 3 个 Tavily key 已明文出现在对话记录 + `~/.claude.json`（MCP 配置）+ `claude-tmp/tavily-search.ts`（fallback）。免费 key 风险低，但建议抽空到 tavily.com 后台**轮换一次**，然后更新上述两处配置（脚本改 `FALLBACK_KEYS`，MCP 重新 `claude mcp add`）。
+
+---
+
+**最后更新**: 2026-09-24（v12.21.2 + 十节·联网搜索定案）

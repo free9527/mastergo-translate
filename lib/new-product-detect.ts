@@ -242,6 +242,88 @@ export function parseProductName(text: string): ParsedProductName | null {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// v12.30: 品类词 → 品线推导（产品名判定与品线判定的闭环锚点）
+// ═══════════════════════════════════════════════════════════════
+// 闭环逻辑（用户拍板）：品线原从文件名（型号）判，但文件名一般按型号命名、
+//   型号本身不等于品线；产品名判定（品线分层）能直接从内容拿到品类词——
+//   「文件名（型号）」和「产品名（品类词）」指向同一个产品，推出同一个品线。
+//   品类词定「大类」，系列词定「细分品线」，文件名型号做兜底印证。
+// ═══════════════════════════════════════════════════════════════
+
+/** 品类词 → 品线唯一/歧义映射（唯一映射直接定，歧义用系列词辅助） */
+const CATEGORY_TO_LINE: Record<string, { unique?: string; ambiguous?: Record<string, string>; default?: string }> = {
+  'Flash Drive':            { unique: 'portable_storage' },
+  'Dual Drive':             { unique: 'portable_storage' },
+  'Solid State Dual Drive': { unique: 'portable_storage' },
+  'Reader':                 { unique: 'portable_storage' },
+  'Enclosure':              { unique: 'portable_storage' },
+  'Hub':                    { unique: 'portable_storage' },
+  'Desktop Memory':         { ambiguous: { gaming: 'gaming_dimm', productivity: 'pc_productivity' }, default: 'pc_productivity' },
+  'Laptop Memory':          { ambiguous: { gaming: 'gaming_dimm', productivity: 'pc_productivity' }, default: 'pc_productivity' },
+  'SSD':                    { ambiguous: { gaming: 'gaming_ssd', productivity: 'pc_productivity' }, default: 'pc_productivity' },
+  'Portable SSD':           { ambiguous: { gaming: 'gaming_ssd', portable: 'portable_storage' }, default: 'portable_storage' },
+  'Card':                   { ambiguous: { professional: 'professional_imaging', gaming: 'gaming_card', consumer: 'consumer_cards' }, default: 'consumer_cards' },
+}
+
+/** 系列词 → 细分品线信号（用于品类词歧义时辅助分） */
+const SERIES_LINE_SIGNALS: Array<{ re: RegExp; signal: string }> = [
+  { re: /\b(ARES|THOR|RGB)\b/i, signal: 'gaming' },
+  { re: /\b(PLAY|ARMOR)\b/i, signal: 'gaming' },
+  { re: /\b(NM|NQ|NS|EQ)\d*/i, signal: 'productivity' },
+  { re: /\b(GOLD|DIAMOND|Professional|CFexpress|CFe|1667x|2000x)\b/i, signal: 'professional' },
+  { re: /\b(SILVER|BLUE|High[- ]?Endurance|E[- ]?series)\b/i, signal: 'consumer' },
+]
+
+/**
+ * 从品类词 + 系列词/文本推导品线（闭环核心）。
+ * @param categoryWord 品类词（CATEGORY_WORDS key，品线分层判定产出）
+ * @param contextText  辅助上下文（系列词/型号/文件名，用于品类词歧义时辅助分）
+ * @returns 品线 id（professional_imaging/gaming_dimm/...），无法判定返回 null
+ */
+export function deriveProductLineFromCategory(
+  categoryWord: string | null,
+  contextText?: string,
+): string | null {
+  if (!categoryWord) return null
+  const rule = CATEGORY_TO_LINE[categoryWord]
+  if (!rule) return null
+
+  // 唯一映射直接定
+  if (rule.unique) return rule.unique
+
+  // 歧义映射：用系列词/上下文辅助分
+  if (rule.ambiguous && contextText) {
+    for (const { re, signal } of SERIES_LINE_SIGNALS) {
+      if (re.test(contextText) && rule.ambiguous[signal]) {
+        return rule.ambiguous[signal]
+      }
+    }
+  }
+  // 歧义无信号 → 默认
+  return rule.default || null
+}
+
+/**
+ * 从批次文本推导品线（闭环入口）：先判品类词（品线分层），再推导品线。
+ * 品类词优先级：取批次中「最具体/最可靠」的品类词（多词品类词优先于单词）。
+ *
+ * @param texts 批次源文
+ * @returns 品线 id 或 null
+ */
+export function deriveProductLineFromTexts(texts: string[]): string | null {
+  const joined = texts.join(' ')
+  // 多词品类词优先（Solid State Dual Drive > Portable SSD > SSD），与 CATEGORY_KEYS 降序一致
+  const catKeys = Object.keys(CATEGORY_WORDS).sort((a, b) => b.length - a.length)
+  for (const cat of catKeys) {
+    const escaped = cat.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    if (new RegExp(`\\b${escaped}\\b`, 'i').test(joined)) {
+      return deriveProductLineFromCategory(cat, joined)
+    }
+  }
+  return null
+}
+
+// ═══════════════════════════════════════════════════════════════
 // 检测入口
 // ═══════════════════════════════════════════════════════════════
 
@@ -337,12 +419,14 @@ export interface FallbackCandidate {
  * 检测需要 LLM 兜底解析的候选产品名。
  *
  * 触发条件（三重收窄，可靠性优先）：
- *   1. 强锚点：含 Lexar®（® 是"完整产品名"强信号，设计稿常态写法）
+ *   1. 强锚点：Lexar 或 Lexar Professional 开头（v12.30：® 从必要条件降为可选——
+ *      命名规则文档证明®是排版习惯非产品名本质特征；不带®的 Lexar JumpDrive C40E
+ *      结构同样是产品名。Lexar[Professional] + 后续特定组合 = 大部分可判产品名）
  *   2. 品类指纹：detectCategory ≠ null（规则文档严格界定的 11 个核心品类词）
  *   3. 代码判定失败：parseProductName 返回 null 或 valid:false
  *
  * 不触发（保持现状，不放宽）：
- *   - 无 Lexar® 锚点（纯系列名如 "MUSE Portable SSD"）→ 人工确认通道
+ *   - 非 Lexar 开头（纯系列名如 "MUSE Portable SSD"）→ 人工确认通道
  *   - 未知品类词（"Memory Stick" 不在 11 词表）→ 人工确认通道
  *   - parseProductName 成功（正常检出路径已覆盖）
  *
@@ -365,8 +449,10 @@ export function detectFallbackCandidates(
     const trimmed = text.trim()
     if (!trimmed) return
 
-    // 触发条件 1：强锚点 — 含 Lexar®（® 是强信号；不带®的 Lexar 不触发，保持保守）
-    if (!/Lexar®/.test(trimmed)) return
+    // 触发条件 1：强锚点 — Lexar 或 Lexar Professional 开头（v12.30：® 降为可选，
+    //   命名规则文档证明®是排版习惯非本质；不带®的 Lexar JumpDrive C40E 结构同样是产品名）
+    const firstTok = stripTrademark(trimmed.split(/\s+/)[0] || '').toLowerCase()
+    if (firstTok !== 'lexar') return
 
     // 触发条件 2：品类指纹 — 必须含规则文档严格界定的核心品类词
     if (!detectCategory(trimmed)) return

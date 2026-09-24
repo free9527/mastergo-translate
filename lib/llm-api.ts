@@ -23,6 +23,7 @@ import { getFewShotExamples } from '@lib/few-shot-examples'
 import { isBuiltinThirdPartyWholeText, isBuiltinModelSegment, BUILTIN_THIRD_PARTY_ENTRIES, BUILTIN_THIRD_PARTY_ALL_KEYS, isBilingualCameraBrand } from '@lib/third-party-models'
 import { shouldSkipGlossaryEntry } from '@lib/glossary-guard'
 import { getJudgePersonas } from '@lib/judge-personas'
+import { extractProductModel, deriveProductLineFromModel } from '@lib/product-model-extract'
 import { validatePolishOutput, COMPLIANCE_KEYWORDS, splitSemanticSegments, stripTmSymbols } from '@lib/polish-guard'
 /**
  * 内置第三方遮蔽表（v11.13）：第三方词条的 source→source identity Map。
@@ -185,6 +186,20 @@ export function detectProductLine(texts: string[], pageName?: string, fileName?:
   if (nameResult) {
     addToProductLineCache(cacheKey, nameResult)
     return nameResult
+  }
+
+  // v12.30: 产品名闭环——从批次文本提取产品名→型号→推导品线（品类词定大类、
+  //   系列/型号词定细分品线），优先于下方文本启发式。只处理完整产品名形态
+  //   （Lexar 锚点 + 品类词），非产品名文本 extractProductModel 返回 null 自然跳过。
+  for (const t of texts) {
+    const ext = extractProductModel(t)
+    if (ext) {
+      const line = deriveProductLineFromModel(ext, t)
+      if (line) {
+        addToProductLineCache(cacheKey, line)
+        return line
+      }
+    }
   }
 
   const joined = texts.join(' ')

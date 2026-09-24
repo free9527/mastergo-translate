@@ -39,9 +39,17 @@ import { LLMConfig } from '../messages/types'
 // ============================================================
 // 配置（与 test-all-languages.ts 相同的实机 API）
 // ============================================================
-const API_URL = 'https://aigo.lexar.com/v1/chat/completions'
-const API_KEY = 'sk-LcscmmvLrVlwRbWtoPgF1jSNg6fzR7rgp2FX8pFaHreVYMyu'
-const MODEL = 'gpt-5.5'
+// v12.30 安全迁移：API key 一律从环境变量读，不硬编码（全局 Do-Not #1）。
+//   原硬编码 key 已进 git 历史，视为泄露——请轮换后把新 key 设到环境变量。
+const API_URL = process.env.LEXAR_LIVE_API_URL || 'https://aigo.lexar.com/v1/chat/completions'
+const API_KEY = process.env.LEXAR_LIVE_API_KEY || ''
+const MODEL = process.env.LEXAR_LIVE_MODEL || 'gpt-5.5'
+
+if (!API_KEY) {
+  console.error('❌ 未配置 LEXAR_LIVE_API_KEY 环境变量。本脚本需要真实 API key（从环境变量读，不硬编码）。')
+  console.error('   设置示例（PowerShell）: [Environment]::SetEnvironmentVariable(\'LEXAR_LIVE_API_KEY\', \'你的key\', \'User\')')
+  process.exit(1)
+}
 
 const config: LLMConfig = {
   apiKey: API_KEY,

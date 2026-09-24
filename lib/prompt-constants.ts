@@ -2458,7 +2458,9 @@ export const CATEGORY_WORDS: Record<string, CategoryWordEntry> = {
     'ru': 'USB-флеш-накопитель', 'vi': 'Flash Drive', 'th': 'แฟลชไดร์ฟ', 'id': 'Flashdisk',
     'ar': 'محرك فلاش USB', 'nl': 'USB-stick', 'pl': 'Pendrive',
     'sv': 'USB-minne', 'tr': 'USB Bellek', 'en': 'Flash Drive',
-    productName: { 'ja': 'フラッシュドライブ', 'ko': 'Flash Drive' },  // CSV 现状：ko 保留英文
+    // 产品名生成：CSV 现状——ko 保留英文；de 全 16 条 JumpDrive 产品名统一 Flash-Laufwerk
+    // （生成器此前无 de override，回退用 prompt 对照 USB-Stick，与 CSV 钦定漂移——v12.30 补）
+    productName: { 'ja': 'フラッシュドライブ', 'ko': 'Flash Drive', 'de': 'Flash-Laufwerk' },
   },
   'Dual Drive': {
     'zh-CN': '闪存盘', 'zh-TW': '隨身碟', 'ja': 'フラッシュドライブ', 'ko': 'Flash Drive',

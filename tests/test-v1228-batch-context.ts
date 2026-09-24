@@ -13,7 +13,6 @@
 
 import {
   getStagePolicy,
-  SCENE_PIPELINE_POLICY,
   BatchContext,
   JudgmentTable,
   ConsistencyDegrader,

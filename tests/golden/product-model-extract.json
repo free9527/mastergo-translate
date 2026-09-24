@@ -1,0 +1,564 @@
+{
+  "cases": [
+    {
+      "source": "Lexar 2.5 Inch Hard Drive Enclosure",
+      "model": "2.5 Inch"
+    },
+    {
+      "source": "Lexar ARES DDR4 Desktop Memory",
+      "model": "ARES DDR4"
+    },
+    {
+      "source": "Lexar ARES DDR5 OC Desktop Memory",
+      "model": "ARES DDR5 OC"
+    },
+    {
+      "source": "Lexar ARES PRO M.2 2280 PCIe 5.0 NVMe SSD",
+      "model": "ARES PRO"
+    },
+    {
+      "source": "Lexar ARES RGB 2nd Gen DDR5 Desktop Memory",
+      "model": "ARES RGB"
+    },
+    {
+      "source": "Lexar ARES RGB DDR4 Desktop Memory",
+      "model": "ARES RGB DDR4"
+    },
+    {
+      "source": "Lexar ARES RGB DDR5 Desktop Memory",
+      "model": "ARES RGB DDR5"
+    },
+    {
+      "source": "Lexar ARMOR 700 Portable SSD",
+      "model": "ARMOR 700"
+    },
+    {
+      "source": "Lexar ARMOR GOLD SDXC UHS-II Card",
+      "model": "ARMOR GOLD"
+    },
+    {
+      "source": "Lexar ARMOR SILVER PRO SDXC UHS-II Card",
+      "model": "ARMOR SILVER PRO"
+    },
+    {
+      "source": "Lexar Air Portable SSD",
+      "model": "Air"
+    },
+    {
+      "source": "Lexar Air Portable SSD Elite Legends Series",
+      "model": "Air"
+    },
+    {
+      "source": "Lexar BLUE PLUS microSDHC/microSDXC UHS-I Card",
+      "model": "BLUE PLUS"
+    },
+    {
+      "source": "Lexar BLUE microSDXC UHS-I Card",
+      "model": "BLUE"
+    },
+    {
+      "source": "Lexar CFexpress Type A USB-C Reader",
+      "model": "CFexpress Type A"
+    },
+    {
+      "source": "Lexar CFexpress Type B USB-C Reader",
+      "model": "CFexpress Type B"
+    },
+    {
+      "source": "Lexar DDR4 SODIMM Laptop Memory",
+      "model": "DDR4 SODIMM"
+    },
+    {
+      "source": "Lexar DDR4 UDIMM Desktop Memory",
+      "model": "DDR4 UDIMM"
+    },
+    {
+      "source": "Lexar DDR5 SODIMM Laptop Memory",
+      "model": "DDR5 SODIMM"
+    },
+    {
+      "source": "Lexar DDR5 UDIMM Desktop Memory",
+      "model": "DDR5 UDIMM"
+    },
+    {
+      "source": "Lexar Dual Drive Portable SSD D70E",
+      "model": "D70E"
+    },
+    {
+      "source": "Lexar Dual-Slot USB-A/C Reader",
+      "model": "Dual-Slot USB-A/C"
+    },
+    {
+      "source": "Lexar Dual-Slot USB-A Reader",
+      "model": "Dual-Slot USB-A"
+    },
+    {
+      "source": "Lexar E300 M.2 SSD Enclosure",
+      "model": "E300"
+    },
+    {
+      "source": "Lexar E300 M.2 SSD Enclosure",
+      "model": "E300"
+    },
+    {
+      "source": "Lexar E6 M.2 SSD Enclosure",
+      "model": "E6"
+    },
+    {
+      "source": "Lexar EQ790 M.2 2280 PCIe Gen4x4 NVMe SSD",
+      "model": "EQ790"
+    },
+    {
+      "source": "Lexar EQ790 with Heatsink M.2 2280 PCIe Gen4x4 NVMe SSD",
+      "model": "EQ790"
+    },
+    {
+      "source": "Lexar ES3 Portable SSD",
+      "model": "ES3"
+    },
+    {
+      "source": "Lexar ES4 Portable SSD with Magnetic Set",
+      "model": "ES4"
+    },
+    {
+      "source": "Lexar ES5 Magnetic Portable SSD",
+      "model": "ES5"
+    },
+    {
+      "source": "Lexar Professional Go Portable SSD",
+      "model": "Professional Go"
+    },
+    {
+      "source": "Lexar H31 7-in-1 USB-C Hub",
+      "model": "H31"
+    },
+    {
+      "source": "Lexar High-Endurance microSDHC/microSDXC UHS-I Card",
+      "model": "High-Endurance"
+    },
+    {
+      "source": "Lexar High-Performance 633x microSDHC/microSDXC UHS-I Card BLUE Series",
+      "model": "633x BLUE"
+    },
+    {
+      "source": "Lexar High-Performance 800x PRO SDHC/SDXC UHS-I Card BLUE Series",
+      "model": "800x PRO BLUE"
+    },
+    {
+      "source": "Lexar JumpDrive A30E USB 3.2 Gen 1 Flash Drive",
+      "model": "A30E"
+    },
+    {
+      "source": "Lexar JumpDrive Dual Drive D300 USB 3.2 Gen 1 Type-C",
+      "model": "D300"
+    },
+    {
+      "source": "Lexar JumpDrive Dual Drive D35c USB 3.0 Type-C",
+      "model": "D35c"
+    },
+    {
+      "source": "Lexar JumpDrive Dual Drive D400 USB 3.2 Type-C",
+      "model": "D400"
+    },
+    {
+      "source": "Lexar JumpDrive Dual Drive D40E USB 3.2 Gen 1 Type-C",
+      "model": "D40E"
+    },
+    {
+      "source": "Lexar JumpDrive Dual Drive E32c USB 3.2 Gen1 Type-C",
+      "model": "E32c"
+    },
+    {
+      "source": "Lexar JumpDrive E21 USB 2.0 Flash Drive",
+      "model": "E21"
+    },
+    {
+      "source": "Lexar JumpDrive E31 USB 3.0 Flash Drive",
+      "model": "E31"
+    },
+    {
+      "source": "Lexar JumpDrive Fingerprint F35 PRO USB 3.2 Gen 1 Flash Drive",
+      "model": "F35 PRO"
+    },
+    {
+      "source": "Lexar JumpDrive M22 USB Flash Drive",
+      "model": "M22"
+    },
+    {
+      "source": "Lexar JumpDrive M400 USB 3.2 Flash Drive",
+      "model": "M400"
+    },
+    {
+      "source": "Lexar JumpDrive M900 USB 3.1 Flash Drive (EOL)",
+      "model": "M900"
+    },
+    {
+      "source": "Lexar JumpDrive P30 USB 3.2 Gen 1 Flash Drive",
+      "model": "P30"
+    },
+    {
+      "source": "Lexar JumpDrive S47 USB 3.2 Flash Drive",
+      "model": "S47"
+    },
+    {
+      "source": "Lexar JumpDrive S57 USB 3.0 Flash Drive (EOL)",
+      "model": "S57"
+    },
+    {
+      "source": "Lexar JumpDrive S60 USB Flash Drive",
+      "model": "S60"
+    },
+    {
+      "source": "Lexar JumpDrive S80 USB 3.2 Flash Drive",
+      "model": "S80"
+    },
+    {
+      "source": "Lexar JumpDrive Solid State Dual Drive D500 USB 3.2 Gen 1 Type-C",
+      "model": "D500"
+    },
+    {
+      "source": "Lexar JumpDrive Solid State Dual Drive D50E USB 3.2 Gen 1 Type-C",
+      "model": "D50E"
+    },
+    {
+      "source": "Lexar JumpDrive TwistTurn2 USB Flash Drive",
+      "model": "TwistTurn2"
+    },
+    {
+      "source": "Lexar JumpDrive V100 USB 3.2 Flash Drive",
+      "model": "V100"
+    },
+    {
+      "source": "Lexar JumpDrive V40 USB Flash Drive",
+      "model": "V40"
+    },
+    {
+      "source": "Lexar JumpDrive V400 USB 3.2 Flash Drive",
+      "model": "V400"
+    },
+    {
+      "source": "Lexar Multi-Card 2-in-1 USB 3.1 Reader",
+      "model": "Multi-Card 2-in-1"
+    },
+    {
+      "source": "Lexar NM Card",
+      "model": "NM Card"
+    },
+    {
+      "source": "Lexar NM100 M.2 2280 SATA III (6Gb/s) SSD",
+      "model": "NM100"
+    },
+    {
+      "source": "Lexar NM610PRO M.2 2280 PCIe Gen3x4 NVMe SSD",
+      "model": "NM610PRO"
+    },
+    {
+      "source": "Lexar NM620 M.2 2280 NVMe SSD",
+      "model": "NM620"
+    },
+    {
+      "source": "Lexar NM710 M.2 2280 PCIe Gen4x4 NVMe SSD",
+      "model": "NM710"
+    },
+    {
+      "source": "Lexar NM790 M.2 2280 PCIe Gen 4x4 NVMe SSD",
+      "model": "NM790"
+    },
+    {
+      "source": "Lexar NM970 M.2 2280 PCIe 5.0 NVMe SSD",
+      "model": "NM970"
+    },
+    {
+      "source": "Lexar NM990 M.2 2280 PCIe 5.0 NVMe SSD",
+      "model": "NM990"
+    },
+    {
+      "source": "Lexar NQ100 2.5” SATA III (6Gb/s) SSD",
+      "model": "NQ100"
+    },
+    {
+      "source": "Lexar NQ700 M.2 2280 PCIe Gen4x4 NVMe SSD",
+      "model": "NQ700"
+    },
+    {
+      "source": "Lexar NQ710 NVMe PCIe 4.0 SSD",
+      "model": "NQ710"
+    },
+    {
+      "source": "Lexar NQ780 M.2 2280 PCIe Gen 4x4 NVMe SSD",
+      "model": "NQ780"
+    },
+    {
+      "source": "Lexar NQ790 M.2 2280 PCIe Gen4x4 NVMe SSD",
+      "model": "NQ790"
+    },
+    {
+      "source": "Lexar NS100 2.5” SATA III (6Gb/s) SSD",
+      "model": "NS100"
+    },
+    {
+      "source": "Lexar PLAY 2230 PCIe 4.0 SSD",
+      "model": "2230"
+    },
+    {
+      "source": "Lexar PLAY 2280 PCIe 4.0 SSD",
+      "model": "2280"
+    },
+    {
+      "source": "Lexar PLAY PRO microSDXC Express Card",
+      "model": "PLAY PRO"
+    },
+    {
+      "source": "Lexar PLAY microSDXC UHS-I Card",
+      "model": "PLAY"
+    },
+    {
+      "source": "Lexar PLAY X M.2 PCIe 4.0 NVMe SSD",
+      "model": "PLAY X"
+    },
+    {
+      "source": "Lexar Professional 1066x SDXC UHS-I Card SILVER Series",
+      "model": "1066x SILVER"
+    },
+    {
+      "source": "Lexar Professional 1066x microSDXC UHS-I Card SILVER Series",
+      "model": "1066x SILVER"
+    },
+    {
+      "source": "Lexar Professional 1667x SDXC UHS-II Card SILVER Series",
+      "model": "1667x SILVER"
+    },
+    {
+      "source": "Lexar Professional 1800x SDXC UHS-II Card GOLD Series",
+      "model": "1800x GOLD"
+    },
+    {
+      "source": "Lexar Professional 2000x SDXC UHS-II Card GOLD Series",
+      "model": "2000x GOLD"
+    },
+    {
+      "source": "Lexar Professional CFexpress Type A Card GOLD Series",
+      "model": "CFexpress Type A GOLD"
+    },
+    {
+      "source": "Lexar Professional CFexpress Type A Card SILVER Series",
+      "model": "CFexpress Type A SILVER"
+    },
+    {
+      "source": "Lexar Professional CFexpress Type A / SD USB 3.2 Gen 2 Reader",
+      "model": "CFexpress Type A / SD"
+    },
+    {
+      "source": "Lexar Professional Cfexpress TypeB Card DIAMOND Series",
+      "model": "CFexpress Type B DIAMOND"
+    },
+    {
+      "source": "Lexar Professional CFexpress Type B Card GOLD Series",
+      "model": "CFexpress Type B GOLD"
+    },
+    {
+      "source": "Lexar Professional CFexpress Type B Card SILVER Series",
+      "model": "CFexpress Type B SILVER"
+    },
+    {
+      "source": "Lexar Professional CFexpress Type B USB 3.2 Gen 2×2 Reader",
+      "model": "CFexpress Type B"
+    },
+    {
+      "source": "Lexar Professional CFexpress Type B / SD USB 3.2 Gen 2 Reader",
+      "model": "CFexpress Type B / SD"
+    },
+    {
+      "source": "Lexar Professional DIAMOND CFexpress 4.0 Type B Card",
+      "model": "CFexpress 4.0 Type B DIAMOND"
+    },
+    {
+      "source": "Lexar Professional GOLD CFexpress 4.0 Type A Card",
+      "model": "CFexpress 4.0 Type A GOLD"
+    },
+    {
+      "source": "Lexar Professional GOLD CFexpress 4.0 Type B Card",
+      "model": "CFexpress 4.0 Type B GOLD"
+    },
+    {
+      "source": "Lexar Professional GOLD microSDXC UHS-II Card",
+      "model": "GOLD"
+    },
+    {
+      "source": "Lexar Professional Go Portable SSD with Hub",
+      "model": "Professional Go"
+    },
+    {
+      "source": "Lexar Professional Multi-Card 3-in-1 USB 3.1 Reader",
+      "model": "Multi-Card 3-in-1"
+    },
+    {
+      "source": "Lexar Professional NM1090 PRO PCIe 5.0 NVMe M.2 2280 SSD",
+      "model": "NM1090 PRO"
+    },
+    {
+      "source": "Lexar Professional SILVER CFexpress 4.0 Type A Card",
+      "model": "CFexpress 4.0 Type A SILVER"
+    },
+    {
+      "source": "Lexar Professional SILVER CFexpress 4.0 Type B Card",
+      "model": "CFexpress 4.0 Type B SILVER"
+    },
+    {
+      "source": "Lexar Professional SILVER PLUS SDXC UHS-I Card",
+      "model": "SILVER PLUS"
+    },
+    {
+      "source": "Lexar Professional SILVER PLUS microSDXC UHS-I Card",
+      "model": "SILVER PLUS"
+    },
+    {
+      "source": "Lexar Professional SILVER PRO SDXC UHS-II Card",
+      "model": "SILVER PRO"
+    },
+    {
+      "source": "Lexar Professional SILVER SDXC UHS-I Card",
+      "model": "SILVER"
+    },
+    {
+      "source": "Lexar Professional SILVER microSDXC UHS-I Card",
+      "model": "SILVER"
+    },
+    {
+      "source": "Lexar Professional SL600 Portable SSD",
+      "model": "SL600"
+    },
+    {
+      "source": "Lexar Professional USB 4 SSD Enclosure",
+      "model": "USB 4"
+    },
+    {
+      "source": "Lexar Professional USB-C Dual-Slot Reader",
+      "model": "USB-C Dual-Slot"
+    },
+    {
+      "source": "Lexar Professional Workflow",
+      "model": "Workflow"
+    },
+    {
+      "source": "Lexar Professional Workflow CFexpress 4.0 Type A Card Reader",
+      "model": "CFexpress 4.0 Type A"
+    },
+    {
+      "source": "Lexar Professional Workflow CFexpress 4.0 Type B Card Reader",
+      "model": "CFexpress 4.0 Type B"
+    },
+    {
+      "source": "Lexar Professional Workflow Dual-Slot SD UHS-II Card Reader",
+      "model": "Dual-Slot SD"
+    },
+    {
+      "source": "Lexar Professional Workflow Portable SSD",
+      "model": "Workflow"
+    },
+    {
+      "source": "Lexar Professional Workflow SD/Micro SD UHS-II Card Reader",
+      "model": "SD/Micro SD"
+    },
+    {
+      "source": "Lexar Professional Workflow Go",
+      "model": "Workflow Go"
+    },
+    {
+      "source": "Lexar SDHC/SDXC UHS-I Card E-series",
+      "model": "E-series"
+    },
+    {
+      "source": "Lexar SL200 Portable SSD",
+      "model": "SL200"
+    },
+    {
+      "source": "Lexar SL210 Portable SSD (EOL)",
+      "model": "SL210"
+    },
+    {
+      "source": "Lexar SL300 Portable SSD",
+      "model": "SL300"
+    },
+    {
+      "source": "Lexar SL500 Portable SSD",
+      "model": "SL500"
+    },
+    {
+      "source": "Lexar SL500 Portable SSD Elite Legends Series",
+      "model": "SL500"
+    },
+    {
+      "source": "Lexar SL500 Portable SSD with Magnetic Set",
+      "model": "SL500"
+    },
+    {
+      "source": "Lexar SL660 BLAZE Gaming Portable SSD (EOL)",
+      "model": "SL660"
+    },
+    {
+      "source": "Lexar Solid State Dual Drive D500 USB 3.2 Gen 1 Type-C",
+      "model": "D500"
+    },
+    {
+      "source": "Lexar THOR 2nd Gen DDR5 Desktop Memory",
+      "model": "THOR"
+    },
+    {
+      "source": "Lexar THOR DDR4 UDIMM Desktop Memory",
+      "model": "THOR DDR4"
+    },
+    {
+      "source": "Lexar THOR OC DDR5 Desktop Memory",
+      "model": "THOR OC"
+    },
+    {
+      "source": "Lexar THOR PRO PCIe Gen4X4 NVMe SSD",
+      "model": "THOR PRO"
+    },
+    {
+      "source": "Lexar THOR RGB 2nd Gen DDR5 Desktop Memory",
+      "model": "THOR RGB"
+    },
+    {
+      "source": "Lexar THOR RGB DDR5 Desktop Memory",
+      "model": "THOR RGB"
+    },
+    {
+      "source": "Lexar THOR Z DDR5 Desktop Memory",
+      "model": "THOR Z"
+    },
+    {
+      "source": "Lexar THOR Z RGB DDR5 Desktop Memory",
+      "model": "THOR Z RGB"
+    },
+    {
+      "source": "Lexar TouchLock Portable SSD",
+      "model": "TouchLock"
+    },
+    {
+      "source": "Lexar microSD/SD USB-A/C Card Reader",
+      "model": "microSD/SD"
+    },
+    {
+      "source": "Lexar microSDHC/microSDXC UHS-I Card E-Series",
+      "model": "E-Series"
+    },
+    {
+      "source": "Lexar microSDXC Express Card Reader",
+      "model": "microSDXC Express"
+    },
+    {
+      "source": "Lexar microSDXC UHS-I Card E-Series Plus",
+      "model": "E-Series Plus"
+    },
+    {
+      "source": "Lexar nCARD NM card 2-in-1 USB 3.1 Reader",
+      "model": "nCARD NM"
+    },
+    {
+      "source": "Lexar NM790 with Heatsink M.2 2280 PCIe Gen 4x4 NVMe SSD",
+      "model": "NM790"
+    }
+  ]
+}
