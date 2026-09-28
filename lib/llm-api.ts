@@ -1464,19 +1464,35 @@ ${texts.map((t, i) => `${i + 1}. "${t.slice(0, 100)}"`).join('\n')}
 
   // ── S6-V2【事实完整性位】数字校验 ──
   // 数字校验：检测译文中数字是否与源文一致（防止 LLM 幻觉，如 4TB→8TB）
-  // v7.3: validateNumbers 只警告不回退，不加入 revertedIndices（避免阻止重试）
+  // v7.3: validateNumbers 只警告不回退（数量不一致可能合法增删，不阻止重试）
+  // v12.37: 数值篡改子集（tamperedIndices）升级为高置信回退——数量相等但数值被改
+  //   是客观事实错（4TB→8TB），形式可判零误判，回退源文走重试链（与品牌注入/品类词同款）。
+  //   数量不一致仍只警告（mismatchedIndices），可能是合法增删单位，不阻止重试。
   const numberValidation = validateNumbers(texts, result)
-  if (numberValidation.mismatchedIndices.size > 0) {
+  if (numberValidation.tamperedIndices.size > 0) {
     debugWarn(
-      `[translateBatch] 检测到 ${numberValidation.mismatchedIndices.size} 条数字格式差异（保留译文，不回退）`,
+      `[translateBatch] 检测到 ${numberValidation.tamperedIndices.size} 条数值篡改（事实错，已回退源文走重试链）`,
+      [...numberValidation.tamperedIndices].map(j => ({
+        idx: j,
+        source: texts[j].slice(0, 50),
+        translated: result[j].slice(0, 50),
+      })),
+    )
+    uiLog('translate', `数字校验: ${numberValidation.tamperedIndices.size} 条数值篡改回退重翻 ${[...numberValidation.tamperedIndices].map(j => `[${j + 1}]`).join('')}`)
+    for (const idx of numberValidation.tamperedIndices) {
+      result[idx] = texts[idx]
+      revertedIndices.add(idx)
+    }
+  } else if (numberValidation.mismatchedIndices.size > 0) {
+    debugWarn(
+      `[translateBatch] 检测到 ${numberValidation.mismatchedIndices.size} 条数字格式差异（数量不一致，保留译文仅警告）`,
       [...numberValidation.mismatchedIndices].map(j => ({
         idx: j,
         source: texts[j].slice(0, 50),
         translated: result[j].slice(0, 50),
       })),
     )
-    // ⛔ 不加入 revertedIndices — validateNumbers 不回退，只是警告
-    // 如果加入 revertedIndices 会导致这些条目被排除在重试之外，漏翻无法修复
+    // ⛔ 数量不一致不加入 revertedIndices — 可能是合法增删单位，不阻止重试
   }
 
   // ── S6-V3【格式修复位】存储单位/首字母 ──
@@ -2088,6 +2104,29 @@ DO NOT return the source text unchanged. Output ONLY the translation, no explana
   }
 
   auditStage('S8', texts, result)
+
+  // ── v12.37: S8 出口不变量透出（零修改只透出——坑11 静默兜底=漏翻隐身衣的显式化）──
+  //   两条纯形式硬约束：①源文非空 → 译文非空；②译文无 __XXX_N__ 占位符残留。
+  //   违反 = 漏翻/占位符未被任何一层兜住，透出到 untranslatedIndices 进现有待确认通道
+  //   （不新增机制、不改 result 数据——数据修复由上层重翻负责，此处只保证「绝不静默」）。
+  if (untranslatedIndices) {
+    const invariantHits: Array<{ idx: number; kind: string }> = []
+    for (let i = 0; i < result.length; i++) {
+      const src = (texts[i] || '').trim()
+      const t = result[i] || ''
+      if (misspelledIndices?.has(i)) continue  // 疑似错词已单独标记，不重复
+      if (src && !t.trim()) {
+        invariantHits.push({ idx: i, kind: '空译文' })
+      } else if (/__[A-Z]+_\d+__/.test(t)) {
+        invariantHits.push({ idx: i, kind: '占位符残留' })
+      }
+    }
+    for (const h of invariantHits) untranslatedIndices.add(h.idx)
+    if (invariantHits.length > 0) {
+      uiLog('translate', `S8 出口不变量透出: ${invariantHits.length} 条进待确认 ${invariantHits.map(h => `[${h.idx}]${h.kind}`).join(' | ')}`)
+    }
+  }
+
   uiLog('translate', `S8 最终兜底完成: 返回${result.length}条`)
 
   return result

@@ -1495,8 +1495,11 @@ export function sanitizeLineBreaks(
 export function validateNumbers(
   sourceTexts: string[],
   translatedTexts: string[],
-): { texts: string[]; mismatchedIndices: Set<number> } {
+): { texts: string[]; mismatchedIndices: Set<number>; tamperedIndices: Set<number> } {
   const mismatchedIndices = new Set<number>()
+  // v12.37: 数值篡改子集（数量相等但数值不等）——客观事实错（4TB→8TB），
+  //   形式可判零误判，供调用方高置信回退；数量不一致（可能合法增删）不进此集。
+  const tamperedIndices = new Set<number>()
 
   // 提取"数字+单位"组合（支持存储/速度/频率单位）
   const extractNumbers = (text: string): number[] => {
@@ -1547,13 +1550,14 @@ export function validateNumbers(
     }
     if (hasValueMismatch) {
       mismatchedIndices.add(i)
+      tamperedIndices.add(i)  // v12.37: 数量相等但数值被改 = 事实篡改（高置信，供回退）
       debugWarn(
-        `[validateNumbers] 数值不一致（保留译文）：源文 [${sourceNumbers.join(', ')}]，译文 [${transNumbers.join(', ')}]`,
+        `[validateNumbers] 数值不一致（事实篡改，供高置信回退）：源文 [${sourceNumbers.join(', ')}]，译文 [${transNumbers.join(', ')}]`,
         { idx: i, source: source.slice(0, 80), translated: translated.slice(0, 80) },
       )
     }
   }
 
-  // ✅ 始终返回原始译文，不回退
-  return { texts: [...translatedTexts], mismatchedIndices }
+  // ✅ 始终返回原始译文（本函数不改数据；tamperedIndices 由调用方决定回退）
+  return { texts: [...translatedTexts], mismatchedIndices, tamperedIndices }
 }

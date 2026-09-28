@@ -6,6 +6,12 @@ export function formatCJKSpace(text: string, lang: string): string {
   const CJK = '[一-鿿㐀-䶿ぁ-ゖァ-ヶ가-힣ㄱ-ㅎㅏ-ㅣ]'
   let result = text
 
+  // v12.37: 全角英数字 → 半角（ja 语言规则「英数字は半角、全角英数字厳禁」；
+  //   LLM 偶发把 2000/Lexar 输出成全角 ２０００/Ｌｅｘａｒ，proofread 语义层接不住。
+  //   纯形式信号零误判——全角英数字在 CJK 正式排版中本就该半角，无合法保留场景）。
+  result = result.replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xfee0))
+  result = result.replace(/[Ａ-Ｚａ-ｚ]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xfee0))
+
   const unitPatterns = /(\d+)(%|°[CF]?|℃|℉|[GMK]?B|k?g|m?m|cm|km|px|em|rem|元|万|亿|倍|个|次|秒)/g
   const protected1: string[] = []
   result = result.replace(unitPatterns, function (m) {
