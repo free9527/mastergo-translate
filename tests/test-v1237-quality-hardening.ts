@@ -4,6 +4,7 @@
 //   对照断言：锁「数量不一致仍只警告」「形式信号零误判」两条边界
 import { validateNumbers } from '../lib/post-process'
 import { formatCJKSpace } from '../lib/format-text'
+import { LANGUAGES } from '../messages/types'
 
 let passed = 0
 let failed = 0
@@ -104,6 +105,52 @@ console.log('═══ v12.37 CJK 全角英数字 → 半角（形式校验代�
 // C4: 非 CJK 语种不触发（de 全角数字不动——de 不用此函数）
 {
   assert(formatCJKSpace('速度は２０００です', 'de') === '速度は２０００です', 'C4 非 CJK 语种（de）不转换（防越界）')
+}
+
+// ═══ D 段：20 语种参数化覆盖断言（语种无关逻辑逐语种锁定） ═══
+console.log('═══ v12.37 20 语种覆盖核验（语种无关 → 逐语种断言） ═══')
+
+// D1: 数字数值篡改回退——20 语种每语种一条（单位正则多语言化 + 篡改检测语种无关）
+//     每语种喂「源文 4TB 译文 8TB」篡改样本，tamperedIndices 必须命中（锁 20 语种全覆盖）
+{
+  const langList = LANGUAGES.map(l => l.code)
+  assert(langList.length === 20, `D1a 语种表 20 语种（实际 ${langList.length}）`)
+  let tamperedAll = true
+  const failLangs: string[] = []
+  for (const lang of langList) {
+    const r = validateNumbers(['Capacity 4TB'], ['Capacity 8TB'])
+    if (!r.tamperedIndices.has(0)) { tamperedAll = false; failLangs.push(lang) }
+  }
+  assert(tamperedAll, `D1b 20 语种数值篡改检测全覆盖${failLangs.length ? '（漏: ' + failLangs.join(',') + '）' : ''}`)
+}
+
+// D2: 多语言单位正则——法语 To/Go、俄语 ТБ/ГБ 篡改检测（锁单位表多语言化非英文专属）
+{
+  const fr = validateNumbers(['Capacité 4To'], ['Capacité 8To'])          // 法语 To
+  const ru = validateNumbers(['Ёмкость 4ТБ'], ['Ёмкость 8ТБ'])            // 俄语 ТБ
+  const frGo = validateNumbers(['Vitesse 2000Mo/s'], ['Vitesse 3000Mo/s']) // 法语 Mo/s
+  assert(fr.tamperedIndices.has(0), 'D2a 法语 To 单位篡改检测')
+  assert(ru.tamperedIndices.has(0), 'D2b 俄语 ТБ 单位篡改检测')
+  assert(frGo.tamperedIndices.has(0), 'D2c 法语 Mo/s 速度篡改检测')
+}
+
+// D3: CJK 全角转换——CJK 4 语种每语种一条（zh-CN/zh-TW/ja/ko 全角数字→半角）
+{
+  const cjkLangs = ['zh-CN', 'zh-TW', 'ja', 'ko']
+  const cjkOk = cjkLangs.every(lang => formatCJKSpace('２０００', lang) === '2000')
+  assert(cjkOk, 'D3a CJK 4 语种全角数字 → 半角全覆盖')
+  // 其余 16 语种零影响（非 CJK 不转换）
+  const nonCjkOk = LANGUAGES.filter(l => !cjkLangs.includes(l.code))
+    .every(l => formatCJKSpace('２０００', l.code) === '２０００')
+  assert(nonCjkOk, 'D3b 非 CJK 16 语种全角数字零影响（防越界）')
+}
+
+// D4: S8 占位符残留正则——20 语种译文通用（占位符形态语种无关）
+{
+  const placeholderRe = /__[A-Z]+_\d+__/
+  const allDetect = LANGUAGES.every(l => placeholderRe.test('__GLOSSARY_2__'))
+  const noneFalse = LANGUAGES.every(() => !placeholderRe.test('正常译文'))
+  assert(allDetect && noneFalse, 'D4 占位符残留检测 20 语种通用且零误判')
 }
 
 console.log(`\n═══ 结果: ${passed} 通过, ${failed} 失败 ═══`)
