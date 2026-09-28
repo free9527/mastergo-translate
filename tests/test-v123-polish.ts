@@ -15,6 +15,8 @@
 import { isPolishEligible, validatePolishOutput, detectPolarityBreach, polishExemptReason } from '../lib/polish-guard'
 import { buildProofreadSystemPrompt } from '../lib/prompt-constants'
 import { proofreadBatch, personaJudgeBatch, polishBatch, polishVerifyBatch } from '../lib/llm-api'
+import { prePolishFormatCleanup } from '../lib/post-process'
+import { formatCJKSpace } from '../lib/format-text'
 import { LLMConfig } from '../messages/types'
 
 let passed = 0
@@ -304,7 +306,7 @@ async function runD() {
   assert(results[0].text.includes('900MB/s'), 'D2b 润色后文本保留数字/单位')
 }
 
-// D2c: v12.12 按段润色——语义断行保留（拼回 ' ↵ ' 形态）+ 段独立润色
+// D2c: v12.12 按段润色——语义断行保留 + 段独立润色（v12.36：拼回改 \n 形态，与 S5 出口一致）
 // 源文语义断行（标题 4 词 ≤5 → 语义断行），段2（8 词正文）润色生效、段1 标题不润（极短段 v12.7 规则）
 {
   enqueueResponse('{"polished":[{"i":1,"text":"Performansı en üst düzeye çıkarır","changes":[{"issueIndex":0,"before":"c","after":"d"}]}]}')
@@ -319,10 +321,11 @@ async function runD() {
     'tr',
     mockConfig,
   )
-  assert(results[0].polished && results[0].text.includes(' ↵ '), 'D2c 按段润色：语义断行保留（拼回 ↵ 形态）', JSON.stringify(results[0].text))
-  assert(results[0].text.split(' ↵ ').length === 2, 'D2c2 按段润色：段数不变（2 段）')
-  assert(results[0].text.startsWith('Bir Üst Seviye ↵ '), 'D2c3 极短标题段不润（原译文段保留）')
+  assert(results[0].polished && results[0].text.includes('\n'), 'D2c 按段润色：语义断行保留（拼回 \n 形态，v12.36）', JSON.stringify(results[0].text))
+  assert(results[0].text.split('\n').length === 2, 'D2c2 按段润色：段数不变（2 段）')
+  assert(results[0].text.startsWith('Bir Üst Seviye\n'), 'D2c3 极短标题段不润（原译文段保留）')
   assert(results[0].text.includes('Performansı en üst düzeye çıkarır'), 'D2c4 正文段润色生效（LLM 输出写入）')
+  assert(!results[0].text.includes('↵'), 'D2c5 v12.36 润色产物不含字面 ↵（字面 ↵ 不上画布不变量）')
 }
 
 // D2d: v12.12 段数不等 → 整格不润（源文 1 语义段 vs 译文 2 段——tr 短左段被 lenient 误判段边界，
@@ -339,6 +342,44 @@ async function runD() {
   )
   assert(!results[0].polished && (results[0].reason || '').includes('段数不等'), 'D2d 段数不等 → 整格不润（保守）', results[0].reason)
   assert(results[0].text.includes('↵'), 'D2d2 整格不润时译文原样保留（含 ↵）')
+}
+
+// ═══ v12.36 F 段：第三方品牌连写拆分 + CJK 标点半角空格净化 ═══
+// F1: prePolishFormatCleanup 拆 Apple/Samsung 连写（ja 实机：占位符还原后连写，被润色误判 issue）
+{
+  const { texts, cleanedCount } = prePolishFormatCleanup([
+    'AppleProRes録画に対応し',
+    'SamsungPro Video録画に対応し',
+    '対応機種一覧',  // 无连写 → 不动
+  ])
+  assert(texts[0] === 'Apple ProRes録画に対応し', 'F1a AppleProRes → Apple ProRes（拆分）', texts[0])
+  assert(texts[1] === 'Samsung Pro Video録画に対応し', 'F1b SamsungPro Video → Samsung Pro Video（拆分）', texts[1])
+  assert(texts[2] === '対応機種一覧', 'F1c 无连写条目不动（防误伤）', texts[2])
+  assert(cleanedCount === 2, 'F1d 净化计数=2', String(cleanedCount))
+}
+
+// F2: 自有品牌词连写拆分不受影响（v12.7 语义保持）
+{
+  const { texts } = prePolishFormatCleanup(['SILVERCFexpress Card'])
+  assert(texts[0] === 'SILVER CFexpress Card', 'F2 SILVERCFexpress → SILVER CFexpress（既有语义保持）', texts[0])
+}
+
+// F3: formatCJKSpace 剥 CJK 标点半角空格（ja 实机：句末/冒号/※ 后半角空格）
+{
+  assert(formatCJKSpace('過酷な環境に耐えられるよう設計されています。  ', 'ja') === '過酷な環境に耐えられるよう設計されています。',
+    'F3a ja 句末「。」后半角空格剥除')
+  assert(formatCJKSpace('対応デバイス：   iPhone 15 Pro', 'ja') === '対応デバイス：iPhone 15 Pro',
+    'F3b ja 全角冒号后半角空格剥除（冒号后无空格，拉丁规则不插——前是 ： 非 CJK）')
+  assert(formatCJKSpace('※ iCloudコンテンツのバックアップ', 'ja') === '※iCloud コンテンツのバックアップ',
+    'F3c ja ※ 后半角空格剥除（※ 后无空格，CJK∥拉丁规则补 iCloud 后空格）')
+  assert(formatCJKSpace('読み込み速度 2000MB/s', 'ja') === '読み込み速度 2000MB/s',
+    'F3d 拉丁词间正常空格保留（CJK∥拉丁规则插入的空格不剥）')
+}
+
+// F4: 非 CJK 语种不触发 formatCJKSpace 标点空格剥除（de 不受影响）
+{
+  assert(formatCJKSpace('設計されています。  next', 'de') === '設計されています。  next',
+    'F4 非 CJK 语种（de）不剥标点半角空格（防越界）')
 }
 
 // D3: changes 数量超限 → 回退

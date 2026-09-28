@@ -43,5 +43,17 @@ export function formatCJKSpace(text: string, lang: string): string {
   result = result.replace(/[ ]*([，．；：！？（）、。])[ ]*/g, '$1')
   result = result.replace(/([。！？，；：])\1+/g, '$1')
 
+  // v12.36: CJK 标点后的半角空格剥除（ja 实机事故——LLM 在句末/全角冒号/※ 后
+  //   插入半角空格，ja 语言规则明确禁止「❌ 半角スペース」，proofread 语义层接不住
+  //   这类纯形式问题，代码层零误判修复）。
+  //   只剥「CJK 标点/记号之后紧跟的半角空格」，拉丁词间正常空格不碰（CJK 文本里
+  //   拉丁词靠上面 CJK∥拉丁规则插空格，与标点无关，不受影响）。
+  //   ① 句末终止标点（。！？…）后的半角空格
+  result = result.replace(/([。！？…])[ ]+/g, '$1')
+  //   ② 全角标点（：，、；）后的半角空格（如「対応デバイス：   iPhone」→「対応デバイス：iPhone」）
+  result = result.replace(/([：，、；])[ ]+/g, '$1')
+  //   ③ ※ 脚注记号后的半角空格（如「※ iCloud」→「※iCloud」）
+  result = result.replace(/(※)[ ]+/g, '$1')
+
   return result
 }

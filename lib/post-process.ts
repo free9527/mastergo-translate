@@ -37,6 +37,7 @@
 
 import { DEBUG_MODE } from '@lib/constants'
 import { shouldSkipGlossaryEntry } from '@lib/glossary-guard'
+import { CATEGORY_WORDS } from '@lib/prompt-constants'
 
 // DEBUG 日志辅助函数
 const debugLog = (...args: unknown[]) => DEBUG_MODE && console.log(...args)
@@ -278,7 +279,18 @@ export function restoreTrademarkSymbols(sourceTexts: string[], translatedTexts: 
 // ============================================================
 
 /** 已知品牌词表（连写拆分白名单——只拆这些词的连写形态，防误伤正常驼峰词） */
-const BRAND_WORDS_FOR_SPLIT = ['SILVER', 'GOLD', 'DIAMOND', 'BLUE', 'PLAY', 'THOR', 'ARES', 'CFexpress', 'Professional', 'Lexar']
+const BRAND_WORDS_FOR_SPLIT = [
+  // Lexar 自有品牌词（v12.7 原始白名单）
+  'SILVER', 'GOLD', 'DIAMOND', 'BLUE', 'PLAY', 'THOR', 'ARES', 'CFexpress', 'Professional', 'Lexar',
+  // v12.36: 第三方品牌 identity 词条补录——术语遮蔽把 Apple/Samsung 换成 __GLOSSARY_N__
+  //   占位符，LLM 输出时常与后词连写（__GLOSSARY_0__ProRes → AppleProRes），进润色被
+  //   judge 当「连写错误」插空格记为润色生效（ja 实机实锤）。补录后 prePolishFormatCleanup
+  //   直接拆分，格式问题不再被误判成语义润色收益。
+  //   与 default-glossary.ts 第三方 identity 词条对齐；相机品牌（Canon/Nikon/Sony 等）
+  //   由 CAMERA_BRAND_CJK 双语豁免承接，不在此列。
+  'Apple', 'Samsung', 'Microsoft', 'DJI', 'GoPro', 'Insta360', 'Nintendo', 'ASUS', 'Logitech',
+  'Fujifilm', 'Panasonic', 'Hasselblad',
+]
 
 /**
  * 润色前格式净化：™ 去重 + 品牌词连写拆分 + 多余空格压缩。
@@ -421,6 +433,9 @@ export function cleanKey(s: string): string {
  * 任何写画布的文本最后一站统一过此函数：↵ 占位符 → 真实换行（画布需要真换行，
  * ↵ 只是管道内占位符）。翻译 S5 postProcessTranslation 内联同语义代码既有，
  * 新增写回路径（润色/择优/未来新 pass）必须调本函数——防 v12.10.2 型「字面 ↵ 上画布」事故。
+ *
+ * v12.36 落地：本函数在 lib/main.ts applyTranslations 写画布处被真正调用（此前只定义零调用，
+ *   约定未成结构保证，润色路径漏还原致字面 ↵ 上画布复发）。幂等——已含 \n 的文本重跑无副作用。
  */
 export function finalizeForCanvas(text: string): string {
   return text.replace(/\s*↵\s*/g, '\n')
@@ -555,6 +570,101 @@ export function enforceGlossaryTerms(
 
     return result
   })
+}
+
+// ============================================================
+// v12.34: 品类词钦定校验（S6-V1 术语合规位）
+// ============================================================
+// 闭环：v12.27/v12.32 修好注入层（动态检测+保英文锁词），本函数补校验层——
+//   源文含注入了的品类词 → 译文必须含钦定译法。LLM 不遵守注入时回退源文走重试链。
+// 边界：
+//   ✅ 只校验「本批次 prompt 实际注入了的品类词」（allowedWords 透传）——注入什么校验什么
+//   ✅ 保英文锁词条目（钦定===en 源文）→ 译文含英文品类词即合规
+//   ✅ productName override 条目 → 用 override 值校验（与产品名生成层一致）
+//   ✅ ja 片假名/de 复合词归一化；归一化覆盖不了的语种 → 只警告不回退（宁可漏不可误）
+//   ⛔ 不校验正文弱信号场景（品类词在句中不结尾）——误判率高
+//   ⛔ 不校验术语库命中条目（glossaryMatchedIndices/revertedIndices 已有合规锁管）
+// ============================================================
+
+/** 归一化译文用于品类词匹配：小写+去®™©+空白归一+ja 片假名兼容+de 复合词兼容 */
+function normalizeForCategoryMatch(text: string, targetLang: string): string {
+  let s = text.toLowerCase().replace(/[®™©]/g, '').replace(/\s+/g, ' ').trim()
+  if (targetLang === 'ja') {
+    // ja：钦定值含片假名的，同时接受平假名（ポータブル→ぽーたぶる 不常见但防御）
+    // 主要归一化是长音符号兼容（ー 与 - 混用）
+    s = s.replace(/[ー‐‑–—-]/g, 'ー')
+  }
+  if (targetLang === 'de') {
+    // de：复合词拆分兼容（USB-Stick 命中 usbstick/usb stick）
+    s = s.replace(/[-]/g, ' ')
+  }
+  return s
+}
+
+/**
+ * 品类词钦定校验：源文含注入了的品类词 → 译文必须含钦定译法。
+ * @param allowedCategoryWords 本批次 prompt 实际注入的品类词集合（S3 buildCategoryTerminology 同源）
+ * @returns 校验失败的条目索引（调用方回退源文+revertedIndices 标记）
+ */
+export function enforceCategoryTerminology(
+  sourceTexts: string[],
+  translatedTexts: string[],
+  targetLang: string,
+  allowedCategoryWords: string[],
+  skipIndices?: Set<number>,
+): { violatedIndices: Set<number>; details: Array<{ idx: number; category: string; expected: string; translation: string }> } {
+  const violatedIndices = new Set<number>()
+  const details: Array<{ idx: number; category: string; expected: string; translation: string }> = []
+  if (allowedCategoryWords.length === 0) return { violatedIndices, details }
+
+  // 归一化覆盖不了的语种（非 ja/de/zh/CJK/拉丁主流语种）→ 保守只警告不回退
+  const NORMALIZED_LANGS = new Set(['ja', 'de', 'zh-CN', 'zh-TW', 'ko', 'fr', 'es', 'pt', 'pt-BR', 'it', 'ru', 'vi', 'th', 'id', 'ar', 'nl', 'pl', 'sv', 'tr', 'en'])
+  const canRevert = NORMALIZED_LANGS.has(targetLang)
+
+  for (let i = 0; i < sourceTexts.length; i++) {
+    if (skipIndices?.has(i)) continue
+    const src = (sourceTexts[i] || '').trim()
+    const trans = (translatedTexts[i] || '').trim()
+    if (!src || !trans) continue
+
+    for (const cat of allowedCategoryWords) {
+      const entry = CATEGORY_WORDS[cat]
+      if (!entry) continue
+      // 源文含品类词（\b 词边界，与 buildCategoryTerminology/detectCategory 同源）
+      const escaped = cat.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      if (!new RegExp(`\\b${escaped}\\b`, 'i').test(src)) continue
+
+      // 保英文锁词条目（钦定===en 源文，v12.32）→ 译文含英文品类词即合规
+      const promptValue = entry[targetLang]
+      const overrideMap = entry.productName as Record<string, string> | undefined
+      const expected = (overrideMap && overrideMap[targetLang]) || (typeof promptValue === 'string' ? promptValue : '') || ''
+      if (!expected) continue  // 该语种无钦定值，跳过
+      if (expected === cat) {
+        // 保英文锁词：译文含英文品类词即合规
+        if (new RegExp(`\\b${escaped}\\b`, 'i').test(trans)) continue
+        // 译文不含英文品类词——违规
+        violatedIndices.add(i)
+        details.push({ idx: i, category: cat, expected, translation: trans.slice(0, 60) })
+        break  // 一条文本报一个品类词足够
+      }
+
+      // 常规校验：译文含钦定译法（归一化子串匹配）
+      const normalizedTrans = normalizeForCategoryMatch(trans, targetLang)
+      const normalizedExpected = normalizeForCategoryMatch(expected, targetLang)
+      if (normalizedTrans.includes(normalizedExpected)) continue
+
+      // 未命中——违规
+      violatedIndices.add(i)
+      details.push({ idx: i, category: cat, expected, translation: trans.slice(0, 60) })
+      break  // 一条文本报一个品类词足够
+    }
+  }
+
+  // 归一化覆盖不了的语种 → 只警告不回退（清空 violatedIndices，保留 details 供日志）
+  if (!canRevert) {
+    return { violatedIndices: new Set(), details }
+  }
+  return { violatedIndices, details }
 }
 
 // ============================================================
