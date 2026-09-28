@@ -242,6 +242,16 @@ assert(allOff.length === 0, 'H4 检查项全关 → 不报（开关语义）')
 const noDetectors = preflightSource(['Some text'], 'ecommerce')
 assert(Array.isArray(noDetectors), 'H5 不传 detectors → 不报错（向后兼容）')
 
+// H6: v12.34 错词体检默认关——PREFLIGHT_CHECKS_ALL 不再含 misspelled（判定前移 S2.5 LLM 判定，
+//     体检形态预筛是重复且不准的预判——词典词 Creators/Vloggers 全命中误判）
+const defaultChecks = preflightSource(
+  ['Panasionic camera'],
+  'ecommerce',
+  undefined,  // 默认 PREFLIGHT_CHECKS_ALL（v12.34 misspelled=false）
+  { isSuspectMisspelledWord: () => true },
+)
+assert(defaultChecks.filter(f => f.kind === 'misspelled').length === 0, 'H6 v12.34 默认体检不报错词（判定前移 S2.5）')
+
 // ────────────────────────────────────────────────────────────
 console.log(`\n结果: ${pass} 通过, ${fail} 失败`)
 if (fail > 0) process.exit(1)

@@ -3,7 +3,7 @@ import { API_MAX_RETRIES, API_RETRY_DELAY_MS, API_TIMEOUT_MS, DEBUG_MODE, MIN_DU
 import { filterRelevantGlossary } from '@lib/glossary-filter'
 import { normalizeTextForLLM, protectCjkSpaces } from '@lib/text-normalizer'
 import { maskEntities, unmaskEntities, maskEntitiesForProofread, maskGlossaryTerms, unmaskGlossaryTerms } from '@lib/entity-masker'
-import { postProcessTranslation, restoreTrademarkSymbols, restoreStorageUnitFormatting, enforceGlossaryTerms, capitalizeFirstLetter, detectTranslationExpansion, detectBrandInjection, validateNumbers, cleanKey, hasTrademarkSpam } from '@lib/post-process'
+import { postProcessTranslation, restoreTrademarkSymbols, restoreStorageUnitFormatting, enforceGlossaryTerms, capitalizeFirstLetter, detectTranslationExpansion, detectBrandInjection, validateNumbers, cleanKey, hasTrademarkSpam, enforceCategoryTerminology } from '@lib/post-process'
 import {
   IDENTITY_MISSION,
   CORE_PRINCIPLES,
@@ -13,11 +13,13 @@ import {
   BRAND_NAME_RULE,
   BRAND_NAME_RULE_ZH,
   getStyleCard,
+  getStyleCardSplit,
   renderLangForTranslate,
   buildProofreadSystemPrompt,
   isCJKTarget,
   PRODUCT_NAME_PARSE_PROMPT,
   PRODUCT_NAME_PARSE_PROMPT_ZH,
+  computeAllowedCategoryWords,
 } from '@lib/prompt-constants'
 import { getFewShotExamples } from '@lib/few-shot-examples'
 import { isBuiltinThirdPartyWholeText, isBuiltinModelSegment, BUILTIN_THIRD_PARTY_ENTRIES, BUILTIN_THIRD_PARTY_ALL_KEYS, isBilingualCameraBrand } from '@lib/third-party-models'
@@ -918,6 +920,31 @@ export async function translateBatch(
   uiLog('translate', `S1-S2 预处理+遮蔽完成: ${texts.length}条, 术语短路${glossaryMatchedIndices.size}条, 术语遮蔽${termMap.size}词, 实体遮蔽${entityMap.size}词`)
 
   // ═══════════════════════════════════════════════════════════
+  // S2.5: 疑似错词 LLM 判定（v12.33——词典词误伤根治）
+  //     形态可疑单词（复用 isSuspectMisspelledWord 筛选）送 LLM 判定 valid/misspelled。
+  //     判定结果驱动下游全部错词分流（漏翻拦截/兜底通道/回退兜底）：
+  //       valid → 正常翻译管道（音译直通不回退，保留原形走正常漏翻链）
+  //       misspelled → 保留原形 + misspelledIndices 黄条（被音译由 S7f 回退兜底）
+  //     判定失败/超时 → undefined（下游回退 v10.6 形态判定，行为兼容旧版）。
+  //     会话级缓存：同词不重复判定；跳过短路条目（术语库整条命中已豁免）。
+  // ═══════════════════════════════════════════════════════════
+  let judgedMisspelledSet: Set<string> | undefined
+  if (!_isRetry) {
+    const suspectWords: string[] = []
+    for (let i = 0; i < texts.length; i++) {
+      if (glossaryMatchedIndices.has(i)) continue  // 短路条目身份已明确（术语库钦定），不判定
+      const s = (texts[i] || '').trim()
+      if (s && isSuspectMisspelledWord(s, glossaryMap)) suspectWords.push(s)
+    }
+    if (suspectWords.length > 0) {
+      const judged = await judgeMisspelledWords(suspectWords, config)
+      if (judged !== null) judgedMisspelledSet = judged
+    } else {
+      judgedMisspelledSet = new Set()  // 无可疑词：空集合（下游一律按 valid 处理）
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
   // S3: Prompt 构建（产品线/风格/术语提示/风格卡/few-shot，不动 result）
   // ═══════════════════════════════════════════════════════════
   // 产品线检测（提前到术语过滤之前）
@@ -986,8 +1013,15 @@ export async function translateBatch(
   //        不同物；校对渲染链不含 commonErrors（renderLangForProofread 无此项），零加戏风险
   const langBlock = renderLangForTranslate(targetLang, productLine, /* includeCommonErrors */ true, /* sourceTexts v12.27 */ texts)
 
+  // v12.34: 品类词注入集合透传——与 buildCategoryTerminology 同源（computeAllowedCategoryWords），
+  //   S6-V1 校验层用同一集合做钦定校验（注入什么校验什么）。
+  const allowedCategoryWords = computeAllowedCategoryWords(productLine, texts)
+
   // v8.0: 统一风格卡片（替代分散的 productTone + styleGuide + sceneConstraints）
+  // v12.34: 拆段——重试时保留 tone（轻量受众约束），砍掉完整 styleGuide（营销调指令）。
+  //   根因：forceTranslate 重试时 styleCard=''（v11.5 减肥误伤），重试产物无风格约束。
   const styleCard = getStyleCard(targetLang, productLine, effectiveStyle || 'standard', config.scenePreset)
+  const { toneCard } = getStyleCardSplit(targetLang, productLine, effectiveStyle || 'standard', config.scenePreset)
 
   // v8.0: 目标语言 Few-Shot 示例（按场景+风格动态选择类型）
   // v8.6: 使用实际检测到的源语言，而非硬编码 'en'
@@ -1010,7 +1044,8 @@ export async function translateBatch(
   let systemPrompt = buildSystemPrompt({
     targetLang,
     langBlock,
-    styleCard: forceTranslate ? '' : styleCard,
+    // v12.34: 重试保留 tone（受众约束），砍掉完整 styleGuide（营销调指令重试不需要）
+    styleCard: forceTranslate ? toneCard : styleCard,
     fewShotBlock: forceTranslate ? '' : fewShotBlock,
     glossaryHint,
     includeRemediation: forceTranslate,
@@ -1321,11 +1356,19 @@ ${texts.map((t, i) => `${i + 1}. "${t.slice(0, 100)}"`).join('\n')}
   uiLog('translate', `S5 还原完成: 实体还原${entityMap.size}词, 术语还原${termMap.size}词`)
 
   // ═══════════════════════════════════════════════════════════
-  // S6: 安全后处理（品牌注入→术语校准→v9.9合规→™还原→数字校验→存储单位→首字母→扩展检测→重复检测）
+  // S6: 安全后处理（v12.34 收敛为 4 个显式校验位）
+  // ═══════════════════════════════════════════════════════════
+  // S6-V1【术语合规位】钦定值校准/锁定：enforceGlossaryTerms → v9.9 合规锁 → 品类词校验
+  // S6-V2【事实完整性位】防编造：detectBrandInjection → validateNumbers
+  // S6-V3【格式修复位】符号/格式修复：restoreTrademarkSymbols → restoreStorageUnitFormatting → capitalizeFirstLetter
+  // S6-V4【检测透出位】信号透出给校对层：detectTranslationExpansion → 连写检测（v12.17）
+  // ⚠️ 物理执行顺序不变——品牌注入仍在术语校准之前（避免术语库正确应用被误判）。
+  //    分组只是显式标注职责归属，新增校验时只需问「属于哪个位」（坑 15 防线）。
   // ═══════════════════════════════════════════════════════════
   // 收集被检测函数回退到源文的索引（避免误判为"漏翻"）
   const revertedIndices = new Set<number>()
 
+  // ── S6-V2【事实完整性位】品牌注入检测 ──
   // 品牌注入检测：在术语库校准之前检测 LLM 是否添加了源文中不存在的品牌名/规格
   // 必须在校准之前运行，避免术语库正确应用的跨语言品牌名（如 雷克沙）被误判
   const injectionResult = detectBrandInjection(texts, result, glossaryMap)
@@ -1342,6 +1385,7 @@ ${texts.map((t, i) => `${i + 1}. "${t.slice(0, 100)}"`).join('\n')}
     for (const idx of injectionResult.injectedIndices) revertedIndices.add(idx)
   }
 
+  // ── S6-V1【术语合规位】术语库强制校准 ──
   // 术语库强制校准（翻译后直接替换，零 token 开销）
   // 跳过被回退到源文的条目（避免在源文上做术语校准）
   result = enforceGlossaryTerms(texts, result, glossaryMap, revertedIndices, normalizedGlossaryMap)
@@ -1367,6 +1411,30 @@ ${texts.map((t, i) => `${i + 1}. "${t.slice(0, 100)}"`).join('\n')}
     }
   }
 
+  // ── S6-V1【术语合规位】品类词钦定校验（v12.34 闭环补全） ──
+  // v12.34: 源文含注入了的品类词 → 译文必须含钦定译法。LLM 不遵守注入时回退源文走重试链。
+  //   ko SSDD 音译事故（v12.27 修了注入层）校验层补位——注入什么校验什么（allowedCategoryWords 透传）。
+  //   豁免：术语库命中条目（S1 短路/合规锁已管）+ 品牌注入回退条目（已回退源文）。
+  {
+    const categorySkip = new Set<number>([...glossaryMatchedIndices, ...revertedIndices])
+    const categoryCheck = enforceCategoryTerminology(texts, result, targetLang, allowedCategoryWords, categorySkip)
+    if (categoryCheck.violatedIndices.size > 0) {
+      debugWarn(
+        `[translateBatch] 品类词钦定校验：${categoryCheck.violatedIndices.size} 条译文未用钦定译法，已回退源文`,
+        categoryCheck.details.map(d => ({ idx: d.idx, category: d.category, expected: d.expected, translation: d.translation })),
+      )
+      uiLog('translate', `品类词钦定校验: ${categoryCheck.violatedIndices.size} 条未用钦定译法回退重翻 ${categoryCheck.details.map(d => `[${d.idx}]${d.category}→${d.expected}`).join(' | ')}`)
+      for (const idx of categoryCheck.violatedIndices) {
+        result[idx] = texts[idx]
+        revertedIndices.add(idx)
+      }
+    } else if (categoryCheck.details.length > 0) {
+      // 归一化覆盖不了的语种：只警告不回退
+      debugWarn(`[translateBatch] 品类词钦定校验（只警告不回退）: ${categoryCheck.details.length} 条`, categoryCheck.details)
+    }
+  }
+
+  // ── S6-V3【格式修复位】商标符号还原 ──
   // 商标符号还原（兜底：原文有则译文必有，原文无则不添加）
   result = restoreTrademarkSymbols(texts, result)
 
@@ -1394,6 +1462,7 @@ ${texts.map((t, i) => `${i + 1}. "${t.slice(0, 100)}"`).join('\n')}
     }
   }
 
+  // ── S6-V2【事实完整性位】数字校验 ──
   // 数字校验：检测译文中数字是否与源文一致（防止 LLM 幻觉，如 4TB→8TB）
   // v7.3: validateNumbers 只警告不回退，不加入 revertedIndices（避免阻止重试）
   const numberValidation = validateNumbers(texts, result)
@@ -1410,6 +1479,7 @@ ${texts.map((t, i) => `${i + 1}. "${t.slice(0, 100)}"`).join('\n')}
     // 如果加入 revertedIndices 会导致这些条目被排除在重试之外，漏翻无法修复
   }
 
+  // ── S6-V3【格式修复位】存储单位/首字母 ──
   // 存储单位格式还原：原文数字和单位连写时，恢复译文的连写格式
   // 修复 AI 常见错误：900MB/s → 900 MB/s 还原为 900MB/s
   result = restoreStorageUnitFormatting(texts, result)
@@ -1417,6 +1487,7 @@ ${texts.map((t, i) => `${i + 1}. "${t.slice(0, 100)}"`).join('\n')}
   // 首字母大写
   result = result.map(t => capitalizeFirstLetter(t))
 
+  // ── S6-V4【检测透出位】译文扩展检测 ──
   // 译文扩展检测（v10.8 起：只检测不截断，长度信号透出给校对层语义裁决）
   // 长度≠加戏（de/pt/fr 天然长 50-90%），自动截断会把合法详尽译文切成半截句上画布。
   // 代码只量化"是否显著超长"，透出 expandedIndices 供校对 hint；裁决权移交校对 LLM。
@@ -1560,7 +1631,7 @@ ${texts.map((t, i) => `${i + 1}. "${t.slice(0, 100)}"`).join('\n')}
         // 继续激进兜底只会空转 API（v8.4 MAX_AGGRESSIVE_RETRIES 的同类教训），
         // 直接走 misspelledIndices 独立通道（与 S7f/S8 的回退路径共用一个出口）。
         for (const j of [...retriedUntranslated]) {
-          if (isSuspectMisspelledWord(texts[j], glossaryMap) && getTargetScript(targetLang) !== 'latin' && result[j] === texts[j]) {
+          if (isJudgedMisspelled(texts[j], glossaryMap, judgedMisspelledSet) && getTargetScript(targetLang) !== 'latin' && result[j] === texts[j]) {
             retriedUntranslated.delete(j)
             misspelledIndices?.add(j)
             uiLog('translate', `疑似错词拦截（LLM两次原样保留，跳过激进兜底）: "${texts[j].slice(0, 50)}"`)
@@ -1927,7 +1998,7 @@ DO NOT return the source text unchanged. Output ONLY the translation, no explana
               // v10.6.2: 疑似错词（拉丁单词，LLM 音译后又被激进兜底纠正回原文）
               // 走 misspelledIndices 独立通道，不标"翻译失败"（v10.6 只堵了 S8 安全网一处，
               // 漏了 S7f 这个入口——2026-08-03 实机 Panasionic 案例）
-              if (isSuspectMisspelledWord(texts[j], glossaryMap) && getTargetScript(targetLang) !== 'latin') {
+              if (isJudgedMisspelled(texts[j], glossaryMap, judgedMisspelledSet) && getTargetScript(targetLang) !== 'latin') {
                 misspelledIndices?.add(j)
                 uiLog('translate', `疑似错词进独立通道（激进兜底回原文）: "${texts[j].slice(0, 50)}"`)
               } else {
@@ -1950,7 +2021,7 @@ DO NOT return the source text unchanged. Output ONLY the translation, no explana
   // LLM 万一没忍住把疑似错词音译/意译成非拉丁文字（Panasionic→帕納西奧尼克），兜回源文原形。
   // 仅非拉丁目标有此硬信号；拉丁目标跳过（拉丁→拉丁猜测无法与合法翻译形式区分，归校对 LLM）。
   // 零编辑距离/零词典/零自动替换——只回退保留，不猜测正确拼写，规避用户担忧的新匹配风险。
-  const misspelledReverted = revertMisspelledWordTranslation(texts, result, glossaryMap, targetLang)
+  const misspelledReverted = revertMisspelledWordTranslation(texts, result, glossaryMap, targetLang, judgedMisspelledSet)
   // v10.6: 疑似错词走独立 misspelledIndices 通道（UI 单独标记"疑似拼写错误"），
   // 不进 untranslatedIndices——它不是"翻译失败"，是"源稿疑似拼错"，语义须区分（用户反馈）。
   for (const idx of misspelledReverted) misspelledIndices?.add(idx)
@@ -2787,8 +2858,10 @@ export async function polishBatch(
     if (!anyPolished) {
       return { index: idx, text: original, polished: false, reason: segReasons[0] || '全部段未润色' }
     }
-    // 拼回段（↵ 语义断行——画布写回处与翻译管道 S5 汇合后统一 ↵→\n，此处保持占位符形态）
-    const joined = finalSegs.join(' ↵ ')
+    // 拼回段（v12.36：直接 \n 拼接——与翻译管道 S5 出口形态一致（postProcessTranslation
+    //   已把 ↵→\n），管道自 S5 起全程 \n 态；润色 LLM 看到的始终是单段无 ↵ 文本，
+    //   拼回不再引入字面 ↵ 占位符，配合 main.ts 应用入口 finalizeForCanvas 双保险）
+    const joined = finalSegs.join('\n')
     return { index: idx, text: joined, polished: true, segReasons: segReasons.length > 0 ? segReasons : undefined }
   })
 }
@@ -3396,11 +3469,169 @@ export function isSuspectMisspelledWord(src: string, glossaryMap?: Map<string, s
   return true
 }
 
+// ═══════════════════════════════════════════════════════════════
+// v12.33: 疑似错词 LLM 语义判定（词典词误伤根治）
+// ═══════════════════════════════════════════════════════════════
+// 背景（2026-09-28 ja 实机）：Creators/Vloggers 被回退+黄条「疑似拼写错误」——
+//   它们是正常英文词典词，LLM 音译成 クリエイター/ブイロガー 完全正确，
+//   但形态判定（isSuspectMisspelledWord）把「≥6 字母拉丁单词」一律当疑似错词，
+//   词典词与真错词形态完全同形（Creators vs Panasionic），静态名单永远补不完。
+// 方案（用户拍板裁决）：判定权移交 LLM 语义（valid/misspelled 二分类），
+//   代码只做形式筛选（复用 isSuspectMisspelledWord 收窄输入域）。
+//   判定结果驱动下游分流：misspelled→保留原形+黄条，valid→正常翻译零提示。
+// 防线边界：
+//   ✅ 判定失败/超时/输出非法 → 一律 valid 放行（缺省=正常翻译，不误伤）
+//   ✅ 判定输入只收单词（SUSPECT_MISSPELLED_WORD_RE 预筛），句子级文本不进判定
+//   ✅ 回退兜底不退役——判定 misspelled 的词被音译仍兜回原形（Panasionic 防线在）
+//   ✅ 会话级缓存：同词不重复判定（一次会话一个词只判一次）
+// ═══════════════════════════════════════════════════════════════
+
+interface MisspelledJudgeCache { valid: Set<string>; misspelled: Set<string> }
+const misspelledJudgeCache: MisspelledJudgeCache = { valid: new Set(), misspelled: new Set() }
+const MISSPELLED_JUDGE_CACHE_LIMIT = 2000
+
+/** v12.33: 导出供测试/调试用——清空判定缓存（避免跨测试污染） */
+export function clearMisspelledJudgeCache(): void {
+  misspelledJudgeCache.valid.clear()
+  misspelledJudgeCache.misspelled.clear()
+}
+
+function addToMisspelledJudgeCache(word: string, kind: 'valid' | 'misspelled'): void {
+  const target = kind === 'valid' ? misspelledJudgeCache.valid : misspelledJudgeCache.misspelled
+  const other = kind === 'valid' ? misspelledJudgeCache.misspelled : misspelledJudgeCache.valid
+  other.delete(word)  // 一词一归属，后判覆盖先判
+  if (target.size >= MISSPELLED_JUDGE_CACHE_LIMIT) {
+    const firstKey = target.keys().next().value
+    if (firstKey !== undefined) target.delete(firstKey)
+  }
+  target.add(word)
+}
+
+/**
+ * v12.33: LLM 批量判定形态可疑单词的 valid/misspelled。
+ * 返回判定结果集（misspelled 归一化词集合）；判定失败/无输入 → null（调用方按 valid 放行）。
+ * 会话级缓存：已判词直接命中，不重复调用。
+ */
+export async function judgeMisspelledWords(
+  words: string[],
+  config: LLMConfig,
+): Promise<Set<string> | null> {
+  if (words.length === 0) return new Set()
+  const normalized = [...new Set(words.map(w => normalizeGlossaryKey(w)))]
+  const uncached = normalized.filter(w =>
+    !misspelledJudgeCache.valid.has(w) && !misspelledJudgeCache.misspelled.has(w))
+  if (uncached.length === 0) {
+    return new Set(normalized.filter(w => misspelledJudgeCache.misspelled.has(w)))
+  }
+
+  const system = `You classify words as VALID or MISSPELLED.
+
+Rules:
+- VALID: any real word in any language (including internet/gaming/marketing coinages: vloggers, creators, streamers, gamers), any real brand/proper noun, any plausible new coinage a marketer might invent
+- MISSPELLED: a garbled string that is not a word in any language, almost certainly a typo of a known word (Panasionic, Transfser, Spede)
+- When in doubt, output valid. Preserving a real word's translation is always better than wrongly flagging it.
+
+Output ONLY a valid JSON object:
+{"words":[{"w":"<exact input word>","v":"valid"|"misspelled"}]}
+- Include ALL input words, "w" must match the input exactly
+- Raw JSON only, no markdown`
+
+  const user = uncached.map((w, i) => `[${i + 1}] ${w}`).join('\n')
+
+  try {
+    const res = await fetchWithRetry(config.proofreadApiUrl || config.apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.proofreadApiKey || config.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: config.proofreadModel || config.model,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
+        temperature: 0.1,
+        response_format: { type: 'json_object' },
+      }),
+      // v12.19 同纪律：判定类短超时——判定失败=缺省 valid 放行（保守），不该用生产翻译 90s 超时
+    }, API_MAX_RETRIES, API_RETRY_DELAY_MS, 30000)
+    if (!res.ok) return null
+    const resData = res.json as Record<string, unknown> | undefined
+    const choices = resData?.choices as Array<{ message?: { content?: string } }> | undefined
+    const content = choices?.[0]?.message?.content || res.text || ''
+    logUsage('misspelled-judge', resData)
+
+    const parsed = extractWordsObject(content)
+    if (!parsed) return null
+
+    // 归一化比对：LLM 输出的 w 必须与输入词（归一化后）匹配，防编造/变形
+    const uncachedSet = new Set(uncached)
+    for (const entry of parsed.words) {
+      const w = normalizeGlossaryKey(entry.w || '')
+      if (!uncachedSet.has(w)) continue  // 非本次输入词，忽略（防幻觉词混入）
+      addToMisspelledJudgeCache(w, entry.v === 'misspelled' ? 'misspelled' : 'valid')
+    }
+    // 未被 LLM 覆盖的词按 valid 处理（宁可放行不误伤）
+    for (const w of uncached) {
+      if (!misspelledJudgeCache.valid.has(w) && !misspelledJudgeCache.misspelled.has(w)) {
+        addToMisspelledJudgeCache(w, 'valid')
+      }
+    }
+    uiLog('translate', `疑似错词判定: ${uncached.length}词 → misspelled ${uncached.filter(w => misspelledJudgeCache.misspelled.has(w)).length} / valid ${uncached.filter(w => misspelledJudgeCache.valid.has(w)).length}${uncached.filter(w => misspelledJudgeCache.misspelled.has(w)).length > 0 ? ' [misspelled: ' + uncached.filter(w => misspelledJudgeCache.misspelled.has(w)).join(',') + ']' : ''}`)
+    return new Set(normalized.filter(w => misspelledJudgeCache.misspelled.has(w)))
+  } catch (e) {
+    debugWarn(`[judgeMisspelledWords] 判定异常（缺省 valid 放行）: ${(e as Error).message.slice(0, 80)}`)
+    return null
+  }
+}
+
+/** 平衡括号提取 {"words":[...]}（坑16同型：对内容文本里的 "words" 字样防误锚） */
+function extractWordsObject(text: string): { words: Array<{ w: string; v: string }> } | null {
+  let searchFrom = 0
+  for (;;) {
+    const keyIdx = text.indexOf('"words"', searchFrom)
+    if (keyIdx < 0) return null
+    let openIdx = -1
+    for (let i = keyIdx - 1; i >= 0; i--) {
+      if (text[i] === '{') { openIdx = i; break }
+      if (text[i] === '}') break
+    }
+    if (openIdx >= 0) {
+      let depth = 0, inStr = false, esc = false, end = -1
+      for (let i = openIdx; i < text.length; i++) {
+        const ch = text[i]
+        if (esc) { esc = false; continue }
+        if (ch === '\\') { esc = true; continue }
+        if (ch === '"') { inStr = !inStr; continue }
+        if (inStr) continue
+        if (ch === '{') depth++
+        else if (ch === '}') { depth--; if (depth === 0) { end = i; break } }
+      }
+      if (end > openIdx) {
+        try {
+          const obj = JSON.parse(text.slice(openIdx, end + 1))
+          if (obj && Array.isArray(obj.words)) return obj
+        } catch { /* 找下一个 */ }
+      }
+    }
+    searchFrom = keyIdx + 1
+  }
+}
+
+/** v12.33: 判定消费点统一口径——判定集合优先，缺省回退形态判定（旧路径兼容） */
+function isJudgedMisspelled(src: string, glossaryMap: Map<string, string> | undefined, misspelledSet?: Set<string>): boolean {
+  return misspelledSet
+    ? misspelledSet.has(normalizeGlossaryKey(src))
+    : isSuspectMisspelledWord(src, glossaryMap)
+}
+
 function revertMisspelledWordTranslation(
   texts: string[],
   result: string[],
   glossaryMap: Map<string, string>,
   targetLang: string,
+  misspelledSet?: Set<string>,
 ): Set<number> {
   const reverted = new Set<number>()
   const script = getTargetScript(targetLang)
@@ -3411,8 +3642,9 @@ function revertMisspelledWordTranslation(
     const src = (texts[i] || '').trim()
     const trans = (result[i] || '').trim()
     if (!src || !trans) continue
-    // 1-3. 疑似错词形态（单词≥6 / 非术语库 / 非已豁免类别）— 委托 isSuspectMisspelledWord 单一口径
-    if (!isSuspectMisspelledWord(src, glossaryMap)) continue
+    // v12.33: 判定依据从「纯形态可疑」改为「LLM 判定 misspelled」（统一口径函数）
+    const suspect = isJudgedMisspelled(src, glossaryMap, misspelledSet)
+    if (!suspect) continue
     // 4. LLM 做了改动
     if (trans === src) continue
     // 5. 译文含非拉丁字符（音译/意译铁证）
@@ -3529,8 +3761,13 @@ interface UntranslatableIndex {
 const untranslatableIndexCache = new WeakMap<Map<string, string>, UntranslatableIndex>()
 
 /** 归一化：小写 + 去 ®™© + trim */
+// v12.35: 归一化口径统一——normalizeGlossaryKey 委托 cleanKey（单一事实源）。
+// 根因（宏观复盘实锤）：cleanKey 含 [-_]→空格归一，normalizeGlossaryKey 不含——
+//   'ZV-E10' 在 S1 短路（用本函数）key='zv-e10' 不命中术语库，但在 enforceGlossaryTerms
+//   （用 cleanKey）key='zv e10' 命中。同一 key 两条路径命中不同结果，型号词（连字符高发区）
+//   S1 短路率被口径差异拉低。统一后 S1 短路与译后校准命中一致。
 function normalizeGlossaryKey(s: string): string {
-  return s.toLowerCase().replace(/[®™©]/g, '').trim()
+  return cleanKey(s)
 }
 
 /** 英语词形还原：ies→y → sses→ss → (x|z|ch|sh)es→词干 → 去尾s */

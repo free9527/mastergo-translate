@@ -264,9 +264,11 @@ export interface PreflightChecks {
   bilingualHint?: boolean   // 双语混写提示
 }
 
-/** 默认全查（翻译前体检） */
+/** 默认检查项（翻译前体检）——v12.34: misspelled 默认 false（判定已前移 S2.5 LLM 判定，
+ *  体检形态预筛是重复且不准的预判——词典词 Creators/Vloggers 全命中误判）。
+ *  字段保留向后兼容，调用方显式传 true 仍可查。 */
 export const PREFLIGHT_CHECKS_ALL: Required<PreflightChecks> = {
-  sceneMismatch: true, misspelled: true, prohibitedSrc: true, bilingualHint: true,
+  sceneMismatch: true, misspelled: false, prohibitedSrc: true, bilingualHint: true,
 }
 
 /** 体检判定器依赖注入（避免 batch-context 反向依赖 llm-api/prohibited-check——
@@ -371,7 +373,9 @@ export function preflightSource(
       findings.push({
         kind: 'misspelled',
         severity: 'info',
-        message: `${idx.length} 条疑似错词/未识别专名（将保留原形不音译）`,
+        // v12.33: 体检只做形态预筛，措辞中性不预判「错词」——词典词（Creators/Vloggers）
+        // 与真错词形态同形，最终处置由翻译时 LLM 判定（valid→正常翻译 / misspelled→保留原形）。
+        message: `${idx.length} 条未识别单词（翻译时自动判定：错词保留原形，正常词正常翻译）`,
         entryIndices: idx,
         fragments: frags,
       })

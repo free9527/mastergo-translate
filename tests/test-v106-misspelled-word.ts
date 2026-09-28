@@ -19,7 +19,7 @@
 /// <reference types="node" />
 /// <reference path="../typings/plugin-runtime.d.ts" />
 
-import { translateBatch, detectUntranslatedText, buildSystemPrompt } from '../lib/llm-api'
+import { translateBatch, detectUntranslatedText, buildSystemPrompt, clearMisspelledJudgeCache } from '../lib/llm-api'
 import { CORE_PRINCIPLES, CORE_PRINCIPLES_ZH } from '../lib/prompt-constants'
 import { clearUiLogs } from '../lib/ui-debug-log'
 import { LLMConfig } from '../messages/types'
@@ -96,6 +96,9 @@ async function main() {
   // C1: 核心场景——Panasionic 被音译成帕納西奧尼克 → 回退为 Panasionic
   clearUiLogs()
   mockCalls.length = 0
+  clearMisspelledJudgeCache()
+  // v12.33: 批次含形态可疑词时，首个 mock 响应是错词判定调用（judgeMisspelledWords）
+  enqueueResponse('{"words":[{"w":"panasionic","v":"misspelled"}]}')
   // 批次 3 条：型号列表（v10.5 豁免保留）、真实句子（正常翻译）、Panasionic（错词被音译）
   enqueueResponse(
     '[1] EOS R5    /    EOS R6    /    EOS RP\n' +
@@ -124,7 +127,7 @@ async function main() {
   out.push('─'.repeat(40))
 
   // B1: 术语库已收录的品牌词被翻译 → 不兜底（走 LOCK/正常流程，不是错词）
-  clearUiLogs(); mockCalls.length = 0
+  clearUiLogs(); mockCalls.length = 0; clearMisspelledJudgeCache()
   const glossary = new Map<string, string>([['Panasonic', 'Panasonic']])
   enqueueResponse('[1] Panasonic')  // LLM 原样回显（在库，正常）
   const b1untrans = new Set<number>()
@@ -133,21 +136,21 @@ async function main() {
   assert(rb1[0] === 'Panasonic', 'B1 术语库已收录品牌词保留原形（短路，非错词兜底）', JSON.stringify(rb1[0]))
 
   // B2: 短词（<6）被音译 → 不兜底（长度约束）
-  clearUiLogs(); mockCalls.length = 0
+  clearUiLogs(); mockCalls.length = 0; clearMisspelledJudgeCache()
   enqueueResponse('[1] 索尼')  // Sony 被译成索尼（合法翻译，且 Sony 长度 4<6）
   const rb2 = await translateBatch(['Sony'], 'zh-TW', emptyGlossary, config,
     undefined, undefined, undefined, undefined, undefined, undefined, false, false, undefined, new Set())
   assert(rb2[0] === '索尼', 'B2 短词(<6)被翻译不兜底（Sony→索尼 合法）', JSON.stringify(rb2[0]))
 
   // B3: 含数字的词被翻 → 不兜底（已有归属：型号豁免）
-  clearUiLogs(); mockCalls.length = 0
+  clearUiLogs(); mockCalls.length = 0; clearMisspelledJudgeCache()
   enqueueResponse('[1] A7M4 型號相機')  // 含数字+空格，非单词
   const rb3 = await translateBatch(['A7M4 camera'], 'zh-TW', emptyGlossary, config,
     undefined, undefined, undefined, undefined, undefined, undefined, false, false, undefined, new Set())
   assert(rb3[0] === 'A7M4 型號相機', 'B3 含数字非单词不兜底', JSON.stringify(rb3[0]))
 
   // B4: 多词短语被翻 → 不兜底（非单词）
-  clearUiLogs(); mockCalls.length = 0
+  clearUiLogs(); mockCalls.length = 0; clearMisspelledJudgeCache()
   enqueueResponse('[1] 高速傳輸')
   const rb4 = await translateBatch(['High Speed'], 'zh-TW', emptyGlossary, config,
     undefined, undefined, undefined, undefined, undefined, undefined, false, false, undefined, new Set())
@@ -160,7 +163,8 @@ async function main() {
   out.push('═'.repeat(60))
 
   // D1: 拉丁目标（en/de/fr 等）不兜底——拉丁→拉丁猜测无法与合法翻译区分，归校对
-  clearUiLogs(); mockCalls.length = 0
+  clearUiLogs(); mockCalls.length = 0; clearMisspelledJudgeCache()
+  enqueueResponse('{"words":[{"w":"panasionic","v":"misspelled"}]}')  // v12.33 判定调用
   enqueueResponse('[1] Panasionic-DE-variant')  // 拉丁目标，LLM 用另一拉丁词
   const d1untrans = new Set<number>()
   const rd1 = await translateBatch(['Panasionic'], 'de', emptyGlossary, config,
@@ -174,7 +178,8 @@ async function main() {
     ['ru', 'Панасионик'], ['ar', 'باناسيونيك'], ['th', 'พานาซิโอนิค'],
   ]
   for (const [tgt, translit] of nonLatinTargets) {
-    clearUiLogs(); mockCalls.length = 0
+    clearUiLogs(); mockCalls.length = 0; clearMisspelledJudgeCache()
+    enqueueResponse('{"words":[{"w":"panasionic","v":"misspelled"}]}')  // v12.33 判定调用
     enqueueResponse(`[1] ${translit}`)
     const duntrans = new Set<number>()
     const dmiss = new Set<number>()
@@ -209,7 +214,8 @@ async function main() {
 
   // E6: 端到端——en→de 的 Panasionic 原样保留：不进 untranslatedIndices（有 E1 豁免），
   //      也不进 misspelledIndices（拉丁目标无法形式判定，归校对 LLM 裁决）
-  clearUiLogs(); mockCalls.length = 0
+  clearUiLogs(); mockCalls.length = 0; clearMisspelledJudgeCache()
+  enqueueResponse('{"words":[{"w":"panasionic","v":"misspelled"}]}')  // v12.33 判定调用
   enqueueResponse('[1] Panasionic')
   const e6untrans = new Set<number>()
   const e6miss = new Set<number>()
@@ -231,6 +237,77 @@ async function main() {
   const promptEn = buildSystemPrompt({ targetLang: 'de', langBlock: '', styleCard: '', fewShotBlock: '', includeRemediation: true })  // v11.5 同上
   assert(/BRAND & PRODUCT NAMES/.test(promptEn), 'F4 en 指令含品牌产品名规则')
   assert(/Professional/.test(promptEn) && /NEVER translate/.test(promptEn), 'F5 en 规则含品牌词+禁止直译')
+
+  // ═══════════════════════════════════════════════════════════
+  out.push('')
+  out.push('═'.repeat(60))
+  out.push('G. v12.33 词典词误伤根治——LLM 判定 valid 的音译直通不回退')
+  out.push('═'.repeat(60))
+
+  // G1: 核心场景（2026-09-28 ja 实机）——Creators/Vloggers 判定 valid，
+  //     LLM 音译成クリエイター/ブイロガー → 直通不回退、零黄条
+  clearUiLogs(); mockCalls.length = 0; clearMisspelledJudgeCache()
+  enqueueResponse('{"words":[{"w":"creators","v":"valid"},{"w":"vloggers","v":"valid"}]}')
+  enqueueResponse('[1] クリエイター\n[2] ブイロガー')
+  const g1untrans = new Set<number>()
+  const g1miss = new Set<number>()
+  const rg1 = await translateBatch(
+    ['Creators', 'Vloggers'],
+    'ja', emptyGlossary, config,
+    undefined, undefined, undefined, undefined, undefined, undefined, false, false, undefined, g1untrans, g1miss)
+  assert(rg1[0] === 'クリエイター', 'G1 词典词 Creators 判定 valid → 音译直通不回退', JSON.stringify(rg1[0]))
+  assert(rg1[1] === 'ブイロガー', 'G2 词典词 Vloggers 判定 valid → 音译直通不回退', JSON.stringify(rg1[1]))
+  assert(g1miss.size === 0, 'G3 词典词零黄条（misspelledIndices 为空）', `got ${[...g1miss]}`)
+  assert(g1untrans.size === 0, 'G4 词典词音译后零漏翻标记', `got ${[...g1untrans]}`)
+
+  // G5: 判定调用本身确实发出（mock 请求体含判定 prompt 特征）
+  const judgeCall = mockCalls.find(c => c.body.includes('VALID or MISSPELLED'))
+  assert(!!judgeCall, 'G5 判定调用发出（system 含 VALID or MISSPELLED）')
+
+  // G6: 判定 valid 的词保留原形 → 走正常漏翻链（不豁免进错词通道）
+  clearUiLogs(); mockCalls.length = 0; clearMisspelledJudgeCache()
+  enqueueResponse('{"words":[{"w":"creators","v":"valid"}]}')
+  enqueueResponse('[1] Creators')  // LLM 保留原形（漏翻行为）
+  const g6untrans = new Set<number>()
+  const g6miss = new Set<number>()
+  const rg6 = await translateBatch(
+    ['Creators'],
+    'ja', emptyGlossary, config,
+    undefined, undefined, undefined, undefined, undefined, undefined, false, false, undefined, g6untrans, g6miss)
+  assert(rg6[0] === 'Creators', 'G6 判定 valid 保留原形 → 走漏翻兜底链后仍保留原文', JSON.stringify(rg6[0]))
+  assert(!g6miss.has(0), 'G6b 判定 valid 保留原形不进 misspelledIndices（词典词无黄条）', `got ${[...g6miss]}`)
+
+  // G7: 判定失败（mock 返回非法 JSON）→ 缺省 valid 放行，音译直通不回退
+  clearUiLogs(); mockCalls.length = 0; clearMisspelledJudgeCache()
+  enqueueResponse('这不是 JSON——判定失败模拟')
+  enqueueResponse('[1] パナシオニック')  // LLM 音译
+  const g7untrans = new Set<number>()
+  const g7miss = new Set<number>()
+  const rg7 = await translateBatch(
+    ['Panasionic'],
+    'ja', emptyGlossary, config,
+    undefined, undefined, undefined, undefined, undefined, undefined, false, false, undefined, g7untrans, g7miss)
+  // 判定失败回退形态判定（v10.6 行为）——Panasionic 形态可疑+被音译 → 仍兜回原形
+  assert(rg7[0] === 'Panasionic', 'G7 判定失败回退形态判定：真错词音译仍兜回原形', JSON.stringify(rg7[0]))
+  assert(g7miss.has(0), 'G7b 判定失败回退形态判定：进 misspelledIndices', `got ${[...g7miss]}`)
+
+  // G8: 会话级缓存——第二次判定同词不再发判定调用
+  clearUiLogs(); mockCalls.length = 0
+  // 缓存里有 panasionic=misspelled（G7 回退形态判定未写缓存——重新判一次验证）
+  // G7 判定失败未写缓存，此处需要重新入队判定响应
+  enqueueResponse('{"words":[{"w":"panasionic","v":"misspelled"}]}')
+  enqueueResponse('[1] パナシオニック')
+  await translateBatch(['Panasionic'], 'ja', emptyGlossary, config,
+    undefined, undefined, undefined, undefined, undefined, undefined, false, false, undefined, new Set(), new Set())
+  const callsAfterFirst = mockCalls.length
+  // 第二次同词同批次：判定应命中缓存，不再发判定调用
+  clearUiLogs(); mockCalls.length = 0
+  enqueueResponse('[1] パナシオニック')
+  await translateBatch(['Panasionic'], 'ja', emptyGlossary, config,
+    undefined, undefined, undefined, undefined, undefined, undefined, false, false, undefined, new Set(), new Set())
+  const judgeCallsSecond = mockCalls.filter(c => c.body.includes('VALID or MISSPELLED')).length
+  assert(judgeCallsSecond === 0, 'G8 会话级缓存：同词第二次不再发判定调用', `got ${judgeCallsSecond}`)
+  assert(callsAfterFirst >= 2, 'G8b 首次判定+翻译共 ≥2 次调用', `got ${callsAfterFirst}`)
 
   // ═══════════════════════════════════════════════════════════
   out.push('')

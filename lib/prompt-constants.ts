@@ -2345,27 +2345,33 @@ export function buildProofreadCalibration(
  *  产品线映射保留（仍承担该产品线统一基线职责），动态检测只补漏词的钦定。
  *  检测器内联实现（与 product-name-generator.detectCategory 同源 CATEGORY_KEYS，
  *  但避免 prompt-constants ↔ product-name-generator 循环依赖，故内联多词检测）。 */
-function buildCategoryTerminology(targetLang: string, productLine?: string | null, sourceTexts?: string[]): string {
+/**
+ * v12.34: 导出品类词注入集合计算（与 buildCategoryTerminology 同源）——
+ *   翻译后校验层（enforceCategoryTerminology）需要知道「本批次 prompt 实际注入了哪些品类词」，
+ *   注入什么校验什么。提取为独立函数防两处实现漂移。
+ */
+export function computeAllowedCategoryWords(productLine?: string | null, sourceTexts?: string[]): string[] {
   const mapped = productLine
     ? (PRODUCT_LINE_CATEGORY_MAP[productLine] || FALLBACK_CATEGORY_WORDS)
     : FALLBACK_CATEGORY_WORDS
+  if (!sourceTexts || sourceTexts.length === 0) return mapped
 
-  // v12.27: 并集「源文实际出现的多词品类词」——映射漏词时钦定仍注入（ko 事故根治）。
-  // 只收含空格的多词品类词（正文出现几乎必然是品类语境，误判率≈0）；
-  // 排除单词泛词 Hub/Card/SSD（普通句易误判，且另有遮蔽/生成兜底）。
-  let allowedWords = mapped
-  if (sourceTexts && sourceTexts.length > 0) {
-    const detected = new Set<string>()
-    for (const text of sourceTexts) {
-      if (!text) continue
-      for (const cat of CATEGORY_KEYS_DESC) {
-        if (!cat.includes(' ') || detected.has(cat)) continue
-        const escaped = cat.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-        if (new RegExp(`\\b${escaped}\\b`, 'i').test(text)) detected.add(cat)
-      }
+  // v12.27 同逻辑：源文实际出现的多词品类词（含空格）并入集合
+  const detected = new Set<string>()
+  for (const text of sourceTexts) {
+    if (!text) continue
+    for (const cat of CATEGORY_KEYS_DESC) {
+      if (!cat.includes(' ') || detected.has(cat)) continue
+      const escaped = cat.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      if (new RegExp(`\\b${escaped}\\b`, 'i').test(text)) detected.add(cat)
     }
-    if (detected.size > 0) allowedWords = [...new Set([...mapped, ...detected])]
   }
+  return detected.size > 0 ? [...new Set([...mapped, ...detected])] : mapped
+}
+
+function buildCategoryTerminology(targetLang: string, productLine?: string | null, sourceTexts?: string[]): string {
+  // v12.34: 集合计算收编为 computeAllowedCategoryWords（与校验层共享，防两处实现漂移）
+  const allowedWords = computeAllowedCategoryWords(productLine, sourceTexts)
 
   const lines: string[] = []
   const keepEnLines: string[] = []
@@ -2609,7 +2615,10 @@ export const CORE_PRINCIPLES_REMEDIATION = `⛔ NEVER "complete" partial product
    proper noun (not in the glossary, not a valid word in any language), do NOT
    transliterate it, do NOT guess its meaning, do NOT invent a translation —
    keep the EXACT original spelling. Preserving the original is always better
-   than guessing. (e.g., "Panasionic" → keep "Panasionic", never "帕納西奧尼克")`
+   than guessing. (e.g., "Panasionic" → keep "Panasionic", never "帕納西奧尼克")
+   NOTE: Real dictionary words and internet coinages (vloggers, creators, streamers,
+   gamers...) are NOT misspellings — translate them normally. Only garbled strings
+   that are not words in ANY language qualify.`
 
 export const CORE_PRINCIPLES_LEAN_ZH = `[核心原则]
 
@@ -2633,7 +2642,9 @@ export const CORE_PRINCIPLES_REMEDIATION_ZH = `⛔ 严禁"补全"不完整的产
 ⛔ 疑似错词：若某个单词疑似拼写错误或是无法识别的专有名词（不在术语库、
    不构成任何语言的合法词），不要音译、不要猜测词义、不要编造译名 ——
    原样保留源文拼写。保留原形永远优于猜测。
-   （例如 "Panasionic" → 保留 "Panasionic"，绝不译成 "帕納西奧尼克"）`
+   （例如 "Panasionic" → 保留 "Panasionic"，绝不译成 "帕納西奧尼克"）
+   注意：真实词典词与互联网新词（vloggers、creators、streamers、gamers…）
+   不是错词 —— 正常翻译。只有不构成任何语言合法词的乱码字符串才算错词。`
 
 // v11.5: 旧常量保留为 LEAN + REMEDIATION 组合（兼容既有引用点，零回归）
 export const CORE_PRINCIPLES = CORE_PRINCIPLES_LEAN + '\n' + CORE_PRINCIPLES_REMEDIATION
@@ -2744,6 +2755,60 @@ export function getStyleCard(
   }
 
   return parts.length > 0 ? `\n[STYLE]\n${parts.join('\n\n')}` : ''
+}
+
+/**
+ * v12.34: 拆段风格卡——重试时保留 tone（轻量受众约束），砍掉完整 styleGuide（营销调指令）。
+ * 根因：forceTranslate 重试时 styleCard=''（v11.5 减肥误伤），重试产物无风格约束，
+ *   ja/ko 重试率不低，风格一致性没人管。tone 只有 2-4 行（告诉 LLM 受众是 gaming 还是
+ *   professional），不会让 LLM 翻不动；styleGuide 5-6 行营销调指令重试时不需要。
+ * 拆分边界（与 getStyleCard 内部 parts 数组同序）：
+ *   toneCard = 技术语域卡(非详情页) + 产品线 tone + 场景 FORMAT + DONT + MARKET NOTE
+ *   styleGuideCard = 完整 styleGuide（marketing/professional/standard 营销调）
+ */
+export function getStyleCardSplit(
+  targetLang: string,
+  productLine: string | null,
+  style: string,
+  scenePreset: string,
+): { toneCard: string; styleGuideCard: string } {
+  const toneParts: string[] = []
+  let styleGuideCard = ''
+
+  const isEcommerce = scenePreset === 'ecommerce'
+  // 技术语域卡（非详情页）
+  if (!isEcommerce && scenePreset) {
+    const techRegister = getTechnicalRegister(targetLang)
+    if (techRegister) toneParts.push(techRegister)
+  }
+  // 产品线 tone（详情页）
+  const productTone = isEcommerce ? getProductLineTone(productLine || null, targetLang) : ''
+  if (productTone) toneParts.push(productTone)
+  // 完整 styleGuide（拆出，重试砍掉）
+  if (isEcommerce && !productTone) {
+    const styleGuide = style ? getStyleGuide(style, targetLang) : ''
+    if (styleGuide) styleGuideCard = styleGuide
+  }
+  // 场景 FORMAT / DONT / MARKET NOTE（轻量，重试保留）
+  if (scenePreset) {
+    const sceneFormat = getSceneConstraints(scenePreset, targetLang, true)
+    if (sceneFormat) toneParts.push(sceneFormat.trim())
+  }
+  const langBlock = LANG_SPECIFIC[targetLang]
+  if (langBlock?.compliance) {
+    const dontLabel = isCJKTarget(targetLang) ? '[禁止]' : '[DONT]'
+    toneParts.push(`${dontLabel}\n${langBlock.compliance}`)
+  }
+  const marketNote = getMarketNote(targetLang, productLine)
+  if (marketNote) {
+    const noteLabel = isCJKTarget(targetLang)
+      ? '[市场语感 — 与上方通用语气冲突时以此为准]'
+      : '[MARKET NOTE — overrides general tone above where market preference differs]'
+    toneParts.push(`${noteLabel}\n${marketNote}`)
+  }
+
+  const toneCard = toneParts.length > 0 ? `\n[STYLE]\n${toneParts.join('\n\n')}` : ''
+  return { toneCard, styleGuideCard }
 }
 
 // ═══════════════════════════════════════════════════════════════

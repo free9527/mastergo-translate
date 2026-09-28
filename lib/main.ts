@@ -7,6 +7,7 @@ import { DEFAULT_GLOSSARY_PRODUCTS_CSV, DEFAULT_GLOSSARY_EXCLUSIVE_CSV } from '@
 import { loadGlossaryWithMerge, saveGlossaryWithVersion } from '@lib/glossary-store'
 import { parseCSVRow } from '@lib/parse-csv'
 import { normalizeFontStyle } from '@lib/font-mapper'
+import { finalizeForCanvas } from '@lib/post-process'
 
 // DEBUG 日志辅助函数
 const debugLog = (...args: unknown[]) => DEBUG_MODE && console.log(...args)
@@ -297,13 +298,17 @@ async function applyTranslations(items: TextItem[]): Promise<void> {
         }
 
         let textApplied = false
+        // v12.36: 写画布前统一过 finalizeForCanvas（↵ 占位符 → 真换行）。
+        //   管道内翻译 S5/校对已还原，但润色等路径产物可能残留字面 ↵；
+        //   应用是写画布唯一物理出口，在此兜底保证任何上游路径都不会把 ↵ 写上画布（幂等）。
+        const finalText = finalizeForCanvas(item.translatedText)
         try {
-          node.characters = item.translatedText
+          node.characters = finalText
           textApplied = true
         } catch (e) {
           try {
             node.deleteCharacters(0, node.characters.length)
-            node.insertCharacters(0, item.translatedText)
+            node.insertCharacters(0, finalText)
             textApplied = true
           } catch (e2) {
             failed++
@@ -314,7 +319,7 @@ async function applyTranslations(items: TextItem[]): Promise<void> {
 
         if (textApplied) {
           done++
-          appliedTexts.set(nodeId, item.translatedText)
+          appliedTexts.set(nodeId, finalText)
           try {
             applyTextStyle(node, item)
             fixRegisterSymbolFont(

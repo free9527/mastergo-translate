@@ -1,0 +1,50 @@
+﻿1,各站点通用,,,,,,,,,,,,,,,,,,
+,场景,❌ 禁止写法 (违禁词),✅ 合规替代写法,,,,,,,,,,,,,,,,
+"存储 / 电子产品
+专项高风险词 ",速度 / 性能声明,"Fastest, Best speed, #1 fastest, Unbeatable speed","Up to 1050MB/s read, Transfer speeds up to XXX MB/s",,,,,,,,,,,,,,,,
+,防水 / 耐用声明,"100% waterproof, Unbreakable, Indestructible","IP67 rated, Water resistant (IPX7), Drop-tested to 3m",,,,,,,,,,,,,,,,
+,兼容性声明,"Works with all devices, Universal compatibility","Compatible with [specific devices], Designed for PS5, Steam Deck",,,,,,,,,,,,,,,,
+,寿命 / 可靠性,"Lasts forever, Never fails, Lifetime guarantee","Rated for X TBW, 5-year limited warranty, MTTF: 1.8M hours",,,,,,,,,,,,,,,,
+,竞品对比,"Better than Samsung, Beats SanDisk, Unlike Kingston",仅在 A+ 对比图表 中使用，且需基于可验证客观数据,,,,,,,,,,,,,,,,
+,认证声明,"Military grade, Enterprise grade","MIL-STD-810G tested, Meets UHS-II standard",,,,,,,,,,,,,,,,
+通用违禁词,促销 / 主观声明,"Best, Best seller, Amazing, No.1, Top rated, Award winning, Proven, Perfect, Premium quality",,,,,,,,,,,,,,,,,
+,价格 / 促销 / 物流,"Free shipping, Discount, Sale, Special offer, Limited time, Wholesale, Clearance, Buy one get one",,,,,,,,,,,,,,,,,
+,保证 / 保修声明,"Guarantee, Guaranteed, Satisfaction guaranteed, Lifetime warranty, Money back (可在产品具体保修政策区域说明条款)",,,,,,,,,,,,,,,,,
+,行动号召 (CTA),"Buy now, Order today, Act fast, Click here, Shop with confidence, Don't miss out",,,,,,,,,,,,,,,,,
+2, 各站点差异化合规规则 ,,,,,,,,,,,,,,,,,,
+站点,额外限制与特定合规要求,,,,,,,,,,,,,,,,,,
+US (美国),"• 无线/蓝牙产品需具备 FCC 合规声明
+• 含特定化学物质产品需加注 California Prop 65 警告
+• ""Made in USA"" 需符合 FTC 标准（全部或大部分美国制造）",,,,,,,,,,,,,,,,,,
+DE (德国),"• 2026年7月起标题限制 75 字符
+• GPSR：必须提供制造商及欧盟授权代表联系方式
+• EPR 注册号：必须提供，否则 listing 停用
+• WEEE 标志：电子产品必须显示回收标志• UWG (反不正当竞争法)：对“性价比最高”等声明极严
+• ElektroG：电子产品严格履行注册义务",,,,,,,,,,,,,,,,,,
+FR (法国),"• Loi Toubon：所有产品信息必须包含法语版本
+• Loi AGEC：禁止 ""eco-friendly"" 等未经验证的环保声明
+• DEEE 注册：废弃电子设备回收注册",,,,,,,,,,,,,,,,,,
+UK (英国),"• UKCA 标志要求（替代 CE 标志）
+• ASA：对 ""Proven"", ""Clinically tested"" 额外审查
+• 独立的 UK WEEE 注册要求",,,,,,,,,,,,,,,,,,
+JP (日本),"• PSE 标志（电气用品安全法）：特定电子产品必须
+• 景品表示法：禁止 ""最高級"" ""世界初"" ""業界No.1"" 等（除非有客观证据）
+• 技適マーク (TELEC)：无线产品必须
+• 特例：全大写 (ALL CAPS) 在日本站可接受",,,,,,,,,,,,,,,,,,
+3, Amazon 标题合规规定 (2025-2026新规) ,,,,,,,,,,,,,,,,,,
+规则维度,详细规定与要求,,,,,,,,,,,,,,,,,,
+字符限制,2026年7月27日起：所有品类标题 ≤ 75 字符 (含空格)；此前为 150–200 字符,,,,,,,,,,,,,,,,,,
+禁止字符,"{ }, !, $, ?, Ã, ¥ (品牌名本身包含的例外)",,,,,,,,,,,,,,,,,,
+禁止全大写,ALL CAPS 禁止（品牌/技术缩写如 SSD、USB 例外）,,,,,,,,,,,,,,,,,,
+禁止关键词堆砌,不可重复同义词或堆积不相关关键词,,,,,,,,,,,,,,,,,,
+禁止促销语,标题内不可包含任何促销、折扣或主观评价词,,,,,,,,,,,,,,,,,,
+示例对比,"❌ 违规： ""Lexar BEST FASTEST 256GB MicroSD Card - FREE SHIPPING! Top Quality Memory Card for ALL Cameras""
+✅ 合规： ""Lexar Professional 1066x 256GB microSDXC UHS-I Card""",,,,,,,,,,,,,,,,,,
+4, 广告创意违禁要求 (SP / SB / SD / DSP) ,,,,,,,,,,,,,,,,,,
+类别,❌ 违规禁止内容,,,,,,,,,,,,,,,,,,
+格式,ALL CAPS 文字、CaMeL CaSe、过度标点 (!!!)、过度使用 emoji,,,,,,,,,,,,,,,,,,
+声明,虚假紧迫感 (Hurry!)、未验证排名 (#1 in storage)、虚假折扣,,,,,,,,,,,,,,,,,,
+图片,"自制 ""Best Seller"" 徽章、未授权认证 Logo、模糊/低质量图、前后对比图",,,,,,,,,,,,,,,,,,
+品牌,标题或 SB Headline 中植入竞品品牌名、使用第三方 Logo,,,,,,,,,,,,,,,,,,
+引流,外部 URL、电话号码、二维码 (QR Code)、社交媒体账号,,,,,,,,,,,,,,,,,,
+评论,"""5-star rated""、""Customers love it""、引用具体买家评论内容",,,,,,,,,,,,,,,,,,

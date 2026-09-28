@@ -114,7 +114,7 @@
           <span class="pending-text">
             {{ pendingItems.filter(p => p.type === 'error').length }} 条错误，
             {{ pendingItems.filter(p => p.type === 'placeholder').length }} 条占位符，
-            {{ pendingItems.filter(p => p.type === 'untranslated').length }} 条漏翻待确认<template v-if="pendingItems.some(p => p.type === 'misspelled')">，{{ pendingItems.filter(p => p.type === 'misspelled').length }} 条疑似拼写错误</template><template v-if="pendingItems.some(p => p.type === 'llmFallback')">，{{ pendingItems.filter(p => p.type === 'llmFallback').length }} 条新品名待确认</template><template v-if="pendingItems.some(p => p.type === 'prohibitedSrc')">，{{ pendingItems.filter(p => p.type === 'prohibitedSrc').length }} 条源文违禁词</template><template v-if="pendingItems.some(p => p.type === 'prohibitedTrans')">，{{ pendingItems.filter(p => p.type === 'prohibitedTrans').length }} 条译文违禁词</template><template v-if="pendingItems.some(p => p.type === 'prohibitedSrc' || p.type === 'prohibitedTrans')">（上传京东/亚马逊会被拦截）</template>
+            {{ pendingItems.filter(p => p.type === 'untranslated').length }} 条漏翻待确认<template v-if="pendingItems.some(p => p.type === 'misspelled')">，{{ pendingItems.filter(p => p.type === 'misspelled').length }} 条未识别词</template><template v-if="pendingItems.some(p => p.type === 'llmFallback')">，{{ pendingItems.filter(p => p.type === 'llmFallback').length }} 条新品名待确认</template><template v-if="pendingItems.some(p => p.type === 'prohibitedSrc')">，{{ pendingItems.filter(p => p.type === 'prohibitedSrc').length }} 条源文违禁词</template><template v-if="pendingItems.some(p => p.type === 'prohibitedTrans')">，{{ pendingItems.filter(p => p.type === 'prohibitedTrans').length }} 条译文违禁词</template><template v-if="pendingItems.some(p => p.type === 'prohibitedSrc' || p.type === 'prohibitedTrans')">（上传京东/亚马逊会被拦截）</template>
           </span>
           <svg class="chevron" :class="{ open: showPendingList }" width="12" height="12" viewBox="0 0 12 12"><path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
         </div>
@@ -129,7 +129,7 @@
         <div class="pending-list" v-if="showPendingList">
           <div class="pending-item" v-for="p in pendingItems" :key="p.item.nodeIds[0]" :class="p.type">
             <div class="pending-item-source" :title="p.item.sourceText">
-              <span v-if="p.type === 'misspelled'" class="misspelled-tag">疑似拼写错误，请核对源稿：</span><span v-else-if="p.type === 'llmFallback'" class="llm-fallback-tag">新品名待确认（LLM 辅助识别）：</span><span v-else-if="p.type === 'prohibitedSrc'" class="prohibited-tag">源文违禁词（{{ (prohibitedSrcIds.get(p.item.nodeIds[0]) || []).join('、') }}）：</span><span v-else-if="p.type === 'prohibitedTrans'" class="prohibited-tag">译文违禁词（{{ (prohibitedTransIds.get(p.item.nodeIds[0]) || []).join('、') }}）{{ llmConfig.enableProofread ? '，校对改写后仍命中' : '，开校对可规避' }}：</span>{{ p.item.sourceText.slice(0, 40) }}{{ p.item.sourceText.length > 40 ? '...' : '' }}
+              <span v-if="p.type === 'misspelled'" class="misspelled-tag">未识别词·已保留原形（如确认是正确词汇可重翻）：</span><span v-else-if="p.type === 'llmFallback'" class="llm-fallback-tag">新品名待确认（LLM 辅助识别）：</span><span v-else-if="p.type === 'prohibitedSrc'" class="prohibited-tag">源文违禁词（{{ (prohibitedSrcIds.get(p.item.nodeIds[0]) || []).join('、') }}）：</span><span v-else-if="p.type === 'prohibitedTrans'" class="prohibited-tag">译文违禁词（{{ (prohibitedTransIds.get(p.item.nodeIds[0]) || []).join('、') }}）{{ llmConfig.enableProofread ? '，校对改写后仍命中' : '，开校对可规避' }}：</span>{{ p.item.sourceText.slice(0, 40) }}{{ p.item.sourceText.length > 40 ? '...' : '' }}
             </div>
             <div class="pending-item-trans" :title="p.item.translatedText">{{ p.item.translatedText.slice(0, 40) }}{{ p.item.translatedText.length > 40 ? '...' : '' }}</div>
             <div class="pending-item-actions">
@@ -291,7 +291,7 @@
               <span class="error-badge" v-if="translateErrors.has(item.nodeIds[0])">翻译失败</span>
               <span class="prohibited-badge" v-if="prohibitedTransIds.has(item.nodeIds[0])" :title="'译文含平台违禁词：' + (prohibitedTransIds.get(item.nodeIds[0]) || []).join('、')">⚠ 译文违禁词</span>
               <span class="prohibited-badge locked" v-if="prohibitedLockedIds.has(item.nodeIds[0])" :title="'译文为术语库官方值，含平台违禁词：' + (prohibitedLockedIds.get(item.nodeIds[0]) || []).join('、') + '（术语库优先级最高，未自动改写）'">⚠ 术语库违禁词</span>
-              <span class="misspelled-badge" v-if="misspelledIds.has(item.nodeIds[0])">疑似拼写错误</span>
+              <span class="misspelled-badge" v-if="misspelledIds.has(item.nodeIds[0])" title="LLM 未识别的词汇，已保留原文。如确认是正确词汇（新词/专名/品牌造词），可单条重翻">未识别词·已保留原形</span>
               <span class="placeholder-badge" v-if="hasPlaceholderResidue(item.translatedText)">⚠️ 占位符</span>
               <span class="untranslated-badge" v-if="showUntranslatedBadge(item)">⚠️ 漏翻</span>
               <span class="proof-badge" v-if="item.corrected">校正</span>
@@ -3497,7 +3497,7 @@ async function retranslateSingle(item: TextItem) {
       // v10.6: 疑似错词 → 保留原形 + 单独标记（非翻译失败，提示核对源稿）
       item.translatedText = item.sourceText
       misspelledIds.value.add(id)
-      showToast('源文疑似拼写错误，已保留原形，请核对源稿', 'warning')
+      showToast('未识别词已保留原形，如确认是正确词汇可单条重翻', 'warning')
     } else if (untranslated.size > 0) {
       // v9.11: 兜底链全失败 → 保留原文 + 标记失败（待确认可见 + 可重翻）
       item.translatedText = item.sourceText
