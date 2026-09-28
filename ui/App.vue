@@ -129,7 +129,7 @@
         <div class="pending-list" v-if="showPendingList">
           <div class="pending-item" v-for="p in pendingItems" :key="p.item.nodeIds[0]" :class="p.type">
             <div class="pending-item-source" :title="p.item.sourceText">
-              <span v-if="p.type === 'misspelled'" class="misspelled-tag">未识别词·已保留原形（如确认是正确词汇可重翻）：</span><span v-else-if="p.type === 'llmFallback'" class="llm-fallback-tag">新品名待确认（LLM 辅助识别）：</span><span v-else-if="p.type === 'prohibitedSrc'" class="prohibited-tag">源文违禁词（{{ (prohibitedSrcIds.get(p.item.nodeIds[0]) || []).join('、') }}）：</span><span v-else-if="p.type === 'prohibitedTrans'" class="prohibited-tag">译文违禁词（{{ (prohibitedTransIds.get(p.item.nodeIds[0]) || []).join('、') }}）{{ llmConfig.enableProofread ? '，校对改写后仍命中' : '，开校对可规避' }}：</span>{{ p.item.sourceText.slice(0, 40) }}{{ p.item.sourceText.length > 40 ? '...' : '' }}
+              <span class="confidence-tag" :class="'conf-' + p.confidence">{{ p.confidence === 'high' ? '需处理' : p.confidence === 'mid' ? '建议裁决' : '仅提示' }}</span><span v-if="p.type === 'misspelled'" class="misspelled-tag">未识别词·已保留原形（如确认是正确词汇可重翻）：</span><span v-else-if="p.type === 'llmFallback'" class="llm-fallback-tag">新品名待确认（LLM 辅助识别）：</span><span v-else-if="p.type === 'prohibitedSrc'" class="prohibited-tag">源文违禁词（{{ (prohibitedSrcIds.get(p.item.nodeIds[0]) || []).join('、') }}）：</span><span v-else-if="p.type === 'prohibitedTrans'" class="prohibited-tag">译文违禁词（{{ (prohibitedTransIds.get(p.item.nodeIds[0]) || []).join('、') }}）{{ llmConfig.enableProofread ? '，校对改写后仍命中' : '，开校对可规避' }}：</span>{{ p.item.sourceText.slice(0, 40) }}{{ p.item.sourceText.length > 40 ? '...' : '' }}
             </div>
             <div class="pending-item-trans" :title="p.item.translatedText">{{ p.item.translatedText.slice(0, 40) }}{{ p.item.translatedText.length > 40 ? '...' : '' }}</div>
             <div class="pending-item-actions">
@@ -716,21 +716,36 @@ function hasPlaceholderResidue(text: string): boolean {
 }
 
 /** v8.9: 待确认条目 — 三类阻塞问题 + v11.3 LLM 兜底新品名（v12.3.1 起术语库差异提示已下线） */
+// v12.38: 每条附 confidence 置信度分层（纯展示透出，不动阻塞语义——hasPendingBlockingIssue 仍按 type 判定）：
+//   high（代码形式判，直接执行）：error/placeholder/untranslated
+//   mid（LLM 语义判，建议用户裁决）：misspelled/llmFallback/prohibitedSrc
+//   low（形态模糊，仅提示不阻塞）：prohibitedTrans
+type PendingType = 'error' | 'placeholder' | 'untranslated' | 'misspelled' | 'llmFallback' | 'prohibitedSrc' | 'prohibitedTrans'
+const PENDING_CONFIDENCE: Record<PendingType, 'high' | 'mid' | 'low'> = {
+  error: 'high',
+  placeholder: 'high',
+  untranslated: 'high',
+  misspelled: 'mid',
+  llmFallback: 'mid',
+  prohibitedSrc: 'mid',
+  prohibitedTrans: 'low',
+}
 const pendingItems = computed(() => {
-  const errors: Array<{ item: typeof items.value[0]; type: 'error' | 'placeholder' | 'untranslated' | 'misspelled' | 'llmFallback' | 'prohibitedSrc' | 'prohibitedTrans' }> = []
+  const errors: Array<{ item: typeof items.value[0]; type: PendingType; confidence: 'high' | 'mid' | 'low' }> = []
+  const push = (item: typeof items.value[0], type: PendingType) => errors.push({ item, type, confidence: PENDING_CONFIDENCE[type] })
   for (const item of items.value) {
     if (appliedNodeIds.value.has(item.nodeIds[0])) continue // 已应用的不参与
     // v11.3: LLM 兜底检出的新品名（整条原文在 llmFallbackTerms 中）
     if (llmFallbackTerms.value.has(item.sourceText.trim().replace(/[®™©]/g, ''))) {
-      errors.push({ item, type: 'llmFallback' })
+      push(item, 'llmFallback')
     } else if (misspelledIds.value.has(item.nodeIds[0])) {
-      errors.push({ item, type: 'misspelled' })
+      push(item, 'misspelled')
     } else if (translateErrors.value.has(item.nodeIds[0])) {
-      errors.push({ item, type: 'error' })
+      push(item, 'error')
     } else if (hasPlaceholderResidue(item.translatedText)) {
-      errors.push({ item, type: 'placeholder' })
+      push(item, 'placeholder')
     } else if (showUntranslatedBadge(item)) {
-      errors.push({ item, type: 'untranslated' })
+      push(item, 'untranslated')
     }
     // v12.3.1: 术语库差异提示（glossaryDiverged）已下线——用户拍板「不用提示报错」。
     // PCIe 5.0 vs Gen5X4 这类「事实差异」不是「写法差异」，术语库值与源文事实不一致时
@@ -744,8 +759,8 @@ const pendingItems = computed(() => {
   //   锁定徽章保留在结果卡片上（上架前可见提醒），但不再进面板要求操作。
   for (const item of items.value) {
     if (appliedNodeIds.value.has(item.nodeIds[0])) continue
-    if (prohibitedTransIds.value.has(item.nodeIds[0])) errors.push({ item, type: 'prohibitedTrans' })
-    else if (prohibitedSrcIds.value.has(item.nodeIds[0])) errors.push({ item, type: 'prohibitedSrc' })
+    if (prohibitedTransIds.value.has(item.nodeIds[0])) push(item, 'prohibitedTrans')
+    else if (prohibitedSrcIds.value.has(item.nodeIds[0])) push(item, 'prohibitedSrc')
   }
   return errors
 })
@@ -758,6 +773,12 @@ const hasPendingBlockingIssue = computed(() =>
 const hasPendingNonBlockingIssue = computed(() =>
   pendingItems.value.some(p => p.type === 'prohibitedTrans')
 )
+
+// v12.38: 置信度分组（纯展示透出——hasPendingBlockingIssue/hasPendingNonBlockingIssue 仍按 type 判定，一行未动）：
+//   actionable = 高/中置信需用户处理（error/placeholder/untranslated/misspelled/llmFallback/prohibitedSrc）
+//   hintOnly  = 低置信仅提示（prohibitedTrans）——上架前可见但不强制逐条处置
+const pendingActionable = computed(() => pendingItems.value.filter(p => p.confidence !== 'low'))
+const pendingHintOnly = computed(() => pendingItems.value.filter(p => p.confidence === 'low'))
 
 /**
  * v12.3.1: 术语库差异提示（v11.6 glossaryDiverged）已下线——用户拍板「不用提示报错」。

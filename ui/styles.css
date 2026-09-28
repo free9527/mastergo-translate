@@ -898,6 +898,25 @@ body {
   font-weight: 600;
   margin-right: 2px;
 }
+
+/* v12.38: 置信度分层标签（纯展示透出——需处理/建议裁决/仅提示） */
+.confidence-tag {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 0 4px;
+  border-radius: 3px;
+  margin-right: 4px;
+  line-height: 1.5;
+  vertical-align: middle;
+}
+.conf-high { background: #ff3b30; color: #fff; }
+.conf-mid { background: #007aff; color: #fff; }
+.conf-low { background: #8e8e93; color: #fff; }
+/* v12.38: 低置信（仅提示）条目整体弱化，与阻塞项视觉分层 */
+.pending-item:has(.conf-low) {
+  opacity: 0.6;
+}
 /* v11.12: 违禁词待确认条目弱化为非阻塞观感（与 glossaryDiverged 同策略） */
 .pending-item.prohibitedSrc,
 .pending-item.prohibitedTrans {
