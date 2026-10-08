@@ -148,52 +148,10 @@ assert(SCENE_CONSTRAINTS['compliance_doc'].universal[0].includes('legally watert
 // E. 风格越界清零
 // ═══════════════════════════════════════════════════════════════
 out.push('')
-out.push('E. 风格越界清理（marketing 无产品线规则 / professional 无影像专属）')
-
-import { getStyleGuide } from '../lib/prompt-constants'
-
-// marketing 风格 20 语种：不含产品线规则关键词
-const marketingProbes = [
-  ['default', 'Gaming products'],
-  ['zh-CN', '游戏产品'],
-  ['zh-TW', '遊戲產品'],
-  ['ja', 'ゲーミング製品'],
-  ['ko', '게임 제품'],
-  ['de', 'Gaming-Produkte'],
-  ['fr', 'Produits gaming'],
-  ['pt-BR', 'Produtos gaming'],
-  ['ru', 'Игровые продукты'],
-  ['ar', 'منتجات الألعاب'],
-]
-for (const [lang, probe] of marketingProbes) {
-  const guide = getStyleGuide('marketing', lang)
-  assert(!guide.includes(probe as string), `E-mkt-${lang} marketing 风格不含产品线规则（${probe}）`)
-}
-// marketing 核心规则保留（防误删）
-assert(getStyleGuide('marketing', 'default').includes('Strong promotional feel'), 'E-mkt-core marketing 核心规则保留')
-assert(getStyleGuide('marketing', 'zh-CN').includes('强促销感'), 'E-mkt-core-zh marketing zh-CN 核心规则保留')
-
-// professional 风格 20 语种：不含影像专属内容
-const professionalProbes = [
-  ['default', 'V60/V90/VPG400'],
-  ['zh-CN', '影像专业术语'],
-  ['zh-TW', 'V60/V90/VPG400'],
-  ['ja', 'V60/V90/VPG400'],
-  ['ko', '이미징 전문 용어'],
-  ['de', 'Imaging-Fachbegriffen'],
-  ['fr', "terminologie professionnelle d'imagerie"],
-  ['pl', 'V60/V90/VPG400'],
-  ['ru', 'обработки изображений'],
-  ['ar', 'التصوير المحترفة'],
-]
-for (const [lang, probe] of professionalProbes) {
-  const guide = getStyleGuide('professional', lang)
-  assert(!guide.includes(probe as string), `E-pro-${lang} professional 风格不含影像专属（${(probe as string).slice(0, 24)}…）`)
-}
-// professional 核心规则保留（防误删）
-assert(getStyleGuide('professional', 'default').includes('Restrained premium'), 'E-pro-core professional 核心规则保留')
-assert(getStyleGuide('professional', 'zh-CN').includes('克制的高端感'), 'E-pro-core-zh professional zh-CN 核心规则保留')
-assert(getStyleGuide('professional', 'zh-CN').includes('摄影师'), 'E-pro-aud professional zh-CN 受众行保留（摄影师）')
+out.push('E. （v12.56 已退役）STYLE_GUIDES / getStyleGuide 生产死代码清理')
+// v12.56: STYLE_GUIDES 与 getStyleGuide 整体退役（getProductLineTone generic fallback 恒非空
+//   使 getStyleCard 的 isEcommerce && !productTone 分支恒假，3×20 表从未进 prompt）。
+//   原 E 段断言（营销/专业风格越界清理）随退役废止，此处仅确认旧符号已从导出面移除。
 
 // ═══════════════════════════════════════════════════════════════
 // F. 20 语种市场语感分段完整性

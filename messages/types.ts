@@ -33,6 +33,9 @@ export enum UIMessage {
   // v12.21: 源文违禁词人工合规白名单持久化
   LOAD_PROHIBITED_WHITELIST = 'LOAD_PROHIBITED_WHITELIST',
   SAVE_PROHIBITED_WHITELIST = 'SAVE_PROHIBITED_WHITELIST',
+  // v12.45: 术语待审核池（自动搜集不静默入库，审核后入专属库）
+  LOAD_PENDING_REVIEW_TERMS = 'LOAD_PENDING_REVIEW_TERMS',
+  SAVE_PENDING_REVIEW_TERMS = 'SAVE_PENDING_REVIEW_TERMS',
 }
 
 export interface TestConnectionResult {
@@ -73,6 +76,8 @@ export enum PluginMessage {
   UI_LOGS_LOADED = 'UI_LOGS_LOADED',
   // v12.21: 源文违禁词人工合规白名单回传
   PROHIBITED_WHITELIST_LOADED = 'PROHIBITED_WHITELIST_LOADED',
+  // v12.45: 术语待审核池回传
+  PENDING_REVIEW_TERMS_LOADED = 'PENDING_REVIEW_TERMS_LOADED',
 }
 
 export interface TextItem {
@@ -152,6 +157,20 @@ export interface GlossaryEntry {
   /** v12.13: 废弃标记（软删除）——true 时 buildGlossaryMaps 不注册（不注入不遮蔽），
    *  条目保留在库中可恢复；CSV 列名 `deprecated`（值 yes/true/1 生效） */
   deprecated?: boolean
+}
+
+/** v12.45: 术语待入库池条目（使用中自动搜集的术语，用户下载发开发者审核后才写回后台） */
+export interface PendingReviewTerm {
+  source: string                        // 整条原文（去®，与 CSV key 惯例对齐）
+  translations: Record<string, string>  // 语言代码 → 译文（产品名为 20 语种代码生成；歧义词/手动修正可能只有部分语种）
+  series?: string                       // 系列名（产品名生成器用；歧义词/手动修正无）
+  detectedAt: number                    // timestamp
+  /** 搜集来源：v11.2=新产品名保护（代码检测+代码生成）；v11.3=LLM 兜底（LLM 判定+代码生成）；
+   *  suggested=校对建议歧义词；correction=用户手动修正译文 */
+  source2: 'v11.2' | 'v11.3' | 'suggested' | 'correction'
+  /** v12.57: 用户已确认入库（仅产品名 v11.2/v11.3 有此按钮）——确认后本客户端立即生效
+   *  （并入本地术语链 S1 短路/遮蔽/校准），与内置库分离存储；下载后随池清空 = 本地生效层清空。 */
+  confirmed?: boolean
 }
 
 // ============================================================

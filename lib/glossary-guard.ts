@@ -246,7 +246,7 @@ export function hasMalformedTrademark(s: string): boolean {
  * （e.g. cleanKey 注册的 key 是 lowercase，而库里存的 value 保留原大小写）。
  */
 function normalizeIdentity(s: string): string {
-  return s.toLowerCase().replace(/[®™©]/g, '').replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim()
+  return s.toLowerCase().replace(/[®™©]/g, '').replace(/×/g, 'x').replace(/[-_]/g, ' ').replace(/\bgen\s+(\d+)\s*x\s*(\d+)\b/g, 'gen$1x$2').replace(/\s+/g, ' ').trim()
 }
 
 export function shouldSkipGlossaryEntry(key: string, value: string): boolean {

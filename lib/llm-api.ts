@@ -1021,7 +1021,7 @@ export async function translateBatch(
   // v12.34: 拆段——重试时保留 tone（轻量受众约束），砍掉完整 styleGuide（营销调指令）。
   //   根因：forceTranslate 重试时 styleCard=''（v11.5 减肥误伤），重试产物无风格约束。
   const styleCard = getStyleCard(targetLang, productLine, effectiveStyle || 'standard', config.scenePreset)
-  const { toneCard } = getStyleCardSplit(targetLang, productLine, effectiveStyle || 'standard', config.scenePreset)
+  const toneCard = getStyleCardSplit(targetLang, productLine, effectiveStyle || 'standard', config.scenePreset)
 
   // v8.0: 目标语言 Few-Shot 示例（按场景+风格动态选择类型）
   // v8.6: 使用实际检测到的源语言，而非硬编码 'en'
@@ -2185,6 +2185,7 @@ function buildJudgePrompt(personaText: string, targetLang: string): string {
 
 You will be given source texts (English) and their ${targetLang} translations from a product listing.
 Read the translations AS YOUR PERSONA and judge whether each needs polishing for naturalness (机翻感/translation flavor).
+When a "Reference (human-approved)" line is provided for an item, prefer aligning with the reference unless it contains clear errors — the reference is the brand's approved expression.
 
 Output ONLY a valid JSON object:
 {"judgements":[{"i":<1-based index>,"needsPolish":<true|false>,"issues":[{"type":"calque|structure|register","span":"<the exact problematic phrase in the translation>","suggestion":"<how to fix it, in ${targetLang}>"}],"confidence":<1-5>}]}
@@ -2196,13 +2197,16 @@ Output ONLY a valid JSON object:
 - Raw JSON only, no markdown code blocks`
 }
 
-function buildJudgeUser(sources: string[], translations: string[], startIdx: number): string {
+function buildJudgeUser(sources: string[], translations: string[], startIdx: number, humanReferences?: Map<number, string>): string {
   // v12.4: 判定前剥离™®©——判定人设只看自然度，™是格式噪音；
   // 防止判定 LLM 模仿译文中的™分布在其 issues span/suggestion 里输出散弹。
   const stripTm = (t: string) => t.replace(/[™®©]/g, '').replace(/\n/g, ' ↵ ')
   return translations.map((t, k) => {
     const n = startIdx + k + 1
-    return `[${n}] Source: ${stripTm(sources[startIdx + k])}\nTranslation: ${stripTm(t)}`
+    // v12.46: 人工钦定锚点透出——语料库里有钦定译文时，judge 判定向钦定对齐
+    const humanRef = humanReferences ? humanReferences.get(startIdx + k) : undefined
+    const refNote = humanRef ? `\nReference (human-approved): ${stripTm(humanRef)}` : ''
+    return `[${n}] Source: ${stripTm(sources[startIdx + k])}\nTranslation: ${stripTm(t)}${refNote}`
   }).join('\n\n')
 }
 
@@ -2254,6 +2258,7 @@ export async function personaJudgeBatch(
   targetLang: string,
   config: LLMConfig,
   productLine?: string | null,
+  humanReferences?: Map<number, string>,  // v12.46: 批内索引→人工钦定译文（语料锚点——judge 判定向钦定对齐）
 ): Promise<Map<number, PolishIssue[]>> {
   const personas = getJudgePersonas(targetLang, productLine)
   if (personas.length === 0) return new Map()
@@ -2271,7 +2276,7 @@ export async function personaJudgeBatch(
   await Promise.all(judgeTasks.map(async ({ persona, b }) => {
     const system = buildJudgePrompt(persona.text, targetLang)
     const batchTrans = translations.slice(b, b + POLISH_JUDGE_BATCH)
-    const user = buildJudgeUser(sources, batchTrans, b)
+    const user = buildJudgeUser(sources, batchTrans, b, humanReferences)
     try {
         const res = await fetchWithRetry(config.proofreadApiUrl || config.apiUrl, {
           method: 'POST',
@@ -2987,6 +2992,7 @@ export async function proofreadBatch(
   expansionFlags?: Set<number>,                 // v10.8: 译文显著超长的条目索引（长度异常信号，供 CHECK 1 语义裁决）
   prohibitedFixMap?: Map<number, Array<{ word: string; note: string }>>,  // v11.12: 批内索引→命中违禁词列表（语义改写必须列具体词）
   polishedIndices?: Set<number>,                // v12.3: 已人设润色的条目索引（CHECK 1R 分叉——语序句式不同是预期，只查信息点完整与事实准确）
+  humanReferenceMap?: Map<number, string>,      // v12.46: 批内索引→人工钦定译文（语料锚点——校对判定/修正向钦定对齐，行业验证的「有锚点对比」路径）
 ): Promise<ProofreadResult[]> {
   const sourceTexts = items.map(it => it.sourceText)
   // v9.3: 批次级源语言判定（校对后漏翻检测用，治 pt→pt-BR 拉丁源文恒判 'en' 的死代码）
@@ -3071,7 +3077,15 @@ export async function proofreadBatch(
           ? '\n📝 Note: This entry has been polished by a native-speaker pass for naturalness. Its sentence structure/word order may differ from the source — this is EXPECTED. Check ONLY that all information points are present and facts (numbers/specs/terms) are accurate; do NOT flag structural differences as problems.'
           : '\n📝 提示：本条已经母语润色（提升自然度）。语序句式与源文不同是预期行为——只校验信息点完整与事实（数字/规格/术语）准确即可，不要把结构差异判为问题。')
       : ''
-    return `[${i + 1}] (${srcLang}→${targetLang}) ${escapedSource}\n${transLabel}：${proofTmStrippedTranslations[i]}${expansionNote}${prohibitedNote}${polishedNote}`
+    // v12.46: 人工钦定锚点提示 — 语料库里有钦定译文时透出，校对判定/修正向钦定对齐
+    //   （行业验证的「有锚点对比」路径：judge/校对 LLM 判「哪个更接近钦定」比判「哪个更地道」可靠）
+    const humanRef = humanReferenceMap ? humanReferenceMap.get(i) : undefined
+    const humanRefNote = humanRef
+      ? (useEnInstruction
+          ? `\n📌 Reference: The human-approved translation for this source is: "${humanRef.replace(/\n/g, ' ↵ ')}" — if the current translation differs, prefer aligning with the reference unless it contains clear errors.`
+          : `\n📌 参考：本条源文的人工钦定译文为："${humanRef.replace(/\n/g, ' ↵ ')}"——若当前译文与钦定有差异，优先向钦定对齐（除非钦定含明显错误）。`)
+      : ''
+    return `[${i + 1}] (${srcLang}→${targetLang}) ${escapedSource}\n${transLabel}：${proofTmStrippedTranslations[i]}${expansionNote}${prohibitedNote}${polishedNote}${humanRefNote}`
   }).join('\n\n')
 
   // ⛔ 校对环节术语反补全闭环：术语 hint 的 label 不含反补全指令，

@@ -134,7 +134,7 @@ export function stripTrademark(s: string): string {
 
 /** cleanKey 归一化（与 entity-masker/post-process 一致） */
 function cleanKey(s: string): string {
-  return s.toLowerCase().replace(/[®™©]/g, '').replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim()
+  return s.toLowerCase().replace(/[®™©]/g, '').replace(/×/g, 'x').replace(/[-_]/g, ' ').replace(/\bgen\s+(\d+)\s*x\s*(\d+)\b/g, 'gen$1x$2').replace(/\s+/g, ' ').trim()
 }
 
 // ═══════════════════════════════════════════════════════════════

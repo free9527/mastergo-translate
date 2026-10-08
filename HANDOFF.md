@@ -1,14 +1,42 @@
 # 项目交接文档（精简版）
 
-**日期**: 2026-09-28
-**版本**: v12.35（宏观架构优化：校验层收敛+品类词校验闭环+重试 tone 保留+错词提示收口+归一化统一）
+**日期**: 2026-10-01
+**版本**: v12.56（代码/提示词复盘落地轮：UI 漏翻徽章双视图根治 + glossaryEnMap identity 残留收口 + 技术语域卡×市场语感冲突护栏 + STYLE_GUIDES 死表退役）
 **项目**: Lexar 翻译插件（MasterGo 插件）
 
 > **本文件是精简版（日常加载）**——完整过程记录/测试细节/排查证据链在 **`HANDOFF-archive.md`**（304KB，原样保留）。需要细节时按「十一、archive 索引」检索完整版。
 
 ---
 
-## 零、当前版本速览（v12.30–v12.35，2026-09-24/28）
+## 零、当前版本速览（v12.47–v12.56，2026-09-29/10-01）
+
+| 版本 | 一句话 | 验证 |
+| :--- | :--- | :--- |
+| **v12.56** | 复盘落地四件——①UI 漏翻徽章双视图根治（`computeUntranslatedBadge` 原传 full 视图、后端 `detectUntranslatedText` 传 en，v9.10 红线违规；改 en 对齐，错词豁免保持 full）②`glossaryEnMap` identity 残留收口（v11.3 兜底 + 独立校对路径两处 `set(term, term)` 改存译名，v12.50 同根复发）③技术语域卡×marketNote 冲突护栏（非详情页不再注入「满血版/战未来」市场语感，否则显式 override 技术卡第 5 条客观化）④STYLE_GUIDES 3×20 营销调死表退役（`getProductLineTone` generic fallback 恒非空致 `isEcommerce && !productTone` 恒假，整表从未进 prompt） | typecheck+build 绿；回归 40/40、54/54、61/61、26/26、40+40、48/48、94/94、177/177 全绿 |
+| **v12.55** | 终态异常快照收口——`S1-identity保留英文`（软件名/硬件型号走术语库 source===target 通道保英文）是钦定正常路径，移出「终态异常」快照（此前误挂异常标签，实为正常行为惰性噪音）；可见性由上方 S1 短路汇总行保证 | typecheck+build 绿 |
+| **v12.54** | #6/#7 根因修复——`confirmLlmFallbackTerm` 语义纠正（用户拍板：确认入库=收录进待入库池、**不 splice 池不标记 appliedNodeIds**）。旧实现 splice 池 → #6「确认入库后待入库术语归零」；标记 appliedNodeIds → 批量应用静默跳过 → #7「有译文但点应用画布不变」。修复：引入 `poolConfirmedKeys` 只消「待确认」阻塞、池保留原料、翻译照常走应用 | typecheck+build 绿；#6 实机下载拿到 1 条（旧 bug 0 条）/#7 实机 40 条目应用 42 节点成功 0 失败 |
+| **v12.53** | #5 待处理面板重排（代码驱动，截图解码非插件 UI 不可用）——`pending-list` max-height 160→280px、条目 padding 8→10、源/译文 line-height 1.4、按钮区 flex-wrap+max-width 150px | typecheck+build 绿 |
+| **v12.52** | 术语库 CSV 列序对齐——`serializeGlossaryCSV` 把 `en` 恒排最后一列（对齐产品名/专属内置库头部；UI 下拉 LANGUAGES en 在第 3 列但 CSV 导出序与其解耦）。parseGlossaryCSVText 按表头名解析不依赖列序，导入往返不受影响 | typecheck+build 绿 + 回归 86/86、28/28 |
+| **v12.51** | 诊断日志增强——每条文本判定路径透出（`路径[源文]: 走的哪条路 → 译文`）+ S1 短路分支细分（`identity保留英文X条 [具体条目] / 术语命中Y条`）+ 覆盖变更追踪（`译文变更: 生成值 → 被X覆盖为Y`）+ 翻译批次完成锚点（`待应用N条（已译K条/译文=原文M条[应用时跳过替换]）`） | typecheck+build 绿；bundle 验证 6 个新日志串全在产物 |
+| **v12.50** | **根因修复**——`glossaryEnMap.set(d.term, d.term)`（v11.2 新产品名 en 视图设成 identity）改为 `set(d.term, targetVal)`（存译名 src≠tgt）。**根因：identity 导致这条被 noTranslateTerms 收录为「保留英文不翻译」，S1 短路 identity 分支用英文原文覆盖代码生成的西语译文**（PLAY X 判定成产品名走了代码翻译却输出英文） | 298/298 断言全绿（10 套件，重点 test-v1114/test-v1232 identity 语义未受影响）；实机验证 PLAY X 出 `Unidad de estado sólido (SSD) Lexar PLAY X M.2 PCIe 4.0 NVMe` |
+| **v12.49** | 术语治理收口——三个自动搜集口子（校后歧义词/手动修正译文/v11.2/v11.3 产品名）统一收录「待入库术语」池不静默入库 + 下载发开发者审核写回后台 + `loadGlossaryWithMerge` 发版**直接覆盖**内置默认库（GLOSSARY_VERSION 9→10，用户本地自定义全清）+ 专属库重置 127 条（删第三方品牌重复） | typecheck+build 绿；test-v119 E 段 3 断言待更新（合并升级→直接覆盖语义变更预期失败） |
+| **v12.48** | 产品名代码生成规格词序归一——`generateProductNameTranslations` core 槽位 `M.2 ↔ PCIe` 相邻规格对归一到钦定 `M.2 PCIe 4.0`（与画布录入词序解耦，PLAY X es 出钦定形态） | 23 断言全绿 |
+| **v12.47** | 产品名结构归一 key——`productStructureKey`（剥品类词+token 排序）+ `alignToGlossaryWordOrder`（**当前无生产调用点**，留作未来 S1 匹配层词序归一短路备用，用户已否决匹配层词序归一命中——保词序匹配是 S1 精确性保证） | 21 断言全绿 |
+
+**v12.47-v12.51 复盘（PLAY X 实机事故驱动，三连问逼出根因）**：
+
+**根因链**（用户三连问）：画布 `Lexar PLAY X PCIe 4.0 M.2 NVMe SSD`（词序反）→ S1 cleanKey 保词序匹配漏配（**用户拍板：这是对的，录入/书写问题非程序问题**）→ v11.2 检出为「新产品名」→ 代码生成 es 钦定形态 → **但被 S1 identity 短路覆盖回英文**。
+
+**三层根因逐层剥离**：
+1. **词序漏配**（表层）：cleanKey 不保词序归一 → 词序变体漏配（**用户否决匹配层词序归一命中**：保词序是精确性保证）→ 生成层 core 规格词序归一补（v12.48）
+2. **identity 误伤**（核心，v12.50 根治）：v11.2 把 adhoc term 的 `glossaryEnMap` 设成 identity（`term→term`），导致 `noTranslateTerms`（en 视图 src===tgt 收录）把它当「保留英文不翻译」，S1 短路 identity 分支用英文原文覆盖代码生成的西语。**这是「判定成产品名走了代码翻译但输出英文」的直接根因**
+3. **诊断日志盲区**（放大器，v12.51 补）：identity 短路把译文锁成英文但**完全无日志**，只能看到 v11.2 生成了西语、看不到被 identity 覆盖——排查只能靠用户截图译文列。补齐后「译文不对」可只凭日志定位路径+覆盖点
+
+**术语治理（v12.49）**：自动搜集三类（校后歧义词/手动修正译文/产品名）此前静默写 `glossaryExclusive` 污染钦定库——统一收录**待入库术语**池（独立 clientStorage，不参与 S1 生效，「不与后台钦定混在一起」），用户点「下载」打包 21 列 CSV 发开发者审核 → 写回后台 → 发版 `loadGlossaryWithMerge` **直接覆盖**全员（原「合并升级保留用户词条」作废，污染条目一升级全清）。
+
+---
+
+## 零·五、历史版本速览（v12.30–v12.35，2026-09-24/28）
 
 | 版本 | 一句话 | commit | 验证 |
 | :--- | :--- | :--- | :--- |
@@ -64,6 +92,12 @@ MasterGo 设计工具插件，将 Lexar 产品设计稿从英文翻译成 20 个
 
 | 版本 | 一句话 |
 |---|---|
+| v12.47-51 | PLAY X 实机事故根治五连：v12.48 生成层 core 规格词序归一钦定 + v12.49 三自动搜集口子收录待入库池不静默入库+发版直接覆盖（GLOSSARY_VERSION 10）+ **v12.50 根因修复——glossaryEnMap 不设 identity（noTranslateTerms 误伤代码生成译名根治）** + v12.51 诊断日志增强（每条文本判定路径/S1 短路分支细分/覆盖变更追踪/批次完成锚点）；**用户否决匹配层词序归一命中**（保词序是 S1 精确性保证） |
+| v12.52-55 | 待确认/应用/面板/CSV 闭环轮（用户「UI 太丑/替换翻译/画布没反馈」一并处理）：v12.52 CSV en 末列对齐 / v12.53 待处理面板重排 / v12.54 #6 确认入库 splice 池归零 + #7 标记 appliedNodeIds 致应用静默跳过双根因修复（poolConfirmedKeys 分离「待确认」与「池」）/ v12.55 S1-identity 保英文移出异常快照 |
+| **v12.56** | 复盘落地四件（四路侦察 agent 审计 + 我复核确认）：①UI 漏翻徽章双视图根治（v9.10 红线违规唯一生产存活点，改 en 视图对齐后端）②glossaryEnMap identity 残留收口（v11.3 兜底+独立校对路径两处，v12.50 同根）③技术语域卡×marketNote 冲突护栏（非详情页不注营销热词）④STYLE_GUIDES 死表退役（3×20 营销调从未进 prompt） |
+| v12.39-46 | 校对确定性豁免（术语/规则翻译不走 AI 校对改写）/ ® 盲区修复（isGlossaryLockedTranslation de-® 比较）/ S5 unmask 连写修复 / 语料库 1704 条喂 TM + 语料锚点注入 judge/proofread / v12.42 人设候选→综合润色 A/B 测试失败已回滚 |
+| **v12.58** | 人工钦定语料母库全量灌入 + 数字守卫落地：母库 `术语库/素材/商详小语种` 86 CSV 递归扫描（1704→**5245** 条，85 可解析）喂 TM 三闸（短路/few-shot/锚点）；三安全闸收口「提升翻译质量同时不出错」——长度闸 15~160（整段 listing 叙事死重弃）+ **数字守卫 NFKC 数字多重集相等**（HANDOFF 264 行挂起 TODO 落地，生成端+运行时双道）/ 品牌守卫（Lexar→Lexware 同款）；`CORPUS_VERSION=2` 进缓存键（语料更新旧缓存自然失配重翻，否则旧缓存遮蔽新钦定）；母库只读不回写 |
+| **v12.59** | 术语库格式治理 + 匹配归一化收口（「原文不管，译文写对，匹配做归一」三原则落地）：①术语库 source 统一官方写法（Gen 规格词 Gen4x4 去空格/大小写/乘号、USB Gen1 补空格、2×2 字母 x、英寸弯引号→直引号、en 列 identity 补 (EOL) 2 条）——译文书写符合当地规范；②cleanKey 升级 5 处同源实现（post-process/entity-masker/glossary-guard/new-product-detect/glossary-filter）同步加「×→x + Gen 规格空格归一」两 arm——画布变体（Gen 4x4/Gen4X4/Gen 4×4/Gen 4 x 4）归一后命中术语库；③术语库语料书写规范清理（PUA/康熙部首），`GLOSSARY_VERSION` 11→**12** |
 | v12.29 | ko 术语规范：smartphone→스마트폰 + 신뢰성/표준 시험→시험（收窄版，性能测试保留 테스트）；外部 agent 评审采信纪律：格式类先验伪影/术语类查钦定源/整段重写作废 |
 | v12.28 | 质量×效率四杠杆（lib/batch-context.ts）：场景×阶段矩阵（客观陈述+格式敏感类关润色，bestOf2 收窄恒 true）/ consistency 连续 3 次超时降级 / 质量回归门禁三模式 / 源文前置体检 preflightSource（v12.34 起 misspelled 项默认关——判定前移 S2.5） |
 | v12.27 | 品类词「裸奔」修复：buildCategoryTerminology 注入扩为「产品线映射 ∪ 源文动态检测」（只收多词品类词防泛词误判，向后兼容 token 零膨胀）；教训：正确方向是收敛判定所有权不是再加判定源 |
@@ -214,9 +248,30 @@ TS_NODE_COMPILER_OPTIONS='{"module":"commonjs","esModuleInterop":true,"skipLibCh
 2. 含连字符型号（ZV-E10 型）设计稿 → S1 短路命中（归一化统一效果）
 3. 含品类词但 LLM 自由发挥的 → 品类词校验触发回退重翻
 
-**中期/长期**：判定置信度分层完整版（统一待确认队列+会话级裁决）/ ~~JudgmentTable 铺开~~（v12.38 测试证实不值得做，见零节不做清单）/ 限定词三表合并 / 指标收集器 UI 面板 / 术语库版本管理。
+**中期/长期**：判定置信度分层完整版（统一待确认队列+会话级裁决）/ ~~JudgmentTable 铺开~~（v12.38 测试证实不值得做，见零节不做清单）/ ~~限定词三表合并~~（v12.56 复盘确认 POLARITY_TABLE 与 MEASURE_QUALIFIERS 语义独立勿合并，已加交叉护栏注释——改任一语种限定词须检查另一表同步）/ 指标收集器 UI 面板 / 术语库版本管理。
 
 **v12.38 待办（实机驱动）**：连字符型号无连字符变体缺口——`cleanKey('ZV-E10')='zv e10'` ≠ `cleanKey('ZVE10')='zve10'`，术语库只收 `ZV-E10` 时源文写 `ZVE10` 匹配不上。**按事故驱动不预防式补词**：实机真碰到 `ZVE10` 类无连字符变体漏匹配时，术语库补 identity 变体（third-party-models.ts），不动 cleanKey 口径（影响全管道）。
+
+**v12.49 待办**：
+- test-v119-builtin-third-party.ts E 段 3 断言（E6/E7/E9）测的是旧「合并升级保留用户词条」语义，v12.49 改直接覆盖后过时，**待更新为「直接覆盖」新语义断言**
+- test-v118 B3c unmask 空格插入（`Pocket 4 P` vs `Pocket 4P`）是遮蔽-还原链既有缺陷，**与 v12.49 无关**，单独排查 `unmaskGlossaryTerms` 对含数字+字母后缀词条的还原
+- v12.49 实机验证：PLAY X 词序变体 es 出钦定形态 / 待入库术语模块收录+下载清空+提示 / 升级后本地污染条目被直接覆盖清除
+
+**v12.50/51 待实机验证**：
+- PLAY X 点开始翻译 → 译文列出 `Unidad de estado sólido (SSD) Lexar PLAY X M.2 PCIe 4.0 NVMe`（西语，不再英文）→ 应用翻译写进画布
+- v12.51 诊断日志：翻译完看日志能否直接定位路径——`路径[源文]: 走的哪条路 → 译文` / `S1短路: identity保留英文X条 [具体条目] / 术语命中Y条` / `译文变更: 生成值 → 被X覆盖为Y` / `翻译批次完成: 待应用N条（已译K条/译文=原文M条[应用时跳过替换]）`
+- 验证点：下次「译文不对」只凭诊断日志定位，不再需要用户截图译文列/确认操作顺序
+
+**v12.56 待办（复盘产出，两件翻译质量提升项单独立项）**：
+1. **TM 语料锚点效果证据链**——v12.46 的语料锚点（judge/proofread 向人工钦定对齐）是「按行业经验」注入，全库**无任何量化证据**（锚点注入前后质量差异零数据）。做法：跑一次 A/B 对照（无锚点 vs 有锚点），复用 `claude-tmp/test-v1242-polish-ab.ts` 的编辑距离脚本（要烧一次性 API token）。~~②在 `loadHumanCorpus` 加「源文数字==钦定译文数字」形式守卫~~ **→ v12.58 已落地**（生成端 gen-corpus-inline.ts + 运行时 loadHumanCorpus 双道数字守卫 + 长度闸 + 品牌守卫）。
+2. **翻译首调去整句化锚点**——现在翻译首调 few-shot 是「整条原文→整条译文」（`lib/llm-api.ts` fewShotBlock 替换处），改成抽**具体关键词/短语对照表**（复用术语库/品类词/品牌词表，代码可判的形式信号，不引入 LLM 抽词）。依据：v12.24 教训「上下文注入 +38% token 仅 1-3 条改进」+ 项目铁律「具体词汇>抽象形容词」。**前提：先设计抽词逻辑（何种短语值得锚）再动手。**
+
+**v12.56 复盘归档「不要再提」（防重复提出）**：
+- ❌ 人设判定→润色整链加投入（v12.42 A/B 已回滚：润色后编辑距离 -6.6% 变差、21/30 持平；v12.3 迭代4「32 次润色 0 生效」两次证据同向）
+- ❌ 限定词双表合并（语义独立，见「中期/长期」划线行）
+- ❌ STYLE_GUIDES 恢复/复活（已退役，generic fallback 已承担通用语感，恢复反而制造 v12.56 前已审计出的 A1/A2 冲突）
+- ❌ 给「该断不断」加独立改写信号（定性为可靠性约束的故意取舍）
+- ❌ 松/紧 TM 相似度阈值 0.90（数字防线已锁死规格错位风险，分层合理）
 
 ---
 
@@ -263,4 +318,4 @@ User Message 格式：翻译 `[N] ({src}→{tgt}) "source"` / 校对 `[N] ({src}
 
 ---
 
-**最后更新**: 2026-09-28（精简版建立；完整版 → HANDOFF-archive.md）
+**最后更新**: 2026-10-01（v12.56 代码/提示词复盘落地四件：UI 漏翻徽章双视图根治 + glossaryEnMap identity 残留收口 + 技术语域卡×市场语感冲突护栏 + STYLE_GUIDES 死表退役；完整版 → HANDOFF-archive.md）

@@ -25,8 +25,14 @@ export const API_RETRY_DELAY_MS = 1000
 // 翻译缓存上限（超出后删旧留新）
 export const MAX_CACHE_SIZE = 500
 
-// 术语库版本号（更新 default-glossary.ts 后手动 +1；v11.9 起升级改为合并升级保留用户自定义）
-export const GLOSSARY_VERSION = 9  // 2026-09-22: 新增 Muse Ultra-Slim Portable SSD 产品名（20 语种，ko=휴의용 SSD）+ Frameo App 专属术语（20 语种钦定形态）
+// 术语库版本号（更新 default-glossary.ts 后手动 +1；v12.49 起升级改为发版直接覆盖内置默认库，
+//   用户本地自定义词条一升级全清——后台钦定迭代需全员强制对齐，手动上传是低频口子重新上传即可）
+export const GLOSSARY_VERSION = 12  // 2026-10-08: 术语库格式治理——Gen 规格词统一 Gen4x4（去空格/大小写/乘号）/ USB Gen1 补空格 / 2×2→2x2 / 英寸弯引号→直引号 / en 列 identity 补 (EOL)（v12.58 术语格式审计收口）
+
+// 语料库版本号（人工钦定语料 human-corpus-data.ts 版本戳，进翻译缓存键）——语料更新后旧译文缓存
+//   自然失配重翻，让新增人工钦定经 TM 短路/few-shot 覆盖旧 LLM 译文（缓存命中在 TM 短路之前，
+//   不加戳旧缓存会遮蔽新语料——「越用越聪明」只在重扫时生效）。    语料更新纪律：任何增删 +1。
+export const CORPUS_VERSION = 2  // v2 (2026-10-08): 母库 术语库/素材/商详小语种 全量 86 CSV 灌入（2068→5245 条）+ 长度/数字/品牌三闸
 
 // UI 超时（仅用于 toast 消失等非关键逻辑）
 export const TOAST_DURATION_MS = 2500
@@ -42,6 +48,11 @@ export const STORAGE_KEY_TRANSLATION_CACHE = 'translate_cache'
 export const STORAGE_KEY_CORRECTIONS = 'translate_corrections'
 // v12.21: 源文违禁词人工合规白名单持久化（用户点「判定合规」的 cleanKey 列表，跨会话保留）
 export const STORAGE_KEY_PROHIBITED_WHITELIST = 'translate_prohibited_whitelist'
+// v12.45: 术语待审核池（v11.2/v11.3 自动搜集的新产品名，用户审核后才入专属库——
+//   根治「代码生成值静默污染持久层」（2026-09-29 PLAY X 实机事故：
+//   v11.2 代码生成 es 值≠人工钦定，静默入库后 S1 短路锁死，人工钦定永远没有出场机会）。
+//   池内条目只供审核面板透出，不进 S1 短路/遮蔽/合规锁（与 glossaryExclusive 严格隔离）。
+export const STORAGE_KEY_PENDING_REVIEW_TERMS = 'translate_pending_review_terms'
 // v10.3: 诊断日志持久化（崩溃/刷新后可追溯，主线程写入）
 export const STORAGE_KEY_UI_LOGS = 'translate_ui_logs'
 export const CORRECTION_THRESHOLD = 1  // 同一源文本被修正后立即生效，加入术语库

@@ -205,6 +205,11 @@ export function _prohibitedCacheSize(): number {
  * 后查 normalizedGlossaryMap。豁免的前提是"译文就是术语库钦定值"——调用方传入的
  * translatedText 需与锁定值相等才豁免（防"源文命中术语库但译文是自由发挥"误豁免）。
  *
+ * v12.39: 比对前剥®™©——S1 短路对带®源文已做®还原（App.vue:1810），
+ *   译文含®、钦定值不含®是正当形态，不该导致锁定/豁免判定失效。
+ *   一处修复三通道痊愈：违禁词锁定（routeProhibitedHits）/ 润色豁免（polishExemptReason）/
+ *   校对确定性值豁免（App.vue 批次组装过滤）。
+ *
  * @returns true = 源文整条命中术语库且译文等于钦定值 → 违禁词只提示不改写
  */
 export function isGlossaryLockedTranslation(
@@ -215,5 +220,5 @@ export function isGlossaryLockedTranslation(
   if (!normalizedGlossaryMap || !sourceText || !translatedText) return false
   const expected = normalizedGlossaryMap.get(cleanKey(sourceText))
   if (!expected) return false
-  return translatedText === expected
+  return translatedText.replace(/[®™©]/g, '') === expected
 }

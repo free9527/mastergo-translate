@@ -435,6 +435,9 @@ async function main() {
     'F8 源文整条命中+译文==钦定值 → 锁定')
   assert(isGlossaryLockedTranslation('Limited Lifetime Warranty®', '有限终身质保', fMap) === true,
     'F9 源文带®（cleanKey 剥离）仍判锁定')
+  // v12.39: ®盲区根治——译文带®（S1 短路对带®源文已做®还原）也判锁定
+  assert(isGlossaryLockedTranslation('Limited Lifetime Warranty®', '有限终身质保®', fMap) === true,
+    'F9b 源文带®+译文带®（S1已还原）仍判锁定——®盲区根治')
   assert(isGlossaryLockedTranslation('Limited Lifetime Warranty', '终身质保', fMap) === false,
     'F10 译文≠钦定值（自由发挥含违禁词）→ 不豁免')
   assert(isGlossaryLockedTranslation('Some random sentence', '有限终身质保', fMap) === false,

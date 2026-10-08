@@ -163,12 +163,14 @@ export function parseGlossaryCSVText(text: string, validLangCodes: Set<string>):
  * 现用 csvEncodeCell（换行→↵ 占位符，一条记录恒一物理行，与翻译导出同规约）。
  */
 export function serializeGlossaryCSV(entries: GlossaryCSVEntry[], langCodes: string[]): string {
+  // en 恒在最后一列（对齐产品名/专属内置库头部）；其余语言保持调用方传入顺序
+  const orderedLangCodes = [...langCodes.filter(c => c !== 'en'), ...langCodes.filter(c => c === 'en')]
   // v12.13: 库内含 deprecated 条目时输出 deprecated 列（软删除标记可往返——导出再导入不丢）
   const hasDeprecated = entries.some(g => g.deprecated)
-  const header = hasDeprecated ? ['source', ...langCodes, 'deprecated'].join(',') : ['source', ...langCodes].join(',')
+  const header = hasDeprecated ? ['source', ...orderedLangCodes, 'deprecated'].join(',') : ['source', ...orderedLangCodes].join(',')
   const rows = entries.map(g => {
     const cells = [csvEncodeCell(g.source)]
-    for (const code of langCodes) {
+    for (const code of orderedLangCodes) {
       cells.push(csvEncodeCell(g.translations[code] || ''))
     }
     if (hasDeprecated) cells.push(g.deprecated ? 'yes' : '')

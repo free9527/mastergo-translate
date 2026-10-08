@@ -81,7 +81,9 @@ function normalizeForMatch(s: string): string {
   return s
     .toLowerCase()
     .replace(/[®™©]/g, '')           // 去商标符号
+    .replace(/×/g, 'x')              // v12.58: 乘号→字母 x
     .replace(/[-_]/g, ' ')           // 连字符/下划线 → 空格
+    .replace(/\bgen\s+(\d+)\s*x\s*(\d+)\b/g, 'gen$1x$2')  // v12.58: Gen 规格空格归零
     .replace(/\s+/g, ' ')            // 空白归一化
     .trim()
 }

@@ -97,5 +97,23 @@ assert(/Technical Register|技术语域/.test(specDe), 'D3 de 规格书注入技
 assert(!/Product Tone|产品调性/.test(specDe), 'D4 de 规格书跳过产品线 tone')
 
 // ────────────────────────────────────────────────────────────
+console.log('\nE. v12.56 非详情页不注入 marketNote（技术语域卡与市场语感冲突护栏）')
+
+// E1: 规格书（非详情页）不注入电竞热词 marketNote（满血版/战未来本会 override 技术卡第5条客观化）
+const specGamingZh = getStyleCard('zh-CN', 'gaming_dimm', 'marketing', 'spec_sheet')
+assert(!/满血版|战未来|甜品级/.test(specGamingZh), 'E1 规格书不注入电竞热词 marketNote（满血版/战未来/甜品级）')
+assert(!/市场语感|MARKET NOTE/i.test(specGamingZh), 'E2 规格书不注入市场语感段')
+
+// E3: 详情页仍注入 marketNote（营销主战场，热词是合法表达）
+const ecommerceGamingZh = getStyleCard('zh-CN', 'gaming_dimm', 'marketing', 'ecommerce')
+assert(/满血版|战未来|市场语感|MARKET NOTE/i.test(ecommerceGamingZh), 'E3 详情页仍注入 marketNote（营销热词合法）')
+
+// E4: 非详情页其余场景（manual/packaging/ui/after_sales）也不注入 marketNote
+for (const scene of ['manual', 'packaging', 'ui', 'after_sales']) {
+  const card = getStyleCard('zh-CN', 'gaming_dimm', 'marketing', scene)
+  assert(!/市场语感|MARKET NOTE/i.test(card), `E4-${scene} 非详情页不注入市场语感`)
+}
+
+// ────────────────────────────────────────────────────────────
 console.log(`\n结果: ${pass} 通过, ${fail} 失败`)
 if (fail > 0) process.exit(1)

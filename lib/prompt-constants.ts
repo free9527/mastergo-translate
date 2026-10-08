@@ -1430,385 +1430,6 @@ export function getSceneConstraints(scenePreset: string, targetLang: string, sup
   return `\n\n【${groupId} 场景约束】\n${lines.map(l => `- ${l}`).join('\n')}`
 }
 
-// ============================================================
-// Module 2 continued: STYLE GUIDES (per target language)
-// ============================================================
-
-export const STYLE_GUIDES: Record<string, Record<string, string>> = {
-  standard: {
-    'default': `[Style·Standard]
-Core: Complete restoration of all source information, no additions/omissions, no deliberate literary flair, no marketing hype, objective and neutral.
-Rules:
-- Strictly faithful to source semantics, 100% information restoration, no subjective polishing, no eye-catching rewriting
-- Plain and accessible wording for general office, family, student users
-- No exaggerated promotion, no literary phrases, no gaming/trendy language, standard sentence structure`,
-    'zh-CN': `[风格·标准]
-核心：完整还原源文所有信息，不增删、不加戏、不刻意文学化、不营销化，客观中立。
-规则：
-- 严格忠实源文语义，100%信息还原，不主观润色，不吸引眼球的改写
-- 用词平实易懂，面向普通办公、家庭、学生用户
-- 无夸张宣传，无文学化表达，无游戏/潮流用语，句式规范`,
-    'zh-TW': `[風格·標準]
-核心：完整還原源文所有資訊，不增刪、不加戲、不刻意文學化、不行銷化，客觀中立。
-規則：
-- 嚴格忠實源文語義，100%資訊還原，不主觀潤色，不吸引眼球的改寫
-- 用詞平實易懂，面向普通辦公、家庭、學生用戶
-- 無誇張宣傳，無文學化表達，無遊戲/潮流用語，句式規範`,
-    'ja': `[スタイル·標準]
-核心：源文の全情報を完全に復元。増減なし、誇張なし、文学的表現なし、マーケティング的誇張なし、客観的で中立。
-ルール：
-- 源文の意味に厳密に忠実、100%情報復元、主観的な推敲なし
-- 一般オフィス、家庭、学生ユーザー向けに平易で分かりやすい表現
-- 誇張した宣伝なし、文学的な表現なし、ゲーム・トレンド用語なし、標準的な文構造`,
-    'ko': `[스타일·표준]
-핵심: 원문의 모든 정보를 완전히 복원. 추가/삭제 없음, 과장 없음, 문학적 표현 없음, 마케팅 과장 없음, 객관적이고 중립적.
-규칙:
-- 원문 의미에 엄격히 충실, 100% 정보 복원, 주관적인 윤문 없음
-- 일반 사무실, 가정, 학생 사용자를 위한 평이하고 이해하기 쉬운 표현
-- 과장된 홍보 없음, 문학적 표현 없음, 게임/트렌드 용어 없음, 표준 문장 구조`,
-    'de': `[Stil·Standard]
-Kern: Vollständige Wiederherstellung aller Quellinformationen, keine Hinzufügungen/Weglassungen, keine bewusste literarische Ausschmückung, kein Marketing-Hype, objektiv und neutral.
-Regeln:
-- Streng quellengetreu, 100% Informationswiedergabe, keine subjektive Politur
-- Plain und verständliche Formulierung für allgemeine Büro-, Familien-, Studentenutzer
-- Keine übertriebene Werbung, keine literarischen Phrasen, keine Gaming/Trend-Sprache`,
-    'fr': `[Style·Standard]
-Core : Restauration complète de toutes les informations source, pas d'ajouts/omissions, pas de fioritures littéraires, pas de battage marketing, objectif et neutre.
-Règles :
-- Strictement fidèle à la sémantique source, restauration d'information à 100%, pas de polissage subjectif
-- Formulation simple et accessible pour les utilisateurs de bureau, famille, étudiants
-- Pas de promotion exagérée, pas de phrases littéraires, pas de langage gaming/tendance`,
-    'es': `[Estilo·Estándar]
-Núcleo: Restauración completa de toda la información fuente, sin adiciones/omisiones, sin florituras literarias, sin bombo de marketing, objetivo y neutral.
-Reglas:
-- Estrictamente fiel a la semántica fuente, restauración de información al 100%, sin pulido subjetivo
-- Redacción sencilla y accesible para usuarios de oficina, familias, estudiantes
-- Sin promoción exagerada, sin frases literarias, sin lenguaje gaming/tendencia`,
-    'pt': `[Estilo·Padrão]
-Núcleo: Restauração completa de toda a informação fonte, sem adições/omissões, sem floreios literários, sem exagero de marketing, objetivo e neutro.
-Regras:
-- Estritamente fiel à semântica fonte, restauração de informação a 100%, sem polimento subjetivo
-- Redação simples e acessível para utilizadores de escritório, famílias, estudantes
-- Sem promoção exagerada, sem frases literárias, sem linguagem gaming/tendência`,
-    'pt-BR': `[Estilo·Padrão]
-Núcleo: Restauração completa de toda a informação fonte, sem adições/omissões, sem floreios literários, sem exagero de marketing, objetivo e neutro.
-Regras:
-- Estritamente fiel à semântica fonte, restauração de informação a 100%, sem polimento subjetivo
-- Redação simples e acessível para usuários de escritório, famílias, estudantes
-- Sem promoção exagerada, sem frases literárias, sem linguagem gaming/tendência`,
-    'it': `[Stile·Standard]
-Nucleo: Ripristino completo di tutte le informazioni sorgente, senza aggiunte/omissioni, senza fronzoli letterari, senza hype marketing, obiettivo e neutrale.
-Regole:
-- Strettamente fedele alla semantica sorgente, ripristino informazioni al 100%, senza lucidatura soggettiva
-- Formulazione semplice e accessibile per utenti ufficio, famiglie, studenti
-- Senza promozione esagerata, senza frasi letterarie, senza linguaggio gaming/trend`,
-    'nl': `[Stijl·Standaard]
-Kern: Volledig herstel van alle broninformatie, geen toevoegingen/weglatingen, geen literaire opsmuk, geen marketing-hype, objectief en neutraal.
-Regels:
-- Strikt trouw aan bronsemantiek, 100% informatieherstel, geen subjectieve oppoetsing
-- Eenvoudige en toegankelijke formulering voor kantoor-, gezins-, studentgebruikers
-- Geen overdreven promotie, geen literaire zinnen, geen gaming/trend-taal`,
-    'pl': `[Styl·Standardowy]
-Rdzeń: Pełne odtworzenie wszystkich informacji źródłowych, bez dodatków/pominięć, bez literackich ozdobników, bez marketingowego szumu, obiektywnie i neutralnie.
-Zasady:
-- Ściśle wierny semantyce źródła, 100% odtworzenie informacji, bez subiektywnego polerowania
-- Prosta i dostępna formuła dla użytkowników biurowych, rodzin, studentów
-- Bez przesadnej promocji, bez literackich fraz, bez języka gamingowego/trendowego`,
-    'sv': `[Stil·Standard]
-Kärna: Fullständig återställning av all källinformation, inga tillägg/utelämningar, inga litterära utsmyckningar, ingen marknadsföringshype, objektiv och neutral.
-Regler:
-- Strikt trogen källsemantik, 100% informationsåterställning, ingen subjektiv polering
-- Enkel och tillgänglig formulering för kontors-, familj-, studentanvändare
-- Ingen överdriven marknadsföring, inga litterära fraser, inget gaming/trend-språk`,
-    'tr': `[Stil·Standart]
-Çekirdek: Tüm kaynak bilgilerinin tam olarak geri yüklenmesi, ekleme/çıkarma yok, edebi süsleme yok, pazarlama abartısı yok, nesnel ve tarafsız.
-Kurallar:
-- Kaynak anlambilimine sıkı sıkıya bağlı, %100 bilgi geri yüklemesi, öznel cilalama yok
-- Ofis, aile, öğrenci kullanıcıları için sade ve anlaşılır ifade
-- Abartılı tanıtım yok, edebi ifadeler yok, oyun/trend dili yok`,
-    'ru': `[Стиль·Стандарт]
-Ядро: Полное восстановление всей исходной информации, без добавлений/пропусков, без литературных украшений, без маркетингового ажиотажа, объективно и нейтрально.
-Правила:
-- Строго верно семантике источника, 100% восстановление информации, без субъективной полировки
-- Простая и доступная формулировка для офисных, семейных, студенческих пользователей
-- Без преувеличенной рекламы, без литературных фраз, без игрового/трендового языка`,
-    'vi': `[Phong cách·Tiêu chuẩn]
-Cốt lõi: Khôi phục đầy đủ tất cả thông tin nguồn, không thêm/bớt, không hoa mỹ văn chương, không cường điệu tiếp thị, khách quan và trung lập.
-Quy tắc:
-- Trung thành nghiêm ngặt với ngữ nghĩa nguồn, khôi phục thông tin 100%, không chuốt sửa chủ quan
-- Diễn đạt đơn giản và dễ hiểu cho người dùng văn phòng, gia đình, sinh viên
-- Không quảng cáo phóng đại, không câu văn văn chương, không ngôn ngữ game/xu hướng`,
-    'th': `[สไตล์·มาตรฐาน]
-แกนหลัก: กู้คืนข้อมูลต้นทางทั้งหมดอย่างครบถ้วน ไม่เพิ่ม/ไม่ลบ ไม่เสริมวรรณกรรม ไม่โฆษณาเกินจริง เป็นกลางและตรงไปตรงมา
-กฎ:
-- ซื่อสัตย์ต่อความหมายต้นทางอย่างเคร่งครัด กู้คืนข้อมูล 100% ไม่ขัดเกลาตามอัตวิสัย
-- การใช้ภาษาที่เรียบง่ายและเข้าใจง่ายสำหรับผู้ใช้สำนักงาน ครอบครัว นักศึกษา
-- ไม่โฆษณาเกินจริง ไม่มีวลีวรรณกรรม ไม่มีภาษาเกม/เทรนด์`,
-    'id': `[Gaya·Standar]
-Inti: Pemulihan lengkap semua informasi sumber, tanpa penambahan/penghilangan, tanpa hiasan sastra, tanpa hype pemasaran, objektif dan netral.
-Aturan:
-- Sangat setia pada semantik sumber, pemulihan informasi 100%, tanpa polesan subjektif
-- Formulasi sederhana dan mudah diakses untuk pengguna kantor, keluarga, mahasiswa
-- Tanpa promosi berlebihan, tanpa frasa sastra, tanpa bahasa gaming/tren`,
-    'ar': `[أسلوب·قياسي]
-الجوهر: الاستعادة الكاملة لجميع معلومات المصدر، بدون إضافات/حذف، بدون زخارف أدبية، بدون ضجة تسويقية، موضوعي ومحايد.
-القواعد:
--忠实 بدقة لدلالة المصدر، استعادة المعلومات بنسبة 100%، بدون تلميع ذاتي
-- صياغة بسيطة وسهلة الوصول لمستخدمي المكاتب والعائلات والطلاب
-- بدون مبالغة في الترويج، بدون عبارات أدبية، بدون لغة ألعاب/موضة`,
-  },
-  professional: {
-    'default': `[Style·Professional]
-Core: Restrained premium, emphasizing stability, reliability, professional creative trust, no flashy marketing.
-Rules:
-- Concise and calm sentences, targeting photographers, film crews, drone operators
-- Can pair with minimalist literary quality slogans (style: restrained premium, emphasizing craftsmanship and trust — express in target language, do NOT copy Japanese)
-- No hot-blooded, lightweight e-commerce language, no gaming terminology`,
-    'zh-CN': `[风格·专业]
-核心：克制的高端感，强调稳定性、可靠性、专业创作信任感，无浮夸营销。
-规则：
-- 简洁沉稳的句式，面向摄影师、影视团队、无人机操作者
-- 可搭配极简文学质感标语（风格：克制高端，强调匠心与信任——用目标语言表达，不要照搬日式）
-- 无热血、轻量的电商语言，无游戏术语`,
-    'zh-TW': `[風格·專業]
-核心：克制的高端感，強調穩定性、可靠性、專業創作信任感，無浮誇行銷。
-規則：
-- 簡潔沉穩的句式，面向攝影師、影視團隊、無人機操作者
-- 可搭配極簡文學質感標語（風格：克制高端，強調匠心與信任——用目標語言表達，不要照搬日式）
-- 無熱血、輕量的電商語言，無遊戲術語`,
-    'ja': `[スタイル·プロフェッショナル]
-核心：抑制されたプレミアム感、安定性、信頼性、プロフェッショナルな創作への信頼を強調、派手なマーケティングなし。
-ルール：
-- 簡潔で落ち着いた言い回し、写真家、フィルムクルー、ドローンオペレーターを対象
-- ミニマリスト的な文学的品質のスローガンと組み合わせ可能（スタイル：抑制されたプレミアム、職人技と信頼を強調——目標言語で表現、日本語をそのままコピーしない）
-- 熱血的で軽量なEC言語なし、ゲーム用語なし`,
-    'ko': `[스타일·프로페셔널]
-핵심: 절제된 프리미엄, 안정성, 신뢰성, 전문 크리에이티브 신뢰 강조, 화려한 마케팅 없음.
-규칙:
-- 간결하고 차분한 문장, 사진작가, 영화 팀, 드론 운영자 대상
-- 미니멀리즘 문학적 품질 슬로건과 조합 가능 (스타일: 절제된 프리미엄, 장인정신과 신뢰 강조 — 목표 언어로 표현, 일본어 복사 금지)
-- 열혈적이고 가벼운 이커머스 언어 없음, 게임 용어 없음`,
-    'de': `[Stil·Professionell]
-Kern: Zurückhaltende Premium-Qualität, betont Stabilität, Zuverlässigkeit, professionelles kreatives Vertrauen, kein auffälliges Marketing.
-Regeln:
-- Präzise und ruhige Sätze, zielt auf Fotografen, Filmteams, Drohnenpiloten ab
-- Kann mit minimalistischen literarischen Qualitätsslogans kombiniert werden
-- Keine heißblütige, leichte E-Commerce-Sprache, keine Gaming-Begriffe`,
-    'fr': `[Style·Professionnel]
-Core : Premium retenu, mettant l'accent sur la stabilité, la fiabilité, la confiance créative professionnelle, pas de marketing tape-à-l'œil.
-Règles :
-- Phrases concises et calmes, ciblant photographes, équipes de tournage, opérateurs de drones
-- Peut s'associer à des slogans de qualité littéraire minimaliste
-- Pas de langage e-commerce sanglé et léger, pas de terminologie gaming`,
-    'es': `[Estilo·Profesional]
-Núcleo: Premium contenido, enfatizando estabilidad, confiabilidad, confianza creativa profesional, sin marketing llamativo.
-Reglas:
-- Oraciones concisas y tranquilas, dirigidas a fotógrafos, equipos de filmación, operadores de drones
-- Puede combinarse con eslóganes de calidad literaria minimalista
-- Sin lenguaje de comercio electrónico ardiente y ligero, sin terminología gaming`,
-    'pt': `[Estilo·Profissional]
-Núcleo: Premium contido, enfatizando estabilidade, confiabilidade, confiança criativa profissional, sem marketing chamativo.
-Regras:
-- Frases concisas e calmas, dirigidas a fotógrafos, equipas de filmagem, operadores de drones
-- Pode combinar-se com slogans de qualidade literária minimalista
-- Sem linguagem de comércio eletrónico ardente e leve, sem terminologia gaming`,
-    'pt-BR': `[Estilo·Profissional]
-Núcleo: Premium contido, enfatizando estabilidade, confiabilidade, confiança criativa profissional, sem marketing chamativo.
-Regras:
-- Frases concisas e calmas, dirigidas a fotógrafos, equipes de filmagem, operadores de drones
-- Pode combinar-se com slogans de qualidade literária minimalista
-- Sem linguagem de comércio eletrônico ardente e leve, sem terminologia gaming`,
-    'it': `[Stile·Professionale]
-Nucleo: Premium contenuto, enfatizzando stabilità, affidabilità, fiducia creativa professionale, senza marketing appariscente.
-Regole:
-- Frasi concise e calme, rivolte a fotografi, troupe cinematografiche, operatori di droni
-- Può essere abbinato a slogan di qualità letteraria minimalista
-- Senza linguaggio e-commerce caldo e leggero, senza terminologia gaming`,
-    'nl': `[Stijl·Professioneel]
-Kern: Beheerste premium, benadrukt stabiliteit, betrouwbaarheid, professioneel creatief vertrouwen, geen opvallende marketing.
-Regels:
-- Beknopte en kalme zinnen, gericht op fotografen, filmteams, drone-exploitanten
-- Kan gecombineerd worden met minimalistische literaire kwaliteitsslogans
-- Frequente professionele beeldterminologie: duurzaam schrijven, RAW, 8K, extreme buitenschutz
-- Geen bloedige, lichte e-commerce-taal, geen gaming-terminologie`,
-    'pl': `[Styl·Profesjonalny]
-Rdzeń: Powściągliwy premium, podkreślający stabilność, niezawodność, profesjonalne zaufanie twórcze, bez krzykliwego marketingu.
-Zasady:
-- Zwięzłe i spokojne zdania, skierowane do fotografów, ekip filmowych, operatorów dronów
-- Może być połączone z minimalistycznymi sloganami jakości literackiej
-- Bez gorącego, lekkiego języka e-commerce, bez terminologii gamingowej`,
-    'sv': `[Stil·Professionell]
-Kärna: Återhållen premium, betonar stabilitet, tillförlitlighet, professionellt kreativt förtroende, ingen iögonfallande marknadsföring.
-Regler:
-- Koncisa och lugna meningar, riktar sig till fotografer, filmteam, drönaroperatörer
-- Kan kombineras med minimalistiska slogans av litterär kvalitet
-- Ingen blodig, lätt e-commerce-språk, ingen gaming-terminologi`,
-    'tr': `[Stil·Profesyonel]
-Çekirdek: Dengeli premium, istikrar, güvenilirlik, profesyonel yaratıcı güveni vurgulayan, gösterişli pazarlama yok.
-Kurallar:
-- Kısa ve sakin cümleler, fotoğrafçılara, film ekiplerine, drone operatörlerine yönelik
-- Minimalist edebi kalite sloganlarıyla birleştirilebilir
-- Ateşli, hafif e-ticaret dili yok, oyun terminolojisi yok`,
-    'ru': `[Стиль·Профессиональный]
-Ядро: Сдержанный премиум, подчеркивающий стабильность, надежность, профессиональное творческое доверие, без броского маркетинга.
-Правила:
-- Лаконичные и спокойные предложения, ориентированные на фотографов, съемочные группы, операторов дронов
-- Может сочетаться с минималистичными слоганами литературного качества
-- Без горячего, легкого языка электронной коммерции, без игровой терминологии`,
-    'vi': `[Phong cách·Chuyên nghiệp]
-Cốt lõi: Cao cấp kiềm chế, nhấn mạnh sự ổn định, đáng tin cậy, niềm tin sáng tạo chuyên nghiệp, không tiếp thị phô trương.
-Quy tắc:
-- Câu ngắn gọn và bình tĩnh, hướng đến nhiếp ảnh gia, đoàn làm phim, người vận hành drone
-- Có thể kết hợp với khẩu hiệu chất lượng văn học tối giản
-- Không ngôn ngữ thương mại điện tử nồng nhiệt và nhẹ, không thuật ngữ game`,
-    'th': `[สไตล์·มืออาชีพ]
-แกนหลัก: พรีเมียมที่ควบคุมได้ เน้นความเสถียร ความน่าเชื่อถือ ความไว้วางใจในการสร้างสรรค์ระดับมืออาชีพ ไม่มีการตลาดที่ฉูดฉาด
-กฎ:
-- ประโยคกระชับและสงบ กำหนดเป้าหมายไปที่ช่างภาพ ทีมถ่ายทำ ผู้ปฏิบัติการโดรน
-- สามารถผสมผสานกับสโลแกนคุณภาพวรรณกรรมแบบมินิมอล
-- ไม่มีภาษาอีคอมเมิร์ซที่เร่าร้อนและเบา ไม่มีคำศัพท์เกม`,
-    'id': `[Gaya·Profesional]
-Inti: Premium terkendali, menekankan stabilitas, keandalan, kepercayaan kreatif profesional, tanpa pemasaran yang mencolok.
-Aturan:
-- Kalimat ringkas dan tenang, ditujukan untuk fotografer, kru film, operator drone
-- Dapat dipasangkan dengan slogan kualitas sastra minimalis
-- Tanpa bahasa e-commerce yang bersemangat dan ringan, tanpa terminologi gaming`,
-    'ar': `[أسلوب·احترافي]
-الجوهر: متميز متزن، يؤكد على الاستقرار والموثوقية والثقة الإبداعية المهنية، بدون تسويق مبهرج.
-القواعد:
-- جمل موجزة وهادئة، موجهة للمصورين وأطقم التصوير ومشغلي الطائرات بدون طيار
-- يمكن دمجها مع شعارات جودة أدبية بسيطة
-- بدون لغة تجارة إلكترونية حارة وخفيفة، بدون مصطلحات ألعاب`,
-  },
-  marketing: {
-    'default': `[Style·Marketing]
-Core: E-commerce traffic-oriented, eye-catching, impactful, highlighting usage experience improvement for conversion.
-Rules:
-- Youthful, light expression, downplay dry parameters, highlight usage pleasure
-- Allow advertising slogans, rhetorical questions, preserve product series uppercase English for brand recognition
-- Strong promotional feel, suitable for e-commerce homepage traffic, main image large text promotion`,
-    'zh-CN': `[风格·营销]
-核心：电商引流导向，吸引眼球，有冲击力，突出使用体验提升，促进转化。
-规则：
-- 年轻化、轻量化表达，弱化枯燥参数，突出使用愉悦感
-- 允许广告语、反问句，保留产品系列大写英文以增强品牌识别
-- 强促销感，适合电商首页引流、主图大字推广`,
-    'zh-TW': `[風格·行銷]
-核心：電商引流導向，吸引眼球，有衝擊力，突出使用體驗提升，促進轉化。
-規則：
-- 年輕化、輕量化表達，弱化枯燥參數，突出使用愉悅感
-- 允許廣告語、反問句，保留產品系列大寫英文以增強品牌識別
-- 強促銷感，適合電商首頁引流、主圖大字推廣`,
-    'ja': `[スタイル·マーケティング]
-核心：ECトラフィック指向、目を引く、インパクトがある、使用体験の向上を強調、コンバージョン促進。
-ルール：
-- 若々しく軽い表現、乾いたパラメーターを控えめに、使用の楽しさを強調
-- 広告スローガン、修辞疑問を許可、製品シリーズの大文字英語を保持してブランド認識を強化
-- 強いプロモーション感、ECホームページのトラフィック、メイン画像の大きなテキストプロモーションに適している`,
-    'ko': `[스타일·마케팅]
-핵심: 이커머스 트래픽 지향, 눈길을 끄는, 임팩트 있는, 사용 경험 향상을 강조하여 전환 촉진.
-규칙:
-- 젊고 가벼운 표현, 건조한 파라미터는 약화, 사용 쾌감 강조
-- 광고 슬로건, 수사적 질문 허용, 제품 시리즈 대문자 영어 유지로 브랜드 인식 강화
-- 강력한 프로모션 느낌, 이커머스 홈페이지 트래픽, 메인 이미지 큰 텍스트 프로모션에 적합`,
-    'de': `[Stil·Marketing]
-Kern: E-Commerce-Traffic-orientiert, auffällig, wirkungsvoll, hebt die Verbesserung der Nutzungserfahrung hervor, fördert Konversion.
-Regeln:
-- Jugendlicher, leichter Ausdruck, trockene Parameter heruntergespielt, hebt den Nutzungsspaß hervor
-- Werbeslogans, rhetorische Fragen erlaubt, Produktserien-Großbuchstaben für Markenbewusstsein beibehalten
-- Starkes Werbegefühl, geeignet für E-Commerce-Homepage-Traffic, Hauptbild-Großtextwerbung`,
-    'fr': `[Style·Marketing]
-Core : Orienté trafic e-commerce, accrocheur, percutant, mettant en valeur l'amélioration de l'expérience d'utilisation pour la conversion.
-Règles :
-- Expression jeune et légère, minimiser les paramètres arides, mettre en valeur le plaisir d'utilisation
-- Slogans publicitaires, questions rhétoriques autorisés, préserver les séries de produits en majuscules pour la reconnaissance de marque
-- Forte sensation promotionnelle, adapté au trafic de page d'accueil e-commerce, promotion en grand texte d'image principale`,
-    'es': `[Estilo·Marketing]
-Núcleo: Orientado al tráfico de comercio electrónico, llamativo, impactante, destacando la mejora de la experiencia de uso para la conversión.
-Reglas:
-- Expresión juvenil y ligera, minimizar parámetros áridos, destacar el placer de uso
-- Esloganes publicitarios, preguntas retóricas permitidas, preservar series de productos en mayúsculas para el reconocimiento de marca
-- Fuerte sensación promocional, adecuado para tráfico de página principal de comercio electrónico, promoción de texto grande de imagen principal`,
-    'pt': `[Estilo·Marketing]
-Núcleo: Orientado ao tráfego de comércio eletrónico, chamativo, impactante, destacando a melhoria da experiência de utilização para conversão.
-Regras:
-- Expressão jovem e leve, minimizar parámetros áridos, destacar o prazer de utilização
-- Slogans publicitários, perguntas retóricas permitidas, preservar séries de produtos em maiúsculas para reconhecimento de marca
-- Forte sensação promocional, adequado para tráfego de página principal de comércio eletrónico`,
-    'pt-BR': `[Estilo·Marketing]
-Núcleo: Orientado ao tráfego de e-commerce, chamativo, impactante, destacando a melhoria da experiência de uso para conversão.
-Regras:
-- Expressão jovem e leve, minimizar parâmetros áridos, destacar o prazer de uso
-- Slogans publicitários, perguntas retóricas permitidas, preservar séries de produtos em maiúsculas para reconhecimento de marca
-- Forte sensação promocional, adequado para tráfego de página principal de e-commerce`,
-    'it': `[Stile·Marketing]
-Nucleo: Orientato al traffico e-commerce, accattivante, d'impatto, che evidenzia il miglioramento dell'esperienza d'uso per la conversione.
-Regole:
-- Espressione giovane e leggera, minimizzare i parametri aridi, evidenziare il piacere d'uso
-- Slogan pubblicitari, domande retoriche consentite, preservare le serie di prodotti in maiuscolo per il riconoscimento del marchio
-- Forte sensazione promozionale, adatto al traffico della homepage e-commerce`,
-    'nl': `[Stijl·Marketing]
-Kern: E-commerce traffic-georiënteerd, opvallend, impactvol, het benadrukken van de verbetering van de gebruikerservaring voor conversie.
-Regels:
-- Jeugdige, lichte uitdrukking, droge parameters geminimaliseerd, gebruiksplezier benadrukt
-- Advertentieslogans, retorische vragen toegestaan, productserie-hoofdletters behouden voor merkherkenning
-- Sterk promotioneel gevoel, geschikt voor e-commerce homepage verkeer`,
-    'pl': `[Styl·Marketing]
-Rdzeń: Zorientowany na ruch e-commerce, przyciągający uwagę, wpływowy, podkreślający poprawę doświadczenia użytkowania dla konwersji.
-Zasady:
-- Młodzieżowa, lekka ekspresja, zminimalizowane suche parametry, podkreślona przyjemność użytkowania
-- Slogany reklamowe, pytania retoryczne dozwolone, zachowanie wielkich liter serii produktów dla rozpoznawalności marki
-- Silne uczucie promocyjne, odpowiednie dla ruchu na stronie głównej e-commerce`,
-    'sv': `[Stil·Marknadsföring]
-Kärna: E-handelstrafik-orienterad, iögonfallande, impactfull, framhäver förbättring av användarupplevelsen för konvertering.
-Regler:
-- Ungt, lätt uttryck, nedtonade torra parametrar, framhäver användningsglädje
-- Reklamslogans, retoriska frågor tillåtna, behåll produktseriens versaler för varumärkesigenkänning
-- Stark marknadsföringskänsla, lämplig för e-handelns hemsidstrafik`,
-    'tr': `[Stil·Pazarlama]
-Çekirdek: E-ticaret trafiği odaklı, dikkat çekici, etkili, dönüşüm için kullanım deneyimi iyileştirmesini vurgulayan.
-Kurallar:
-- Genç, hafif ifade, kuru parametreler minimize edilmiş, kullanım zevkini vurgulayan
-- Reklam sloganları, retorik sorulara izin, marka tanıma için ürün serisi büyük harflerinin korunması
-- Güçlü promosyon hissi, e-ticaret ana sayfa trafiği için uygun`,
-    'ru': `[Стиль·Маркетинг]
-Ядро: Ориентированный на трафик электронной коммерции, привлекательный, впечатляющий, подчеркивающий улучшение пользовательского опыта для конверсии.
-Правила:
-- Молодёжное, лёгкое выражение, минимизировать сухие параметры, подчеркнуть удовольствие от использования
-- Рекламные слоганы, риторические вопросы разрешены, сохранять заглавные буквы серий продуктов для узнаваемости бренда
-- Сильное промо-ощущение, подходит для трафика главной страницы e-commerce`,
-    'vi': `[Phong cách·Tiếp thị]
-Cốt lõi: Hướng đến lưu lượng thương mại điện tử, bắt mắt, ấn tượng, nhấn mạnh cải thiện trải nghiệm sử dụng để chuyển đổi.
-Quy tắc:
-- Diễn đạt trẻ trung, nhẹ nhàng, giảm thiểu thông số khô khan, nhấn mạnh niềm vui sử dụng
-- Khẩu hiệu quảng cáo, câu hỏi tu từ được phép, giữ chữ hoa chuỗi sản phẩm để nhận diện thương hiệu
-- Cảm giác khuyến mãi mạnh mẽ, phù hợp lưu lượng trang chủ thương mại điện tử`,
-    'th': `[สไตล์·การตลาด]
-แกนหลัก: มุ่งเน้นการจราจรอีคอมเมิร์ซ ดึงดูดสายตา มีผลกระทบ เน้นการปรับปรุงประสบการณ์การใช้งานเพื่อการแปลง
-กฎ:
-- การแสดงออกที่เยาว์วัยและเบา ลดพารามิเตอร์ที่แห้ง เน้นความสนุกในการใช้งาน
-- สโลแกนโฆษณา อนุญาตให้ใช้คำถามเชิงวาทกรรม รักษาตัวพิมพ์ใหญ่ของซีรีส์ผลิตภัณฑ์เพื่อจดจำแบรนด์
-- ความรู้สึกโปรโมชันที่แข็งแกร่ง เหมาะกับการจราจรหน้าหลักอีคอมเมิร์ซ`,
-    'id': `[Gaya·Pemasaran]
-Inti: Berorientasi lalu lintas e-commerce, menarik, berdampak, menyoroti peningkatan pengalaman penggunaan untuk konversi.
-Aturan:
-- Ekspresi muda dan ringan, minimalkan parameter kering, soroti kesenangan penggunaan
-- Slogan iklan, pertanyaan retoris diizinkan, pertahankan huruf besar seri produk untuk pengenalan merek
-- Perasaan promosi yang kuat, cocok untuk lalu lintas beranda e-commerce`,
-    'ar': `[أسلوب·تسويقي]
-الجوهر: موجه لحركة مرور التجارة الإلكترونية، جذاب، مؤثر، يبرز تحسين تجربة الاستخدام للتحويل.
-القواعد:
-- تعبير شبابي وخفيف، تقليل المعلمات الجافة، إبراز متعة الاستخدام
-- الشعارات الإعلانية، الأسئلة البلاغية مسموحة، الحفاظ على الأحرف الكبيرة لسلاسل المنتجات للتعرف على العلامة التجارية
-- إحساس ترويجي قوي، مناسب لحركة مرور الصفحة الرئيسية للتجارة الإلكترونية`,
-  },
-}
-
-export function getStyleGuide(style: string, targetLang: string): string {
-  const guides = STYLE_GUIDES[style] || STYLE_GUIDES['standard']
-  return guides[targetLang] || guides['default'] || ''
-}
-
 // ═══════════════════════════════════════════════════════════════
 // 模块: LANG_SPECIFIC — 目标语言专属提示词
 // ═══════════════════════════════════════════════════════════════
@@ -2673,10 +2294,10 @@ export const BRAND_NAME_RULE_ZH = `[品牌与产品名] Lexar 品牌名、产品
 //
 // ── 5 个数据源 ──
 //   1. productTone     — 来自 PRODUCT_LINE_TONE_GUIDES（受众+使用场景）
-//   2. styleGuide      — 来自 STYLE_GUIDES（语气风格，如 standard/gaming/lifestyle）
-//   3. sceneFormat     — 来自 SCENE_CONSTRAINTS（场景特有的 Format/Terminology，抑制 Expression 避免与 styleGuide 冲突）
+//   2. styleGuide      — （v12.56 已退役）STYLE_GUIDES 生产死代码，语气风格由 productTone + marketNote 承载
+//   3. sceneFormat     — 来自 SCENE_CONSTRAINTS（场景特有的 Format/Terminology，抑制 Expression 避免与 tone/marketNote 冲突）
 //   4. compliance      — 来自 LANG_SPECIFIC.compliance（合规/广告法/禁止项）
-//   5. marketNote      — 来自 LANGUAGE_MARKET_NOTES（语种级市场表达习惯）
+//   5. marketNote      — 来自 LANGUAGE_MARKET_NOTES（语种级市场表达习惯，仅详情页注入）
 //
 // ── 输出语言 ──
 //   CJK 目标(zh-CN/zh-TW/ja/ko) → 目标语言标签（如 [受众]/[语气]/[格式]/[禁止]/[市场语感]）
@@ -2719,15 +2340,9 @@ export function getStyleCard(
   }
 
   // 2. TONE — 来自风格指南（营销调，围绕详情页设计）
-  // v8.6: 当产品调性存在时，抑制风格指南，避免冲突
-  // 例：gaming产品线说"参数精确"，marketing风格说"淡化参数" → 产品调性优先
-  // v12.31: 非详情页跳过 style guide——营销调不属于严谨技术语域（技术语域卡已注入）
-  if (isEcommerce && !productTone) {
-    const styleGuide = style ? getStyleGuide(style, targetLang) : ''
-    if (styleGuide) {
-      parts.push(styleGuide)
-    }
-  }
+  // v12.56: STYLE_GUIDES 已退役（生产死代码——getProductLineTone 的 generic fallback 恒非空，
+  //   使 isEcommerce && !productTone 恒假，整表从未进入 prompt）。风格职责由 productTone
+  //   上方的「受众/用例」+ marketNote「市场语感」+ 技术卡承载，无需单独的营销调表。
 
   // 3. FORMAT — 来自场景约束（仅保留 Format/Terminology，抑制 Expression 避免冲突）
   if (scenePreset) {
@@ -2746,7 +2361,11 @@ export function getStyleCard(
 
   // 5. MARKET NOTE — 语种级市场表达习惯（目标语言文本）
   // v10.9: 按产品线分段注入（对应段+shared），无产品线时全段注入
-  const marketNote = getMarketNote(targetLang, productLine)
+  // v12.56: 非详情页不注入 marketNote——marketNote 是「营销受众/热词」维度（满血版/战未来/
+  //   电竞热词），与技术语域卡第 5 条「规格陈述客观化不加营销修饰」正面冲突，且其注释
+  //   「与上方通用语气冲突时以此为准」会显式 override 掉技术卡。故与 productTone/styleGuide
+  //   同门控（仅详情页注入），消除非详情页技术语域对电竞产品线失守的冲突。
+  const marketNote = isEcommerce ? getMarketNote(targetLang, productLine) : ''
   if (marketNote) {
     const noteLabel = isCJKTarget(targetLang)
       ? '[市场语感 — 与上方通用语气冲突时以此为准]'
@@ -2758,22 +2377,20 @@ export function getStyleCard(
 }
 
 /**
- * v12.34: 拆段风格卡——重试时保留 tone（轻量受众约束），砍掉完整 styleGuide（营销调指令）。
+ * v12.34: 拆段风格卡——重试时保留 tone（轻量受众约束 + 技术卡 + 场景 FORMAT + DONT + MARKET NOTE）。
  * 根因：forceTranslate 重试时 styleCard=''（v11.5 减肥误伤），重试产物无风格约束，
  *   ja/ko 重试率不低，风格一致性没人管。tone 只有 2-4 行（告诉 LLM 受众是 gaming 还是
- *   professional），不会让 LLM 翻不动；styleGuide 5-6 行营销调指令重试时不需要。
- * 拆分边界（与 getStyleCard 内部 parts 数组同序）：
- *   toneCard = 技术语域卡(非详情页) + 产品线 tone + 场景 FORMAT + DONT + MARKET NOTE
- *   styleGuideCard = 完整 styleGuide（marketing/professional/standard 营销调）
+ *   professional），不会让 LLM 翻不动。
+ * v12.56: STYLE_GUIDES 退役后 styleGuideCard 无物可拆，本函数直接返回 toneCard 字符串。
+ *   原「拆段砍 styleGuide」语义不再需要，重试卡与首调卡在风格维度已一致（都无死表）。
  */
 export function getStyleCardSplit(
   targetLang: string,
   productLine: string | null,
   style: string,
   scenePreset: string,
-): { toneCard: string; styleGuideCard: string } {
+): string {
   const toneParts: string[] = []
-  let styleGuideCard = ''
 
   const isEcommerce = scenePreset === 'ecommerce'
   // 技术语域卡（非详情页）
@@ -2784,11 +2401,6 @@ export function getStyleCardSplit(
   // 产品线 tone（详情页）
   const productTone = isEcommerce ? getProductLineTone(productLine || null, targetLang) : ''
   if (productTone) toneParts.push(productTone)
-  // 完整 styleGuide（拆出，重试砍掉）
-  if (isEcommerce && !productTone) {
-    const styleGuide = style ? getStyleGuide(style, targetLang) : ''
-    if (styleGuide) styleGuideCard = styleGuide
-  }
   // 场景 FORMAT / DONT / MARKET NOTE（轻量，重试保留）
   if (scenePreset) {
     const sceneFormat = getSceneConstraints(scenePreset, targetLang, true)
@@ -2799,7 +2411,7 @@ export function getStyleCardSplit(
     const dontLabel = isCJKTarget(targetLang) ? '[禁止]' : '[DONT]'
     toneParts.push(`${dontLabel}\n${langBlock.compliance}`)
   }
-  const marketNote = getMarketNote(targetLang, productLine)
+  const marketNote = isEcommerce ? getMarketNote(targetLang, productLine) : ''
   if (marketNote) {
     const noteLabel = isCJKTarget(targetLang)
       ? '[市场语感 — 与上方通用语气冲突时以此为准]'
@@ -2807,8 +2419,7 @@ export function getStyleCardSplit(
     toneParts.push(`${noteLabel}\n${marketNote}`)
   }
 
-  const toneCard = toneParts.length > 0 ? `\n[STYLE]\n${toneParts.join('\n\n')}` : ''
-  return { toneCard, styleGuideCard }
+  return toneParts.length > 0 ? `\n[STYLE]\n${toneParts.join('\n\n')}` : ''
 }
 
 // ═══════════════════════════════════════════════════════════════

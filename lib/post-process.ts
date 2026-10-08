@@ -423,7 +423,9 @@ export function cleanKey(s: string): string {
   return s
     .toLowerCase()
     .replace(/[®™©]/g, '')
+    .replace(/×/g, 'x')                                        // v12.58: 乘号→字母 x（规格 token 国际通用写法 2×2 vs 2x2）
     .replace(/[-_]/g, ' ')
+    .replace(/\bgen\s+(\d+)\s*x\s*(\d+)\b/g, 'gen$1x$2')      // v12.58: Gen 规格空格归零（Gen4x4/Gen 4x4/Gen 4 x 4 → gen4x4）
     .replace(/\s+/g, ' ')
     .trim()
 }
@@ -1241,6 +1243,10 @@ export interface InjectionResult {
 // 不同时豁免；源文真没该数字/单位（编造规格）仍回退，红线不破。
 // 限定词表语种纪律（宁漏勿滥实机驱动）：收录已实锤的 en/ja/zh-TW/zh-CN + 既有 de/es/ru/tr
 // 表；未收录语种的限定词不剥（文本原样），退回现有行为不误伤。
+// v12.56: 交叉护栏——本表与 lib/polish-guard.ts 的 POLARITY_TABLE 覆盖同一批语种的限定词
+//   （de/es/ru/tr/ja/zh-TW），但语义不同：本表是「剥词归一化」（数值注入检测），后者是
+//   「译文必须含」（润色硬锁）。⚠️ 改动任一语种限定词，必须检查另一表是否需要同步；
+//   两表语义独立、口径不同，勿合并。
 const MEASURE_QUALIFIERS = [
   // 英文源文限定词
   'up to', 'maximum', 'max', 'theoretical', 'approximately', 'approx', 'about', 'around', 'over',

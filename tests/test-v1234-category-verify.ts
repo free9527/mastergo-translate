@@ -214,22 +214,14 @@ async function main() {
   out.push('F. 重试 tone 保留（forceTranslate 时含 tone 不含 styleGuide）')
   out.push('═'.repeat(60))
 
-  // F1: getStyleCardSplit 拆段——toneCard 含产品线 tone，styleGuideCard 含完整 styleGuide
+  // F1: getStyleCardSplit 拆段（v12.56 起返回 tone 字符串，STYLE_GUIDES 已退役无 styleGuideCard）
   const f1 = getStyleCardSplit('ja', 'gaming', 'marketing', 'ecommerce')
-  assert(f1.toneCard.length > 0, 'F1 ecommerce+gaming → toneCard 非空', `len=${f1.toneCard.length}`)
-  assert(f1.toneCard.includes('gaming') || f1.toneCard.includes('ゲーミング') || f1.toneCard.length > 0, 'F1b toneCard 含产品线 tone')
-  // styleGuideCard 在 productTone 存在时被抑制（v8.6 产品调性优先）——但 getStyleCardSplit 无条件
-  //   计算 styleGuideCard（与 getStyleCard 不同：拆段函数把「算不算」的决定权交给调用方）。
-  //   重试时调用方用 toneCard 不用 styleGuideCard，所以 styleGuideCard 是否非空不影响重试行为。
-  //   此处只验证拆段函数正确拆出了 styleGuide（gaming+marketing 时 styleGuide 存在但被 tone 抑制）
+  assert(f1.length > 0, 'F1 ecommerce+gaming → tone 卡非空', `len=${f1.length}`)
+  assert(f1.includes('gaming') || f1.includes('ゲーミング') || f1.length > 0, 'F1b tone 卡含产品线 tone')
 
-  // F2: 无产品线+marketing 风格 → styleGuideCard 非空
+  // F2: 无产品线+marketing 风格 → tone 卡仍含 FORMAT/DONT/MARKET NOTE
   const f2 = getStyleCardSplit('ja', null, 'marketing', 'ecommerce')
-  assert(f2.toneCard.length > 0, 'F2 无产品线 → toneCard 仍含 FORMAT/DONT/MARKET NOTE', `len=${f2.toneCard.length}`)
-  // F2b: styleGuideCard 在无 productTone 时应非空（marketing styleGuide 存在）
-  //   ——但 getStyleCardSplit 的 styleGuideCard 在 productTone 存在时被条件抑制（isEcommerce && !productTone），
-  //   无产品线时 productTone=getProductLineTone(null) 有 generic fallback（ja 有兜底），所以 !productTone=false → styleGuideCard=''
-  //   这是正确行为：无产品线时 generic tone 存在，styleGuide 被抑制（与 getStyleCard 一致）
+  assert(f2.length > 0, 'F2 无产品线 → tone 卡仍含 FORMAT/DONT/MARKET NOTE', `len=${f2.length}`)
 
   // F3: 端到端——forceTranslate 重试时 styleCard=toneCard（含 tone 不含 styleGuide）
   clearUiLogs(); mockCalls.length = 0

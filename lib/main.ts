@@ -1,6 +1,6 @@
-import { PluginMessage, UIMessage, TextItem, LLMConfig, GlossaryEntry, TranslationCorrection } from '@messages/types'
+import { PluginMessage, UIMessage, TextItem, LLMConfig, GlossaryEntry, TranslationCorrection, PendingReviewTerm } from '@messages/types'
 import { sendMsgToUI } from '@messages/main-sender'
-import { STORAGE_KEY_GLOSSARY_PRODUCTS, STORAGE_KEY_GLOSSARY_EXCLUSIVE, STORAGE_KEY_SETTINGS, STORAGE_KEY_ORIGINALS, STORAGE_KEY_APPLIED, STORAGE_KEY_TRANSLATION_CACHE, STORAGE_KEY_CORRECTIONS, STORAGE_KEY_PROHIBITED_WHITELIST, STORAGE_KEY_UI_LOGS, CORRECTION_THRESHOLD, UI_WIDTH, UI_HEIGHT, MAX_CACHE_SIZE, MAX_SCAN_NODES, GLOSSARY_VERSION, makeFontKey, DEBUG_MODE } from '@lib/constants'
+import { STORAGE_KEY_GLOSSARY_PRODUCTS, STORAGE_KEY_GLOSSARY_EXCLUSIVE, STORAGE_KEY_SETTINGS, STORAGE_KEY_ORIGINALS, STORAGE_KEY_APPLIED, STORAGE_KEY_TRANSLATION_CACHE, STORAGE_KEY_CORRECTIONS, STORAGE_KEY_PROHIBITED_WHITELIST, STORAGE_KEY_PENDING_REVIEW_TERMS, STORAGE_KEY_UI_LOGS, CORRECTION_THRESHOLD, UI_WIDTH, UI_HEIGHT, MAX_CACHE_SIZE, MAX_SCAN_NODES, GLOSSARY_VERSION, makeFontKey, DEBUG_MODE } from '@lib/constants'
 import { collectTextNodes, mergeDuplicates } from '@lib/text-collector'
 import { exportCSV, importCSV } from '@lib/csv-handler'
 import { DEFAULT_GLOSSARY_PRODUCTS_CSV, DEFAULT_GLOSSARY_EXCLUSIVE_CSV } from '@lib/default-glossary'
@@ -8,6 +8,7 @@ import { loadGlossaryWithMerge, saveGlossaryWithVersion } from '@lib/glossary-st
 import { parseCSVRow } from '@lib/parse-csv'
 import { normalizeFontStyle } from '@lib/font-mapper'
 import { finalizeForCanvas } from '@lib/post-process'
+import { loadHumanCorpus } from '@lib/human-corpus-loader'
 
 // DEBUG 日志辅助函数
 const debugLog = (...args: unknown[]) => DEBUG_MODE && console.log(...args)
@@ -53,6 +54,9 @@ function fixRegisterSymbolFont(node: TextNode, rawStyle: string, effectiveFamily
 }
 
 mg.showUI(__html__, { width: UI_WIDTH, height: UI_HEIGHT })
+
+// v12.49: 语料库合并日志初始化刷一次（loadCorrections 在翻译中被反复调用，避免刷 N 次）
+logCorpusMergeOnce()
 
 // v9.1 #8: 选区变化实时推送，UI 据此禁用"选中对象扫描"（无选区时点击只会报错）
 function pushSelectionState(): void {
@@ -442,7 +446,14 @@ async function applyFontsOnly(payloads: FontPayload[]): Promise<void> {
         done++
       } catch (e) {
         failed++
-        console.error('[translate] applyFonts failed for node', nodeId, e)
+        // v12.40: 字体替换失败诊断——补源文+目标字体+错误信息，定位字符集缺失/字体不可用根因
+        // （2026-09-29 fr 实机 17/57 失败，ja 零失败，疑拉丁扩展字符在目标字体缺字形）
+        const srcPreview = (node.characters || '').slice(0, 40)
+        const errMsg = e instanceof Error ? e.message : String(e)
+        console.error('[translate] applyFonts failed for node', nodeId,
+          `| 目标字体: ${p.targetFontFamily || '(未指定)'} ${p.targetFontStyle || 'Regular'}`,
+          `| 源文: "${srcPreview}"`,
+          `| 错误: ${errMsg}`)
       }
     }
   }
@@ -732,13 +743,55 @@ async function saveSettings(config: LLMConfig): Promise<void> {
 // ============================================================
 // 翻译修正记录（用户反馈循环）
 // ============================================================
-async function loadCorrections(): Promise<TranslationCorrection[]> {
+/** v12.52: 只读持久层的用户自身修正（不含语料库合并）——saveCorrection 写回专用，
+ *  防止语料库条目被落盘污染持久层（语料库只读动态合并，永不落盘）。 */
+async function loadUserCorrectionsRaw(): Promise<TranslationCorrection[]> {
   const data = await mg.clientStorage.getAsync(STORAGE_KEY_CORRECTIONS)
-  return data || []
+  return (Array.isArray(data) ? data : []) as TranslationCorrection[]
+}
+
+async function loadCorrections(): Promise<TranslationCorrection[]> {
+  const userCorrections = await loadUserCorrectionsRaw()
+  // v12.43: 人工钦定语料库合并——lib/human-corpus-data.ts 内联的 20 语种人工钦定译文，
+  //   作为 origin='user' 人工验收源并入 TM 数据源（与用户手动验收同级——
+  //   都是人工背书的质量锚点）。静态 import（main 构建是 UMD 单文件，动态 import 会触发 code-splitting 报错）。
+  try {
+    const corpus = loadHumanCorpus()
+    if (corpus.length > 0) {
+      // 去重：语料库与用户手动验收重叠时，用户手动验收优先（后到者胜——用户是最新意图）
+      const userKeys = new Set(userCorrections.map(c => `${c.source}|||${c.targetLang}`))
+      const dedupedCorpus = corpus.filter(c => !userKeys.has(`${c.source}|||${c.targetLang}`))
+      const merged = [...dedupedCorpus, ...userCorrections]
+      return merged
+    }
+  } catch (e) {
+    // 语料库加载失败静默降级（管道仍走 LLM 正常路径）
+    console.warn('[main] v12.43 语料库加载失败（静默降级）:', e instanceof Error ? e.message : String(e))
+  }
+  return userCorrections
+}
+
+// v12.49: 语料库合并日志只在插件初始化时刷一次（loadCorrections 在翻译流程中被反复调用——
+//   每次 SAVE_CORRECTION → saveCorrection → loadCorrections 都触发，导致一条翻译刷 5+ 次
+//   「v12.43 语料库合并」日志淹没诊断视图。改为初始化时单独刷一次，loadCorrections 静默合并）。
+async function logCorpusMergeOnce(): Promise<void> {
+  try {
+    const data = await mg.clientStorage.getAsync(STORAGE_KEY_CORRECTIONS)
+    const userCorrections: TranslationCorrection[] = data || []
+    const corpus = loadHumanCorpus()
+    const userKeys = new Set(userCorrections.map(c => `${c.source}|||${c.targetLang}`))
+    const dedupedCorpus = corpus.filter(c => !userKeys.has(`${c.source}|||${c.targetLang}`))
+    mainLog('main:init', `v12.43 语料库合并: 语料 ${corpus.length} 条 + 用户验收 ${userCorrections.length} 条（去重后语料 ${dedupedCorpus.length} 条）→ TM 数据源共 ${dedupedCorpus.length + userCorrections.length} 条`)
+  } catch (e) {
+    console.warn('[main] v12.43 语料库合并日志失败:', e instanceof Error ? e.message : String(e))
+  }
 }
 
 async function saveCorrection(correction: TranslationCorrection): Promise<void> {
-  const corrections = await loadCorrections()
+  // v12.52: 只用持久层的用户自身修正（loadUserCorrectionsRaw，含语料库的 loadCorrections
+  //   会把 2062 条语料库条目一起截断到 500 条写回 → 语料库污染持久层 + 挤掉用户早期修正）。
+  //   持久层存的是用户真实意图，语料库在 loadCorrections 读时动态合并、永不落盘。
+  const corrections = await loadUserCorrectionsRaw()
   corrections.push(correction)
 
   // 只保留最近 500 条记录
@@ -779,6 +832,18 @@ async function loadProhibitedWhitelist(): Promise<string[]> {
 
 async function saveProhibitedWhitelist(keys: string[]): Promise<void> {
   await mg.clientStorage.setAsync(STORAGE_KEY_PROHIBITED_WHITELIST, keys)
+}
+
+// ============================================================
+// v12.45: 术语待审核池（自动搜集不静默入库，审核后入专属库）
+// ============================================================
+async function loadPendingReviewTerms(): Promise<PendingReviewTerm[]> {
+  const data = await mg.clientStorage.getAsync(STORAGE_KEY_PENDING_REVIEW_TERMS)
+  return Array.isArray(data) ? data.filter(t => t && typeof t.source === 'string') : []
+}
+
+async function savePendingReviewTerms(terms: PendingReviewTerm[]): Promise<void> {
+  await mg.clientStorage.setAsync(STORAGE_KEY_PENDING_REVIEW_TERMS, terms)
 }
 
 // ============================================================
@@ -909,6 +974,12 @@ mg.ui.onmessage = async function (msg: UIMessageEvent) {
       break
     case UIMessage.SAVE_PROHIBITED_WHITELIST:
       await saveProhibitedWhitelist(data as string[])
+      break
+    case UIMessage.LOAD_PENDING_REVIEW_TERMS:
+      sendMsgToUI(PluginMessage.PENDING_REVIEW_TERMS_LOADED, await loadPendingReviewTerms())
+      break
+    case UIMessage.SAVE_PENDING_REVIEW_TERMS:
+      await savePendingReviewTerms(data as PendingReviewTerm[])
       break
     case UIMessage.NOTIFY:
       if (isNotifyPayload(data)) {

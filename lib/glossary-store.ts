@@ -1,10 +1,13 @@
 // ============================================================
-// 术语库加载合并（v11.9 收口）
+// 术语库加载合并（v11.9 收口 / v12.49 直接覆盖）
 // ============================================================
 //
 // 职责（唯一事实源）：
-//   1. 版本升级时「合并升级」——内置默认词条优先，用户自定义词条保留追加
-//      （diff 键 = source.trim().toLowerCase()；不再整体覆盖冲掉用户词条）
+//   1. 版本升级时「直接覆盖」——v12.49 起发版即把本地库整体重置为内置默认库
+//      （此前 v11.9 是「默认优先 + 用户自定义追加」合并升级，保留用户词条；
+//        改为直接覆盖的动机：后台钦定术语迭代后需全员强制对齐，用户本地自定义
+//        词条（含历史污染条目）一升级全清，避免污染残留。用户手动上传是低频口子，
+//        重新上传即可。翻译记忆 corrections 分开存，不受影响。）
 //   2. 版本戳写回 STORAGE_KEY_GLOSSARY_VERSION（修复 v11.8 及以前的既有 bug：
 //      升级分支从不写回版本号 → 每次启动重复走升级分支）
 //
@@ -28,6 +31,9 @@ function normKey(source: string): string {
 /**
  * 合并升级：内置默认在前（同 key 覆盖用户旧值），用户自定义词条（默认里没有的）
  * 原样追加在后。返回合并结果与用户自定义条数（供日志）。
+ *
+ * @deprecated v12.49 起 loadGlossaryWithMerge 改为直接覆盖，本函数仅保留供旧测试引用，
+ *   不再被生产路径调用。
  */
 export function mergeGlossaryOnUpgrade(
   defaults: GlossaryEntry[],
@@ -46,8 +52,12 @@ export function mergeGlossaryOnUpgrade(
 }
 
 /**
- * 术语库加载：版本升级 → 合并升级 + 写回版本戳；否则读存量；
+ * 术语库加载：版本升级 → 直接覆盖为内置默认 + 写回版本戳；否则读存量；
  * 存量为空（首次/被清空）→ 落内置默认 + 写回版本戳。
+ *
+ * v12.49：升级分支从「合并升级」改为「直接覆盖」——发版即把本地库重置为内置默认，
+ *   用户本地自定义词条（含历史污染）一升级全清。onUpgraded 回调语义随之变化：
+ *   仍用于清翻译缓存/记日志，但不再有「保留的自定义条数」概念（恒为 0）。
  *
  * @param storageKey 该库的 clientStorage key
  * @param parseDefaults 内置默认词条解析函数
@@ -65,12 +75,11 @@ export async function loadGlossaryWithMerge(
 
   if (storedVersion == null || storedVersion < version) {
     const defaults = parseDefaults()
-    const stored = ((await storage.getAsync(storageKey)) as GlossaryEntry[] | null | undefined) || []
-    const { merged, customCount } = mergeGlossaryOnUpgrade(defaults, stored)
-    await storage.setAsync(storageKey, merged)
+    // v12.49: 直接覆盖——不再 mergeGlossaryOnUpgrade 保留用户自定义，发版即强制对齐后台钦定
+    await storage.setAsync(storageKey, defaults)
     await storage.setAsync(STORAGE_KEY_GLOSSARY_VERSION, version)
-    onUpgraded?.(customCount)
-    return merged
+    onUpgraded?.(0)
+    return defaults
   }
 
   const fromLocal = (await storage.getAsync(storageKey)) as GlossaryEntry[] | null | undefined

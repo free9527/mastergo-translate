@@ -75,6 +75,57 @@ const CATEGORY_KEYS = Object.keys(CATEGORY_WORDS)
   .sort((a, b) => b.length - a.length) // 最长优先（Solid State Dual Drive > Portable SSD > SSD）
 
 /**
+ * 产品名结构归一（v12.47）：剥品类词 → 剩余 token 排序。
+ * 根治「词序变体缺口」：画布 `Lexar PLAY X PCIe 4.0 M.2 NVMe SSD` 与术语库钦定
+ * `Lexar PLAY X M.2 PCIe 4.0 NVMe SSD`（词序 M.2 PCIe 4.0 ↔ PCIe 4.0 M.2）cleanKey 不同
+ * 导致 S1 短路漏配、v11.2 误判「新产品名」重复收录。结构归一后两者同 key。
+ *
+ * 与通用 cleanKey 的区别：只在「产品名形态」语境用（Lexar 锚点 + 品类词双门），
+ * 且只在词序维度归一（token 排序），其余归一（®™©/空白/连字符/大小写）继承 cleanKey。
+ * 词序差异的「规格写法」（PCIe 4.0 M.2 ↔ M.2 PCIe 4.0）属同一产品的不同表述，归一安全；
+ * 不同产品（系列/型号不同）token 集合必不同，不会误判。
+ *
+ * @returns 结构归一 key；非产品名形态（无品类词）返回 null（调用方不启用词序匹配）
+ */
+export function productStructureKey(text: string): string | null {
+  const category = detectCategory(text)
+  if (!category) return null
+  const escaped = category.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const core = text.replace(new RegExp(`\\s*\\b${escaped}\\b\\s*`, 'i'), ' ').replace(/\s+/g, ' ').trim()
+  const tokens = core.toLowerCase().replace(/[®™©]/g, '').replace(/[-_]/g, ' ').split(/\s+/).filter(Boolean)
+  if (tokens.length === 0) return null
+  return tokens.sort().join(' ') + '|' + category.toLowerCase()
+}
+
+/**
+ * 钦定词序对齐（v12.47）：真新品代码生成译名前，把词序变体对齐到术语库同结构钦定词序。
+ *
+ * 问题：画布 `Lexar PLAY X PCIe 4.0 M.2 NVMe SSD`（词序 PCIe 4.0 M.2）与公司钦定风格
+ *   `M.2 PCIe 4.0`（产品名库 141 条归纳）漂移——直接用源文词序生成译名，产出非钦定形态。
+ * 解法：用 productStructureKey 在术语库 source 里找「同结构（token 集合+品类相同）」的钦定 key，
+ *   找到则采用钦定 key 的完整词序（含品类词），找不到（真新品/全新规格组合）保留源文词序。
+ *
+ * 安全边界（实测普查背书）：
+ *   - 产品名库 141 条内部 tokenKey 零冲突、跨专属库零冲突 → 同结构 key 唯一指向同一产品
+ *   - 只在产品名形态（productStructureKey 非 null）启用，普通句子零影响
+ *   - 对齐只发生在「词序不同但 token 集合+品类全同」——即同一产品的不同表述，不跨产品
+ *
+ * @param enName 英文产品名（含品类词）
+ * @param glossarySources 术语库全部 source key（产品名库 ∪ 专属库）
+ * @returns 对齐后的英文产品名（词序调整为钦定风格）；无同结构钦定则原样返回
+ */
+export function alignToGlossaryWordOrder(enName: string, glossarySources: string[]): string {
+  const myKey = productStructureKey(enName)
+  if (!myKey) return enName
+  for (const src of glossarySources) {
+    // 完全同形（cleanKey 级）跳过——那种情况 S1 短路已命中钦定译文，无需对齐
+    if (src === enName) continue
+    if (productStructureKey(src) === myKey) return src
+  }
+  return enName
+}
+
+/**
  * 从英文产品名识别品类（末尾/词边界匹配，最长优先）。返回 null 表示无品类词。
  *
  * v11.4 大小写不敏感化 + 品名语境守卫：
@@ -152,6 +203,15 @@ export function generateProductNameTranslations(
   const catRe = new RegExp(`\\s*\\b${category.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b\\s*`, 'i')
   const core = enName.replace(catRe, ' ').replace(/\s+/g, ' ').trim()
 
+  // v12.48: 规格槽位词序归一到钦定风格（命名规则文档钦定接口形态在协议形态前：M.2 PCIe 4.0）。
+  //   根因：画布/录入可能把规格写反（PCIe 4.0 M.2），代码生成若忠实保留源文词序 → 产出非钦定形态。
+  //   「按规则翻译」要求输出钦定词序，与输入端书写差异解耦。只调整 M.2↔PCIe 相邻规格对的相对
+  //   顺序，其余 token（品牌/系列/型号/其他规格）位置不动——同产品的规格写法归一，不跨产品改写。
+  const canonicalCore = core.replace(
+    /\b(PCIe\s+[\d.]+)\s+(M\.2)\b/i,
+    (_m, pcie: string, m2: string) => `${m2.toUpperCase()} ${pcie.replace(/^pcie/i, 'PCIe')}`,
+  )
+
   for (const lang of TARGET_LANGS) {
     // 越南语外设特例：整条保留英文
     if (lang === 'vi' && VI_KEEP_ENGLISH_CATEGORIES.has(category)) {
@@ -168,8 +228,8 @@ export function generateProductNameTranslations(
     }
 
     translations[lang] = order === 'prefix'
-      ? `${catTranslated} ${core}`.replace(/\s+/g, ' ').trim()
-      : `${core} ${catTranslated}`.replace(/\s+/g, ' ').trim()
+      ? `${catTranslated} ${canonicalCore}`.replace(/\s+/g, ' ').trim()
+      : `${canonicalCore} ${catTranslated}`.replace(/\s+/g, ' ').trim()
   }
 
   return { category, translations, zhMarketingNameBlank: true }

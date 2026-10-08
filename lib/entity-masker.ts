@@ -276,7 +276,9 @@ function cleanKeyForMask(s: string): string {
   return s
     .toLowerCase()
     .replace(/[®™©]/g, '')
+    .replace(/×/g, 'x')                                        // v12.58: 乘号→字母 x
     .replace(/[-_]/g, ' ')
+    .replace(/\bgen\s+(\d+)\s*x\s*(\d+)\b/g, 'gen$1x$2')      // v12.58: Gen 规格空格归零
     .replace(/\s+/g, ' ')
     .trim()
 }
@@ -502,6 +504,15 @@ export function unmaskGlossaryTerms(
       if (fuzzyRegex.test(result)) {
         fuzzyRegex.lastIndex = 0
         result = result.replace(fuzzyRegex, target)
+        // v12.40: 还原后连写修复——术语值（字母/数字结尾）后紧跟字母/数字 → 补空格。
+        // 根因：LLM 把占位符与后文粘连输出（__GLOSSARY_0__S25），直接还原产生 SamsungS25。
+        //   2026-09-29 ja/fr 实机三连发（SamsungS25 × 2 fr + 1 ja），润色层救回 2 漏 1。
+        // 纯形式修复零误判：钦定值后紧跟字母/数字必为粘连异常（无正当形态）——代码管形式。
+        // 只补拉丁字母/数字粘连；CJK 与术语值天然相邻无空格，不处理（v12.17 连写检测同纪律）。
+        if (/[A-Za-z0-9]$/.test(target)) {
+          const escapedTarget = target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+          result = result.replace(new RegExp(`(${escapedTarget})(?=[A-Za-z0-9])`, 'g'), '$1 ')
+        }
       } else if (result.includes(placeholder)) {
         // 严格匹配兜底
         result = result.split(placeholder).join(target)

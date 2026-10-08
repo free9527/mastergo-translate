@@ -447,14 +447,17 @@ body {
 }
 .pending-list {
   border-top: 1px solid rgba(255, 165, 0, 0.2);
-  max-height: 160px;
+  /* v12.54(#5): 160px → 280px——待确认条目多于 3 条时只能滚着看，拥挤难读；
+     放大留白后整批条目一屏可见，仍是可滚动上限不侵占下方列表空间 */
+  max-height: 280px;
   overflow-y: auto;
 }
 .pending-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
-  padding: 8px 12px;
+  /* v12.54(#5): 垂直 padding 8→10，条目之间更松，源文/译文/按钮不再糊成一片 */
+  padding: 10px 12px;
   border-bottom: 1px solid rgba(255, 165, 0, 0.1);
   font-size: var(--text-footnote);
 }
@@ -463,17 +466,32 @@ body {
 .pending-item.placeholder { border-left: 3px solid #ff3b30; }
 .pending-item.untranslated { border-left: 3px solid #ffa500; }
 .pending-item.llmFallback { border-left: 3px solid #007aff; }
+/* v12.53: 待确认条目源文/译文全文展示（判断对象完整可见，不再截断省略） */
+.pending-item-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  /* v12.54(#5): 最小可用高度——窄照片样式的条目也不至于扁成一横条 */
+  min-height: 34px;
+  justify-content: center;
+}
 .pending-item-source {
-  flex: 1; min-width: 0;
   color: var(--label-2);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.4;
 }
 .pending-item-trans {
-  flex: 1; min-width: 0;
   color: var(--label-3);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.4;
 }
-.pending-item-actions { display: flex; gap: 4px; flex-shrink: 0; }
+/* v12.54(#5): 操作按钮区——收窄时换行而非横向挤爆/溢出；
+   btn-xs 4px 间隙 + 最多 3 个按钮（确认入库/应用但不入库/编辑）一行放不下自动换行 */
+.pending-item-actions { display: flex; gap: 4px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; align-items: center; max-width: 150px; }
 
 /* ============================================================
    通用面板（配置/结果/高级）
@@ -1346,6 +1364,17 @@ body {
 .glossary-sub-title { font-size: var(--text-body); font-weight: 500; color: var(--label-1); }
 .glossary-sub-count { font-size: var(--text-caption); color: var(--label-2); }
 .glossary-hint { font-size: var(--text-caption); color: var(--label-3); margin: 4px 0 0; line-height: 1.4; }
+
+/* v12.45: 待审核池列表 */
+.pending-review-list { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.pending-review-item {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 8px; border-radius: 6px;
+  background: var(--fill-tertiary, rgba(120,120,128,0.08));
+}
+.pending-review-source { font-size: var(--text-body); color: var(--label-1); font-weight: 500; word-break: break-all; }
+.pending-review-meta { font-size: var(--text-caption); color: var(--label-3); }
+.pending-review-actions { display: flex; gap: 6px; margin-top: 2px; }
 
 /* v11.9: 内置第三方型号（只读，弱化展示） */
 .glossary-builtin { opacity: 0.65; }
