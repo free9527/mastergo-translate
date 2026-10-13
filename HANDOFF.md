@@ -8,6 +8,17 @@
 
 ---
 
+## 零·〇、Figma 版副本说明（2026-10-13）
+
+**本仓库是 MasterGo 版（原版，平台差异的唯一权威）**。Figma 版已另立副本并存：
+
+- **Figma 版仓库**：`github.com/free9527/figma-translate`（私有），本地 `Desktop/materGO/translate-figma`
+- **移植方式**：反向 shim（`figma` 包成 `mg`），翻译业务承重墙零改动；平台差异收敛到 Figma 版的 3 个新文件（`lib/platform-shim.ts` / `lib/node-style.ts` / `lib/mg-shim.d.ts`），另有 2 个业务文件节点形状适配（`lib/text-collector.ts` / `lib/main.ts`）+ `manifest.json` 重写
+- **两版同步**：本文件的版本史/架构/坑清单是翻译业务知识，两版共享。MG 版改翻译业务 → Figma 版 `git diff` 只对齐「翻译业务文件」，勿覆盖 Figma 版专属的 shim/manifest/typings 配置
+- **Figma 版特有说明**（platform-shim 职责、networkAccess 通配风险、SharedPluginData 半失效、上架前换 plugin id 待办）详见 Figma 副本 HANDOFF.md「零·〇」节
+
+---
+
 ## 零、当前版本速览（v12.47–v12.56，2026-09-29/10-01）
 
 | 版本 | 一句话 | 验证 |
