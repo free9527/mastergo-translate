@@ -15,6 +15,7 @@
 - **Figma 版仓库**：`github.com/free9527/figma-translate`（私有），本地 `Desktop/materGO/translate-figma`
 - **移植方式**：反向 shim（`figma` 包成 `mg`），翻译业务承重墙零改动；平台差异收敛到 Figma 版的 3 个新文件（`lib/platform-shim.ts` / `lib/node-style.ts` / `lib/mg-shim.d.ts`），另有 2 个业务文件节点形状适配（`lib/text-collector.ts` / `lib/main.ts`）+ `manifest.json` 重写
 - **两版同步**：本文件的版本史/架构/坑清单是翻译业务知识，两版共享。MG 版改翻译业务 → Figma 版 `git diff` 只对齐「翻译业务文件」，勿覆盖 Figma 版专属的 shim/manifest/typings 配置
+- **维护手册（核心）**——**单向流动 + MG 权威**：翻译业务只在 **MG 版**迭代，做完同步到 Figma 版；Figma 版独立产出只有「平台适配外壳」。文件分三类：①纯业务（lib 除②③外/ui/messages/tests/typings/术语素材）→ 直接覆盖；②分叉文件只有 2 个（`lib/text-collector.ts` / `lib/main.ts`，`visible`/`readsFontName`/`installPlatformShim`/`BaseNode` 是 Figma 写法）→ 手工合并；③Figma 专属（platform-shim/node-style/mg-shim.d.ts/manifest/tsconfig/package）→ 永不覆盖。反向：Figma 实机发现的翻译业务 bug 回 MG 版修。**完整流程与同步命令见 Figma 副本 HANDOFF.md「零·〇」节**
 - **Figma 版特有说明**（platform-shim 职责、networkAccess 通配风险、SharedPluginData 半失效、上架前换 plugin id 待办）详见 Figma 副本 HANDOFF.md「零·〇」节
 
 ---
