@@ -37,6 +37,10 @@ export const CORPUS_VERSION = 2  // v2 (2026-10-08): 母库 术语库/素材/商
 // UI 超时（仅用于 toast 消失等非关键逻辑）
 export const TOAST_DURATION_MS = 2500
 
+// 默认团队模型（v12.60）：恢复默认配置 / 老用户一次性升级迁移的目标模型。
+//   改进：改这里后同步改 ui/App.vue useDefaultConfig() 的字面量（如需两者解耦可后续收敛）。
+export const DEFAULT_MODEL = 'gpt-6.1-sol'
+
 // 存储 Key
 export const STORAGE_KEY_GLOSSARY_VERSION = 'translate_glossary_version'
 export const STORAGE_KEY_GLOSSARY_PRODUCTS = 'translate_glossary_products'

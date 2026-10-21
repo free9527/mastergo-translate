@@ -405,6 +405,14 @@ export function restoreStorageUnitFormatting(sourceTexts: string[], translatedTe
     result = result.replace(/(\d+)\s+([KMGT][B])(\/s\*)/g, '$1$2$3')
     result = result.replace(/(\d+)\s+([KMGT][B]\/s)\*/g, '$1$2*')
 
+    // v12.60: 斜杠丢失修复——LLM 偶把 200MB/s 输出成 200MB  s（丢 / + 拆开 s，2026-10-21
+    //   dashcam 实机）。现有 unitPatterns 只修「数字后空格」不修「单位后空格+s 残骸」。
+    //   仅当源文确实含 /s 单位时才还原（否则不动，防误伤合法 "MB s"）；`s\b` 边界确保
+    //   只吃孤立 s、不吃 "MB super" 这类词首 s。
+    if (/\d+\s*(?:MB|GB|TB|KB)\/s/i.test(source)) {
+      result = result.replace(/(\d+)\s*(MB|GB|TB|KB)\s+s\b/gi, '$1$2/s')
+    }
+
     return result
   })
 }

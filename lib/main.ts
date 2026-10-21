@@ -1,6 +1,6 @@
 import { PluginMessage, UIMessage, TextItem, LLMConfig, GlossaryEntry, TranslationCorrection, PendingReviewTerm } from '@messages/types'
 import { sendMsgToUI } from '@messages/main-sender'
-import { STORAGE_KEY_GLOSSARY_PRODUCTS, STORAGE_KEY_GLOSSARY_EXCLUSIVE, STORAGE_KEY_SETTINGS, STORAGE_KEY_ORIGINALS, STORAGE_KEY_APPLIED, STORAGE_KEY_TRANSLATION_CACHE, STORAGE_KEY_CORRECTIONS, STORAGE_KEY_PROHIBITED_WHITELIST, STORAGE_KEY_PENDING_REVIEW_TERMS, STORAGE_KEY_UI_LOGS, CORRECTION_THRESHOLD, UI_WIDTH, UI_HEIGHT, MAX_CACHE_SIZE, MAX_SCAN_NODES, GLOSSARY_VERSION, makeFontKey, DEBUG_MODE } from '@lib/constants'
+import { STORAGE_KEY_GLOSSARY_PRODUCTS, STORAGE_KEY_GLOSSARY_EXCLUSIVE, STORAGE_KEY_SETTINGS, STORAGE_KEY_ORIGINALS, STORAGE_KEY_APPLIED, STORAGE_KEY_TRANSLATION_CACHE, STORAGE_KEY_CORRECTIONS, STORAGE_KEY_PROHIBITED_WHITELIST, STORAGE_KEY_PENDING_REVIEW_TERMS, STORAGE_KEY_UI_LOGS, CORRECTION_THRESHOLD, UI_WIDTH, UI_HEIGHT, MAX_CACHE_SIZE, MAX_SCAN_NODES, GLOSSARY_VERSION, DEFAULT_MODEL, makeFontKey, DEBUG_MODE } from '@lib/constants'
 import { collectTextNodes, mergeDuplicates } from '@lib/text-collector'
 import { exportCSV, importCSV } from '@lib/csv-handler'
 import { DEFAULT_GLOSSARY_PRODUCTS_CSV, DEFAULT_GLOSSARY_EXCLUSIVE_CSV } from '@lib/default-glossary'
@@ -709,9 +709,34 @@ async function loadUiLogs(): Promise<PersistedLogEntry[]> {
   }
 }
 
+// v12.60: 默认模型一次性升级迁移——旧默认模型(gpt-5.5/gpt-4o/空) → DEFAULT_MODEL。
+//   只迁移「还在旧默认值上」的用户：手动改过模型的用户不动（尊重个性化）。
+function migrateDefaultModel(config: LLMConfig): boolean {
+  const LEGACY_DEFAULT_MODELS = ['gpt-5.5', 'gpt-4o', '']
+  const m = (config.model || '').trim()
+  // 非法模型值（沿用 app 首次启动的缺省回填）→ 直接替换
+  let changed = false
+  if (LEGACY_DEFAULT_MODELS.includes(m)) {
+    config.model = DEFAULT_MODEL
+    changed = true
+  }
+  if (config.proofreadModel && LEGACY_DEFAULT_MODELS.includes(config.proofreadModel.trim())) {
+    config.proofreadModel = DEFAULT_MODEL
+    changed = true
+  }
+  return changed
+}
+
 async function loadSettings(): Promise<LLMConfig | null> {
   const fromLocal = await mg.clientStorage.getAsync(STORAGE_KEY_SETTINGS)
-  if (fromLocal) return fromLocal
+  if (fromLocal) {
+    // v12.60: 默认模型一次性升级迁移（旧默认值 → DEFAULT_MODEL，改过的不动）
+    if (migrateDefaultModel(fromLocal)) {
+      await mg.clientStorage.setAsync(STORAGE_KEY_SETTINGS, fromLocal)
+      sendMsgToUI(PluginMessage.MODEL_MIGRATED)
+    }
+    return fromLocal
+  }
 
   // 尝试从文档 SharedPluginData 中读取（跨客户端同步）
   for (const page of mg.document.children) {
@@ -719,6 +744,10 @@ async function loadSettings(): Promise<LLMConfig | null> {
       const json = asSharedPluginDataPage(page).getSharedPluginData('translate', STORAGE_KEY_SETTINGS)
       if (json) {
         const config = JSON.parse(json)
+        // v12.60: SharedPluginData 存在的 config 同样走默认模型迁移（与 fromLocal 同源同逻辑）
+        if (migrateDefaultModel(config)) {
+          sendMsgToUI(PluginMessage.MODEL_MIGRATED)
+        }
         await mg.clientStorage.setAsync(STORAGE_KEY_SETTINGS, config)
         return config
       }

@@ -3767,6 +3767,11 @@ function isModelListOrCode(s: string): boolean {
     // v11.13: 段名单（Mini/Switch NS）——不进遮蔽表（切碎既有词条/过遮蔽），
     // 只在【整条全是型号段】的列表语境认段，正文不受影响。
     if (isBuiltinModelSegment(seg)) return true
+    // v12.60: 单字母+数字 车型代号（i6/i8/L6/a1）——小写字母+数字导致大写占比<0.5，
+    //   原规则接不住致理想/Li Auto 等车型列表漏翻（2026-10-21 dashcam 实机）。
+    //   单字母前缀+数字是强型号指纹（零词典词碰撞；多字母前缀如 USB3 不命中，
+    //   避免误伤技术缩写）。
+    if (/^[A-Za-z]\d{1,3}$/.test(seg)) return true
     const letters = seg.replace(/[^A-Za-z]/g, '')
     if (letters.length === 0) return false
     const upper = letters.replace(/[^A-Z]/g, '').length

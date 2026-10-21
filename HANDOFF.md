@@ -1,7 +1,7 @@
 # 项目交接文档（精简版）
 
-**日期**: 2026-10-01
-**版本**: v12.56（代码/提示词复盘落地轮：UI 漏翻徽章双视图根治 + glossaryEnMap identity 残留收口 + 技术语域卡×市场语感冲突护栏 + STYLE_GUIDES 死表退役）
+**日期**: 2026-10-21
+**版本**: v12.60（dashcam 实机三修：汽车品牌字典豁免 + 车型代号豁免 + 单位斜杠丢失修复 + 默认模型迁移 gpt-5.5→gpt-6.1-sol）
 **项目**: Lexar 翻译插件（MasterGo 插件）
 
 > **本文件是精简版（日常加载）**——完整过程记录/测试细节/排查证据链在 **`HANDOFF-archive.md`**（304KB，原样保留）。需要细节时按「十一、archive 索引」检索完整版。
@@ -20,10 +20,11 @@
 
 ---
 
-## 零、当前版本速览（v12.47–v12.56，2026-09-29/10-01）
+## 零、当前版本速览（v12.47–v12.60，2026-09-29/10-21）
 
 | 版本 | 一句话 | 验证 |
 | :--- | :--- | :--- |
+| **v12.60** | dashcam 实机三修 + 默认模型迁移——①汽车品牌字典铺开（39 单词整词豁免+遮蔽 / Li Auto·Mercedes-Benz·Rolls-Royce·Land Rover 等 7 多词+连字符进遮蔽，根治品牌漏翻标红空转；**用户拍板「有风险的不收」**：Ford/Fiat/Ram/Mini/Smart 等通用词多义词一律不收）②车型代号豁免（isModelish 单字母+数字段 `^[A-Za-z]\d{1,3}$`，i6/i8/L6）③单位斜杠丢失修复（restoreStorageUnitFormatting 新增 `/s` 源文时 `200MB  s→200MB/s`）④默认模型 gpt-5.5→gpt-6.1-sol（DEFAULT_MODEL 常量 + 一次性迁移只迁旧默认值，改过的用户不动）；**顺带修坑 18 第三次复发——third-party-models `normKey` 漏同步 cleanKey 连字符归一，致连字符型号/品牌在 ALL_KEYS 恒失配裸奔** | typecheck+build 绿；test-v1260 127 断言 + v105/v1113/v1225/v1237 回归全绿 |
 | **v12.56** | 复盘落地四件——①UI 漏翻徽章双视图根治（`computeUntranslatedBadge` 原传 full 视图、后端 `detectUntranslatedText` 传 en，v9.10 红线违规；改 en 对齐，错词豁免保持 full）②`glossaryEnMap` identity 残留收口（v11.3 兜底 + 独立校对路径两处 `set(term, term)` 改存译名，v12.50 同根复发）③技术语域卡×marketNote 冲突护栏（非详情页不再注入「满血版/战未来」市场语感，否则显式 override 技术卡第 5 条客观化）④STYLE_GUIDES 3×20 营销调死表退役（`getProductLineTone` generic fallback 恒非空致 `isEcommerce && !productTone` 恒假，整表从未进 prompt） | typecheck+build 绿；回归 40/40、54/54、61/61、26/26、40+40、48/48、94/94、177/177 全绿 |
 | **v12.55** | 终态异常快照收口——`S1-identity保留英文`（软件名/硬件型号走术语库 source===target 通道保英文）是钦定正常路径，移出「终态异常」快照（此前误挂异常标签，实为正常行为惰性噪音）；可见性由上方 S1 短路汇总行保证 | typecheck+build 绿 |
 | **v12.54** | #6/#7 根因修复——`confirmLlmFallbackTerm` 语义纠正（用户拍板：确认入库=收录进待入库池、**不 splice 池不标记 appliedNodeIds**）。旧实现 splice 池 → #6「确认入库后待入库术语归零」；标记 appliedNodeIds → 批量应用静默跳过 → #7「有译文但点应用画布不变」。修复：引入 `poolConfirmedKeys` 只消「待确认」阻塞、池保留原料、翻译照常走应用 | typecheck+build 绿；#6 实机下载拿到 1 条（旧 bug 0 条）/#7 实机 40 条目应用 42 节点成功 0 失败 |
@@ -104,6 +105,7 @@ MasterGo 设计工具插件，将 Lexar 产品设计稿从英文翻译成 20 个
 
 | 版本 | 一句话 |
 |---|---|
+| **v12.60** | dashcam 实机三修 + 默认模型迁移 gpt-5.5→gpt-6.1-sol：汽车品牌字典铺开（39 单词整词豁免+遮蔽 / Li Auto·Mercedes-Benz·Rolls-Royce·Land Rover 等 7 多词+连字符进遮蔽，**用户拍板「有风险的不收」Ford/Fiat/Ram/Mini/Smart 等通用词不收**）+ 车型代号豁免（i6/i8/L6 单字母+数字段）+ 单位斜杠丢失修复（200MB  s→200MB/s）；**顺带根治坑 18 第三次复发（third-party-models normKey 漏同步 cleanKey 连字符归一）** |
 | v12.47-51 | PLAY X 实机事故根治五连：v12.48 生成层 core 规格词序归一钦定 + v12.49 三自动搜集口子收录待入库池不静默入库+发版直接覆盖（GLOSSARY_VERSION 10）+ **v12.50 根因修复——glossaryEnMap 不设 identity（noTranslateTerms 误伤代码生成译名根治）** + v12.51 诊断日志增强（每条文本判定路径/S1 短路分支细分/覆盖变更追踪/批次完成锚点）；**用户否决匹配层词序归一命中**（保词序是 S1 精确性保证） |
 | v12.52-55 | 待确认/应用/面板/CSV 闭环轮（用户「UI 太丑/替换翻译/画布没反馈」一并处理）：v12.52 CSV en 末列对齐 / v12.53 待处理面板重排 / v12.54 #6 确认入库 splice 池归零 + #7 标记 appliedNodeIds 致应用静默跳过双根因修复（poolConfirmedKeys 分离「待确认」与「池」）/ v12.55 S1-identity 保英文移出异常快照 |
 | **v12.56** | 复盘落地四件（四路侦察 agent 审计 + 我复核确认）：①UI 漏翻徽章双视图根治（v9.10 红线违规唯一生产存活点，改 en 视图对齐后端）②glossaryEnMap identity 残留收口（v11.3 兜底+独立校对路径两处，v12.50 同根）③技术语域卡×marketNote 冲突护栏（非详情页不注营销热词）④STYLE_GUIDES 死表退役（3×20 营销调从未进 prompt） |
@@ -181,7 +183,7 @@ MasterGo 设计工具插件，将 Lexar 产品设计稿从英文翻译成 20 个
 15. 豁免/修正若加在「锁定之后」就是死代码——每个豁免点问：这个变异在谁之前生效？（v11.12+）
 16. 测试按「邻近文本+定长窗口」断言会出血——断言按结构边界 `[n]` 切段，不按字符数窗口
 17. 模型能力升级导致旧防护对新失败模式失效——形式校验层覆盖边界要随模型能力定期重审；形式问题代码修比 prompt 修可靠 100 倍，但要覆盖模型实际输出形态非想象形态
-18. 归一化函数多处定义必漂移——同一「归一化」概念的函数必须单一事实源（v12.35 cleanKey 收口：normalizeGlossaryKey 无 [-_]→空格归一致 ZV-E10 型连字符型号 S1 短路与译后校准命中不一致）
+18. 归一化函数多处定义必漂移——同一「归一化」概念的函数必须单一事实源（v12.35 cleanKey 收口：normalizeGlossaryKey 无 [-_]→空格归一致 ZV-E10 型连字符型号 S1 短路与译后校准命中不一致；**v12.60 第三次复发**：third-party-models normKey 漏同步 cleanKey 连字符归一，致 Mercedes-Benz/ZV-E10 等连字符词条在 ALL_KEYS 恒失配裸奔漏翻）
 19. 注入层修好了不等于闭环——「注入→校验」是两层，LLM 不遵守注入时校验层是最后防线（v12.34 品类词：v12.27/v12.32 修注入，v12.34 补校验）
 
 ---
@@ -278,6 +280,11 @@ TS_NODE_COMPILER_OPTIONS='{"module":"commonjs","esModuleInterop":true,"skipLibCh
 1. **TM 语料锚点效果证据链**——v12.46 的语料锚点（judge/proofread 向人工钦定对齐）是「按行业经验」注入，全库**无任何量化证据**（锚点注入前后质量差异零数据）。做法：跑一次 A/B 对照（无锚点 vs 有锚点），复用 `claude-tmp/test-v1242-polish-ab.ts` 的编辑距离脚本（要烧一次性 API token）。~~②在 `loadHumanCorpus` 加「源文数字==钦定译文数字」形式守卫~~ **→ v12.58 已落地**（生成端 gen-corpus-inline.ts + 运行时 loadHumanCorpus 双道数字守卫 + 长度闸 + 品牌守卫）。
 2. **翻译首调去整句化锚点**——现在翻译首调 few-shot 是「整条原文→整条译文」（`lib/llm-api.ts` fewShotBlock 替换处），改成抽**具体关键词/短语对照表**（复用术语库/品类词/品牌词表，代码可判的形式信号，不引入 LLM 抽词）。依据：v12.24 教训「上下文注入 +38% token 仅 1-3 条改进」+ 项目铁律「具体词汇>抽象形容词」。**前提：先设计抽词逻辑（何种短语值得锚）再动手。**
 
+**v12.60 待办（2026-10-21 dashcam 三修）**：
+- **实机复验**：重翻含 Li Auto/ZEEKR/Mercedes-Benz/Chery/Jetour + 车型代号（i6/i8）的 dashcam 兼容列表 → 品牌/车型零漏翻徽章、零重试、不出现「Modelos L6」加戏；含 `200MB/s` 规格 → 译文单位不再出现 `200MB  s` 斜杠丢失。**速度**：三处漏翻根因修掉后重跑对比耗时（此前 4 条品牌每条空转 4+ 次兜底 API 是拖慢主因之一）。
+- **cleanKey 第 6 处实现待收敛**：third-party-models `normKey` 本次已对齐 cleanKey 五 arm（坑 18 第三次复发根治），但 cleanKey 现散落 6 处同源实现（post-process/entity-masker/glossary-guard/new-product-detect/glossary-filter/third-party-models），建议下版本收敛为单一导入单一事实源（HANDOFF 坑 18 纪律）。
+- **裸汽车型号词待实机驱动**：`MEGA`（理想 MPV）裸词形态模糊，本次刻意未豁免（宁漏勿滥）；实机再撞时按品牌字典/段名单补。
+
 **v12.56 复盘归档「不要再提」（防重复提出）**：
 - ❌ 人设判定→润色整链加投入（v12.42 A/B 已回滚：润色后编辑距离 -6.6% 变差、21/30 持平；v12.3 迭代4「32 次润色 0 生效」两次证据同向）
 - ❌ 限定词双表合并（语义独立，见「中期/长期」划线行）
@@ -330,4 +337,4 @@ User Message 格式：翻译 `[N] ({src}→{tgt}) "source"` / 校对 `[N] ({src}
 
 ---
 
-**最后更新**: 2026-10-01（v12.56 代码/提示词复盘落地四件：UI 漏翻徽章双视图根治 + glossaryEnMap identity 残留收口 + 技术语域卡×市场语感冲突护栏 + STYLE_GUIDES 死表退役；完整版 → HANDOFF-archive.md）
+**最后更新**: 2026-10-21（v12.60 dashcam 实机三修：汽车品牌字典豁免 + 车型代号豁免 + 单位斜杠丢失修复 + 默认模型迁移 gpt-5.5→gpt-6.1-sol + third-party-models normKey 对齐 cleanKey 根治坑 18 第三次复发；完整版 → HANDOFF-archive.md）

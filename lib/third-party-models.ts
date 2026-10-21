@@ -93,6 +93,25 @@ const BUILTIN_THIRD_PARTY_TERMS_INTERNAL: string[] = [
   //   进润色被当「连写错误」二次改写放大。整词内置后遮蔽锚定完整技术名，
   //   LLM 物理上碰不到内部空格。用户拍板：跟品牌一起当系统默认术语。
   'Microsoft DirectStorage',
+  // ── v12.60 多词汽车品牌（2026-10-21 dashcam 兼容列表实机：品牌名漏翻标红）──
+  // 专有名词零通用词碰撞，整收进遮蔽表（正文提及即遮蔽保留原文 + 整条文本节点精确
+  // 命中走整词豁免 + S1 短路）。单词品牌走下方 CAR_BRANDS_BARE 整词豁免名单。
+  // 纪律（用户拍板「有风险的不收」）：通用词/多义词品牌不在此列（Mini/Smart/Ford/
+  //   Seat/Ram/Genesis/Polestar/Lucid/One/Auto/Tank 等一律不收）。
+  'Li Auto', 'Mercedes-Benz', 'Land Rover', 'Range Rover',
+  'Rolls-Royce', 'Aston Martin', 'Alfa Romeo',
+]
+
+// ── v12.60 裸汽车品牌（单词）——整词豁免 + 遮蔽表（见 MASK_ONLY_WHOLE_TEXT）──
+// 收录纪律同上：只收无通用词/多义碰撞的专有名词，宁漏勿滥。
+const CAR_BRANDS_BARE: string[] = [
+  'ZEEKR', 'NIO', 'XPENG', 'Tesla', 'BYD', 'Chery', 'Jetour', 'Geely',
+  'Haval', 'Denza', 'Leapmotor', 'Arcfox', 'Hongqi', 'Rivian', 'Changan',
+  'Nissan', 'Toyota', 'Honda', 'Mazda', 'Subaru', 'Mitsubishi',
+  'Hyundai', 'Kia', 'Lexus', 'Acura', 'Infiniti', 'Volvo', 'Audi', 'Porsche',
+  'Ferrari', 'Bentley', 'Peugeot', 'Renault', 'Citroen', 'Opel',
+  'Dacia', 'Skoda',
+  'Lamborghini', 'Bugatti', 'Maserati',
 ]
 
 /**
@@ -109,9 +128,10 @@ const BUILTIN_THIRD_PARTY_TERMS_INTERNAL: string[] = [
  *
  * 收录原则（事故驱动，宁漏勿滥）：
  *   ✅ 已发生实机事故的裸品牌词，按事故补录
- *   ⛔ 不预先铺开词典（Sony/Canon…未出事故不收）
+ *   ⛔ 不预先铺开词典（Sony/Canon…未出事故不收）——汽车品牌例外：v12.60 用户拍板
+ *      「铺开主流汽车品牌字典」（dashcam 兼容列表是高频实机场景，品牌名不译恒正确）
  *   ⛔ 过短/多义 token 不收（'X2' 是影像格式名；裸 X5/X4/X3/X2 靠 isModelListOrCode
- *      形态规则豁免即可，无需收录）
+ *      形态规则豁免即可，无需收录；Fiat 类通用词撞名也一律不收）
  */
 const BUILTIN_THIRD_PARTY_WHOLE_TEXT_TERMS: string[] = [
   // v11.13 实机事故裸品牌（2026-08-14 兼容性列表）
@@ -121,6 +141,9 @@ const BUILTIN_THIRD_PARTY_WHOLE_TEXT_TERMS: string[] = [
   // 收录即遮蔽会切碎既有词条的型号（子串嵌套：'Hero 7 Black' ⊂ 'Hero 7 Black'…
   // 无嵌套但遮蔽有连带风险——'Hero 7' 已在遮蔽表，'Hero 7 Black' 整词豁免即可）
   'Hero 7 Black',
+  // v12.60: 裸汽车品牌（单词）——dashcam 兼容列表实机泄露修复（2026-10-21）。
+  // 收录纪律同 CAR_BRANDS_BARE 注释：只收无通用词/多义碰撞的专有名词，宁漏勿滥。
+  ...CAR_BRANDS_BARE,
 ]
 
 /**
@@ -148,6 +171,8 @@ const WHOLE_TEXT_EXEMPT_SET = new Set(
  */
 const MASK_ONLY_WHOLE_TEXT = new Set([
   'DJI', 'GoPro', 'Insta360', 'Nintendo', 'Lenovo', 'ASUS', 'Logitech',
+  // v12.60: 裸汽车品牌同时进遮蔽表（正文提及即保留原文，与既有裸品牌同款取舍）。
+  ...CAR_BRANDS_BARE,
 ])
 const BUILTIN_THIRD_PARTY_TERMS_COMBINED: string[] = [
   ...BUILTIN_THIRD_PARTY_TERMS_INTERNAL,
@@ -232,9 +257,20 @@ function identityEntry(source: string): GlossaryEntry {
   return { source, translations: { '*': source } }
 }
 
-/** 归一化 key（与 normalizeGlossaryKey 同口径：小写 + 去®™© + trim） */
+/** 归一化 key（与 normalizeGlossaryKey 即 cleanKey 同口径，v12.60 对齐）——
+ *  v12.59 cleanKey 升级「×→x + 连字符→空格 + Gen 规格空格归一」三 arm 时漏了本文件，
+ *  致连字符词条（Mercedes-Benz/ZV-E10…）在 ALL_KEYS 存 'mercedes-benz' 而 isUntranslatable
+ *  用 cleanKey 'mercedes benz' 查 → 恒失配。无数字连字符品牌（Mercedes-Benz）直接裸奔漏翻。
+ *  必须与 lib/post-process.ts cleanKey 完全一致（漂移见 HANDOFF 坑 18）。 */
 function normKey(s: string): string {
-  return s.toLowerCase().replace(/[®™©]/g, '').trim()
+  return s
+    .toLowerCase()
+    .replace(/[®™©]/g, '')
+    .replace(/×/g, 'x')
+    .replace(/[-_]/g, ' ')
+    .replace(/\bgen\s+(\d+)\s*x\s*(\d+)\b/g, 'gen$1x$2')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 /**

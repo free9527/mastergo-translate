@@ -471,7 +471,7 @@
             </div>
             <div class="field-group">
               <label class="field-label">模型</label>
-              <input class="field" v-model="llmConfig.model" placeholder="gpt-4o" />
+              <input class="field" v-model="llmConfig.model" placeholder="gpt-6.1-sol" />
             </div>
             <!-- v12.10.5: AI 优化总开关（校对+润色+择优三机制统一开关）——
                  开=三机制后台自动跑（用户零感知）；关=三机制全停（省 token/草稿预览） -->
@@ -4000,12 +4000,12 @@ function confirmLlmFallbackTerm(item: TextItem) {
 function useDefaultConfig() {
   llmConfig.value.apiKey = 'sk-LcscmmvLrVlwRbWtoPgF1jSNg6fzR7rgp2FX8pFaHreVYMyu'
   llmConfig.value.apiUrl = 'https://aigo.lexar.com/v1/chat/completions'
-  llmConfig.value.model = 'gpt-5.5'
+  llmConfig.value.model = 'gpt-6.1-sol'
   llmConfig.value.enableProofread = true
   llmConfig.value.enableAiOptimize = true
   llmConfig.value.enablePolish = true
   llmConfig.value.enableBestOfN = true
-  llmConfig.value.proofreadModel = 'gpt-5.5'
+  llmConfig.value.proofreadModel = 'gpt-6.1-sol'
   saveSettings()
   showToast('已恢复默认团队配置并保存', 'success')
 }
@@ -4335,6 +4335,12 @@ onMounted(() => {
         saving.value = false
         apiConfigured.value = !!(llmConfig.value.apiKey && llmConfig.value.apiUrl)
         showToast('配置已保存，可跨客户端同步', 'success')
+        break
+
+      // v12.60: 默认模型升级迁移完成回传——主线程已把旧默认模型(gpt-5.5/空)
+      //   切到 gpt-6.1-sol 并落盘，UI 弹提示告知（轻量 toast，非阻塞）。
+      case PluginMessage.MODEL_MIGRATED:
+        showToast('已升级默认模型：gpt-6.1-sol（可在设置中手动修改）', 'info')
         break
 
       case PluginMessage.CSV_EXPORT_READY:
