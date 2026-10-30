@@ -2067,6 +2067,7 @@ export const CATEGORY_WORDS: Record<string, CategoryWordEntry> = {
     'ru': 'Портативный SSD', 'vi': 'SSD Di Động', 'th': 'SSD แบบพกพา', 'id': 'SSD Portabel',
     'ar': 'SSD محمول', 'nl': 'Draagbare SSD', 'pl': 'Przenośny dysk SSD',
     'sv': 'Portabel SSD', 'tr': 'Taşınabilir SSD', 'en': 'Portable SSD',
+    productName: { de: 'tragbare SSD', ja: 'ポータブル SSD', ko: '휴대용 SSD' },
   },
   'Desktop Memory': {
     'zh-CN': '台式机内存条', 'zh-TW': '桌上型電腦記憶體', 'ja': 'デスクトップメモリ', 'ko': '데스크탑 메모리',
@@ -2077,7 +2078,7 @@ export const CATEGORY_WORDS: Record<string, CategoryWordEntry> = {
     'ar': 'ذاكرة RAM لأجهزة الكمبيوتر المكتبية', 'nl': 'RAM-geheugen voor desktop',
     'pl': 'Pamięć RAM do komputera stacjonarnego', 'sv': 'Arbetsminne för stationär dator',
     'tr': 'Masaüstü RAM', 'en': 'Desktop Memory',
-    productName: { 'zh-CN': '台式电脑内存' },  // 与术语库 CSV 全 12 条台式内存一致
+    productName: { 'zh-CN': '台式电脑内存', de: 'Desktop-Arbeitsspeicher', fr: 'Module mémoire pour ordinateur de bureau' },  // 与术语库 CSV 全 12 条台式内存一致
   },
   'Laptop Memory': {
     'zh-CN': '笔记本电脑内存', 'zh-TW': '筆記型電腦記憶體', 'ja': 'ラップトップメモリ', 'ko': '랩탑 메모리',
@@ -2088,6 +2089,7 @@ export const CATEGORY_WORDS: Record<string, CategoryWordEntry> = {
     'ar': 'ذاكرة RAM لأجهزة الكمبيوتر المحمولة', 'nl': 'RAM-geheugen voor laptop',
     'pl': 'Pamięć RAM do laptopa', 'sv': 'Arbetsminne för bärbar dator',
     'tr': 'Laptop RAM', 'en': 'Laptop Memory',
+    productName: { de: 'Laptop-Arbeitsspeicher' },
   },
   'Flash Drive': {
     'zh-CN': '闪存盘', 'zh-TW': '隨身碟', 'ja': 'USBメモリ', 'ko': 'USB 메모리',
@@ -2148,6 +2150,7 @@ export const CATEGORY_WORDS: Record<string, CategoryWordEntry> = {
     'ru': 'Картридер', 'vi': 'Reader', 'th': 'การ์ดรีดเดอร์', 'id': 'Card Reader',
     'ar': 'قارئ بطاقات', 'nl': 'Kaartlezer', 'pl': 'Czytnik kart',
     'sv': 'Kortläsare', 'tr': 'Kart Okuyucu', 'en': 'Reader',
+    productName: { de: 'Kartenleser' },
   },
   'Enclosure': {
     'zh-CN': '硬盘盒', 'zh-TW': '硬碟盒', 'ja': 'ケース', 'ko': '케이스',

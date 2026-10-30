@@ -563,16 +563,13 @@ function parseDefaultGlossaryProducts(): GlossaryEntry[] {
 }
 
 async function loadGlossaryProducts(): Promise<GlossaryEntry[]> {
-  // v11.9: 合并升级（保留用户自定义词条）+ 版本戳写回（修复重复升级既有 bug）
+  // Force current defaults on upgrade; each library has its own version stamp.
   return loadGlossaryWithMerge(
     mg.clientStorage,
     STORAGE_KEY_GLOSSARY_PRODUCTS,
     parseDefaultGlossaryProducts,
     GLOSSARY_VERSION,
-    (customCount) => {
-      mg.clientStorage.setAsync(STORAGE_KEY_TRANSLATION_CACHE, {})
-      mainLog('glossary', `术语库升级合并（产品名）：自定义 ${customCount} 条已保留`)
-    },
+    () => mainLog('glossary', `术语库已升级覆盖（产品名）：版本 ${GLOSSARY_VERSION}，已清除旧词条与翻译缓存`),
   )
 }
 
@@ -596,16 +593,13 @@ function parseDefaultGlossaryExclusive(): GlossaryEntry[] {
 }
 
 async function loadGlossaryExclusive(): Promise<GlossaryEntry[]> {
-  // v11.9: 合并升级（保留用户自定义词条）+ 版本戳写回（修复重复升级既有 bug）
+  // Force current defaults on upgrade; each library has its own version stamp.
   return loadGlossaryWithMerge(
     mg.clientStorage,
     STORAGE_KEY_GLOSSARY_EXCLUSIVE,
     parseDefaultGlossaryExclusive,
     GLOSSARY_VERSION,
-    (customCount) => {
-      mg.clientStorage.setAsync(STORAGE_KEY_TRANSLATION_CACHE, {})
-      mainLog('glossary', `术语库升级合并（专属）：自定义 ${customCount} 条已保留`)
-    },
+    () => mainLog('glossary', `术语库已升级覆盖（专属）：版本 ${GLOSSARY_VERSION}，已清除旧词条与翻译缓存`),
   )
 }
 

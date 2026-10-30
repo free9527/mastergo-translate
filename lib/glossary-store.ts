@@ -15,7 +15,7 @@
 // 保存用户术语库时统一顺手写回版本戳，保证戳与内容永不失配。
 
 import { GlossaryEntry } from '@messages/types'
-import { STORAGE_KEY_GLOSSARY_VERSION } from '@lib/constants'
+import { STORAGE_KEY_GLOSSARY_VERSION, STORAGE_KEY_TRANSLATION_CACHE } from '@lib/constants'
 
 /** clientStorage 最小抽象（插件线程传 mg.clientStorage，测试传内存 mock） */
 export interface GlossaryStorage {
@@ -71,13 +71,17 @@ export async function loadGlossaryWithMerge(
   version: number,
   onUpgraded?: (customCount: number) => void,
 ): Promise<GlossaryEntry[]> {
-  const storedVersion = (await storage.getAsync(STORAGE_KEY_GLOSSARY_VERSION)) as number | null | undefined
+  // Each library must finish its own upgrade; a shared stamp lets the first load hide the second.
+  const versionKey = `${STORAGE_KEY_GLOSSARY_VERSION}:${storageKey}`
+  const storedVersion = (await storage.getAsync(versionKey)) as number | null | undefined
 
   if (storedVersion == null || storedVersion < version) {
     const defaults = parseDefaults()
     // v12.49: 直接覆盖——不再 mergeGlossaryOnUpgrade 保留用户自定义，发版即强制对齐后台钦定
     await storage.setAsync(storageKey, defaults)
+    await storage.setAsync(STORAGE_KEY_TRANSLATION_CACHE, {})
     await storage.setAsync(STORAGE_KEY_GLOSSARY_VERSION, version)
+    await storage.setAsync(versionKey, version)
     onUpgraded?.(0)
     return defaults
   }
@@ -87,7 +91,9 @@ export async function loadGlossaryWithMerge(
 
   const defaults = parseDefaults()
   await storage.setAsync(storageKey, defaults)
+  await storage.setAsync(STORAGE_KEY_TRANSLATION_CACHE, {})
   await storage.setAsync(STORAGE_KEY_GLOSSARY_VERSION, version)
+  await storage.setAsync(versionKey, version)
   return defaults
 }
 
@@ -103,4 +109,5 @@ export async function saveGlossaryWithVersion(
 ): Promise<void> {
   await storage.setAsync(storageKey, entries)
   await storage.setAsync(STORAGE_KEY_GLOSSARY_VERSION, version)
+  await storage.setAsync(`${STORAGE_KEY_GLOSSARY_VERSION}:${storageKey}`, version)
 }

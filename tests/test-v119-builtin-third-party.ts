@@ -210,9 +210,9 @@ out.push('═'.repeat(60))
 {
   const leaked = INCIDENT_16.filter(t => userExclusive.some(g => g.source === t))
   assert(leaked.length === 0, 'B1 专属 CSV 已删除全部 16 条第三方词条', leaked.join(','))
-  // 删除不影响用户自有词条：老第三方品牌行（Apple/Samsung/DJI…）仍在用户库
-  const legacyKept = ['Apple', 'Samsung', 'DJI', 'GoPro'].filter(t => userExclusive.some(g => g.source === t))
-  assert(legacyKept.length === 4, 'B2 用户库原有第三方品牌行不受影响', legacyKept.join(','))
+  // Exclusive brand/software/specification terms remain after third-party cleanup.
+  const legacyKept = ['Lexar DataShield', 'Lexar Recovery Tool', 'Intel XMP 3.0', 'AMD EXPO'].filter(t => deMerged.get(t) === t)
+  assert(legacyKept.length === 4, 'B2 自有软件及规格词条仍在专属库生效', legacyKept.join(','))
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -310,7 +310,7 @@ const DEFAULTS: GlossaryEntry[] = [
 }
 
 async function runStorageTests() {
-  // E6: 升级触发：storedVersion < version → 合并 + 版本戳写回 + 缓存失效回调
+  // E6: Upgrade replaces stored terms with current defaults.
   {
     const storage = makeMemStorage({
       [STORAGE_KEY_GLOSSARY_VERSION]: 4,
@@ -318,12 +318,12 @@ async function runStorageTests() {
     })
     let upgraded = -1
     const result = await loadGlossaryWithMerge(storage, 'g_products', () => DEFAULTS, 6, c => { upgraded = c })
-    assert(result.length === 3, 'E6 升级合并：默认 2 + 用户 1', `got ${result.length}`)
-    assert(upgraded === 1, 'E7 升级回调报告自定义条数', `got ${upgraded}`)
+    assert(result.length === 2, 'E6 升级直接覆盖：仅默认 2 条', `got ${result.length}`)
+    assert(upgraded === 0, 'E7 升级不保留本地自定义', `got ${upgraded}`)
     assert(storage.data[STORAGE_KEY_GLOSSARY_VERSION] === 6, 'E8 版本戳已写回（v11.8 既有 bug 修复）',
       `got ${storage.data[STORAGE_KEY_GLOSSARY_VERSION]}`)
     const persisted = storage.data['g_products'] as GlossaryEntry[]
-    assert(persisted.length === 3 && persisted.some(e => e.source === '用户词条A'), 'E9 合并结果已持久化')
+    assert(persisted.length === 2 && !persisted.some(e => e.source === '用户词条A'), 'E9 默认覆盖结果已持久化')
   }
 
   // E7→E10: 版本戳已新 → 不重复升级（直接读存量）
@@ -331,6 +331,7 @@ async function runStorageTests() {
     const storedEntries: GlossaryEntry[] = [{ source: '用户词条B', translations: { de: 'B' } }]
     const storage = makeMemStorage({
       [STORAGE_KEY_GLOSSARY_VERSION]: 6,
+      [`${STORAGE_KEY_GLOSSARY_VERSION}:g_products`]: 6,
       'g_products': storedEntries,
     })
     let upgradeCalled = false

@@ -130,7 +130,7 @@
           <div class="pending-item" v-for="p in pendingItems" :key="p.item.nodeIds[0]" :class="p.type">
             <div class="pending-item-body">
               <div class="pending-item-source" :title="p.item.sourceText">
-                <span class="confidence-tag" :class="'conf-' + p.confidence">{{ p.confidence === 'high' ? '需处理' : p.confidence === 'mid' ? '建议裁决' : '仅提示' }}</span><span v-if="p.type === 'misspelled'" class="misspelled-tag">未识别词·已保留原形（如确认是正确词汇可重翻）：</span><span v-else-if="p.type === 'llmFallback'" class="llm-fallback-tag">新品名待确认（LLM 辅助识别）：</span><span v-else-if="p.type === 'proofreadGlossary'" class="llm-fallback-tag">校对改写钦定值（建议裁决）：</span><span v-else-if="p.type === 'prohibitedSrc'" class="prohibited-tag">源文违禁词（{{ (prohibitedSrcIds.get(p.item.nodeIds[0]) || []).join('、') }}）：</span><span v-else-if="p.type === 'prohibitedTrans'" class="prohibited-tag">译文违禁词（{{ (prohibitedTransIds.get(p.item.nodeIds[0]) || []).join('、') }}）{{ llmConfig.enableProofread ? '，校对改写后仍命中' : '，开校对可规避' }}：</span>{{ p.item.sourceText }}
+                <span class="confidence-tag" :class="'conf-' + p.confidence">{{ p.confidence === 'high' ? '需处理' : p.confidence === 'mid' ? '建议裁决' : '仅提示' }}</span><span v-if="p.type === 'misspelled'" class="misspelled-tag">未识别词·已保留原形（如确认是正确词汇可重翻）：</span><span v-else-if="p.type === 'llmFallback'" class="llm-fallback-tag">新品名待确认（规则生成／辅助识别）：</span><span v-else-if="p.type === 'proofreadGlossary'" class="llm-fallback-tag">校对改写钦定值（建议裁决）：</span><span v-else-if="p.type === 'prohibitedSrc'" class="prohibited-tag">源文违禁词（{{ (prohibitedSrcIds.get(p.item.nodeIds[0]) || []).join('、') }}）：</span><span v-else-if="p.type === 'prohibitedTrans'" class="prohibited-tag">译文违禁词（{{ (prohibitedTransIds.get(p.item.nodeIds[0]) || []).join('、') }}）{{ llmConfig.enableProofread ? '，校对改写后仍命中' : '，开校对可规避' }}：</span>{{ p.item.sourceText }}
               </div>
               <div class="pending-item-trans" :title="p.item.translatedText">{{ p.item.translatedText }}</div>
             </div>
@@ -628,7 +628,7 @@ import { isBilingualCameraBrand } from '@lib/third-party-models'
 import { startMetricsCollection, recordBatchMetrics, recordProofreadMetrics, finalizeMetrics, formatMetricsReport, createBatchTimer } from '@lib/metrics'
 import { DEFAULT_GLOSSARY_PRODUCTS_CSV } from '@lib/default-glossary'
 import { BUILTIN_THIRD_PARTY_ENTRIES } from '@lib/third-party-models'
-import { TRANSLATE_BATCH_SIZE, PROOFREAD_BATCH_SIZE, TOAST_DURATION_MS, CORRECTION_THRESHOLD, makeFontKey, parseFontKey, normalizeText, CORPUS_VERSION } from '@lib/constants'
+import { TRANSLATE_BATCH_SIZE, PROOFREAD_BATCH_SIZE, TOAST_DURATION_MS, CORRECTION_THRESHOLD, makeFontKey, parseFontKey, normalizeText, CORPUS_VERSION, GLOSSARY_VERSION } from '@lib/constants'
 
 // v12.18: 校对批次动态化——v12.17 实机实锤批次 4（长文本+违禁词改写链叠加）52.8 秒为异常值。
 // 长文本批次单拆小批：LLM 时延随批内总字数近似线性增长，长条挤在 8 条满批里会拖出超长尾批。
@@ -1654,6 +1654,7 @@ function persistAdhocProductNames(adhocDetected: ReturnType<typeof detectAdhocPr
   let addedCount = 0
   for (const d of adhocDetected) {
     const gen = generateProductNameTranslations(d.term, d.series)
+    if (gen.reviewReasons.length > 0) uiLog('glossary', `新品规则待审核[${d.term}]: ${gen.reviewReasons.join('; ')}`)
     const translations: Record<string, string> = {}
     for (const [lang, val] of Object.entries(gen.translations)) {
       if (lang !== 'en') translations[lang] = val  // en = source 本身，不重复入库
@@ -1761,6 +1762,7 @@ async function startTranslate() {
     const adhocTargetTranslations = new Map<string, string>()
     for (const d of adhocDetected) {
       const gen = generateProductNameTranslations(d.term, d.series)
+      if (gen.reviewReasons.length > 0) uiLog('glossary', `新品规则待审核[${d.term}]: ${gen.reviewReasons.join('; ')}`)
       let targetVal = gen.translations[targetLang.value] || d.term
       if (targetLang.value === 'zh-TW' && targetVal === gen.translations['zh-CN']) {
         targetVal = zhCNtoZhTW(targetVal)
@@ -1796,6 +1798,7 @@ async function startTranslate() {
         if (llmParsed && llmParsed.isProductName) {
           // 校验通过 → 代码渲染 20 语种译名 → 收录待入库池（v12.49：不静默入库，下载发开发者审核后写回后台）
           const gen = generateProductNameTranslations(candidate.term, llmParsed.series)
+          if (gen.reviewReasons.length > 0) uiLog('glossary', `新品规则待审核[${candidate.term}]: ${gen.reviewReasons.join('; ')}`)
           const translations: Record<string, string> = {}
           for (const [lang, val] of Object.entries(gen.translations)) {
             if (lang !== 'en') translations[lang] = val
@@ -1956,7 +1959,7 @@ async function startTranslate() {
   // （防旧词表时代的违禁词译文经缓存复活，v10.7 型缺口的词表维度补件）
   // v12.58: 语料库版本戳进缓存键 — 人工钦定语料更新后旧译文缓存自然失配重翻
   // （缓存命中在 TM 短路之前，不加戳旧缓存会遮蔽新增钦定——「越用越聪明」只在重扫生效）
-  const cacheKey = (text: string) => normalizeText(text) + '\x00' + targetLang.value + '\x00' + glossaryHash + '\x00' + adhocHash + '\x00' + PROHIBITED_WORDS_VERSION + '\x00' + CORPUS_VERSION
+  const cacheKey = (text: string) => normalizeText(text) + '\x00' + targetLang.value + '\x00' + glossaryHash + '\x00' + adhocHash + '\x00' + PROHIBITED_WORDS_VERSION + '\x00' + CORPUS_VERSION + '\x00' + GLOSSARY_VERSION
   let cacheHits = 0
   let failedBatches = 0
   const lastErrors: string[] = []
@@ -2776,6 +2779,10 @@ async function startProofread() {
   //   此前 EN 视图设 identity `term→term`，noTranslateTerms 会把新产品名当「保留英文」）
   for (const d of detectAdhocProductTerms(items.value.map(it => it.sourceText), glossaryMap)) {
     const gen = generateProductNameTranslations(d.term, d.series)
+    if (gen.reviewReasons.length > 0) {
+      uiLog('glossary', `新品规则待审核[${d.term}]: ${gen.reviewReasons.join('; ')}`)
+      addToPendingReview({ source: d.term, translations: gen.translations, series: d.series, detectedAt: Date.now(), source2: 'v11.2' })
+    }
     let targetVal = gen.translations[targetLang.value] || d.term
     if (targetLang.value === 'zh-TW' && targetVal === gen.translations['zh-CN']) {
       targetVal = zhCNtoZhTW(targetVal)

@@ -99,6 +99,29 @@ export function restoreTrademarkSymbols(sourceTexts: string[], translatedTexts: 
 
     if (symbols.length === 0) return translated
 
+    // Distinct anchors can change order in localized names (Italian CFexpress before Lexar).
+    // Only bypass ordered recovery when every source anchor has exactly one whole-token target.
+    const plain = translated.replace(/[®™©]/g, '')
+    const uniqueWords = new Set(symbols.map(s => s.word.toLowerCase()))
+    if (uniqueWords.size === symbols.length) {
+      const anchors: Array<{ end: number; symbol: string }> = []
+      for (const { word, symbol } of symbols) {
+        const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        const re = new RegExp(`(^|[^A-Za-z0-9])(${escaped})(?![A-Za-z0-9])`, 'gi')
+        const matches = [...plain.matchAll(re)]
+        if (matches.length !== 1) break
+        const m = matches[0]
+        anchors.push({ end: m.index! + m[0].length, symbol })
+      }
+      if (anchors.length === symbols.length && anchors.some((a, i) => i > 0 && a.end < anchors[i - 1].end)) {
+        let restored = plain
+        for (const { end, symbol } of anchors.sort((a, b) => b.end - a.end)) {
+          restored = restored.slice(0, end) + symbol + restored.slice(end)
+        }
+        return restored
+      }
+    }
+
     let result = translated
 
     // v12.14: 同词同符号逐实例消费（游标锚定，替代 v12.6「锚第一个实例」去重）。
@@ -603,6 +626,7 @@ function normalizeForCategoryMatch(text: string, targetLang: string): string {
     // ja：钦定值含片假名的，同时接受平假名（ポータブル→ぽーたぶる 不常见但防御）
     // 主要归一化是长音符号兼容（ー 与 - 混用）
     s = s.replace(/[ー‐‑–—-]/g, 'ー')
+    s = s.replace(/([ァ-ヶー])\s+(?=[A-Za-z])/g, '$1')
   }
   if (targetLang === 'de') {
     // de：复合词拆分兼容（USB-Stick 命中 usbstick/usb stick）

@@ -27,7 +27,7 @@ export const MAX_CACHE_SIZE = 500
 
 // 术语库版本号（更新 default-glossary.ts 后手动 +1；v12.49 起升级改为发版直接覆盖内置默认库，
 //   用户本地自定义词条一升级全清——后台钦定迭代需全员强制对齐，手动上传是低频口子重新上传即可）
-export const GLOSSARY_VERSION = 12  // 2026-10-08: 术语库格式治理——Gen 规格词统一 Gen4x4（去空格/大小写/乘号）/ USB Gen1 补空格 / 2×2→2x2 / 英寸弯引号→直引号 / en 列 identity 补 (EOL)（v12.58 术语格式审计收口）
+export const GLOSSARY_VERSION = 13  // 2026-10-30: Product-name rules, localized glossary corrections and EOL removal; force both libraries to current defaults.
 
 // 语料库版本号（人工钦定语料 human-corpus-data.ts 版本戳，进翻译缓存键）——语料更新后旧译文缓存
 //   自然失配重翻，让新增人工钦定经 TM 短路/few-shot 覆盖旧 LLM 译文（缓存命中在 TM 短路之前，

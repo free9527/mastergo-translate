@@ -8,6 +8,70 @@
 
 ---
 
+## 产品名规则精细化与德语库本地化（2026-10-30，工作区变更，未发布）
+
+两项独立工作：①新品生成规则细化，不调用 LLM 翻译产品名；②产品名库德语表达本地化，另经官网核实修正7个非de译值；专属库先统一3个de规格词，后修正15个译值并去重2行，128→126条。source除用户指定删除(EOL)外不变。内置 default-glossary 与两份 CSV 同步。
+
+命名规则与分层兜底完整说明：[`docs/product-naming-rules.md`](docs/product-naming-rules.md)。该文档区分已实现机制与识别失败后回普通翻译等当前边界。
+
+### 匹配、解析与输出边界
+
+- 匹配沿用 cleanKey：大小写、®™©、空白、连字符、×/x、Gen 格式归一；不启用 token 排序匹配，不混合 Type A/B、版本、容量或裸机/配件套装。未接入 alignToGlossaryWordOrder。
+- 生成独立规格槽：PCIe Gen 4 × 4→Gen4x4；USB 3.2 Gen 2x2 保持 USB 规格空格；M.2/PCIe 仅既有相邻规格对归序，其余型号与数字不猜不补。
+- 分类优先级：Reader/Enclosure/Hub 等结构品类优先于嵌入的 Card/SSD；with 后配件不参与主体分类；Portable SSD 不降为内置 SSD。
+
+| 命名分支 | 规则与安全边界 |
+|---|---|
+| CFexpress 卡 | Type A/B 与可选版本作为整体规格；de=Typ、es/it=Tipo；意语规格块前置到 Lexar 前，型号和等级保留 |
+| SD / microSD 卡 | 各自介质含 HC/XC 与斜杠双格式，UHS-I/II 与 Express 纳入规格块；意语整体前置；NM Card 不套 SD 规格模板 |
+| 卡类等级/系列 | GOLD/SILVER/BLUE/DIAMOND 前置等级原位保留；尾部 X Series 按语言本地化；de 统一 Karte der X-Serie，不凭 Series 推断复数；E-Series/Plus 单列后缀 |
+| 普通/双接口/固态双接口 U盘 | 三类分开；双接口西语 Unidad dual、法语 Lecteur double，固态双接口 SSD doble/Lecteur double SSD；de 保留 Dual Drive/采用 Dual-SSD，按槽位而非统一前后置 |
+| 内置 SSD | 意语 Professional 或带 Heatsink 使用 Unità a stato solido，其余 SSD；不补接口代数、NVMe 或其他缺失参数 |
+| 移动 SSD | 与内置分开；Magnetic 的中/法/西/意/葡/阿表达单列；ja/ko 使用库内品类写法；中文营销名不自动派生 |
+| 内存 | Desktop/Laptop 分开；de Desktop-/Laptop-Arbeitsspeicher；2nd Gen 在 ja/ko/fr/vi 原槽本地化，其他语言作世代后缀；不自动补 UDIMM/营销名 |
+| 读卡器/硬盘盒/Hub | Card Reader 不残留额外 Card；SSD Enclosure 作为复合品类；de Kartenleser、Multi-Kartenleser、SSD-Gehäuse、2,5-Zoll-Festplattengehäuse、USB-C-Hub |
+| 配件与状态 | with Heatsink/Magnetic Set/Hub 单独查19语种词汇；意语 con concentratore 与独立 Hub 区别；配件后置，日语 Hub 前置；2026-10-30 用户裁决：(EOL) 为下架状态，不属于产品名，source/英文列/译名与生成输出全部移除，保留产品记录 |
+
+### 官网核实与下架标记裁决（2026-10-30）
+
+- `(EOL)` 标记从4条产品的全部字段移除（34处），不删除141条产品记录；同步 default-glossary、glossary-tag-map 与 convert-glossary-tags 源；生成器对旧输入剥状态，不再回填任何语种。历史测试的 EOL 输入保留用于兼容回归。
+- 日语两款 DDR4 的 3200/2666 不是凭空补值：
+  - https://www.lexar.com/jp/products/Lexar-DDR4-SODIMM-Laptop-Memory
+  - https://www.lexar.com/jp/products/Lexar-DDR4-UDIMM-Desktop-Memory
+- PLAY 2230 德语 NVMe 有官网标题依据：https://www.lexar.com/de/products/Lexar-PLAY-2230-PCIe-4-0-SSD 。德语 Type 类规格仍按用户明确裁决使用 Typ，不随个别官网标题改成 Type。
+- 已核实并于2026-10-30按用户授权修正：
+  - E-Series Plus 意语应不扩成 microSDHC/microSDXC，官网标题仅 microSDXC：https://www.lexar.com/it/products/Lexar-microSDXC-UHS-I-Card-E-Series-Plus
+  - 三款U盘西语标题含 USB 3.2，库中遗漏：/es/products/Lexar-JumpDrive-S47-USB-3-1-Flash-Drive、Lexar-JumpDrive-S80-USB-3-1-Flash-Drive、Lexar-JumpDrive-V100-USB-3-0-Flash-Drive（域名 https://www.lexar.com）。URL 旧版本号不作为规格依据，以正文/标题为准。
+  - 2.5英寸盒官网明确兼容SSD/HDD，西/意语仅SSD的命名过窄：https://www.lexar.com/global/products/Lexar-2-5-Inch-Hard-Drive-Enclosure 。本地西/意页面未取得，不声称核实其地区标题。
+  - Muse 英文官方名可确认，韩语页未取得，휴의용→휴대용 为拼写修正建议，不冒充韩语官网钦定：https://www.lexar.com/global/products/Lexar-Muse-Ultra-Slim-Portable-SSD
+
+### 专属术语与产品名数据修正（2026-10-30）
+
+- 专属库15个译值：韩语SD/microSD误入日语→카드；波兰语向下兼容→Wstecznie kompatybilny、Frameo独立词条改主格aplikacja Frameo；荷兰语Compact拼写；瑞典语ditt spelbibliotek；土耳其语掌机用存储卡修饰关系；繁中On-die ECC明确错误更正而非仅侦错；德语Portable SSD→tragbare SSD；欧葡Pen USB/Pen USB SSD（巴葡保留）；法语兼容词及完整XMP/EXPO句、日语XMP/EXPO语法和读取速度用词统一。
+- 去除PCIe Gen4x4、Gen5x4各一条完全重复记录，所有126个独立source保留，无空译值。保修、认证、温度范围与影像限定待具体产品/场景确认，不改承诺。
+- 产品名7格：意语E-Series Plus仅microSDXC；西语S47/S80/V100补USB 3.2；Muse韩语휴의용→휴대용；2.5英寸盒西/意语改SSD/HDD中性范围。2.5英寸盒生成规则同步为Carcasa…para unidades…/Box esterno…per unità…，不限制仅SSD。
+- CSV与default-glossary保持解析值完全一致；tests/test-v1261-glossary-localization.ts覆盖上述行为及126条去重、区域钦定保留、19语种非空。
+- 验证：新增3套29+7+11=47组检查通过（含20语种新品组合不变量）；相关15套专项回归通过；npm test 330断言通过；npm run typecheck、npm run build通过。构建仍有环境--localstorage-file警告，未影响退出码。未做MasterGo实机验证，未发布/提交；后续按用户授权GLOSSARY_VERSION已提升13。
+
+### 双库版本升级（2026-10-30 用户授权）
+
+- 用户裁决：所有升级到新版插件的用户使用最新内置术语库，GLOSSARY_VERSION=13，不手动换CSV，原自定义随版本升级直接覆盖。
+- 修复共用版本戳缺陷：顺序加载时第一库写全局版本会导致第二库跳升级；现在按storageKey独立记版本，保留全局戳兼容。库与缓存写入成功后再记本库版本，避免中断后永久跳升级。
+- 翻译缓存键加入GLOSSARY_VERSION，防启动时旧缓存消息先返回继续命中；升级日志不再声称保留自定义。
+- tests/test-v1261-glossary-upgrade.ts覆盖两种加载顺序、141/126直接覆盖、缓存清空、启动幂等、写入中断重试。test-v119历史合并断言及旧品牌夹具已对齐现状。
+
+### 兜底与已知边界
+
+- 未知配件、未支持世代/系列、未知卡格式保留源信息，返回 reviewReasons，翻译/辅助识别/独立校对入口透出日志，复用现有待入库池与待确认按钮；不是自动确认，不新增自由翻译兜底。
+- 品牌/规格唯一锚点被意语重排时，restoreTrademarkSymbols 按唯一词位还原；重复商标实例仍走既有消费游标。避免 Lexar®/CFexpress™ 顺序变化导致重复补词。
+- ja 品类校验仅容忍片假名与拉丁缩写间空格差异，避免 ポータブル SSD/ポータブルSSD 误回退。
+- 2026-10-30 官网复核：日本官网 SODIMM/UDIMM 两条标题确实含 DDR4-3200/2666，保留；德国官网 PLAY 2230 标题确实含 NVMe，保留区域钦定，不外推给新品。
+- 旧库中的营销名、个别参数增补、历史单复数及语序特例不当作新品通则；已入库整条仍优先使用钦定值。非德语只改明确核实的授权条目，不整库重写。
+- **版本升级已授权并实现：GLOSSARY_VERSION 12→13。新版插件启动后，两份本地库各自直接覆盖为141条产品名、126条专属术语，不保留旧自定义；清空旧翻译缓存，缓存键追加术语版本。独立版本戳在库与缓存写入成功后提交，失败下次重试。未发布；Figma副本业务已同步（平台适配保留），两仓库类型检查、构建、标准测试及9套专项回归通过；GitHub备份提交见仓库分支。**
+- 测试：tests/test-v1261-product-name-rules.ts（新品组合/格式等价/反例/20语种商标不变量），tests/test-v1261-de-localization.ts（本地化/非de列SHA256不变/CSV与内置一致）；加跑既有新品、商标、品类、缓存、合规回归及 typecheck/build。
+
+---
+
 ## 零·〇、Figma 版副本说明（2026-10-13）
 
 **本仓库是 MasterGo 版（原版，平台差异的唯一权威）**。Figma 版已另立副本并存：

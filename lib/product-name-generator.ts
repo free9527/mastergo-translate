@@ -6,7 +6,7 @@
  * 冲突时以 CSV 现状为准（保证新品名与已有术语库风格统一、可混用）。
  *
  * 五槽位：品牌 Lexar + [Professional] + 系列名 + 型号/规格 + 品类词
- *   - 系列名/型号/规格：全语种原样保留（规则文档"系列命名保留、硬件原生参数不翻译"）
+ *   - Brand/model/specification values are preserved; known labels and suffixes are localized.
  *   - 品类词：按 CATEGORY_WORDS（v11.7 单一事实源）查译法 × 按 WORD_ORDER 套语序模板
  *
  * 中文营销名槽位：一律留空（ARES→战神/THOR→雷神 内部不一致、Air→小轻块为特例，
@@ -24,7 +24,7 @@ export const TARGET_LANGS = [
 ] as const
 
 // ═══════════════════════════════════════════════════════════════
-// 语序模板（CSV 归纳，一致率 100%）
+// Base word order; media blocks, accessories and suffixes are rendered separately.
 //   'suffix' 品类后置： Lexar + 系列 + 型号/规格 + 品类
 //   'prefix' 品类前置： 品类 + Lexar + 系列 + 型号/规格
 // ═══════════════════════════════════════════════════════════════
@@ -138,6 +138,13 @@ export function alignToGlossaryWordOrder(enName: string, glossarySources: string
  *   - 返回 canonical key（'Card' 非 'card'），下游 CATEGORY_WORDS 查询不受影响
  */
 export function detectCategory(enName: string): string | null {
+  // Structural accessories outrank embedded media (Card Reader / Portable SSD with Hub).
+  if (/^Lexar[®™©]?\s/i.test(enName)) {
+    const primary = enName.split(/\s+with\s+/i)[0].replace(/\s*\(EOL\)\s*$/i, '')
+    for (const cat of ['Reader', 'Enclosure', 'Hub', 'Portable SSD']) {
+      if (new RegExp('\\b' + cat + '\\b', 'i').test(primary)) return cat
+    }
+  }
   for (const cat of CATEGORY_KEYS) {
     const escaped = cat.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     // 第一遍：官方写法精确匹配（大小写敏感）——既有行为完全不变
@@ -174,65 +181,188 @@ export interface GeneratedProductNames {
   translations: Record<string, string>
   /** 中文营销名槽位是否留空（恒 true，本版本不自动继承） */
   zhMarketingNameBlank: boolean
+  /** Uncovered structures require review; no information is discarded. */
+  reviewReasons: string[]
+}
+
+const ACCESSORY_NAMES: Record<string, Record<string, string>> = {
+  Heatsink: {
+    'zh-CN': 'with Heatsink', 'zh-TW': 'with Heatsink', ja: 'with Heatsink', ko: 'with Heatsink',
+    fr: 'avec dissipateur thermique', de: 'mit Kühlkörper', es: 'con disipador de calor',
+    pt: 'com dissipador', 'pt-BR': 'com dissipador', ru: 'с радиатором', it: 'con dissipatore di calore',
+    vi: 'with Heatsink', th: 'พร้อมฮีตซิงก์', id: 'dengan Heatsink', ar: 'مع مشتت حراري',
+    nl: 'met heatsink', pl: 'z radiatorem', sv: 'med kylfläns', tr: 'Soğutuculu', en: 'with Heatsink',
+  },
+  'Magnetic Set': {
+    'zh-CN': '磁吸套装', 'zh-TW': '磁吸套組', ja: 'with Magnetic Set', ko: 'with Magnetic Set',
+    fr: 'avec kit magnétique', de: 'mit Magnetset', es: 'con juego magnético',
+    pt: 'com kit magnético', 'pt-BR': 'com kit magnético', ru: 'с магнитным креплением', it: 'con set magnetico',
+    vi: 'with Magnetic Set', th: 'พร้อมชุดแม่เหล็ก', id: 'dengan Set Magnetik', ar: 'مع مجموعة مغناطيسية',
+    nl: 'met magnetische set', pl: 'z zestawem magnetycznym', sv: 'med magnetkit', tr: 'Manyetik Setli', en: 'with Magnetic Set',
+  },
+  Hub: {
+    'zh-CN': '配扩展坞', 'zh-TW': '附擴充埠', ja: 'ハブ搭載', ko: '(허브 포함)',
+    fr: 'avec hub', de: 'mit Hub', es: 'con concentrador', pt: 'com Hub', 'pt-BR': 'com Hub',
+    ru: 'с хабом', it: 'con concentratore', vi: 'with Hub', th: 'พร้อมฮับ', id: 'dengan Hub',
+    ar: 'مع موزع', nl: 'met hub', pl: 'z hubem', sv: 'med hubb', tr: 'Hub ile', en: 'with Hub',
+  },
+}
+const SECOND_GENERATION: Record<string, string> = {
+  'zh-CN': '第二代', 'zh-TW': '第二代', ja: '第 2 世代', ko: '2세대', fr: '2e Gen',
+  de: 'der 2. Generation', es: 'de 2.ª generación', pt: '2.ª Geração', 'pt-BR': '2ª Geração',
+  ru: '2-го поколения', it: 'di seconda generazione', vi: '2nd Gen', th: 'Gen 2', id: 'Gen 2',
+  ar: 'الجيل الثاني', nl: '2e generatie', pl: '2. generacji', sv: '2:a generationen', tr: '2. Nesil', en: '2nd Gen',
+}
+
+function localizeType(text: string, lang: string): string {
+  const type = lang === 'de' ? 'Typ' : lang === 'es' || lang === 'it' ? 'Tipo' : 'Type'
+  return text.replace(/\bType(\s+[AB]\b|-C\b)/gi, (_m, suffix: string) => type + suffix.toUpperCase())
+}
+
+function seriesSuffix(label: string, lang: string): string {
+  if (lang === 'de') return label.toLowerCase() === 'elite legends' ? 'Elite Legends-Serie' : `der ${label}-Serie`
+  if (lang === 'fr') return `série ${label}`
+  if (lang === 'es' || lang === 'it') return `Serie ${label}`
+  if (lang === 'zh-CN' || lang === 'zh-TW') return `${label} 系列`
+  if (lang === 'ja') return `${label} シリーズ`
+  if (lang === 'ko') return `${label} 시리즈`
+  return `${label} Series`
+}
+
+function renderDualDrive(body: string, category: string, lang: string): string {
+  const solid = category === 'Solid State Dual Drive'
+  const localized = localizeType(body, lang)
+  const catRe = new RegExp(`\\b${category}\\b`, 'i')
+  const core = localized.replace(catRe, ' ').replace(/\s+/g, ' ').trim()
+  if (lang === 'de') return solid ? localized.replace(catRe, 'Dual-SSD') : localized
+  if (lang === 'it') return solid ? localized.replace(catRe, 'a stato solido Dual Drive') : localized
+  if (lang === 'ko' || lang === 'vi') return localized
+  if (lang === 'ja') return solid ? localized.replace(catRe, 'ソリッドステートデュアルドライブ') : `${localized} フラッシュドライブ`
+  if (lang === 'zh-CN' || lang === 'zh-TW') {
+    if (!solid) return `${localized} ${categoryTranslation('Flash Drive', lang)}`
+    return `${core} ${lang === 'zh-CN' ? '双接口高速固态U盘' : '雙介面高速固態隨身碟'}`
+  }
+  if (lang === 'es') return `${solid ? 'SSD doble' : 'Unidad dual'} ${core}`
+  if (lang === 'fr') return `${solid ? 'Lecteur double SSD' : 'Lecteur double'} ${core}`
+  const names: Record<string, string> = solid ? {
+    pt: 'Pen USB SSD', 'pt-BR': 'Pen Drive SSD', ru: 'USB-флеш-накопитель SSD',
+    th: 'แฟลชไดร์ฟ SSD', id: 'Flashdisk SSD', ar: 'محرك فلاش SSD USB', nl: 'SSD USB-stick',
+    pl: 'Pendrive SSD', sv: 'SSD USB-minne', tr: 'SSD USB Bellek',
+  } : {}
+  return `${names[lang] || categoryTranslation('Flash Drive', lang)} ${localized}`
 }
 
 /**
  * 按规则生成英文产品名的 20 语种译名。
  *
  * @param enName    完整英文产品名（如 "Lexar THOR Ultra M.2 2280 PCIe Gen5x4 NVMe SSD"）
- * @param series    系列名（如 "THOR Ultra"），用于定位品类词之外的保留部分
+ * @param _series   Legacy caller argument; structural rendering reads the complete name.
  * @returns 20 语种译名表
  */
 export function generateProductNameTranslations(
   enName: string,
-  series: string,
+  _series: string,
 ): GeneratedProductNames {
-  const category = detectCategory(enName)
+  const source = enName.replace(/\s*\(EOL\)/gi, '').replace(/×/g, 'x')
+    .replace(/\bGen\s*(\d+)\s*[xX]\s*(\d+)\b/gi, 'Gen$1x$2')
+    .replace(/(\bUSB\s+[\d.]+\s+)Gen(\d+x\d+)/gi, '$1Gen $2')
+    .replace(/\s+/g, ' ').trim()
+  const category = detectCategory(source)
   const translations: Record<string, string> = {}
+  const reviewReasons: string[] = []
+  if (/\b(?:1st|3rd|[4-9]th|\d{2,}th) Gen\b/i.test(source)) reviewReasons.push('Unsupported generation')
 
   if (!category) {
-    // 无品类词（如纯型号/系列组合）→ 全语种原样保留
-    for (const lang of TARGET_LANGS) translations[lang] = enName
-    return { category: null, translations, zhMarketingNameBlank: true }
+    for (const lang of TARGET_LANGS) translations[lang] = source
+    return { category, translations, zhMarketingNameBlank: true, reviewReasons: ['No supported category'] }
   }
+  let body = source
+  const seriesMatch = body.match(/\s+(GOLD|SILVER|BLUE|DIAMOND|Elite Legends)\s+Series$/i)
+  const eSeries = body.match(/\s+E-Series?(\s+Plus)?$/i)
+  if (seriesMatch) body = body.slice(0, seriesMatch.index).trim()
+  if (eSeries) body = body.slice(0, eSeries.index).trim()
+  const accessoryMatch = body.match(/\bwith\s+(Heatsink|Magnetic Set|Hub)(?=\s+(?:M\.2|PCIe|NVMe|SSD|Portable SSD)\b|$)/i)
+  const accessory = accessoryMatch && Object.keys(ACCESSORY_NAMES).find(k => k.toLowerCase() === accessoryMatch[1].toLowerCase())
+  if (accessoryMatch) body = body.replace(accessoryMatch[0], ' ').replace(/\s+/g, ' ').trim()
+  if (/\bwith\b/i.test(body)) reviewReasons.push('Unknown accessory: preserve source and review')
+  if (/\bSeries\b|\bE-Series?\b/i.test(body)) reviewReasons.push('Unsupported series suffix')
+  const generation = /\b2nd Gen\b/i.test(body)
+  const categoryRe = new RegExp(`\\b${category}\\b`, 'i')
+  const core = body.replace(categoryRe, ' ').replace(/\s+/g, ' ').trim()
+    .replace(/\b(PCIe\s+[\d.]+)\s+(M\.2)\b/i, (_m, pcie: string) => `M.2 ${pcie.replace(/^pcie/i, 'PCIe')}`)
+  const cardReader = category === 'Reader' && /\bCard Reader\b/i.test(body)
+  const ssdEnclosure = category === 'Enclosure' && /\bSSD Enclosure\b/i.test(body)
+  const dual = category === 'Dual Drive' || category === 'Solid State Dual Drive'
+  const cardMedia = category === 'Card' && core.match(/\b(?:CFexpress(?:\s+\d+\.\d+)?\s+Type\s+[AB]|(?:microSD(?:HC|XC)?|SD(?:HC|XC)?)(?:\/(?:microSD(?:HC|XC)?|SD(?:HC|XC)?))?(?:\s+(?:UHS-I{1,2}|Express))?)(?:[™®])?/i)
 
-  // 拆分：品类词之外的部分（Lexar + 系列 + 型号/规格），全语种保留
-  // core = enName 去掉品类词，去多余空格
-  // v11.4: i flag —— detectCategory 大小写不敏感命中后，源文中的实际写法（小写 card）
-  //   也必须剥掉，否则 core 残留品类词导致译名重复（"Lexar nCARD NM card 存储卡"）
-  const catRe = new RegExp(`\\s*\\b${category.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b\\s*`, 'i')
-  const core = enName.replace(catRe, ' ').replace(/\s+/g, ' ').trim()
-
-  // v12.48: 规格槽位词序归一到钦定风格（命名规则文档钦定接口形态在协议形态前：M.2 PCIe 4.0）。
-  //   根因：画布/录入可能把规格写反（PCIe 4.0 M.2），代码生成若忠实保留源文词序 → 产出非钦定形态。
-  //   「按规则翻译」要求输出钦定词序，与输入端书写差异解耦。只调整 M.2↔PCIe 相邻规格对的相对
-  //   顺序，其余 token（品牌/系列/型号/其他规格）位置不动——同产品的规格写法归一，不跨产品改写。
-  const canonicalCore = core.replace(
-    /\b(PCIe\s+[\d.]+)\s+(M\.2)\b/i,
-    (_m, pcie: string, m2: string) => `${m2.toUpperCase()} ${pcie.replace(/^pcie/i, 'PCIe')}`,
-  )
+  if (category === 'Card' && !cardMedia && !/\bNM Card\b/i.test(source)) reviewReasons.push('Unsupported card format')
 
   for (const lang of TARGET_LANGS) {
-    // 越南语外设特例：整条保留英文
-    if (lang === 'vi' && VI_KEEP_ENGLISH_CATEGORIES.has(category)) {
-      translations[lang] = enName
+    if (lang === 'en') {
+      translations[lang] = source.replace(/\b(PCIe\s+[\d.]+)\s+(M\.2)\b/i, (_m, pcie: string) => `M.2 ${pcie.replace(/^pcie/i, 'PCIe')}`)
       continue
     }
-
-    const catTranslated = categoryTranslation(category, lang)
-
-    // 语序
-    let order: 'prefix' | 'suffix' = WORD_ORDER[lang] || 'suffix'
-    if (lang === 'vi') {
-      order = VI_PREFIX_CATEGORIES.has(category) ? 'prefix' : 'suffix'
+    if (lang === 'vi' && VI_KEEP_ENGLISH_CATEGORIES.has(category)) {
+      translations[lang] = source
+      continue
     }
+    let localCore = localizeType(core, lang)
+    let cat = categoryTranslation(category, lang)
+    if (cardReader) localCore = localCore.replace(/\bCard\s*$/i, '').trim()
+    if (ssdEnclosure && ['de', 'es', 'it', 'fr', 'pt', 'pt-BR', 'ru', 'th', 'id', 'ar', 'sv', 'tr'].includes(lang)) {
+      localCore = localCore.replace(/\bSSD\s*$/i, '').trim()
+      const names: Record<string, string> = { de: 'SSD-Gehäuse', es: 'Receptáculo de SSD', it: 'Custodia per SSD', fr: 'Boîtier SSD', pt: 'Caixa para SSD', 'pt-BR': 'Case para SSD', ru: 'Корпус для SSD', th: 'กล่องใส่ SSD', id: 'Casing SSD', ar: 'علبة SSD', sv: 'SSD-kabinett', tr: 'SSD Kutusu' }
+      cat = names[lang]
+    }
+    if (category === 'Portable SSD' && /\bMagnetic\b/.test(localCore)) {
+      const magnetic: Record<string, string> = { 'zh-CN': '磁吸移动固态硬盘', 'zh-TW': '磁吸行動固態硬碟',
+        fr: 'SSD portable magnétique', es: 'SSD portátil magnética', it: 'SSD portatile magnetica',
+        pt: 'SSD Portátil Magnético', 'pt-BR': 'SSD Portátil Magnético', ar: 'SSD محمول مغناطيسي' }
+      if (magnetic[lang]) {
+        cat = magnetic[lang]
+        localCore = localCore.replace(/\bMagnetic\b/, '').replace(/\s+/g, ' ').trim()
+      }
+    }
+    if (category === 'SSD' && lang === 'it' && (/\bProfessional\b/.test(source) || accessory === 'Heatsink')) cat = 'Unità a stato solido'
+    if (generation) localCore = localCore.replace(/\b2nd Gen\b/i, ['ja', 'ko', 'fr', 'vi'].includes(lang) ? SECOND_GENERATION[lang] : '').replace(/\s+/g, ' ').trim()
 
-    translations[lang] = order === 'prefix'
-      ? `${catTranslated} ${canonicalCore}`.replace(/\s+/g, ' ').trim()
-      : `${canonicalCore} ${catTranslated}`.replace(/\s+/g, ' ').trim()
+    let order = WORD_ORDER[lang] || 'suffix'
+    if (lang === 'vi') order = VI_PREFIX_CATEGORIES.has(category) ? 'prefix' : 'suffix'
+    let text = order === 'prefix' ? `${cat} ${localCore}` : `${localCore} ${cat}`
+    if (category === 'Card' && lang === 'it' && cardMedia) {
+      const rest = localizeType(core.replace(cardMedia[0], ' ').replace(/\s+/g, ' ').trim(), lang)
+      text = `${cat} ${localizeType(cardMedia[0], lang)} ${rest}`
+    }
+    const driveSize = category === 'Enclosure' && localCore.match(/\b(\d+(?:\.\d+)?) Inch Hard Drive\b/i)
+    if (driveSize && (lang === 'es' || lang === 'it')) {
+      const name = localCore.replace(driveSize[0], '').replace(/\s+/g, ' ').trim()
+      const size = driveSize[1].replace('.', ',')
+      text = lang === 'es' ? `Carcasa ${name} para unidades de ${size} pulgadas`
+        : `Box esterno ${name} per unità da ${size} pollici`
+    }
+    if (dual) text = renderDualDrive(body, category, lang)
+    if (generation && !['ja', 'ko', 'fr', 'vi'].includes(lang)) text += ` ${SECOND_GENERATION[lang]}`
+    if (seriesMatch) text += ` ${seriesSuffix(seriesMatch[1], lang)}`
+    if (eSeries) text += ` ${lang === 'de' ? 'der E-Serie' : lang === 'it' ? 'Serie E' : lang === 'es' ? 'Serie-E' : lang === 'fr' ? 'série E' : 'E-Series'}${eSeries[1] ? ' Plus' : ''}`
+    if (accessory) {
+      const phrase = ACCESSORY_NAMES[accessory][lang]
+      const join = ((lang === 'zh-CN' || lang === 'zh-TW') && accessory === 'Magnetic Set') || (lang === 'ko' && accessory === 'Hub') ? '' : ' '
+      text = lang === 'ja' && accessory === 'Hub' ? `${phrase} ${text}` : `${text}${join}${phrase}`
+    }
+    if (lang === 'de') {
+      text = text.replace(/\bMagnetic\s+tragbare SSD\b/g, 'magnetische tragbare SSD')
+        .replace(/\bUSB Flash-Laufwerk\b/g, 'USB-Flash-Laufwerk')
+        .replace(/\bUSB-C Hub\b/g, 'USB-C-Hub')
+        .replace(/\bMulti-Card\s+(.+)\s+Kartenleser$/, '$1 Multi-Kartenleser')
+        .replace(/\bcard\b/gi, 'Karte')
+      if (category === 'Enclosure') text = text.replace(/\b(\d+)\.(\d+) Inch Hard Drive Gehäuse\b/i, '$1,$2-Zoll-Festplattengehäuse')
+      if (category === 'Portable SSD' && /\bDual Drive\b/.test(source)) {
+        text = text.replace(/\bDual Drive\s+(.+)\s+tragbare SSD$/, 'tragbare Dual-SSD $1')
+      }
+    }
+    translations[lang] = text.replace(/\s+/g, ' ').trim()
   }
-
-  return { category, translations, zhMarketingNameBlank: true }
+  return { category, translations, zhMarketingNameBlank: true, reviewReasons }
 }
 
 /** 简→繁基础映射（zh-CN → zh-TW 用，覆盖产品名常用字）。 */
