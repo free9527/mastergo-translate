@@ -1539,21 +1539,27 @@ export function validateNumbers(
   //   形式可判零误判，供调用方高置信回退；数量不一致（可能合法增删）不进此集。
   const tamperedIndices = new Set<number>()
 
-  // 提取"数字+单位"组合（支持存储/速度/频率单位）
-  const extractNumbers = (text: string): number[] => {
-    // 匹配所有语言的单位：
-    // - 存储容量: TB, GB, MB, KB, PB (及其带/s的形式)
-    // - 速度: MB/s, GB/s, TB/s, MBps, GBps
-    // - 频率: MHz, GHz
-    // - 多语言单位: 法语(To,Go,Mo), 俄语(ТБ,ГБ,МБ) 等
-    const pattern = /(\d+(?:[.,]\d+)?)\s*(TB|GB|MB|KB|PB|To|Go|Mo|Ko|Po|ТБ|ГБ|МБ|КБ|MB\/s|GB\/s|TB\/s|MBps|GBps|MHz|GHz)/gi
-    const matches = text.match(pattern) || []
-    // 提取数字部分（去除千位分隔符）
-    return matches.map(m => {
-      const numMatch = m.match(/^(\d+(?:[.,]\d+)?)/)
-      if (!numMatch) return 0
-      // 去除千位分隔符（逗号或点）
-      return parseFloat(numMatch[1].replace(/[.,]/g, ''))
+  // Ambiguous three-digit separators admit both readings; never guess a locale from one number.
+  const extractNumbers = (text: string): Array<{ values: number[]; unit: string }> => {
+    const pattern = /(\d+(?:[.,]\d+|[   ]\d{3}(?!\d))*)\s*(MHz|GHz|mGy|TBW|(?:TB|GB|MB|KB|PB|To|Go|Mo|Ko|Po|ТБ|ГБ|МБ|КБ)(?:\/[sс]|ps)?)(?![A-Za-z])/gi
+    return [...text.normalize('NFKC').matchAll(pattern)].map(match => {
+      const raw = match[1].replace(/\s/g, '')
+      const separators = raw.match(/[.,]/g) || []
+      const last = Math.max(raw.lastIndexOf('.'), raw.lastIndexOf(','))
+      let values: number[]
+      if (separators.length === 0) values = [Number(raw)]
+      else if (raw.includes('.') && raw.includes(',')) {
+        values = [Number(raw.slice(0, last).replace(/[.,]/g, '') + '.' + raw.slice(last + 1))]
+      } else if (separators.length > 1 && /^\d{1,3}(?:[.,]\d{3})+$/.test(raw)) {
+        values = [Number(raw.replace(/[.,]/g, ''))]
+      } else {
+        values = [Number(raw.replace(',', '.'))]
+        if (/^\d{1,3}[.,]\d{3}$/.test(raw)) values.push(Number(raw.replace(/[.,]/g, '')))
+      }
+      const unit = match[2].toLowerCase().replace(/тб/g, 'tb').replace(/гб/g, 'gb')
+        .replace(/мб/g, 'mb').replace(/кб/g, 'kb').replace(/([tgmkp])o/g, '$1b')
+        .replace(/\/с$|ps$/, '/s')
+      return { values, unit }
     })
   }
 
@@ -1578,14 +1584,14 @@ export function validateNumbers(
       continue
     }
 
-    // 如果数值不一致 → 警告（不回退）
-    let hasValueMismatch = false
-    for (let j = 0; j < sourceNumbers.length; j++) {
-      if (Math.abs(sourceNumbers[j] - transNumbers[j]) > 0.01) {
-        hasValueMismatch = true
-        break
-      }
-    }
+    const remaining = transNumbers.slice()
+    const hasValueMismatch = sourceNumbers.some(sourceNumber => {
+      const index = remaining.findIndex(targetNumber => sourceNumber.unit === targetNumber.unit
+        && sourceNumber.values.some(a => targetNumber.values.some(b => a === b)))
+      if (index < 0) return true
+      remaining.splice(index, 1)
+      return false
+    })
     if (hasValueMismatch) {
       mismatchedIndices.add(i)
       tamperedIndices.add(i)  // v12.37: 数量相等但数值被改 = 事实篡改（高置信，供回退）

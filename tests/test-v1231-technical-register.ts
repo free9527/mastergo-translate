@@ -76,7 +76,7 @@ console.log('\nC. 技术语域卡内容（第5条限定 + 第6条非详情页）
 
 const zhCard = getTechnicalRegister('zh-CN')
 // C1: 第5条限定「规格描述」，UI 操作指引/包装正面营销不受限
-assert(/UI 操作指引|包装正面营销/.test(zhCard), 'C1 第5条限定范围（UI 操作指引/包装正面营销不受限）')
+assert(/UI operation guidance and packaging front copy retain their source intent/.test(zhCard), 'C1 第5条限定范围（UI 操作指引/包装正面营销不受限）')
 // C2: 第6条耐力术语
 assert(/TBW|DWPD|MTBF|有限终身质保/.test(zhCard), 'C2 第6条耐力/可靠性术语')
 // C3: 第1条接口名

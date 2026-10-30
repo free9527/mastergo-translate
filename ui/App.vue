@@ -654,7 +654,7 @@ function chunkProofreadBatches<T extends { translatedText: string }>(arr: T[]): 
 import { convertStorageUnit } from '@lib/unit-convert'
 import { getAutoFontMapping, normalizeFontStyle } from '@lib/font-mapper'
 import { compressBatch, expandBatch } from '@lib/translation-memory'
-import { detectAdhocProductTerms, detectFallbackCandidates, parseProductName } from '@lib/new-product-detect'
+import { detectAdhocProductTerms, detectFallbackCandidates, parseProductName, normalizeProductName } from '@lib/new-product-detect'
 import { generateProductNameTranslations, zhCNtoZhTW } from '@lib/product-name-generator'
 import { parseProductNameWithLLM } from '@lib/llm-api'
 import { uiLog, getUiLogs, getUiLogVersion, clearUiLogs, formatUiLogs, receiveMainLog, restoreUiLogs, serializeUiLogs, UiLogEntry } from '@lib/ui-debug-log'
@@ -775,7 +775,7 @@ const pendingItems = computed(() => {
     // v12.40: 校对改写整条钦定值（先试一条缝，最高优先——用户裁决前不落地）
     if (proofreadGlossaryRewrites.value.has(item.nodeIds[0])) {
       push(item, 'proofreadGlossary')
-    } else if (pendingReviewTerms.value.some(t => t.source === item.sourceText.trim().replace(/[®™©]/g, '') && !t.confirmed)) {
+    } else if (pendingReviewTerms.value.some(t => normalizeProductName(t.source).replace(/[®™©]/g, '') === normalizeProductName(item.sourceText).replace(/[®™©]/g, '') && !t.confirmed)) {
       push(item, 'llmFallback')  // v12.49: 待入库池条目复用 llmFallback 类型渲染（已确认入库的不再待确认）
     } else if (misspelledIds.value.has(item.nodeIds[0])) {
       push(item, 'misspelled')
@@ -1514,6 +1514,8 @@ function enforceSameSourceConsistency() {
 
 /** 从两个译文中选择更好的：优先实际翻译过的，其次有®的 */
 function pickBetterTranslation(source: string, a: string, b: string): string {
+  if (isGlossaryLockedTranslation(source, a, activeNormalizedGlossaryMap)) return a
+  if (isGlossaryLockedTranslation(source, b, activeNormalizedGlossaryMap)) return b
   // 规则1: 优先选被翻译过的（≠源文）
   const aTranslated = a !== source
   const bTranslated = b !== source
@@ -1642,6 +1644,89 @@ function buildGlossaryMaps(): GlossaryMaps {
   return { full, en }
 }
 
+async function prepareProductNames(texts: string[], maps: GlossaryMaps, normalized?: Map<string, string>) {
+  const detected = detectAdhocProductTerms(texts, maps.full)
+  for (const d of detected) {
+    const gen = generateProductNameTranslations(d.term, d.series)
+    if (gen.reviewReasons.length > 0) uiLog('glossary', `新品规则待审核[${d.term}]: ${gen.reviewReasons.join('; ')}`)
+    let value = gen.translations[targetLang.value] || d.term
+    if (targetLang.value === 'zh-TW' && value === gen.translations['zh-CN']) value = zhCNtoZhTW(value)
+    // EN view keeps the generated target too; identity values would suppress translation (v12.50).
+    // Keep raw scan aliases local to this task; the canvas source is never rewritten.
+    for (const key of new Set([d.term, ...d.hitIndices.map(i => texts[i])])) {
+      maps.full.set(key, value)
+      maps.en.set(key, value)
+      normalized?.set(cleanKey(key), value)
+    }
+    uiLog('translate', `产品名规则生成[${d.term}] → ${value}`)
+  }
+  for (const text of texts) {
+    const cleaned = normalizeProductName(text)
+    if (/^Lexar[®™©]?(?:\s|$)/i.test(cleaned)) {
+      if (cleaned !== text) uiLog('translate', `产品名字符归一[${JSON.stringify(text)}] → ${cleaned}`)
+      if (!parseProductName(cleaned)?.valid) uiLog('translate', `产品名形态未通过[${JSON.stringify(text)}]，转辅助识别或普通翻译`)
+    }
+    if (!/^Lexar[®™©]?(?:\s|$)/i.test(cleaned)) continue
+    const key = cleanKey(cleaned)
+    const match = [...maps.full].find(([source]) => cleanKey(normalizeProductName(source)) === key)
+    if (match) {
+      maps.full.set(text, match[1])
+      maps.en.set(text, match[1])
+      normalized?.set(cleanKey(text), match[1])
+    }
+  }
+  const fallbackCandidates = detectFallbackCandidates(
+    texts,
+    maps.full,
+  )
+  if (fallbackCandidates.length > 0) {
+    uiLog('translate', `v11.3 LLM兜底候选: ${fallbackCandidates.map(c => c.term).join(' | ')}`)
+    for (const candidate of fallbackCandidates) {
+      const llmParsed = await parseProductNameWithLLM(candidate.term, targetLang.value, llmConfig.value)
+      if (llmParsed && llmParsed.isProductName) {
+        // 校验通过 → 代码渲染 20 语种译名 → 收录待入库池（v12.49：不静默入库，下载发开发者审核后写回后台）
+        const gen = generateProductNameTranslations(candidate.term, llmParsed.series)
+        if (gen.reviewReasons.length > 0) uiLog('glossary', `新品规则待审核[${candidate.term}]: ${gen.reviewReasons.join('; ')}`)
+        const translations: Record<string, string> = {}
+        for (const [lang, val] of Object.entries(gen.translations)) {
+          if (lang !== 'en') translations[lang] = val
+        }
+        // 并入本批次术语链（S1 短路），但不入库——进待入库池等审核
+        let targetVal = gen.translations[targetLang.value] || candidate.term
+        if (targetLang.value === 'zh-TW' && targetVal === gen.translations['zh-CN']) {
+          targetVal = zhCNtoZhTW(targetVal)
+        }
+        for (const key of new Set([candidate.term, ...candidate.hitIndices.map(i => texts[i])])) {
+          maps.full.set(key, targetVal)
+          maps.en.set(key, targetVal)
+          normalized?.set(cleanKey(key), targetVal)
+        }
+        // v12.49: 收录待入库池（统一去重入口；不静默入库，下载发开发者审核后写回后台）
+        addToPendingReview({ source: candidate.term, translations, series: llmParsed.series, detectedAt: Date.now(), source2: 'v11.3' })
+        uiLog('translate', `v12.45 LLM兜底检出收录待入库池: "${candidate.term}" → series="${llmParsed.series}"`)
+        detected.push({ term: candidate.term, series: llmParsed.series, hitIndices: candidate.hitIndices })
+        showToast(`检测到新产品名 "${candidate.term}"（LLM 辅助识别），已收录待入库术语`, 'info')
+      } else {
+        // LLM 判非产品名或校验失败 → 放弃保护，走正常管道
+        uiLog('translate', `v11.3 LLM兜底放弃: "${candidate.term}"（${llmParsed ? '判非产品名' : '解析/校验失败'}）`)
+      }
+    }
+  }
+
+  return detected
+}
+
+function resolveProductTranslation(text: string, glossaryMap: Map<string, string>): string | undefined {
+  if (!/^Lexar[®™©]?(?:\s|$)/i.test(normalizeProductName(text))) return undefined
+  const key = cleanKey(normalizeProductName(text))
+  for (const [source, value] of glossaryMap) {
+    if (cleanKey(normalizeProductName(source)) !== key || shouldSkipGlossaryEntry(text, value)) continue
+    uiLog('translate', `产品名短路[${text}] → ${value}`)
+    return restoreTrademarkSymbols([normalizeProductName(text)], [value])[0]
+  }
+  return undefined
+}
+
 // ============================================================
 // ═══ v12.49: 新产品名收录待入库池（不静默入库，下载发开发者审核后写回后台）═══
 // 背景：v11.2 静默入库把代码生成值当钦定值锁死（2026-09-29 PLAY X 实机事故：
@@ -1751,33 +1836,11 @@ async function startTranslate() {
     // 按五槽位+语序模板生成当前目标语种译名并入本批次术语链 → S1 整条短路直接出厂形译文，
     // LLM 不碰产品名（代码管形式/LLM 管语义：判定走形态门+锚点+品类指纹，翻译走命名规则）。
     // 只对产品名生效；营销词/描述性文本不碰（形态门+锚点门+品类指纹门+新颖性门四重收紧）。
-    const adhocDetected = detectAdhocProductTerms(
-      items.value.map(it => it.sourceText),
-      glossaryMap,
+    const adhocDetected = await prepareProductNames(
+      items.value.map(it => it.sourceText), { full: glossaryMap, en: glossaryEnMap }, normalizedGlossaryMap,
     )
     const adhocTerms = adhocDetected.map(d => d.term)
-    // 预生成当前目标语种译名（纯查表，微秒级）；zh-TW 若生成器给出与 zh-CN 同形则走简繁转换兜底
-    // v12.48: 规格词序归一已下沉到 generateProductNameTranslations 内部（core 槽位 M.2 PCIe 4.0 钦定），
-    //   此处无需再对齐——代码生成恒产出钦定词序，与画布录入词序解耦。
-    const adhocTargetTranslations = new Map<string, string>()
-    for (const d of adhocDetected) {
-      const gen = generateProductNameTranslations(d.term, d.series)
-      if (gen.reviewReasons.length > 0) uiLog('glossary', `新品规则待审核[${d.term}]: ${gen.reviewReasons.join('; ')}`)
-      let targetVal = gen.translations[targetLang.value] || d.term
-      if (targetLang.value === 'zh-TW' && targetVal === gen.translations['zh-CN']) {
-        targetVal = zhCNtoZhTW(targetVal)
-      }
-      adhocTargetTranslations.set(d.term, targetVal)
-      // 并入 full 视图（短路/遮蔽/合规锁）与 EN 视图（isUntranslatable/noTranslateTerms 同源）
-      glossaryMap.set(d.term, targetVal)
-      // v12.50: en 视图也存译名（src≠tgt）——此前设成 identity（term→term）导致这条被
-      //   noTranslateTerms 收录为「保留英文不翻译」，S1 短路 identity 分支用英文原文覆盖
-      //   代码生成的目标语译名（2026-09-29 PLAY X 实机：判定成产品名走了代码翻译但输出英文）。
-      //   新产品名有品类词该按命名规则翻译，不该被 identity 短路保留英文。
-      glossaryEnMap.set(d.term, targetVal)
-      const ck = cleanKey(d.term)
-      if (ck.length >= 3 && !normalizedGlossaryMap.has(ck)) normalizedGlossaryMap.set(ck, targetVal)
-    }
+    const adhocTargetTranslations = new Map(adhocDetected.map(d => [d.term, glossaryMap.get(d.term)!]))
     if (adhocTerms.length > 0) {
       uiLog('translate', `v11.2 新产品名保护: ${adhocTerms.map(t => `${t}→${adhocTargetTranslations.get(t)}`).join(' | ')}`)
       showToast(`检测到 ${adhocTerms.length} 个未收录新产品名，已按命名规则生成译名: ${adhocTerms.slice(0, 3).join(', ')}${adhocTerms.length > 3 ? ' …' : ''}`, 'info')
@@ -1787,44 +1850,6 @@ async function startTranslate() {
     // 触发条件（三重收窄）：Lexar® 锚点 + detectCategory≠null + parseProductName 失败
     // LLM 只做"是不是产品名+系列名是什么"的判断（结构化 JSON），代码做形式校验后渲染译名。
     // 入库降格为【待确认】，不静默——LLM 参与的产物走显式通道（v10.7 教训）。
-    const fallbackCandidates = detectFallbackCandidates(
-      items.value.map(it => it.sourceText),
-      glossaryMap,
-    )
-    if (fallbackCandidates.length > 0) {
-      uiLog('translate', `v11.3 LLM兜底候选: ${fallbackCandidates.map(c => c.term).join(' | ')}`)
-      for (const candidate of fallbackCandidates) {
-        const llmParsed = await parseProductNameWithLLM(candidate.term, targetLang.value, llmConfig.value)
-        if (llmParsed && llmParsed.isProductName) {
-          // 校验通过 → 代码渲染 20 语种译名 → 收录待入库池（v12.49：不静默入库，下载发开发者审核后写回后台）
-          const gen = generateProductNameTranslations(candidate.term, llmParsed.series)
-          if (gen.reviewReasons.length > 0) uiLog('glossary', `新品规则待审核[${candidate.term}]: ${gen.reviewReasons.join('; ')}`)
-          const translations: Record<string, string> = {}
-          for (const [lang, val] of Object.entries(gen.translations)) {
-            if (lang !== 'en') translations[lang] = val
-          }
-          // 并入本批次术语链（S1 短路），但不入库——进待入库池等审核
-          let targetVal = gen.translations[targetLang.value] || candidate.term
-          if (targetLang.value === 'zh-TW' && targetVal === gen.translations['zh-CN']) {
-            targetVal = zhCNtoZhTW(targetVal)
-          }
-          glossaryMap.set(candidate.term, targetVal)
-          // v12.56: en 视图同样存译名（src≠tgt）——与翻译路径 v12.50 同根修复。
-          //   此前 identity（term→term）会让 noTranslateTerms 把新产品名收进「保留英文」，
-          //   S1 短路 identity 分支用英文原文覆盖代码生成的译名。
-          glossaryEnMap.set(candidate.term, targetVal)
-          const ck = cleanKey(candidate.term)
-          if (ck.length >= 3 && !normalizedGlossaryMap.has(ck)) normalizedGlossaryMap.set(ck, targetVal)
-          // v12.49: 收录待入库池（统一去重入口；不静默入库，下载发开发者审核后写回后台）
-          addToPendingReview({ source: candidate.term, translations, series: llmParsed.series, detectedAt: Date.now(), source2: 'v11.3' })
-          uiLog('translate', `v12.45 LLM兜底检出收录待入库池: "${candidate.term}" → series="${llmParsed.series}"`)
-          showToast(`检测到新产品名 "${candidate.term}"（LLM 辅助识别），已收录待入库术语`, 'info')
-        } else {
-          // LLM 判非产品名或校验失败 → 放弃保护，走正常管道
-          uiLog('translate', `v11.3 LLM兜底放弃: "${candidate.term}"（${llmParsed ? '判非产品名' : '解析/校验失败'}）`)
-        }
-      }
-    }
 
 
   // 跨批次术语预扫描：找出全页高频术语，提前注入每个批次确保译文一致
@@ -1893,7 +1918,7 @@ async function startTranslate() {
       let glossTrans = normalizedGlossaryMap.get(cleanKey(trimmed))!
       // 源文有®™©但术语库译文没有 → 恢复商标符号
       if (/[®™©]/.test(trimmed)) {
-        glossTrans = restoreTrademarkSymbols([trimmed], [glossTrans])[0]
+        glossTrans = restoreTrademarkSymbols([normalizeProductName(trimmed)], [glossTrans])[0]
       }
       item.translatedText = glossTrans
       trackPath(item, 'S1-术语命中', glossTrans)
@@ -1952,14 +1977,17 @@ async function startTranslate() {
 
   const cache = translationCache.value
   // 术语库hash：术语库更新后缓存自动失效
-  const glossaryHash = glossary.value.map(g => g.source + '|' + (g.translations[targetLang.value] || '')).join(',').slice(0, 200).split('').reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0).toString(36)
+  const glossaryHash = glossary.value.map(g => g.source + '|' + (g.translations[targetLang.value] || '')).join(',').split('').reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0).toString(36)
   // v11.1: 检测集合进缓存键 — 新产品名一旦被检测保护，旧的"未保护译文"缓存永不命中（防 v10.7 缓存复活）
-  const adhocHash = adhocTerms.slice().sort().join(',').slice(0, 200).split('').reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0).toString(36)
+  const adhocHash = adhocTerms.slice().sort().join(',').split('').reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0).toString(36)
   // v12.11: 违禁词表版本戳进缓存键 — 词表/豁免表更新后旧译文缓存自然失配重翻
   // （防旧词表时代的违禁词译文经缓存复活，v10.7 型缺口的词表维度补件）
   // v12.58: 语料库版本戳进缓存键 — 人工钦定语料更新后旧译文缓存自然失配重翻
   // （缓存命中在 TM 短路之前，不加戳旧缓存会遮蔽新增钦定——「越用越聪明」只在重扫生效）
-  const cacheKey = (text: string) => normalizeText(text) + '\x00' + targetLang.value + '\x00' + glossaryHash + '\x00' + adhocHash + '\x00' + PROHIBITED_WORDS_VERSION + '\x00' + CORPUS_VERSION + '\x00' + GLOSSARY_VERSION
+  const taskSignature = JSON.stringify([2, llmConfig.value.model, llmConfig.value.scenePreset,
+    llmConfig.value.translationStyle, llmConfig.value.translationStyleCustom, llmConfig.value.manualProductLine,
+    sourceLang.value, pageName.value, fileName.value])
+  const cacheKey = (text: string) => normalizeText(text) + '\x00' + taskSignature + '\x00' + targetLang.value + '\x00' + glossaryHash + '\x00' + adhocHash + '\x00' + PROHIBITED_WORDS_VERSION + '\x00' + CORPUS_VERSION + '\x00' + GLOSSARY_VERSION
   let cacheHits = 0
   let failedBatches = 0
   const lastErrors: string[] = []
@@ -2073,7 +2101,7 @@ async function startTranslate() {
             const uncachedTexts = uncachedIndices.map(idx => texts[idx])
             // 翻译记忆：同型号不同容量/速度的文本压缩为唯一模板，减少 API 调用
             const { uniqueTexts, expandData } = compressBatch(uncachedTexts)
-            // v12.18: TM 短路（≥0.99 + 数字集合相等 + origin=user）——人工验收译文直接落地，
+            // v12.18: TM 短路（同源句顺序精确匹配 + origin=user）——人工验收译文直接落地，
             //   命中条目从 API 调用中剔除（S1 术语短路的同款逻辑，省 token 也省时间）。
             //   术语过期防线：落地前过 enforceGlossaryTerms（术语库后来改译法时拉回现值）。
             const tmShortCircuit = retrieveTMShortCircuit(uniqueTexts, corrections.value, targetLang.value)
@@ -2087,7 +2115,7 @@ async function startTranslate() {
                 tmShortCircuitCount++
               }
               if (tmShortCircuitCount > 0) {
-                uiLog('translate', `TM 短路: ${tmShortCircuitCount}条 直接用人工验收译文（≥0.99+数字相等），跳过翻译 API`)
+                uiLog('translate', `TM 短路: ${tmShortCircuitCount}条 直接用人工验收译文（顺序精确匹配），跳过翻译 API`)
               }
             }
             const apiTexts = uniqueTexts.filter((_, uIdx) => !tmShortCircuitResult.has(uIdx))
@@ -2777,19 +2805,8 @@ async function startProofread() {
   // v11.2: 独立校对路径同样并入新产品名的生成译名（可能绕过 startTranslate 直接校对）
   // 与翻译路径同世界：full 视图与 EN 视图都并入当前目标语种译名（v12.56 同根修复——
   //   此前 EN 视图设 identity `term→term`，noTranslateTerms 会把新产品名当「保留英文」）
-  for (const d of detectAdhocProductTerms(items.value.map(it => it.sourceText), glossaryMap)) {
-    const gen = generateProductNameTranslations(d.term, d.series)
-    if (gen.reviewReasons.length > 0) {
-      uiLog('glossary', `新品规则待审核[${d.term}]: ${gen.reviewReasons.join('; ')}`)
-      addToPendingReview({ source: d.term, translations: gen.translations, series: d.series, detectedAt: Date.now(), source2: 'v11.2' })
-    }
-    let targetVal = gen.translations[targetLang.value] || d.term
-    if (targetLang.value === 'zh-TW' && targetVal === gen.translations['zh-CN']) {
-      targetVal = zhCNtoZhTW(targetVal)
-    }
-    glossaryMap.set(d.term, targetVal)
-    glossaryEnMap.set(d.term, targetVal)
-  }
+  const detected = await prepareProductNames(items.value.map(it => it.sourceText), { full: glossaryMap, en: glossaryEnMap })
+  persistAdhocProductNames(detected)
   // v9.10: 校对路径归一化查找表，供合规校验锁死术语（与翻译管道对齐）
   const proofreadNormalizedMap = new Map<string, string>()
   for (const [key, value] of glossaryMap) {
@@ -3335,16 +3352,43 @@ async function retryFailedTranslations() {
   const failedItems = items.value.filter(it => it.nodeIds.some(nid => errorSet.has(nid)))
   if (failedItems.length === 0) return
 
-  // 清除之前的翻译结果和错误标记
-  for (const item of failedItems) {
-    item.translatedText = ''
-    for (const nid of item.nodeIds) {
-      translateErrors.value.delete(nid)
-    }
-  }
+  translating.value = true
+  cancelFlag.value = false
+  for (const item of failedItems) item.translatedText = ''
 
   // 构建术语库双视图并调用翻译
   const { full: glossaryMap, en: glossaryEnMap } = buildGlossaryMaps()
+  const detected = await prepareProductNames(failedItems.map(it => it.sourceText), { full: glossaryMap, en: glossaryEnMap })
+  persistAdhocProductNames(detected)
+  const retryNormalized = new Map<string, string>()
+  for (const [key, value] of glossaryMap) retryNormalized.set(cleanKey(key), value)
+  activeNormalizedGlossaryMap = retryNormalized
+  const completeRetryItem = (item: TextItem) => {
+    if (!item.translatedText) return
+    item.proofreadText = ''
+    item.proofreadReason = ''
+    item.corrected = false
+    for (const id of item.nodeIds) {
+      translateErrors.value.delete(id)
+      appliedNodeIds.value.delete(id)
+    }
+    const id = item.nodeIds[0]
+    misspelledIds.value.delete(id)
+    expansionIds.value.delete(id)
+    proofreadGlossaryRewrites.value.delete(id)
+    dismissedNodeIds.value.delete(id)
+    untranslatedDismissedIds.value.delete(id)
+    updateProhibitedTrans(id, item.translatedText)
+  }
+  for (const item of failedItems) {
+    const local = resolveProductTranslation(item.sourceText, glossaryMap)
+    if (local !== undefined) {
+      item.translatedText = local
+      completeRetryItem(item)
+    }
+  }
+  const needApi = failedItems.filter(it => !it.translatedText)
+  const localCount = failedItems.length - needApi.length
 
   const crossBatchTerms = findHighFreqGlossaryTerms(
     items.value.map(it => it.sourceText), glossaryMap,
@@ -3358,15 +3402,13 @@ async function retryFailedTranslations() {
     items.value.map(it => it.sourceText),
   )
 
-  translating.value = true
-  cancelFlag.value = false
-  translateProgress.value = { current: 0, total: failedItems.length }
+  translateProgress.value = { current: localCount, total: failedItems.length }
   uiLog('retry', `开始重翻 ${failedItems.length} 条失败条目 → ${targetLang.value}`)
 
   // 分批处理失败项
-  for (let i = 0; i < failedItems.length; i += TRANSLATE_BATCH_SIZE) {
+  for (let i = 0; i < needApi.length; i += TRANSLATE_BATCH_SIZE) {
     if (cancelFlag.value) break
-    const batch = failedItems.slice(i, i + TRANSLATE_BATCH_SIZE)
+    const batch = needApi.slice(i, i + TRANSLATE_BATCH_SIZE)
     const texts = batch.map(it => it.sourceText)
 
     try {
@@ -3387,6 +3429,7 @@ async function retryFailedTranslations() {
       const expandedResult = expandBatch(uniqueResult, expandData, texts.length)
       for (let j = 0; j < batch.length; j++) {
         batch[j].translatedText = formatCJKSpace(expandedResult[j] || '', targetLang.value)
+        completeRetryItem(batch[j])
       }
       // v9.11: 唯一模板索引 → 展开后索引（同源文复制项共享模板译文）
       for (const u of uniqueUntranslated) {
@@ -3412,7 +3455,7 @@ async function retryFailedTranslations() {
       uiLog('retry', `❌ 重翻批次异常: ${e instanceof Error ? e.message : String(e)}`)
       console.error('[translate] retry batch failed', e)
     }
-    translateProgress.value = { current: Math.min(i + TRANSLATE_BATCH_SIZE, failedItems.length), total: failedItems.length }
+    translateProgress.value = { current: localCount + Math.min(i + TRANSLATE_BATCH_SIZE, needApi.length), total: failedItems.length }
   }
 
   translating.value = false
@@ -3767,14 +3810,18 @@ async function retranslateSingle(item: TextItem) {
   retranslatingIds.value.add(id)
 
   try {
-    const glossaryMap = buildGlossaryMaps().full
+    const maps = buildGlossaryMaps()
+    const detected = await prepareProductNames([item.sourceText], maps)
+    persistAdhocProductNames(detected)
+    const glossaryMap = maps.full
+    const local = resolveProductTranslation(item.sourceText, glossaryMap)
     // v9.11: 收集管道最终仍漏翻的条目 — 模型顽固保留原文时不再静默成功
     const untranslated = new Set<number>()
     // v10.6: 收集疑似错词（保留原形）→ 单独标记，不算翻译失败
     const misspelled = new Set<number>()
     // v10.8: 收集译文显著超长信号 → 透出给校对层（不自动截断）
     const expansion = new Set<number>()
-    const results = await translateBatch(
+    const results = local !== undefined ? [local] : await translateBatch(
       [item.sourceText],
       targetLang.value,
       glossaryMap,
@@ -3818,11 +3865,11 @@ async function retranslateSingle(item: TextItem) {
       dismissedNodeIds.value.delete(id)
       untranslatedDismissedIds.value.delete(id)
       // v11.3: 重翻后从 LLM 兜底待确认集合移除（已确认/已跳过/已重翻）
-      const termKey = item.sourceText.trim().replace(/[®™©]/g, '')
+      const termKey = normalizeProductName(item.sourceText).replace(/[®™©]/g, '')
       llmFallbackTerms.value.delete(termKey)
       // v12.49: 重翻后从待入库池移除（已重翻/已确认/已跳过）
-      const pendingIdx = pendingReviewTerms.value.findIndex(t => t.source === termKey)
-      if (pendingIdx >= 0) { pendingReviewTerms.value.splice(pendingIdx, 1); savePendingReviewTerms() }
+      const pendingIdx = pendingReviewTerms.value.findIndex(t => normalizeProductName(t.source).replace(/[®™©]/g, '') === termKey)
+      if (pendingIdx >= 0 && local === undefined) { pendingReviewTerms.value.splice(pendingIdx, 1); savePendingReviewTerms() }
       // v11.12: 重翻写回后检测——旁路只提醒不修正（重翻不接校对链）
       updateProhibitedTrans(id, item.translatedText)
       showToast('已重新翻译', 'success')
@@ -3923,7 +3970,7 @@ function whitelistProhibitedSrc(item: TextItem) {
 function dismissPendingItem(item: TextItem) {
   const id = item.nodeIds[0]
   // 按"当前会渲染出的类型"清状态（与 pendingItems else-if 链同优先级顺序）
-  const termKey = item.sourceText.trim().replace(/[®™©]/g, '')
+  const termKey = normalizeProductName(item.sourceText).replace(/[®™©]/g, '')
   if (proofreadGlossaryRewrites.value.has(id)) {
     // v12.40: proofreadGlossary 没有"知道了"按钮（必须显式裁决：保留钦定/采用校对），防御兜底
     return
@@ -3948,8 +3995,8 @@ function dismissPendingItem(item: TextItem) {
 
 /** v11.15: 「应用但不入库」（待入库池专属）——从待入库池移除（不入库），翻译结果照常可用。 */
 function applyWithoutGlossary(item: TextItem) {
-  const termKey = item.sourceText.trim().replace(/[®™©]/g, '')
-  const pendingIdx = pendingReviewTerms.value.findIndex(t => t.source === termKey)
+  const termKey = normalizeProductName(item.sourceText).replace(/[®™©]/g, '')
+  const pendingIdx = pendingReviewTerms.value.findIndex(t => normalizeProductName(t.source).replace(/[®™©]/g, '') === termKey)
   if (pendingIdx >= 0) {
     pendingReviewTerms.value.splice(pendingIdx, 1)
     savePendingReviewTerms()
@@ -3991,8 +4038,8 @@ function adoptProofreadRewrite(item: TextItem) {
  *  实现：给池条目打 confirmed 标记并落盘，废弃旧内存集合 poolConfirmedKeys——
  *  落盘后跨插件重开仍生效，下次扫描新颖性门已收录、不再反复提醒。 */
 function confirmLlmFallbackTerm(item: TextItem) {
-  const termKey = item.sourceText.trim().replace(/[®™©]/g, '')
-  const entry = pendingReviewTerms.value.find(t => t.source === termKey)
+  const termKey = normalizeProductName(item.sourceText).replace(/[®™©]/g, '')
+  const entry = pendingReviewTerms.value.find(t => normalizeProductName(t.source).replace(/[®™©]/g, '') === termKey)
   if (entry && !entry.confirmed) {
     entry.confirmed = true
     savePendingReviewTerms()

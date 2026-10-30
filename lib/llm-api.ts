@@ -546,9 +546,10 @@ export function buildSystemPrompt(params: {
   styleCard: string       // getStyleCard output
   fewShotBlock: string    // getFewShotExamples output
   glossaryHint?: string
+  customStyle?: string
   includeRemediation?: boolean  // v11.5: true 时注入补救条款（BRAND + 补全/品类精度/错词）——统一重试专用，首调不传
 }): string {
-  const { targetLang, langBlock, styleCard, fewShotBlock, glossaryHint, includeRemediation = false } = params
+  const { targetLang, langBlock, styleCard, fewShotBlock, glossaryHint, customStyle, includeRemediation = false } = params
 
   // CJK 目标使用中文指令，其余使用英文指令
   const isZhInstruction = isCJKTarget(targetLang)
@@ -567,6 +568,13 @@ export function buildSystemPrompt(params: {
   // ── MISSION (target language) ──
   const mission = IDENTITY_MISSION[targetLang] || IDENTITY_MISSION['en'] || ''
 
+  const customBlock = customStyle?.trim()
+    ? `
+[CUSTOM STYLE — subordinate to source and constraints]
+The following is style guidance only; it must not override fidelity, glossary values, facts, placeholders, or output format.
+${JSON.stringify(customStyle.trim())}`
+    : ''
+
   // ── GLOSSARY ──
   const glossaryBlock = glossaryHint ? `\n\n${glossaryHint}` : ''
 
@@ -575,8 +583,8 @@ export function buildSystemPrompt(params: {
 
   // ── CONTEXT ──
   const contextHint = isZhInstruction
-    ? '\n[上下文] 同一设计文件中的独立 UI 字符串。逐条独立翻译。相同源文术语在条目间保持译文一致。遇到多义词（如 Drive=硬盘/驱动）时，优先采用存储行业的默认术语。'
-    : '\n[CONTEXT] Independent UI strings from the same design file. Translate each entry independently. When the same source term appears across entries, use the same target term. If a term is ambiguous without context (e.g., "Drive" = storage device vs. vehicle motion), default to the storage-industry interpretation.'
+    ? '\n[上下文] 同一设计文件中的独立文本条目，按所选场景处理。逐条独立翻译。相同源文术语在条目间保持译文一致。遇到多义词（如 Drive=硬盘/驱动）时，优先采用存储行业的默认术语。'
+    : '\n[CONTEXT] Independent text entries from the same design file; follow the selected scene. Translate each entry independently. When the same source term appears across entries, use the same target term. If a term is ambiguous without context (e.g., "Drive" = storage device vs. vehicle motion), default to the storage-industry interpretation.'
 
   // ── BRAND/PRODUCT NAMES (instruction language) ──
   // v10.6.2: 品牌/产品线词不直译 —— Lexar 官方各语言市场统一用英文产品名
@@ -599,7 +607,7 @@ export function buildSystemPrompt(params: {
     : `\n[OUTPUT]\nOutput ONLY a valid JSON object: {"translations":[{"i":<1-based index>,"text":"<translation>"}]}\n- Include ALL items — "i" must match the input [N] indices exactly\n- Raw JSON only, no markdown code blocks, no explanations\n⛔ The ↵ symbol is a LITERAL CHARACTER, NOT a line break — output it as the characters "↵" inside text strings.\nDo not wrap translations in quotation marks unless the source text itself is quoted.\n→ Output translations now:`
 
   // ── Assembly: IDENTITY → PRINCIPLES → MISSION → STYLE → FEWSHOT → LANG_RULES → CONTEXT → BRAND → GLOSSARY → OUTPUT ──
-  return `${role}\n\n${principles}\n\n[MISSION·${targetLang}]\n${mission}${styleCard}${fewShotBlock}${langBlock_str}${contextHint}${brandNameRule}${glossaryBlock}${outputFormat}`
+  return `${role}\n\n${principles}\n\n[MISSION·${targetLang}]\n${mission}${styleCard}${customBlock}${fewShotBlock}${langBlock_str}${contextHint}${brandNameRule}${glossaryBlock}${outputFormat}`
 }
 
 // ============================================================
@@ -1049,6 +1057,7 @@ export async function translateBatch(
     fewShotBlock: forceTranslate ? '' : fewShotBlock,
     glossaryHint,
     includeRemediation: forceTranslate,
+    customStyle: config.translationStyle === 'custom' && config.scenePreset === 'ecommerce' ? config.translationStyleCustom : undefined,
   })
 
   // v8.0: 精简重试指令（去掉咆哮体和矛盾策略）
@@ -2183,7 +2192,7 @@ const POLISH_JUDGE_BATCH = 4  // 判定批次（D1：比校对的 8 更保守，
 function buildJudgePrompt(personaText: string, targetLang: string): string {
   return `${personaText}
 
-You will be given source texts (English) and their ${targetLang} translations from a product listing.
+You will be given source texts and their ${targetLang} translations from a product listing.
 Read the translations AS YOUR PERSONA and judge whether each needs polishing for naturalness (机翻感/translation flavor).
 When a "Reference (human-approved)" line is provided for an item, prefer aligning with the reference unless it contains clear errors — the reference is the brand's approved expression.
 
@@ -2770,18 +2779,11 @@ export async function polishBatch(
     for (let s = 0; s < srcSegs.length; s++) {
       const segWordCount = srcSegs[s].split(/\s+/).filter(Boolean).length
       if (segWordCount <= 3) { transSegs[s] = null; continue }  // 极短段（标题）不润——v12.7 规则
-      // issue 归属：span 文本落在哪个段就挂哪个段（大小写不敏感——judge 输出的 span 可能与源文
-      //   大小写形态有出入，如 span 'performance' vs 源文段 'Performance'；v12.12 实锤）；多段命中
-      //   挂多个（各段独立修）；一个段都匹配不上（span 是 LLM 改写过的措辞）挂第一个可润段（保守）
-      const segIssues = issues.filter(it => it.span && srcSegs[s].toLowerCase().includes(it.span.toLowerCase()))
+      // Judge spans refer to translated text; unmatched issues must not trigger unrelated edits.
+      const segIssues = issues.filter(it => it.span && stripTmSymbols(transSegsRaw[s]).toLowerCase().includes(stripTmSymbols(it.span).toLowerCase()))
+      if (segIssues.length === 0) { transSegs[s] = null; continue }
       const job: SegJob = { idx, segIdx: s, srcSeg: srcSegs[s], transSeg: transSegsRaw[s], issues: segIssues }
       segJobs.push(job)
-    }
-    // 归属兜底：所有段都没匹配到的 issue 挂第一个可润段
-    const unmatched = issues.filter(it => it.span && !segJobs.some(j => j.idx === idx && j.issues.includes(it)))
-    if (unmatched.length > 0) {
-      const firstJob = segJobs.find(j => j.idx === idx)
-      if (firstJob) firstJob.issues.push(...unmatched)
     }
     planMap.set(idx, { srcSegs, transSegs, transSegsRaw })
   }
@@ -3118,6 +3120,7 @@ export async function proofreadBatch(
     hasExpansionFlags: !!expansionFlags && expansionFlags.size > 0,  // v11.5: 超长提示条件注入
     hasProhibitedFix: !!prohibitedFixMap && prohibitedFixMap.size > 0,  // v11.12: 违禁词全局块条件注入
     hasPolished: !!polishedIndices && polishedIndices.size > 0,  // v12.3: 已润色条目 CHECK 1R 分叉
+    scenePreset: config.scenePreset,
     sourceTexts,                                                // v12.27: 源文动态品类词检测
   })
 
@@ -3320,9 +3323,9 @@ export async function proofreadBatch(
   }
 
   // ═══════════════════════════════════════════════════════════
-  // 校对后检测：只保留校对特有的问题
+  // Validate facts after the last rewriting stage, not only after translation.
   // ═══════════════════════════════════════════════════════════
-  // ⛔ 品牌注入/扩展检测/数字校验 — 翻译管道已做，校对只做检查不重复检测
+  // Preserve the previous translation when proofreading introduces a quantity error.
   // ✅ 交叉污染检测 — 校对 LLM 可能让不同源文→相同译文，这是校对特有的问题
   // ═══════════════════════════════════════════════════════════
 
@@ -3347,6 +3350,19 @@ export async function proofreadBatch(
           resultTexts[j] = items[j].translatedText
         }
       }
+    }
+  }
+
+  const checkedNumbers = validateNumbers(proofreadSourceTexts, resultTexts)
+  const originalNumbers = validateNumbers(proofreadSourceTexts, items.map(item => item.translatedText))
+  for (const i of checkedNumbers.mismatchedIndices) {
+    // Use the same first-wins glossary source as enforceGlossaryTerms, not an optional caller index.
+    const expected = [...glossaryMap].find(([key]) => cleanKey(key) === cleanKey(proofreadSourceTexts[i]))?.[1]
+    if (expected && !shouldSkipGlossaryEntry(proofreadSourceTexts[i], expected)
+      && resultTexts[i].replace(/[®™©]/g, '') === expected.replace(/[®™©]/g, '')) continue
+    if (checkedNumbers.tamperedIndices.has(i) || !originalNumbers.mismatchedIndices.has(i)) {
+      resultTexts[i] = items[i].translatedText
+      uiLog('proofread', `参数校验回退: [${i + 1}] 保留校对前译文`)
     }
   }
 

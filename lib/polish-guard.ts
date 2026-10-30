@@ -305,21 +305,7 @@ export function validatePolishOutput(
     return { ok: false, reason: '限定词/否定极性丢失（detectPolarityBreach）' }
   }
 
-  // ④ 单位保留校验（validateNumbers 的补充——数字后的单位字符串必须在译文中出现）
-  //    防 "900MB/s" 润成 "900"（数字对了但单位丢了，validateNumbers 检不出——它只提带单位数字，
-  //    译文无单位时提取为空导致数量不等能检出，但 "900MB/s"→"900 GB" 数值相等会漏放）
-  const unitPattern = /(\d+(?:[.,]\d+)?)\s*(TB|GB|MB|KB|MB\/s|GB\/s|TB\/s|MHz|GHz|mGy)/gi
-  const srcUnits = new Set<string>()
-  let m: RegExpExecArray | null
-  const re = new RegExp(unitPattern.source, 'gi')
-  while ((m = re.exec(source)) !== null) {
-    srcUnits.add(m[2].toLowerCase())
-  }
-  for (const unit of srcUnits) {
-    if (!polished.toLowerCase().includes(unit)) {
-      return { ok: false, reason: `单位丢失（${unit} 未在译文中出现）` }
-    }
-  }
+  // Complete quantity/unit pairs are checked by validateNumbers above, including localized units.
 
   // ⑤ ™ 散弹校验（v12.4——润色 LLM 若模仿™分布输出逐字母™模式，一票否决回退）
   //   v12.6: hasTrademarkSpam 已扩充同符号紧邻重复判据（™™/®®/©©），CFexpress™™ 类事故

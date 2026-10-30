@@ -795,7 +795,7 @@ const LANGUAGE_MARKET_NOTES: Record<string, MarketNoteSegments> = {
     gaming: `ゲーミングは欧米より控えめ（「ゲーム体験を向上」「快適プレイ」）`,
     professional: `プロ向けは「安定稼働」「信頼性」重視`,
     consumer: `コンシューマー向けは「かんたん」「便利」`,
-    shared: `過度な誇張より実績·数値で訴求。「安心の5年保証」など保証·サポートを添えると好印象`,
+    shared: `過度な誇張より実績·数値で訴求。保証・サポートは原文に明記された範囲のみ表現する`,
   },
   'ko': {
     gaming: `게이밍 제품은 "프레임 방어""극한의 퍼포먼스" 등 성능 강조`,
@@ -810,7 +810,7 @@ const LANGUAGE_MARKET_NOTES: Record<string, MarketNoteSegments> = {
     shared: `Éviter le marketing agressif. Mentions légales et garantie obligatoires`,
   },
   'de': {
-    gaming: `Gaming → technische Überlegenheit sachlich darstellen ("Overclocking-Speicher mit Samsung B-Die")`,
+    gaming: `Gaming → technische Vorteile sachlich darstellen, nur mit Angaben aus dem Ausgangstext`,
     professional: `Professional → Präzision, Testsieger-Referenzen`,
     consumer: `Verbraucher → Preis-Leistung, Langlebigkeit`,
     shared: `Keine Übertreibungen, lieber technische Details`,
@@ -958,15 +958,15 @@ export const SCENE_CONSTRAINTS: Record<string, {
       ],
       'ja': [
         'Japanese: Product detail pages use です・ます polite form',
-        'Japanese: Moderate energetic expressions allowed (e.g. 「ゲームの遅延を完全カット」)',
-        'Japanese: Highlight warranty/service info (e.g. 「安心の5年保証」)',
+        'Japanese: Use moderate energy without adding absolute performance claims',
+        'Japanese: Preserve only the warranty and service facts explicitly present in the source',
       ],
       'ko': [
         'Korean: E-commerce copy emphasizes performance (e.g. "프레임 방어", "극한의 퍼포먼스")',
         'Korean: Highlight consumer priorities like value (가성비) and practicality (실속형)',
       ],
       'de': [
-        'German: E-commerce copy objectively presents tech advantages (e.g. "Overclocking-Speicher mit Samsung B-Die")',
+        'German: Present only the technical advantages and hardware facts stated in the source',
         'German: Highlight Preis-Leistung (value), Langlebigkeit (durability)',
       ],
       'fr': [
@@ -1874,14 +1874,15 @@ export function buildProofreadSystemPrompt(opts: {
   hasExpansionFlags?: boolean  // v11.5: true 时注入 EXPANSION_NOTE（expansionFlags 非空才有意义）
   hasProhibitedFix?: boolean   // v11.12: true 时注入 PROHIBITED_NOTE（prohibitedFixMap 非空才有意义）
   hasPolished?: boolean        // v12.3: true 时注入 POLISHED_NOTE（polishedIndices 非空才有意义）
+  scenePreset?: string
   sourceTexts?: string[]       // v12.27: 源文动态品类词检测（映射外多词品类词强制注入）
 }): string {
-  const { targetLang, productLine, useEnInstruction, glossaryHint = '', sourceLang, hasExpansionFlags = false, hasProhibitedFix = false, hasPolished = false, sourceTexts } = opts
+  const { targetLang, productLine, useEnInstruction, glossaryHint = '', sourceLang, hasExpansionFlags = false, hasProhibitedFix = false, hasPolished = false, sourceTexts, scenePreset } = opts
 
   const mission = IDENTITY_MISSION[targetLang] || IDENTITY_MISSION['en'] || ''
   const missionBlock = mission ? `\n[MISSION·${targetLang}]\n${mission}\n` : ''
   const proofreadPrompt = useEnInstruction ? PROOFREAD_SYSTEM_PROMPT : PROOFREAD_SYSTEM_PROMPT_ZH
-  const calibration = buildProofreadCalibration(targetLang, productLine, useEnInstruction)
+  const calibration = !scenePreset || scenePreset === 'ecommerce' ? buildProofreadCalibration(targetLang, productLine, useEnInstruction) : ''
   const calibrationBlock = calibration ? `\n${calibration}\n` : ''
   const langBlock = renderLangForProofread(targetLang, productLine, sourceTexts)
   // v12.18: 边界指令仅当 langBlock 非空时注入（无语种规范则边界无的放矢）
@@ -2347,6 +2348,15 @@ export function getStyleCard(
   //   使 isEcommerce && !productTone 恒假，整表从未进入 prompt）。风格职责由 productTone
   //   上方的「受众/用例」+ marketNote「市场语感」+ 技术卡承载，无需单独的营销调表。
 
+  if (isEcommerce) {
+    const channel = style === 'professional'
+      ? 'Professional channel: restrained, factual wording; no slang or hype. Overrides general product tone, not source meaning.'
+      : style === 'marketing'
+        ? 'Marketing channel: engaging, direct wording using only benefits supported by the source.'
+        : 'Standard channel: clear, neutral wording; preserve every source claim without embellishment.'
+    parts.push(`[CHANNEL] ${channel}`)
+  }
+
   // 3. FORMAT — 来自场景约束（仅保留 Format/Terminology，抑制 Expression 避免冲突）
   if (scenePreset) {
     const sceneFormat = getSceneConstraints(scenePreset, targetLang, true) // suppressExpression=true
@@ -2393,36 +2403,7 @@ export function getStyleCardSplit(
   style: string,
   scenePreset: string,
 ): string {
-  const toneParts: string[] = []
-
-  const isEcommerce = scenePreset === 'ecommerce'
-  // 技术语域卡（非详情页）
-  if (!isEcommerce && scenePreset) {
-    const techRegister = getTechnicalRegister(targetLang)
-    if (techRegister) toneParts.push(techRegister)
-  }
-  // 产品线 tone（详情页）
-  const productTone = isEcommerce ? getProductLineTone(productLine || null, targetLang) : ''
-  if (productTone) toneParts.push(productTone)
-  // 场景 FORMAT / DONT / MARKET NOTE（轻量，重试保留）
-  if (scenePreset) {
-    const sceneFormat = getSceneConstraints(scenePreset, targetLang, true)
-    if (sceneFormat) toneParts.push(sceneFormat.trim())
-  }
-  const langBlock = LANG_SPECIFIC[targetLang]
-  if (langBlock?.compliance) {
-    const dontLabel = isCJKTarget(targetLang) ? '[禁止]' : '[DONT]'
-    toneParts.push(`${dontLabel}\n${langBlock.compliance}`)
-  }
-  const marketNote = isEcommerce ? getMarketNote(targetLang, productLine) : ''
-  if (marketNote) {
-    const noteLabel = isCJKTarget(targetLang)
-      ? '[市场语感 — 与上方通用语气冲突时以此为准]'
-      : '[MARKET NOTE — overrides general tone above where market preference differs]'
-    toneParts.push(`${noteLabel}\n${marketNote}`)
-  }
-
-  return toneParts.length > 0 ? `\n[STYLE]\n${toneParts.join('\n\n')}` : ''
+  return getStyleCard(targetLang, productLine, style, scenePreset)
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2458,44 +2439,45 @@ export function getStyleCardSplit(
 export const TECHNICAL_REGISTER: Record<string, string> = {
   'default': `[Technical Register·Storage Industry]
 - Interface/protocol names stay in English, never transliterate: PCIe, NVMe, SATA, USB, USB-C, Thunderbolt, CFexpress, SD, microSD, DDR4, DDR5.
-- Version/generation per official spec: USB 3.2 Gen 1 / Gen 2 / Gen 2x2 (not "USB 3.0"), PCIe Gen4 x4 / Gen5 x4 (lowercase "x4"), CFexpress Type A / Type B, CFexpress 4.0.
+- Preserve source protocol names and versions, e.g. USB 3.2 Gen 1 / Gen 2x2; never upgrade, infer or complete specifications. Normalize spelling only when authorized by the glossary.
 - Speed/performance class codes stay as-is: V30 / V60 / V90, U1 / U3, Class 10, A1 / A2, 1667x / 2000x.
-- Units standard half-width with a space: 500 GB, 3,500 MB/s, MHz, MT/s, TBW, DWPD.
-- Spec/performance statements objective, no marketing modifiers (❌blazing-fast/ultimate ❌极致/超强 — ✅state the number directly). UI operation guidance & packaging front marketing copy not bound by this.
+- Preserve source numeric values and unit spacing; code handles connected units and locale formatting. Never change the measurement unit or rate suffix.
+- Use objective equivalents for technical descriptions and preserve all source meaning; do not add or delete benefits, qualifiers or performance claims. UI operation guidance and packaging front copy retain their source intent.
 - Reliability/endurance per industry standard & glossary: TBW, DWPD, MTBF, limited lifetime warranty, endurance rating.`,
 
   'zh-CN': `[技术语域·存储行业]
 - 接口/协议名保留英文不音译：PCIe、NVMe、SATA、USB、USB-C、Thunderbolt、CFexpress、SD、microSD、DDR4、DDR5。
-- 版本/代数命名按官方规范：USB 3.2 Gen 1 / Gen 2 / Gen 2x2（非"USB 3.0"）、PCIe Gen4 x4 / Gen5 x4（小写 x4）、CFexpress Type A / Type B、CFexpress 4.0。
+- Preserve source protocol names and versions, e.g. USB 3.2 Gen 1 / Gen 2x2; never upgrade, infer or complete specifications. Normalize spelling only when authorized by the glossary.
 - 速度/性能等级代号保留：V30 / V60 / V90、U1 / U3、Class 10、A1 / A2、1667x / 2000x。
-- 单位标准半角加空格：500 GB、3,500 MB/s、MHz、MT/s、TBW、DWPD。
-- 规格/性能陈述客观化，不加营销修饰（❌极致/超强/ blazing-fast，✅直接给数字/规格）。UI 操作指引、包装正面营销文案不受此限。
+- Preserve source numeric values and unit spacing; code handles connected units and locale formatting. Never change the measurement unit or rate suffix.
+- Use objective equivalents for technical descriptions and preserve all source meaning; do not add or delete benefits, qualifiers or performance claims. UI operation guidance and packaging front copy retain their source intent.
 - 可靠性/耐力术语按行业标准与术语库钦定：TBW、DWPD、MTBF、有限终身质保、耐久度。`,
 
   'zh-TW': `[技術語域·儲存行業]
 - 介面/協定名保留英文不音譯：PCIe、NVMe、SATA、USB、USB-C、Thunderbolt、CFexpress、SD、microSD、DDR4、DDR5。
-- 版本/世代命名按官方規範：USB 3.2 Gen 1 / Gen 2 / Gen 2x2（非"USB 3.0"）、PCIe Gen4 x4 / Gen5 x4（小寫 x4）、CFexpress Type A / Type B、CFexpress 4.0。
+- Preserve source protocol names and versions, e.g. USB 3.2 Gen 1 / Gen 2x2; never upgrade, infer or complete specifications. Normalize spelling only when authorized by the glossary.
 - 速度/效能等級代號保留：V30 / V60 / V90、U1 / U3、Class 10、A1 / A2、1667x / 2000x。
-- 單位標準半形加空格：500 GB、3,500 MB/s、MHz、MT/s、TBW、DWPD。
-- 規格/效能陳述客觀化，不加行銷修飾（❌極致/超強/blazing-fast，✅直接給數字/規格）。UI 操作指引、包裝正面行銷文案不受此限。
+- Preserve source numeric values and unit spacing; code handles connected units and locale formatting. Never change the measurement unit or rate suffix.
+- Use objective equivalents for technical descriptions and preserve all source meaning; do not add or delete benefits, qualifiers or performance claims. UI operation guidance and packaging front copy retain their source intent.
 - 可靠性/耐久術語按行業標準與術語庫欽定：TBW、DWPD、MTBF、有限終身保固、耐久度。`,
 
   'ja': `[技術レジスター·ストレージ業界]
 - インターフェース/プロトコル名は英語のまま（音訳しない）：PCIe、NVMe、SATA、USB、USB-C、Thunderbolt、CFexpress、SD、microSD、DDR4、DDR5。
-- バージョン/世代は公式仕様に従う：USB 3.2 Gen 1 / Gen 2 / Gen 2x2（"USB 3.0"ではない）、PCIe Gen4 x4 / Gen5 x4（小文字 x4）、CFexpress Type A / Type B、CFexpress 4.0。
+- Preserve source protocol names and versions, e.g. USB 3.2 Gen 1 / Gen 2x2; never upgrade, infer or complete specifications. Normalize spelling only when authorized by the glossary.
 - 速度/性能クラスコードはそのまま：V30 / V60 / V90、U1 / U3、Class 10、A1 / A2、1667x / 2000x。
-- 単位は半角スペース付き：500 GB、3,500 MB/s、MHz、MT/s、TBW、DWPD。
-- スペック/性能記述は客観的、マーケティング修飾語なし（❌ blazing-fast/極致 ❌ 最強、✅ 数値を直接記載）。UI 操作案内・パッケージ表面のマーケティングコピーは対象外。
+- Preserve source numeric values and unit spacing; code handles connected units and locale formatting. Never change the measurement unit or rate suffix.
+- Use objective equivalents for technical descriptions and preserve all source meaning; do not add or delete benefits, qualifiers or performance claims. UI operation guidance and packaging front copy retain their source intent.
 - 信頼性/耐久性は業界標準と用語集に従う：TBW、DWPD、MTBF、有限生涯保証、耐久性評価。`,
 
   'ko': `[기술 레지스터·스토리지 업계]
 - 인터페이스/프로토콜명은 영어 유지(음역 금지): PCIe, NVMe, SATA, USB, USB-C, Thunderbolt, CFexpress, SD, microSD, DDR4, DDR5.
-- 버전/세대는 공식 규격 준수: USB 3.2 Gen 1 / Gen 2 / Gen 2x2("USB 3.0" 아님), PCIe Gen4 x4 / Gen5 x4(소문자 x4), CFexpress Type A / Type B, CFexpress 4.0.
+- Preserve source protocol names and versions, e.g. USB 3.2 Gen 1 / Gen 2x2; never upgrade, infer or complete specifications. Normalize spelling only when authorized by the glossary.
 - 속도/성능 클래스 코드 유지: V30 / V60 / V90, U1 / U3, Class 10, A1 / A2, 1667x / 2000x.
-- 단위는 반각 스페이스 포함: 500 GB, 3,500 MB/s, MHz, MT/s, TBW, DWPD.
-- 사양/성능 기술은 객관적으로, 마케팅 수식어 금지(❌ blazing-fast/최강, ✅ 수치 직접 기재). UI 조작 안내·패키지 앞면 마케팅 문구는 제외.
+- Preserve source numeric values and unit spacing; code handles connected units and locale formatting. Never change the measurement unit or rate suffix.
+- Use objective equivalents for technical descriptions and preserve all source meaning; do not add or delete benefits, qualifiers or performance claims. UI operation guidance and packaging front copy retain their source intent.
 - 신뢰성/내구성은 업계 표준과 용어집 준수: TBW, DWPD, MTBF, 제한적 평생 보증, 내구성 등급.`,
 }
+
 
 /** 获取技术语域卡（按目标语言；无该语种时回退英文 default） */
 export function getTechnicalRegister(targetLang: string): string {

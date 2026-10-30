@@ -63,16 +63,9 @@ function removeZeroWidthChars(text: string): string {
 // ⚠️ 重要：™ (U+2122) 会被 NFKC 展开为 "TM" 两个ASCII字符，
 // 这会破坏商标符号的还原。因此在 NFKC 前保护 ™ 符号。
 
-// PUA 字符 U+E000，不会被 NFKC 影响
-const TM_PROTECTION_CHAR = ''
-
 function normalizeCompatibilityChars(text: string): string {
-  // 保护 ™ 符号：NFKC 会将 ™ (U+2122) 展开为 "TM" 两个ASCII字符
-  // 先用 PUA 占位符替换，NFKC 后还原
-  let result = text.replace(/™/g, TM_PROTECTION_CHAR)
-  result = result.normalize('NFKC')
-  result = result.replace(new RegExp(TM_PROTECTION_CHAR, 'g'), '™')
-  return result
+  // Normalize around trademark symbols so neither NFKC expansion nor placeholder collisions can alter them.
+  return text.split('™').map(part => part.normalize('NFKC')).join('™')
 }
 
 // ============================================================

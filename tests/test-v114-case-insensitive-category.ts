@@ -67,9 +67,8 @@ ok(detectCategory('Insert card into slot') === null, 'A6 句中 card 不误判',
 // A7: card reader 双品类词连用（card 非结尾）→ null（守卫 1 拦截）
 ok(detectCategory('card reader') === null, 'A7 双词连用不误判', String(detectCategory('card reader')))
 
-// A8: 混合大小写双品类 ssd enclosure → null（守卫 1：大小写命中不在结尾；
-//    官方写法也未命中——设计如此，非品名形态不走代码检出）
-ok(detectCategory('Lexar E300 ssd enclosure') === null, 'A8 混合双词不检（守卫拦）', String(detectCategory('Lexar E300 ssd enclosure')))
+// A8: Structural enclosure category outranks embedded SSD, independent of casing.
+ok(detectCategory('Lexar E300 ssd enclosure') === 'Enclosure', 'A8 Enclosure outranks embedded SSD', String(detectCategory('Lexar E300 ssd enclosure')))
 
 // ═══════════════════════════════════════════════════════════════
 // B. core-strip 大小写不敏感

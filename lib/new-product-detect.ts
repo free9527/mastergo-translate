@@ -132,9 +132,14 @@ export function stripTrademark(s: string): string {
   return s.replace(/[®™©]/g, '')
 }
 
+/** Normalize typography before product identity checks; preserve actual line breaks. */
+export function normalizeProductName(text: string): string {
+  return text.replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/[^\S\r\n]+/g, ' ').trim()
+}
+
 /** cleanKey 归一化（与 entity-masker/post-process 一致） */
 function cleanKey(s: string): string {
-  return s.toLowerCase().replace(/[®™©]/g, '').replace(/×/g, 'x').replace(/[-_]/g, ' ').replace(/\bgen\s+(\d+)\s*x\s*(\d+)\b/g, 'gen$1x$2').replace(/\s+/g, ' ').trim()
+  return normalizeProductName(s).toLowerCase().replace(/[®™©]/g, '').replace(/×/g, 'x').replace(/[-_]/g, ' ').replace(/\bgen\s+(\d+)\s*x\s*(\d+)\b/g, 'gen$1x$2').replace(/\s+/g, ' ').trim()
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -161,7 +166,7 @@ export interface ParsedProductName {
  */
 export function parseProductName(text: string): ParsedProductName | null {
   if (!text) return null
-  const t = text.trim()
+  const t = normalizeProductName(text)
   // 形态门 1：长度 + 字符集（允许 ®™© 与英寸符号 ”）
   if (t.length < 4 || t.length > 120) return null
   if (!NAME_SHAPE_RE.test(t)) return null
@@ -363,10 +368,10 @@ export function detectAdhocProductTerms(
 
     // 品类指纹门：整条必须含规则文档严格界定的核心品类词（SSD/Card/Reader…）
     // 裸系列名（"Lexar THOR Ultra"）或无品类词文本不判定为产品名
-    if (!detectCategory(text)) return
+    if (!detectCategory(normalizeProductName(text))) return
 
     // 候选术语 = 整条原文去®（与 CSV key 惯例对齐，吃 S1 短路 + 模糊匹配）
-    const term = stripTrademark(text).replace(/\s+/g, ' ').trim()
+    const term = stripTrademark(normalizeProductName(text))
     const ck = cleanKey(term)
     const seriesCk = cleanKey(parsed.series)
 
@@ -378,12 +383,7 @@ export function detectAdhocProductTerms(
     //   例：'Lexar ARES PCIe Gen4x4 M.2 2280 NVMe SSD' 整条不在 CSV → 检出（ARES 已知≠整条已知）
     const isBareSeries = cleanKey(text).split(' ').length === cleanKey(parsed.anchor + ' ' + parsed.series).split(' ').length
     if (!parsed.modelLed && isBareSeries && seriesCk && KNOWN_SERIES.has(seriesCk)) return
-    // 新颖性门 3：整条作为子串已出现在任何术语库 key/value 里 → 跳过
-    let substringHit = false
-    for (const gk of glossaryKeys) {
-      if (gk.includes(ck)) { substringHit = true; break }
-    }
-    if (substringHit) return
+    // A longer glossary name cannot supply this product's exact translation.
 
     if (found.has(ck)) {
       found.get(ck)!.hitIndices.push(i)
@@ -446,7 +446,7 @@ export function detectFallbackCandidates(
 
   const found = new Map<string, FallbackCandidate>()
   texts.forEach((text, i) => {
-    const trimmed = text.trim()
+    const trimmed = normalizeProductName(text)
     if (!trimmed) return
 
     // 触发条件 1：强锚点 — Lexar 或 Lexar Professional 开头（v12.30：® 降为可选，
@@ -465,11 +465,6 @@ export function detectFallbackCandidates(
     const term = stripTrademark(trimmed).replace(/\s+/g, ' ').trim()
     const ck = cleanKey(term)
     if (glossaryKeys.has(ck)) return
-    let substringHit = false
-    for (const gk of glossaryKeys) {
-      if (gk.includes(ck)) { substringHit = true; break }
-    }
-    if (substringHit) return
 
     if (found.has(ck)) {
       found.get(ck)!.hitIndices.push(i)

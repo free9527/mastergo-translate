@@ -51,7 +51,7 @@ out.push('A. 校准块分段注入（与翻译同源同段）')
 
 // gaming 产品线 → gaming 段 + shared
 const calGamingDe = buildProofreadCalibration('de', 'gaming_ssd', true)
-assert(calGamingDe.includes('Overclocking-Speicher'), 'A1 gaming_ssd de 校准含 gaming 段')
+assert(calGamingDe.includes('technische Vorteile sachlich darstellen'), 'A1 gaming_ssd de 校准含 gaming 段')
 assert(!calGamingDe.includes('Preis-Leistung'), 'A2 gaming_ssd de 校准不含 consumer 段')
 assert(calGamingDe.includes('Keine Übertreibungen'), 'A3 gaming_ssd de 校准含 shared 段')
 

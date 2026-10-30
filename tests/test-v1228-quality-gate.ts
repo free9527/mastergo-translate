@@ -142,11 +142,12 @@ interface CaseResult {
   tone?: number
   mustContainOk?: boolean
   error?: string
+  evaluated?: boolean
 }
 const results: Record<string, CaseResult> = {}
 
 if (LIVE_MODE) {
-  console.log('\nC. 真实门禁（真实 API + judge 评分）')
+  console.log('\nC. 首译门禁（真实 API + judge 评分，不含 UI 校对/润色）')
   console.log('  （本模式跑真实管道+judge，耗时较长；fidelity 掉>0.2 只标 ⚠️ 不阻塞）')
 } else {
   console.log('\nC. 真实门禁——跳过（未配置 LEXAR_LIVE_API_KEY/URL，结构门禁模式）')
@@ -202,7 +203,7 @@ async function runLiveGate(): Promise<void> {
     for (const g of allEntries) {
       const t = g.translations[targetLang]
       if (t && !full.has(g.source)) full.set(g.source, t)
-      if (g.translations['en'] && !en.has(g.source)) en.set(g.source, g.translations['en'])
+      if (t && !en.has(g.source)) en.set(g.source, t)
     }
     for (const g of allEntries) {
       const tgt = g.translations[targetLang]
@@ -220,7 +221,7 @@ async function runLiveGate(): Promise<void> {
       // 真实翻译（单条批次）
       const config = {
         apiKey: API_KEY, apiUrl: API_URL, model: process.env.LEXAR_LIVE_MODEL || 'gpt-5.5',
-        scenePreset: c.scenePreset, translationStyle: 'standard',
+        scenePreset: c.scenePreset, manualProductLine: c.productLine || 'none', translationStyle: 'standard',
         enableProofread: false, enablePolish: false, enableBestOfN: false, enableAiOptimize: true,
       } as Parameters<typeof translateBatch>[3]
       const { full: glossaryMap, en: glossaryEnMap } = buildDualView(c.targetLang)
@@ -237,11 +238,13 @@ async function runLiveGate(): Promise<void> {
 
       results[c.id] = {
         id: c.id, translation,
-        fidelity: judgeScores.fidelity, naturalness: judgeScores.naturalness, tone: judgeScores.tone,
+        fidelity: judgeScores?.fidelity, naturalness: judgeScores?.naturalness, tone: judgeScores?.tone,
+        evaluated: judgeScores !== null,
         mustContainOk: mustContainOk && glossaryOk,
       }
+      if (!judgeScores) warn(`[${c.id}] judge unavailable: unscored, excluded from baseline`)
       const flag = mustContainOk && glossaryOk ? '✅' : '❌'
-      console.log(`  ${flag} [${c.id}] fidelity=${judgeScores.fidelity} nat=${judgeScores.naturalness} tone=${judgeScores.tone}${!mustContainOk || !glossaryOk ? ' (expect 未满足)' : ''}`)
+      console.log(`  ${flag} [${c.id}] fidelity=${judgeScores?.fidelity ?? 'unscored'} nat=${judgeScores?.naturalness ?? 'unscored'} tone=${judgeScores?.tone ?? 'unscored'}${!mustContainOk || !glossaryOk ? ' (expect 未满足)' : ''}`)
     } catch (e) {
       results[c.id] = { id: c.id, error: (e as Error).message.slice(0, 120) }
       warn(`[${c.id}] 真实门禁异常: ${(e as Error).message.slice(0, 80)}`)
@@ -273,6 +276,9 @@ async function runLiveGate(): Promise<void> {
   }
 
   // ── 更新基线（--update-baseline，人工确认后）──
+  if (updateBaseline && Object.values(results).some(r => !r.evaluated || r.mustContainOk !== true)) {
+    throw Error('Baseline update refused: every case must be scored and pass deterministic checks')
+  }
   if (updateBaseline) {
     const newBaseline = {
       _meta: {
@@ -294,10 +300,8 @@ async function runLiveGate(): Promise<void> {
 // ============================================================
 async function judgeTranslation(
   source: string, translation: string, targetLang: string, reference?: string,
-): Promise<{ fidelity: number; naturalness: number; tone: number }> {
-  // judge 缺省中位分（无 key 或异常时的保守兜底——judge 是参考信号，缺省不阻塞）
-  const fallback = { fidelity: 3, naturalness: 3, tone: 3 }
-  if (!LIVE_MODE) return fallback
+): Promise<{ fidelity: number; naturalness: number; tone: number } | null> {
+  if (!LIVE_MODE) return null
   try {
     const prompt = `You are a ${targetLang} native localization judge. Score the translation 1-5 on three axes.
 Source: ${source}
@@ -316,21 +320,18 @@ Output ONLY JSON: {"fidelity":<1-5>,"naturalness":<1-5>,"tone":<1-5>}
         response_format: { type: 'json_object' },
       }),
     })
+    if (!res.ok) return null
     const data = await res.json() as { choices?: Array<{ message?: { content?: string } }> }
     const content = data.choices?.[0]?.message?.content || ''
     const m = content.match(/\{[\s\S]*\}/)
     if (m) {
       const p = JSON.parse(m[0]) as { fidelity?: number; naturalness?: number; tone?: number }
-      return {
-        fidelity: clamp15(p.fidelity), naturalness: clamp15(p.naturalness), tone: clamp15(p.tone),
-      }
+      const scores = [p.fidelity, p.naturalness, p.tone]
+      if (!scores.every(n => typeof n === 'number' && Number.isFinite(n) && n >= 1 && n <= 5)) return null
+      return { fidelity: p.fidelity!, naturalness: p.naturalness!, tone: p.tone! }
     }
-  } catch { /* judge 失败静默回退中位分 */ }
-  return fallback
-}
-function clamp15(n: number | undefined): number {
-  if (typeof n !== 'number' || isNaN(n)) return 3
-  return Math.max(1, Math.min(5, Math.round(n)))
+  } catch { /* unavailable judge is unscored, not a synthetic middle score */ }
+  return null
 }
 
 // ============================================================
@@ -355,6 +356,7 @@ async function main(): Promise<void> {
     for (const c of golden.cases) {
       const r = results[c.id]
       if (r?.error) reportLines.push(`  [${c.id}] 异常: ${r.error}`)
+      else if (r && !r.evaluated) reportLines.push(`  [${c.id}] judge=unscored mustContain=${r.mustContainOk ? 'OK' : 'FAIL'}`)
       else if (r) reportLines.push(`  [${c.id}] fidelity=${r.fidelity} nat=${r.naturalness} tone=${r.tone} mustContain=${r.mustContainOk ? 'OK' : 'FAIL'}`)
     }
     reportLines.push('')

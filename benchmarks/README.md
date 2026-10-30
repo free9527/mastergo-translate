@@ -46,3 +46,9 @@ The analyzer reports per-arm count, successful item count, quality-pass count, a
 ## Quality checks
 
 `checkQuality` deterministically compares source and output for numeric tokens, placeholders, trademark marks, and newline counts. It also accepts an optional `isUntranslated(source, output, targetLanguage)` callback for language-specific untranslated detection. The callback can return `true` or a redaction-safe issue message.
+
+## Evidence boundaries
+
+`tests/test-v1228-quality-gate.ts` evaluates first translation only, not the full UI pipeline. An unavailable or malformed judge response is unscored and cannot be saved as a baseline. Deterministic checks and judge scores are separate evidence.
+
+`tests/test-v1262-translation-safety.ts` exercises the real UI translation-to-proofread flow with local responses and verifies quantity rollback. It also tests normalization, exact TM reuse, unit preservation, prompt settings and judge failures. It makes no live calls and is not a linguistic quality benchmark. `tests/test-v1261-product-routing.ts` verifies product routing; its synthetic fixtures are not incident-state evidence.

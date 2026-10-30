@@ -171,7 +171,7 @@ console.log('═══ A 择优资格（形式锁条目免判定）═══')
   const stats = { dualRun: 0, judged: 0, pickedB: 0 }
   const statsOut = { add: (s: { dualRun: number; judged: number; pickedB: number }) => { stats.dualRun += s.dualRun; stats.judged += s.judged; stats.pickedB += s.pickedB } }
   enqueueResponse(translationsJson(['Erlebe grenzenlose Freiheit bei jedem Shooting mit dieser Karte']))
-  enqueueResponse(translationsJson(['Genieße uneingeschränkte kreative Freiheit bei jedem Fotoshooting']))
+  enqueueResponse(translationsJson(['Genieße uneingeschränkte kreative Freiheit mit dieser Karte bei jedem Fotoshooting']))
   // 择优判定响应（坑 13 对齐：消费序=双跑 A + 双跑 B + 判定——第一条残留从本段清空）
   enqueueResponse('{"verdicts":[{"i":1,"pick":2,"factsIntact":true,"reason":"natürlicher"}]}')
   const r = await translateBatch(
@@ -182,7 +182,7 @@ console.log('═══ A 择优资格（形式锁条目免判定）═══')
     true, statsOut,
   )
   assert(stats.judged === 1, 'A6 营销长句进择优（judged=1）', `judged=${stats.judged}`)
-  assert(r[0] === 'Genieße uneingeschränkte kreative Freiheit bei jedem Fotoshooting' || r[0] === 'Erlebe grenzenlose Freiheit bei jedem Shooting mit dieser Karte', 'A6 择优生效（swap 映射后选 LLM 判定较优者）')
+  assert(r[0] === 'Genieße uneingeschränkte kreative Freiheit mit dieser Karte bei jedem Fotoshooting' || r[0] === 'Erlebe grenzenlose Freiheit bei jedem Shooting mit dieser Karte', 'A6 择优生效（swap 映射后选 LLM 判定较优者）')
   assert(stats.judged === 1 && stats.pickedB <= 1, 'A6b 统计计数（pickedB=0 或 1 取决于 swap）')
   assert(mockCalls.length === 3, 'A6 双跑 2 次 + 择优判定 1 次', `calls=${mockCalls.length}`)
 }

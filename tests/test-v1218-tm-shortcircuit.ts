@@ -115,14 +115,14 @@ console.log('\nB. 数字防线边界（规格错位防线——短路层最高�
   assert(m.size === 0, 'B1 数字不等（2TB vs 4TB）→ 不短路（规格错位防线）')
 }
 
-// B2 数字集合相等但语序不同 → 短路（防线不误伤）
+// B2 Same words and numbers in another order are references, never exact reuse.
 {
   const m = retrieveTMShortCircuit(
     ['Read speed 1050MB/s and write 1000MB/s'],
     [mkCorr('Write 1000MB/s and read speed 1050MB/s', 'SPEEDS_DE')],
     'de',
   )
-  assert(m.get(0) === 'SPEEDS_DE', 'B2 数字集合相等（顺序不同）→ 短路不误伤')
+  assert(m.size === 0, 'B2 reordered source never bypasses generation')
 }
 
 // B3 千分位/小数数字归一（数字集合按原始 token 比较——10,000 ≠ 10000 是规格防线

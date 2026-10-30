@@ -311,7 +311,7 @@ async function runD() {
 {
   enqueueResponse('{"polished":[{"i":1,"text":"Performansı en üst düzeye çıkarır","changes":[{"issueIndex":0,"before":"c","after":"d"}]}]}')
   const issuesMap = new Map([[0, [
-    { type: 'calque' as const, span: 'Performance', suggestion: 'Performans' },
+    { type: 'calque' as const, span: 'Performans bir sonraki seviyeye taşır', suggestion: 'Performansı en üst düzeye çıkarır' },
   ]]])
   const results = await polishBatch(
     ['Take It Higher ↵ Performance for the next level of your game'],
@@ -385,7 +385,7 @@ async function runD() {
 // D3: changes 数量超限 → 回退
 {
   enqueueResponse('{"polished":[{"i":1,"text":"bis zu 4-mal schneller","changes":[{"issueIndex":0,"before":"a","after":"b"},{"issueIndex":1,"before":"c","after":"d"}]}]}')
-  const issuesMap = new Map([[0, [{ type: 'calque' as const, span: 'Fast', suggestion: 'schneller' }]]])
+  const issuesMap = new Map([[0, [{ type: 'calque' as const, span: 'beeindruckende schneller Gaming', suggestion: 'schneller' }]]])
   const results = await polishBatch(
     ['Fast speeds for gaming'],
     ['beeindruckende schneller Gaming'],
@@ -400,7 +400,7 @@ async function runD() {
 // D4: 硬锁失败（数字被改）→ 回退
 {
   enqueueResponse('{"polished":[{"i":1,"text":"bis zu 800MB/s","changes":[{"issueIndex":0,"before":"900","after":"800"}]}]}')
-  const issuesMap = new Map([[0, [{ type: 'calque' as const, span: 'x', suggestion: 'y' }]]])
+  const issuesMap = new Map([[0, [{ type: 'calque' as const, span: 'Lesegeschwindigkeit', suggestion: 'Lesetempo' }]]])
   const results = await polishBatch(
     ['Read speed up to 900MB/s'],
     ['Lesegeschwindigkeit bis zu 900MB/s'],

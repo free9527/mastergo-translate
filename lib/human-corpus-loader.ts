@@ -4,7 +4,7 @@
  * 职责：把内联语料库（human-corpus-data.ts，源文 × 多语种人工钦定对照）
  *   转为 TranslationCorrection[]（origin='user'，最高优先级人工验收源），
  *   供 TM 短路（retrieveTMShortCircuit）/ TM few-shot（retrieveTM）消费——
- *   人工钦定译文直接落地（≥0.99）或作为 few-shot 范例（≥0.90）。
+ *   人工钦定译文仅同源句顺序精确匹配时直接落地或作为 few-shot 范例（≥0.90）。
  *
  * 为什么是行业标准第一杠杆（TextUnited/Smartling 实锤）：
  *   「The real operational value is not generated language. It is reusable approved language.」
@@ -12,7 +12,7 @@
  *
  * 安全闸（与 retrieveTMShortCircuit 既有防线完全对齐）：
  *   ⛔ origin='user' 单源——人工钦定与用户手动验收同级（都是人工背书的质量锚点）
- *   ⛔ 相似度 ≥0.99 + 数字集合完全相等（tmSimilarity 内建规格错位防线）
+ *   ⛔ 直接落地要求同源句顺序精确匹配；相似句仅作参考
  *   ⛔ targetLang 严格相等
  *   ⛔ 调用方负责【术语过期防线】：落地前过 enforceGlossaryTerms（App.vue:2010 既有）
  *   ⛔ v12.58 数字守卫（HANDOFF 264 行 TODO 落地）：源文/译文数字多重集须相等。
